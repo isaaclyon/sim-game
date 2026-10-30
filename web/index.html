@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>sim-game</title>
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #0f1419; }
+      canvas { display: block; }
+      #hud {
+        position: fixed; top: 12px; left: 12px; padding: 10px 12px; border-radius: 8px;
+        background: rgba(15, 20, 25, 0.85); color: #c9d4df;
+        font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre;
+        pointer-events: none;
+      }
+      #toolbar { position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%); display: flex; gap: 6px; }
+      #toolbar button {
+        background: #1c2530; color: #c9d4df; border: 1px solid #2e3a47; border-radius: 6px;
+        padding: 6px 10px; font: 12px ui-monospace, Menlo, monospace; cursor: pointer;
+      }
+      #toolbar button.active { background: #2f6fb0; border-color: #4a8bd0; color: white; }
+    </style>
+  </head>
+  <body>
+    <div id="hud">loading…</div>
+    <div id="toolbar">
+      <button data-speed="0">pause</button>
+      <button data-speed="1" class="active">1×</button>
+      <button data-speed="3">3×</button>
+      <button data-speed="10">10×</button>
+      <button id="spawn">+5k cars</button>
+      <button id="road">road tool (R)</button>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

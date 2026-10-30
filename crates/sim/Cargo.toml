@@ -1,0 +1,8 @@
+[package]
+name = "sim"
+description = "Engine-agnostic city simulation core"
+edition.workspace = true
+version.workspace = true
+publish.workspace = true
+
+[dependencies]
