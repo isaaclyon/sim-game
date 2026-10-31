@@ -1,6 +1,7 @@
 # 0007. Three.js rendering approach
 
-- Status: Accepted
+- Status: Deprecated (2026-10-30). These choices are easy to reverse, so they don't meet the bar
+  in [AGENTS.md](AGENTS.md). The notes now live at the top of `web/src/renderer.ts`.
 - Date: 2026-10-30
 
 ## Context

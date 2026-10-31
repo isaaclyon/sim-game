@@ -12,7 +12,8 @@ rewriting history; mark the old one `Superseded by NNNN`.
 | [0004](0004-deterministic-fixed-timestep-sim.md) | Deterministic fixed-timestep sim | Accepted |
 | [0005](0005-data-oriented-storage.md) | Data-oriented storage with append-only ids | Accepted |
 | [0006](0006-agents-pathfinding-and-traffic-model.md) | Agents, pathfinding and traffic model | Accepted |
-| [0007](0007-three-js-rendering-approach.md) | Three.js rendering approach | Accepted |
+| [0007](0007-three-js-rendering-approach.md) | Three.js rendering approach | Deprecated |
 | [0008](0008-permissive-licenses-only.md) | Permissive-license dependencies only | Accepted |
 
-New ADRs copy the shape of the existing ones: Status, Context, Decision, Consequences.
+ADRs are only for decisions that are hard to reverse. See [AGENTS.md](AGENTS.md) for when to
+write one and how.

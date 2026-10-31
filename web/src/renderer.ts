@@ -1,5 +1,14 @@
 // Three.js scene: roads as line segments, vehicles as one instanced box mesh. Sim (x, y) maps
 // to world (x, z) with y up.
+//
+// Current choices, all cheap to change:
+// - WebGLRenderer. WebGPURenderer is still experimental; write new shaders in TSL so switching
+//   later is easy.
+// - camera-controls for the camera (MapControls was cruder at damping, bounds, zoom-to-cursor).
+// - Vehicle matrices are written on the CPU each frame. If that becomes the bottleneck, move
+//   interpolation and orientation into a vertex shader fed by the raw snapshot.
+// - Picking is a ray against the ground plane. Add three-mesh-bvh once we pick against meshes.
+// - Road meshes will likely want BatchedMesh, bezierjs for curves and earcut for polygons.
 
 import * as THREE from 'three';
 import CameraControls from 'camera-controls';
