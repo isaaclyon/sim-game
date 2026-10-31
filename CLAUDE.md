@@ -2,6 +2,7 @@
 
 Architecture decisions and their reasons live in `docs/adrs/`. Read the index before changing
 architecture. If a change contradicts an ADR, say so and write a superseding ADR.
+What to build next and why lives in `docs/ROADMAP.md`. Work on the current milestone unless told otherwise.
 
 ## Architecture
 - The sim (`crates/sim`) is the source of truth. The frontend never computes game state; it sends
