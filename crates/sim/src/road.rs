@@ -4,7 +4,7 @@
 //! `2k + 1` (b→a). Lanes are append-only, so a `LaneId` stays valid for the life of the world.
 //! Roads are straight segments for now; curves will replace `lane_point` without changing ids.
 
-use std::collections::HashSet;
+use std::collections::BTreeSet;
 
 use crate::rng::Rng;
 
@@ -28,7 +28,7 @@ pub struct RoadNetwork {
     // CSR adjacency: lanes leaving node n are out_lanes[out_start[n]..out_start[n + 1]].
     out_start: Vec<u32>,
     out_lanes: Vec<LaneId>,
-    roads: HashSet<(NodeId, NodeId)>,
+    roads: BTreeSet<(NodeId, NodeId)>,
     adjacency_dirty: bool,
     /// Bumped on every topology change so the renderer knows when to re-upload roads.
     pub version: u32,
@@ -118,7 +118,10 @@ impl RoadNetwork {
     }
 
     pub fn out_lanes(&self, node: NodeId) -> &[LaneId] {
-        debug_assert!(!self.adjacency_dirty, "call rebuild_adjacency after editing roads");
+        debug_assert!(
+            !self.adjacency_dirty,
+            "call rebuild_adjacency after editing roads"
+        );
         let n = node as usize;
         &self.out_lanes[self.out_start[n] as usize..self.out_start[n + 1] as usize]
     }
@@ -127,12 +130,18 @@ impl RoadNetwork {
     pub fn lane_point(&self, lane: LaneId, dist: f32, side: f32) -> (f32, f32) {
         let l = lane as usize;
         let (a, b) = (self.lane_from[l] as usize, self.lane_to[l] as usize);
-        let (dx, dy) = (self.node_x[b] - self.node_x[a], self.node_y[b] - self.node_y[a]);
+        let (dx, dy) = (
+            self.node_x[b] - self.node_x[a],
+            self.node_y[b] - self.node_y[a],
+        );
         let len = self.lane_len[l].max(1e-3);
         let t = (dist / len).clamp(0.0, 1.0);
         let (nx, ny) = (dx / len, dy / len);
         // (ny, -nx) is the right-hand normal of the travel direction.
-        (self.node_x[a] + dx * t + ny * side, self.node_y[a] + dy * t - nx * side)
+        (
+            self.node_x[a] + dx * t + ny * side,
+            self.node_y[a] + dy * t - nx * side,
+        )
     }
 
     /// Direction of travel along `lane`, radians from +x.
@@ -168,15 +177,23 @@ impl RoadNetwork {
             }
         }
         let id = |c: u32, r: u32| r * cols + c;
-        let is_avenue = |i: u32| i % 5 == 0;
+        let is_avenue = |i: u32| i.is_multiple_of(5);
         for r in 0..rows {
             for c in 0..cols {
                 if c + 1 < cols && (is_avenue(r) || rng.unit() > DROP_CHANCE) {
-                    let speed = if is_avenue(r) { AVENUE_SPEED } else { STREET_SPEED };
+                    let speed = if is_avenue(r) {
+                        AVENUE_SPEED
+                    } else {
+                        STREET_SPEED
+                    };
                     net.add_road(id(c, r), id(c + 1, r), speed);
                 }
                 if r + 1 < rows && (is_avenue(c) || rng.unit() > DROP_CHANCE) {
-                    let speed = if is_avenue(c) { AVENUE_SPEED } else { STREET_SPEED };
+                    let speed = if is_avenue(c) {
+                        AVENUE_SPEED
+                    } else {
+                        STREET_SPEED
+                    };
                     net.add_road(id(c, r), id(c, r + 1), speed);
                 }
             }

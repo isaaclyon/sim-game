@@ -1,0 +1,12 @@
+# Determinism guards for the sim (ADR 0004). Hash collections iterate in a random order per
+# process, and wall-clock reads differ between runs; either can desync `World::state_hash`.
+# Use BTreeMap/BTreeSet or Vec-indexed storage instead. Opt out with a scoped
+# `#[allow(clippy::disallowed_*)]` and a comment only where state is not affected (e.g. benches).
+disallowed-types = [
+  { path = "std::collections::HashMap", reason = "iteration order is random; use BTreeMap or Vec storage (ADR 0004)" },
+  { path = "std::collections::HashSet", reason = "iteration order is random; use BTreeSet or Vec storage (ADR 0004)" },
+]
+disallowed-methods = [
+  { path = "std::time::Instant::now", reason = "wall clock breaks determinism; use the fixed dt (ADR 0004)" },
+  { path = "std::time::SystemTime::now", reason = "wall clock breaks determinism; use the fixed dt (ADR 0004)" },
+]

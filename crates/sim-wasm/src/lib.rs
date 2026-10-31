@@ -28,8 +28,14 @@ pub struct SimStats {
 impl Sim {
     #[wasm_bindgen(constructor)]
     pub fn new(seed: u32, cols: u32, rows: u32) -> Sim {
-        let cfg = Config { seed: seed as u64, ..Config::default() };
-        Sim { world: World::generate(cfg, cols, rows), buf: Vec::new() }
+        let cfg = Config {
+            seed: seed as u64,
+            ..Config::default()
+        };
+        Sim {
+            world: World::generate(cfg, cols, rows),
+            buf: Vec::new(),
+        }
     }
 
     /// Sim seconds per tick, so the frontend clock can't drift from the sim's.
