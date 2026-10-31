@@ -48,6 +48,12 @@ Los Angeles County would be about 600k.
 - Profile at the time of writing (native, steady state): moving cars 28%, route and detour
   search 24%, exit-room checks 18%, junction requests and conflicts 13%, tick overhead 9%,
   signals 4%, finding the waiting car 3%.
+- The exit-room share is not a memory problem. Caching each lane's last-car position, speed and
+  car count, so the check never touches the queue or the agent arrays, changed nothing
+  measurable (6.3 ms before and after, same machine, interleaved runs). The sampled time there
+  is likely skid from the queue walk in `Junctions::request` around it.
+- Run-to-run noise on one machine is about 5-15% (the same build measured 6.1-7.8 ms across a
+  session), so compare builds with interleaved runs, not against numbers in this file.
 - Snapshots grow to about 4 MB per tick at 250k cars, so culled or delta snapshots (M7) are
   required, not optional, to reach 10x in the browser.
 - Native and WASM runs of the same seed already differ slightly, most likely from math library
