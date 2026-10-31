@@ -10,6 +10,9 @@ if [[ "${1:-}" == "--fix" ]]; then
   (cd web && npx biome check --write .)
 fi
 
+echo "==> secrets: gitleaks (full history)"
+command -v gitleaks >/dev/null || { echo "gitleaks not installed: brew install gitleaks" >&2; exit 1; }
+gitleaks git --redact --no-banner --log-level warn .
 echo "==> rust: fmt";      cargo fmt --all --check
 echo "==> rust: clippy";   cargo clippy --workspace --all-targets --locked -- -D warnings
 echo "==> rust: clippy (wasm32)"
