@@ -63,6 +63,13 @@ despawns, and the road tool feels good with snapping, curves and bulldozing.
 - Citizens get a home and a workplace. Trips run home → work → shop → home on a daily
   schedule, replacing random node-to-node trips. **ADR** for the citizen record vs. trip agent
   split.
+- Route choice that feels human:
+  - Road classes: trips use local streets to reach a main road, ride it, then leave it near the
+    destination. Routing searches the main-road layer for the middle of long trips, which is
+    also faster.
+  - Some randomness: each driver adds a small seeded random change to route costs, so cars
+    don't all pick the same "best" route and traffic spreads out. It replaces or tunes the
+    per-queued-car delay from ADR 0009's work.
 - Citizen inspector: click a car to see the citizen's name, home, job and destination; a follow
   camera rides along.
 - Demand: a simple R/C/I balance decides what gets built next.

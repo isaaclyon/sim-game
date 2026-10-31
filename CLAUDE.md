@@ -17,6 +17,8 @@ What to build next and why lives in `docs/ROADMAP.md`. Work on the current miles
 ## Snapshot formats
 - Agents: `[x, y, heading, speed_ratio]` per agent (`SNAPSHOT_STRIDE`), speed_ratio < 0 = hidden.
 - Roads: `[ax, ay, bx, by, speed_limit]` per road.
+- Signals: `[x, y, heading, state]` per signalised approach (`SIGNAL_STRIDE`), state 0 = red,
+  1 = green, 2 = protected-left green.
 Change both sides (Rust writer, `protocol.ts` doc, `renderer.ts` reader) together.
 
 ## Checks before finishing a change

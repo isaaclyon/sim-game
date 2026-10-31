@@ -11,10 +11,12 @@ rewriting history; mark the old one `Superseded by NNNN`.
 | [0003](0003-sim-and-rendering-are-separate.md) | Sim and rendering are separate: commands in, snapshots out | Accepted |
 | [0004](0004-deterministic-fixed-timestep-sim.md) | Deterministic fixed-timestep sim | Accepted |
 | [0005](0005-data-oriented-storage.md) | Data-oriented storage with append-only ids | Accepted |
-| [0006](0006-agents-pathfinding-and-traffic-model.md) | Agents, pathfinding and traffic model | Accepted |
+| [0006](0006-agents-pathfinding-and-traffic-model.md) | Agents, pathfinding and traffic model | Accepted; pathfinding superseded by 0010 |
 | [0007](0007-three-js-rendering-approach.md) | Three.js rendering approach | Deprecated |
 | [0008](0008-permissive-licenses-only.md) | Permissive-license dependencies only | Accepted |
-| [0009](0009-intersection-rules.md) | Intersection rules | Accepted |
+| [0009](0009-intersection-rules.md) | Intersection rules | Accepted; ms/tick target superseded by 0011 |
+| [0010](0010-congestion-aware-routing-and-detours.md) | Congestion-aware routing and detours | Accepted |
+| [0011](0011-absolute-tick-budget.md) | Absolute tick budget for traffic | Accepted |
 
 ADRs are only for decisions that are hard to reverse. See [AGENTS.md](AGENTS.md) for when to
 write one and how.

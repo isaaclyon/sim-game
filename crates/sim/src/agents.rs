@@ -33,8 +33,10 @@ pub struct Agents {
     /// Lanes for the current trip. Each agent keeps its Vec so capacity is reused across trips.
     pub path: Vec<Vec<LaneId>>,
     pub path_idx: Vec<u32>,
-    /// Consecutive ticks spent blocked at the end of a lane.
+    /// Consecutive ticks spent blocked at the end of a lane or a stop line.
     pub stuck_ticks: Vec<u16>,
+    /// Allowed through the junction at the end of the current lane.
+    pub cleared: Vec<bool>,
 }
 
 impl Agents {
@@ -56,6 +58,7 @@ impl Agents {
         self.path.push(Vec::new());
         self.path_idx.push(0);
         self.stuck_ticks.push(0);
+        self.cleared.push(false);
         (self.state.len() - 1) as AgentId
     }
 }

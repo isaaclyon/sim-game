@@ -22,5 +22,15 @@ export interface Stats {
 export type FromWorker =
   /** `segments` is `[ax, ay, bx, by, speedLimit]` per road. */
   | { type: 'roads'; segments: Float32Array; bounds: [number, number, number, number] }
-  /** `agents` is `[x, y, heading, speedRatio]` per agent id; speedRatio < 0 means hidden. */
-  | { type: 'frame'; agents: Float32Array; stats: Stats; tickMs: number };
+  /**
+   * `agents` is `[x, y, heading, speedRatio]` per agent id; speedRatio < 0 means hidden.
+   * `signals` is `[x, y, heading, state]` per signalised approach, at its stop line; state is
+   * 0 = red, 1 = green, 2 = protected-left green.
+   */
+  | {
+      type: 'frame';
+      agents: Float32Array;
+      signals: Float32Array;
+      stats: Stats;
+      tickMs: number;
+    };
