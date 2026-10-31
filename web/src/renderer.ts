@@ -10,8 +10,8 @@
 // - Picking is a ray against the ground plane. Add three-mesh-bvh once we pick against meshes.
 // - Road meshes will likely want BatchedMesh, bezierjs for curves and earcut for polygons.
 
-import * as THREE from 'three';
 import CameraControls from 'camera-controls';
+import * as THREE from 'three';
 
 CameraControls.install({ THREE });
 
@@ -95,7 +95,10 @@ export class Renderer {
       this.roads.geometry.dispose();
       this.roads.geometry = geom;
     } else {
-      this.roads = new THREE.LineSegments(geom, new THREE.LineBasicMaterial({ vertexColors: true }));
+      this.roads = new THREE.LineSegments(
+        geom,
+        new THREE.LineBasicMaterial({ vertexColors: true }),
+      );
       this.scene.add(this.roads);
     }
 
@@ -108,17 +111,23 @@ export class Renderer {
       this.controls.maxDistance = span * 2;
       const pad = span * 0.25;
       this.controls.setBoundary(
-        new THREE.Box3(new THREE.Vector3(x0 - pad, 0, y0 - pad), new THREE.Vector3(x1 + pad, 0, y1 + pad)),
+        new THREE.Box3(
+          new THREE.Vector3(x0 - pad, 0, y0 - pad),
+          new THREE.Vector3(x1 + pad, 0, y1 + pad),
+        ),
       );
     }
   }
 
-  private ensureCars(count: number) {
-    if (this.cars && this.cars.count >= count) return;
+  private ensureCars(count: number): THREE.InstancedMesh {
+    // `count` is how many instances were drawn last frame; `instanceMatrix.count` is capacity.
+    if (this.cars && this.cars.instanceMatrix.count >= count) return this.cars;
     const capacity = Math.max(count, 1024) * 1.5;
     if (this.cars) {
       this.scene.remove(this.cars);
       this.cars.dispose();
+      this.cars.geometry.dispose();
+      (this.cars.material as THREE.Material).dispose();
     }
     const geom = new THREE.BoxGeometry(CAR_LENGTH, CAR_HEIGHT, CAR_WIDTH);
     geom.translate(0, CAR_HEIGHT / 2, 0);
@@ -126,6 +135,7 @@ export class Renderer {
     this.cars.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.cars.frustumCulled = false;
     this.scene.add(this.cars);
+    return this.cars;
   }
 
   /**
@@ -134,8 +144,7 @@ export class Renderer {
    */
   drawAgents(prev: Float32Array | undefined, curr: Float32Array, t: number) {
     const count = curr.length / STRIDE;
-    this.ensureCars(count);
-    const cars = this.cars!;
+    const cars = this.ensureCars(count);
     let drawn = 0;
     for (let i = 0; i < count; i++) {
       const o = i * STRIDE;

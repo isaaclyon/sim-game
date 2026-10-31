@@ -11,3 +11,6 @@ crate-type = ["cdylib"]
 [dependencies]
 sim = { path = "../sim" }
 wasm-bindgen = "0.2"
+
+[lints]
+workspace = true

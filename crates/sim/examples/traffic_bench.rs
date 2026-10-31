@@ -4,6 +4,9 @@
 //!
 //! The browser runs 10 ticks per sim second, so a tick under 10 ms leaves room for 10x speed.
 
+// Benchmarks measure wall time and report to stdout; neither feeds sim state.
+#![allow(clippy::disallowed_methods, clippy::print_stdout)]
+
 use std::time::Instant;
 
 use sim::{Command, Config, World};

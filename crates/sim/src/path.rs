@@ -31,7 +31,10 @@ impl Ord for Open {
     fn cmp(&self, other: &Self) -> Ordering {
         // BinaryHeap is a max-heap, so compare reversed to pop the lowest f first.
         // Node id breaks ties so results never depend on heap internals.
-        other.f.total_cmp(&self.f).then_with(|| other.node.cmp(&self.node))
+        other
+            .f
+            .total_cmp(&self.f)
+            .then_with(|| other.node.cmp(&self.node))
     }
 }
 
@@ -73,7 +76,11 @@ impl Pathfinder {
         self.open.clear();
         self.last_expanded = 0;
         self.visit(from, 0.0, LaneId::MAX);
-        self.open.push(Open { f: h(from), g: 0.0, node: from });
+        self.open.push(Open {
+            f: h(from),
+            g: 0.0,
+            node: from,
+        });
 
         while let Some(Open { g, node, .. }) = self.open.pop() {
             if node == to {
@@ -97,7 +104,11 @@ impl Pathfinder {
                 let ni = next as usize;
                 if self.stamp[ni] != self.generation || ng < self.g[ni] {
                     self.visit(next, ng, lane);
-                    self.open.push(Open { f: ng + h(next), g: ng, node: next });
+                    self.open.push(Open {
+                        f: ng + h(next),
+                        g: ng,
+                        node: next,
+                    });
                 }
             }
         }

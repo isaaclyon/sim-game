@@ -10,3 +10,15 @@ publish = false
 [profile.release]
 codegen-units = 1
 lto = "thin"
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+unused_qualifications = "warn"
+
+[workspace.lints.clippy]
+dbg_macro = "warn"
+todo = "warn"
+unimplemented = "warn"
+print_stdout = "warn"
+disallowed_types = "deny"
+disallowed_methods = "deny"

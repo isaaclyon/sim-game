@@ -19,8 +19,13 @@ architecture. If a change contradicts an ADR, say so and write a superseding ADR
 Change both sides (Rust writer, `protocol.ts` doc, `renderer.ts` reader) together.
 
 ## Checks before finishing a change
-- `cargo test -p sim`
-- `cd web && npm run typecheck`
+- `scripts/check.sh` (same as CI): gitleaks over full history, rustfmt, clippy `-D warnings` (host + wasm32), `cargo test -p sim`,
+  Biome lint/format, `tsc`. `scripts/check.sh --fix` applies formatting and safe fixes first.
+- The repo is public. `.githooks/pre-commit` runs gitleaks on staged changes; enable it per clone
+  with `git config core.hooksPath .githooks`. Never bypass it with `--no-verify`.
+- `clippy.toml` bans `HashMap`/`HashSet` and `Instant::now`/`SystemTime::now` to protect
+  determinism. Use `BTreeMap`/`BTreeSet` or `Vec` storage; only `#[allow]` with a comment where
+  state is unaffected (benches).
 - For perf-sensitive sim changes, rerun `traffic_bench` and compare ms/tick.
 
 ## Licensing

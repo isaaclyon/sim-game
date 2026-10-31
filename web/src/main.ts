@@ -2,8 +2,14 @@ import type * as THREE from 'three';
 import type { FromWorker, Stats, ToWorker } from './protocol';
 import { Renderer } from './renderer';
 
+const byId = (id: string): HTMLElement => {
+  const el = document.getElementById(id);
+  if (!el) throw new Error(`missing #${id} in index.html`);
+  return el;
+};
+
 const renderer = new Renderer(document.body);
-const hud = document.getElementById('hud')!;
+const hud = byId('hud');
 const worker = new Worker(new URL('./sim.worker.ts', import.meta.url), { type: 'module' });
 const send = (msg: ToWorker) => worker.postMessage(msg);
 
@@ -43,10 +49,10 @@ function setSpeed(s: number) {
   for (const b of speedButtons) b.classList.toggle('active', Number(b.dataset.speed) === s);
 }
 for (const b of speedButtons) b.onclick = () => setSpeed(Number(b.dataset.speed));
-document.getElementById('spawn')!.onclick = () => send({ type: 'spawn', count: 5000 });
+byId('spawn').onclick = () => send({ type: 'spawn', count: 5000 });
 
 // --- road tool: click to start, click to place (chains), Esc or right-click to stop ---
-const roadButton = document.getElementById('road')!;
+const roadButton = byId('road');
 let roadTool = false;
 let roadStart: THREE.Vector3 | null = null;
 function setRoadTool(on: boolean) {

@@ -52,7 +52,9 @@ impl Traffic {
         let mut exits = std::mem::take(&mut self.exits);
         exits.clear();
         for (lane, queue) in self.queues.iter().enumerate() {
-            let Some(&front) = queue.front() else { continue };
+            let Some(&front) = queue.front() else {
+                continue;
+            };
             let (len, limit) = (net.lane_len[lane], net.lane_speed[lane]);
             let mut max_pos = len;
             for &agent in queue {

@@ -124,7 +124,9 @@ impl World {
         self.wake_parked();
         self.plan_paths();
         self.enter_lanes();
-        let exits = self.traffic.advance(&self.roads, &mut self.agents, self.cfg.dt);
+        let exits = self
+            .traffic
+            .advance(&self.roads, &mut self.agents, self.cfg.dt);
         self.resolve_exits(&exits);
         self.traffic.recycle_exits(exits);
         self.totals.tick += 1;
@@ -156,7 +158,12 @@ impl World {
                 let lane = a.lane[i];
                 let (x, y) = self.roads.lane_point(lane, a.pos[i], LANE_OFFSET);
                 let heading = self.roads.lane_heading(lane);
-                out.extend([x, y, heading, a.speed[i] / self.roads.lane_speed[lane as usize]]);
+                out.extend([
+                    x,
+                    y,
+                    heading,
+                    a.speed[i] / self.roads.lane_speed[lane as usize],
+                ]);
             } else {
                 out.extend([0.0, 0.0, 0.0, -1.0]);
             }
@@ -171,7 +178,13 @@ impl World {
         for road in 0..r.road_count() {
             let lane = road * 2;
             let (a, b) = (r.lane_from[lane] as usize, r.lane_to[lane] as usize);
-            out.extend([r.node_x[a], r.node_y[a], r.node_x[b], r.node_y[b], r.lane_speed[lane]]);
+            out.extend([
+                r.node_x[a],
+                r.node_y[a],
+                r.node_x[b],
+                r.node_y[b],
+                r.lane_speed[lane],
+            ]);
         }
     }
 
@@ -259,7 +272,9 @@ impl World {
 
     fn plan_paths(&mut self) {
         for _ in 0..self.cfg.path_budget {
-            let Some(agent) = self.path_queue.pop_front() else { break };
+            let Some(agent) = self.path_queue.pop_front() else {
+                break;
+            };
             let a = agent as usize;
             let mut path = std::mem::take(&mut self.agents.path[a]);
             let (from, to) = (self.agents.node[a], self.agents.dest[a]);
@@ -292,7 +307,9 @@ impl World {
     }
 
     fn resolve_exits(&mut self, exits: &[LaneId]) {
-        let stuck_limit = self.secs_to_ticks(self.cfg.stuck_limit_s).min(u16::MAX as u64) as u16;
+        let stuck_limit = self
+            .secs_to_ticks(self.cfg.stuck_limit_s)
+            .min(u16::MAX as u64) as u16;
         for &lane in exits {
             let queue = &self.traffic.queues[lane as usize];
             let agent = queue[0];
@@ -331,7 +348,10 @@ mod tests {
     use super::*;
 
     fn small_world(seed: u64) -> World {
-        let cfg = Config { seed, ..Config::default() };
+        let cfg = Config {
+            seed,
+            ..Config::default()
+        };
         let mut world = World::generate(cfg, 12, 12);
         world.apply(Command::SpawnAgents { count: 2_000 });
         world
@@ -360,7 +380,10 @@ mod tests {
         }
         let s = world.stats();
         assert!(s.trips_completed > 500, "{s:?}");
-        assert_eq!(s.parked + s.awaiting_path + s.entering + s.driving, s.agents);
+        assert_eq!(
+            s.parked + s.awaiting_path + s.entering + s.driving,
+            s.agents
+        );
     }
 
     #[test]
@@ -369,8 +392,21 @@ mod tests {
         let nodes = world.roads.node_count();
         let (x0, y0) = (world.roads.node_x[0], world.roads.node_y[0]);
         let (x8, y8) = (world.roads.node_x[8], world.roads.node_y[8]);
-        assert!(world.apply(Command::BuildRoad { ax: x0 + 3.0, ay: y0, bx: x8, by: y8 - 3.0 }));
+        assert!(world.apply(Command::BuildRoad {
+            ax: x0 + 3.0,
+            ay: y0,
+            bx: x8,
+            by: y8 - 3.0
+        }));
         assert_eq!(world.roads.node_count(), nodes, "both ends should snap");
-        assert!(!world.apply(Command::BuildRoad { ax: x0, ay: y0, bx: x8, by: y8 }), "duplicate");
+        assert!(
+            !world.apply(Command::BuildRoad {
+                ax: x0,
+                ay: y0,
+                bx: x8,
+                by: y8
+            }),
+            "duplicate"
+        );
     }
 }
