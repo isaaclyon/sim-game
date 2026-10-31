@@ -49,9 +49,17 @@ despawns, and the road tool feels good with snapping, curves and bulldozing.
 
 ## M2 – A city that grows (playable toy)
 
-- Zoning brush: residential, commercial, industrial, painted along roads.
-- Lots and buildings appear on zoned land over time, as procedural low-poly boxes by zone and
-  density. **ADR** for the building and lot data model.
+- Zoning brush: residential, commercial and industrial, each with a low- and high-density
+  brush (houses vs. apartments, corner shops vs. stores). You choose density; it doesn't creep
+  up on its own.
+- Block-filling lots: zoning paints whole blocks, and the sim cuts lots to fill the space
+  between roads, including odd shapes left by curves. Where a block is too deep to reach from
+  its edges, the sim adds alleys and small connector streets to reach interior lots. These
+  are ordinary roads in the road graph, so cars use them and the player can bulldoze them.
+  **ADR** for the building and lot data model, block detection and subdivision.
+- Buildings appear on zoned lots over time, as procedural low-poly boxes by zone and density.
+- Repainting or unzoning occupied land doesn't bulldoze it: the old buildings empty out over
+  time and the new zone replaces them.
 - Citizens get a home and a workplace. Trips run home → work → shop → home on a daily
   schedule, replacing random node-to-node trips. **ADR** for the citizen record vs. trip agent
   split.
@@ -117,6 +125,9 @@ The village becomes a town, with councilors as an optional helper for players wh
 - **Eras.** Village (dirt roads, cottages, small shops) and town (paved streets, shopfronts,
   apartments). Reaching a population threshold unlocks the town era. **ADR** for how eras attach
   to roads, buildings and unlocks.
+- **Era zones.** Farms are a village-era zone: fields and barns around the edge of town that
+  supply early jobs. The town era unlocks offices (clean jobs, no pollution) and mixed-use
+  (shops below, flats above) for main streets.
 - **Gradual redevelopment.** Village buildings stay until demand replaces them with town-era
   ones. Mark buildings or areas as heritage to protect them.
 - **Era-tied transit.** The town era brings buses and trams, with simple stops and lines.
