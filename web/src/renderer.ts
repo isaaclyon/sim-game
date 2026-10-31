@@ -16,6 +16,15 @@ import * as THREE from 'three';
 CameraControls.install({ THREE });
 
 const STRIDE = 4;
+const SIGNAL_STRIDE = 4;
+/** Indexed by signal state: red, green, protected-left green. */
+const SIGNAL_COLORS = [
+  new THREE.Color(0xe5484d),
+  new THREE.Color(0x46c46e),
+  new THREE.Color(0x3fb8e8),
+];
+const SIGNAL_SIZE = 1.5;
+const SIGNAL_HEIGHT = 4;
 const BG = 0x0f1419;
 const STREET_COLOR = new THREE.Color(0x3a4654);
 const AVENUE_COLOR = new THREE.Color(0x6b7b8f);
@@ -31,6 +40,7 @@ export class Renderer {
   private readonly clock = new THREE.Clock();
   private roads?: THREE.LineSegments;
   private cars?: THREE.InstancedMesh;
+  private signals?: THREE.InstancedMesh;
   private readonly preview: THREE.Line;
   private readonly matrix = new THREE.Matrix4();
   private readonly quat = new THREE.Quaternion();
@@ -119,23 +129,66 @@ export class Renderer {
     }
   }
 
-  private ensureCars(count: number): THREE.InstancedMesh {
-    // `count` is how many instances were drawn last frame; `instanceMatrix.count` is capacity.
-    if (this.cars && this.cars.instanceMatrix.count >= count) return this.cars;
-    const capacity = Math.max(count, 1024) * 1.5;
-    if (this.cars) {
-      this.scene.remove(this.cars);
-      this.cars.dispose();
-      this.cars.geometry.dispose();
-      (this.cars.material as THREE.Material).dispose();
+  /**
+   * Returns `mesh` if it can hold `count` instances, else a bigger replacement box mesh that
+   * reuses `material`. `mesh.count` is how many instances were drawn last frame;
+   * `instanceMatrix.count` is capacity.
+   */
+  private ensureBoxes(
+    mesh: THREE.InstancedMesh | undefined,
+    count: number,
+    size: [number, number, number],
+    material: THREE.Material,
+  ): THREE.InstancedMesh {
+    if (mesh && mesh.instanceMatrix.count >= count) return mesh;
+    if (mesh) {
+      this.scene.remove(mesh);
+      mesh.dispose();
+      mesh.geometry.dispose();
     }
-    const geom = new THREE.BoxGeometry(CAR_LENGTH, CAR_HEIGHT, CAR_WIDTH);
-    geom.translate(0, CAR_HEIGHT / 2, 0);
-    this.cars = new THREE.InstancedMesh(geom, new THREE.MeshLambertMaterial(), Math.ceil(capacity));
-    this.cars.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-    this.cars.frustumCulled = false;
-    this.scene.add(this.cars);
+    const geom = new THREE.BoxGeometry(...size);
+    geom.translate(0, size[1] / 2, 0);
+    const capacity = Math.ceil(Math.max(count, 1024) * 1.5);
+    const boxes = new THREE.InstancedMesh(geom, material, capacity);
+    boxes.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    boxes.frustumCulled = false;
+    this.scene.add(boxes);
+    return boxes;
+  }
+
+  private ensureCars(count: number): THREE.InstancedMesh {
+    this.cars = this.ensureBoxes(
+      this.cars,
+      count,
+      [CAR_LENGTH, CAR_HEIGHT, CAR_WIDTH],
+      this.cars ? (this.cars.material as THREE.Material) : new THREE.MeshLambertMaterial(),
+    );
     return this.cars;
+  }
+
+  /** `signals` is `[x, y, heading, state]` per signalised approach, at its stop line. */
+  drawSignals(signals: Float32Array) {
+    const count = signals.length / SIGNAL_STRIDE;
+    const material = this.signals
+      ? (this.signals.material as THREE.Material)
+      : new THREE.MeshBasicMaterial();
+    this.signals = this.ensureBoxes(
+      this.signals,
+      count,
+      [SIGNAL_SIZE, SIGNAL_HEIGHT, SIGNAL_SIZE],
+      material,
+    );
+    this.quat.identity();
+    for (let i = 0; i < count; i++) {
+      const o = i * SIGNAL_STRIDE;
+      this.pos.set(signals[o], 0, signals[o + 1]);
+      this.matrix.compose(this.pos, this.quat, this.scale);
+      this.signals.setMatrixAt(i, this.matrix);
+      this.signals.setColorAt(i, SIGNAL_COLORS[signals[o + 3]] ?? SIGNAL_COLORS[0]);
+    }
+    this.signals.count = count;
+    this.signals.instanceMatrix.needsUpdate = true;
+    if (this.signals.instanceColor) this.signals.instanceColor.needsUpdate = true;
   }
 
   /**

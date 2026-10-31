@@ -1,35 +1,54 @@
 //! Headless traffic benchmark.
 //!
-//!     cargo run --release -p sim --example traffic_bench -- --agents 50000 --grid 60 --ticks 6000
+//!     cargo run --release -p sim --example traffic_bench -- --agents 50000 --ticks 36000
+//!     cargo run --release -p sim --example traffic_bench -- --layout organic --max-despawns 9 --seed 2
+//!
+//! `--layout grid` (default) is the generated street grid with avenues. `--layout organic` is a
+//! radial town drawn street by street through `Command::BuildRoad`, the way a player builds:
+//! rings joined by spokes, with gaps, T-junctions and 5-way junctions, and no avenues.
+//! `--max-despawns N` exits with an error if more than N cars hit the stuck limit.
 //!
 //! The browser runs 10 ticks per sim second, so a tick under 10 ms leaves room for 10x speed.
 
 // Benchmarks measure wall time and report to stdout; neither feeds sim state.
 #![allow(clippy::disallowed_methods, clippy::print_stdout)]
 
+use std::f32::consts::TAU;
 use std::time::Instant;
 
+use sim::rng::Rng;
+use sim::road::RoadNetwork;
 use sim::{Command, Config, World};
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
-    let arg = |name: &str, default: u32| -> u32 {
+    let value = |name: &str| {
         args.iter()
             .position(|a| a == name)
             .and_then(|i| args.get(i + 1))
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(default)
+    };
+    let arg = |name: &str, default: u32| -> u32 {
+        value(name).and_then(|v| v.parse().ok()).unwrap_or(default)
     };
     let agents = arg("--agents", 50_000);
     let grid = arg("--grid", 60);
     let ticks = arg("--ticks", 6_000);
+    let max_despawns = value("--max-despawns").and_then(|v| v.parse::<u64>().ok());
+    let layout = value("--layout").map_or("grid", String::as_str);
 
-    let cfg = Config::default();
+    let cfg = Config {
+        seed: arg("--seed", 1) as u64,
+        ..Config::default()
+    };
     let dt = cfg.dt;
-    let mut world = World::generate(cfg, grid, grid);
+    let mut world = match layout {
+        "grid" => World::generate(cfg, grid, grid),
+        "organic" => organic_town(cfg),
+        other => panic!("unknown --layout {other}"),
+    };
     world.apply(Command::SpawnAgents { count: agents });
     println!(
-        "grid {grid}x{grid}: {} nodes, {} roads | {agents} agents | {ticks} ticks ({:.0} sim min)",
+        "{layout}: {} nodes, {} roads | {agents} agents | {ticks} ticks ({:.0} sim min)",
         world.roads.node_count(),
         world.roads.road_count(),
         ticks as f32 * dt / 60.0
@@ -52,7 +71,6 @@ fn main() {
     times.sort_by(f64::total_cmp);
     let pct = |p: f64| times[((times.len() - 1) as f64 * p) as usize];
     let s = world.stats();
-
     println!(
         "tick ms   mean {mean:.2} | p50 {:.2} | p99 {:.2} | max {:.2}",
         pct(0.5),
@@ -65,7 +83,65 @@ fn main() {
         ticks as f64 * dt as f64
     );
     println!(
-        "traffic   peak driving {peak_driving} | trips {} | paths ok {} failed {} | stuck despawns {}",
-        s.trips_completed, s.paths_found, s.paths_failed, s.despawned_stuck
+        "traffic   peak driving {peak_driving} | trips {} | paths ok {} failed {} | stuck despawns {} | detours {}",
+        s.trips_completed, s.paths_found, s.paths_failed, s.despawned_stuck, s.detours
     );
+    if let Some(max) = max_despawns
+        && s.despawned_stuck > max
+    {
+        println!(
+            "FAIL      {} stuck despawns > --max-despawns {max}",
+            s.despawned_stuck
+        );
+        std::process::exit(1);
+    }
+}
+
+/// A radial town of about 3,600 junctions, drawn one street at a time. Ring `r` has `6r`
+/// junctions, so ring streets stay about the same length as the town grows, and each junction
+/// has a spoke to the nearest junction on the ring inside it. Some ring streets are left out.
+fn organic_town(cfg: Config) -> World {
+    const RINGS: u32 = 34;
+    const SPACING: f32 = 110.0;
+    const DROP_CHANCE: f32 = 0.12;
+    let mut rng = Rng::new(cfg.seed ^ 0x5eed);
+    let seed = cfg.seed;
+    let mut world = World::new(cfg, RoadNetwork::default(), Rng::new(seed));
+
+    // ring[r][i] = position of junction i on ring r; ring 0 is the centre.
+    let mut ring: Vec<Vec<(f32, f32)>> = vec![vec![(0.0, 0.0)]];
+    for r in 1..=RINGS {
+        let n = 6 * r;
+        let turn = rng.range(0.0, TAU);
+        let points = (0..n)
+            .map(|i| {
+                let angle = turn + TAU * (i as f32 + rng.range(-0.2, 0.2)) / n as f32;
+                let radius = SPACING * (r as f32 + rng.range(-0.15, 0.15));
+                (radius * angle.cos(), radius * angle.sin())
+            })
+            .collect();
+        ring.push(points);
+    }
+    let mut build = |(ax, ay): (f32, f32), (bx, by): (f32, f32)| {
+        world.apply(Command::BuildRoad { ax, ay, bx, by });
+    };
+    for r in 1..ring.len() {
+        let n = ring[r].len();
+        for i in 0..n {
+            let here = ring[r][i];
+            if rng.unit() > DROP_CHANCE {
+                build(here, ring[r][(i + 1) % n]);
+            }
+            let inner = ring[r - 1]
+                .iter()
+                .copied()
+                .min_by(|a, b| {
+                    let d = |p: &(f32, f32)| (p.0 - here.0).hypot(p.1 - here.1);
+                    d(a).total_cmp(&d(b))
+                })
+                .expect("inner ring is never empty");
+            build(here, inner);
+        }
+    }
+    world
 }

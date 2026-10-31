@@ -67,6 +67,12 @@ impl Sim {
         self.buf.clone()
     }
 
+    /// `[x, y, heading, state]` per signalised approach; see `World::write_signal_snapshot`.
+    pub fn signal_snapshot(&mut self) -> Vec<f32> {
+        self.world.write_signal_snapshot(&mut self.buf);
+        self.buf.clone()
+    }
+
     /// `[ax, ay, bx, by, speed_limit]` per road.
     pub fn road_segments(&mut self) -> Vec<f32> {
         self.world.write_road_segments(&mut self.buf);

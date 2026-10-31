@@ -62,7 +62,11 @@ function step() {
       const perTick = (performance.now() - t0) / n;
       sendRoadsIfChanged(sim);
       const agents = sim.agent_snapshot();
-      post({ type: 'frame', agents, stats: readStats(sim), tickMs: perTick }, [agents.buffer]);
+      const signals = sim.signal_snapshot();
+      post({ type: 'frame', agents, signals, stats: readStats(sim), tickMs: perTick }, [
+        agents.buffer,
+        signals.buffer,
+      ]);
     }
   }
   setTimeout(step, 4);

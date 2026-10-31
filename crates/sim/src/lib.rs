@@ -5,6 +5,7 @@
 //! plus the same command log always produces the same city.
 
 pub mod agents;
+pub mod junction;
 pub mod path;
 pub mod rng;
 pub mod road;

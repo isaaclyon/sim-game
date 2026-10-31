@@ -1,6 +1,6 @@
 # 0006. Agents, pathfinding and traffic model
 
-- Status: Accepted
+- Status: Accepted; the Pathfinding bullet is superseded by [0010](0010-congestion-aware-routing-and-detours.md)
 - Date: 2026-10-30
 
 ## Context

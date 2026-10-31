@@ -1,6 +1,6 @@
 # 0009. Intersection rules
 
-- Status: Accepted
+- Status: Accepted; the ms/tick target is superseded by [0011](0011-absolute-tick-budget.md)
 - Date: 2026-10-30
 
 ## Context
