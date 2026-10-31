@@ -27,7 +27,7 @@ and can spike when many trips start at once.
 ## Consequences
 
 - Scales to 50k agents with ~38k driving at once, well inside a frame budget.
-- **Known gap:** intersections have no rules. Circular waits cause gridlock (thousands of stuck
+- **Known gap** (addressed by [0009](0009-intersection-rules.md)): intersections have no rules. Circular waits cause gridlock (thousands of stuck
   despawns per sim-hour at 50k agents). Next step: intersection reservations or signals, in a new
   ADR.
 - Single-lane roads only; no lane changes or multi-lane roads yet.

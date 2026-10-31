@@ -14,6 +14,7 @@ rewriting history; mark the old one `Superseded by NNNN`.
 | [0006](0006-agents-pathfinding-and-traffic-model.md) | Agents, pathfinding and traffic model | Accepted |
 | [0007](0007-three-js-rendering-approach.md) | Three.js rendering approach | Deprecated |
 | [0008](0008-permissive-licenses-only.md) | Permissive-license dependencies only | Accepted |
+| [0009](0009-intersection-rules.md) | Intersection rules | Accepted |
 
 ADRs are only for decisions that are hard to reverse. See [AGENTS.md](AGENTS.md) for when to
 write one and how.
