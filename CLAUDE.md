@@ -1,5 +1,8 @@
 # Project rules for agents
 
+Architecture decisions and their reasons live in `docs/adrs/`. Read the index before changing
+architecture. If a change contradicts an ADR, say so and write a superseding ADR.
+
 ## Architecture
 - The sim (`crates/sim`) is the source of truth. The frontend never computes game state; it sends
   commands (`web/src/protocol.ts` → worker → `World::apply`) and draws snapshots.

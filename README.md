@@ -20,6 +20,8 @@ Controls: left-drag pans, right-drag orbits, wheel zooms to cursor. `R` toggles 
 - `crates/sim-wasm` – wasm-bindgen wrapper around `sim`.
 - `web/` – Vite app. `sim.worker.ts` owns the sim; `main.ts` draws snapshots.
 
+Architecture decisions: [docs/adrs](docs/adrs/README.md).
+
 ## Benchmarks
 
 ```bash
