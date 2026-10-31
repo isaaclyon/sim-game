@@ -120,11 +120,14 @@ export class Renderer {
   }
 
   private ensureCars(count: number): THREE.InstancedMesh {
-    if (this.cars && this.cars.count >= count) return this.cars;
+    // `count` is how many instances were drawn last frame; `instanceMatrix.count` is capacity.
+    if (this.cars && this.cars.instanceMatrix.count >= count) return this.cars;
     const capacity = Math.max(count, 1024) * 1.5;
     if (this.cars) {
       this.scene.remove(this.cars);
       this.cars.dispose();
+      this.cars.geometry.dispose();
+      (this.cars.material as THREE.Material).dispose();
     }
     const geom = new THREE.BoxGeometry(CAR_LENGTH, CAR_HEIGHT, CAR_WIDTH);
     geom.translate(0, CAR_HEIGHT / 2, 0);
