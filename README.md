@@ -26,4 +26,5 @@ Architecture decisions: [docs/adrs](docs/adrs/README.md). Plan: [docs/ROADMAP.md
 
 ```bash
 cargo run --release -p sim --example traffic_bench -- --agents 50000 --grid 60
+cargo run --release -p sim --example traffic_bench -- --scale la   # ADR 0012 scale target
 ```

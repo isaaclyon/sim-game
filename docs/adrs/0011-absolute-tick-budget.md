@@ -28,4 +28,5 @@ This replaces the ms/tick line in ADR 0009's Consequences. The rest of 0009 stan
 - Today's branch sits at 0.6-0.8 ms, so there is room, but not for careless growth.
 - Profile at the time of writing: car following 29%, route search 23%, exit check 16%, tick
   overhead 17%, junction requests 9%. Road-class routing (M2) is the expected next cut.
-- The 200k+ agent target (ADR 0002, M7) needs its own measurement and budget when it comes up.
+- The 200k+ agent target (ADR 0002, M7) needs its own measurement and budget when it comes up
+  (now [0012](0012-la-scale-target.md)).

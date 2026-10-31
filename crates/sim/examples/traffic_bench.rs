@@ -2,11 +2,17 @@
 //!
 //!     cargo run --release -p sim --example traffic_bench -- --agents 50000 --ticks 36000
 //!     cargo run --release -p sim --example traffic_bench -- --layout organic --max-despawns 9 --seed 2
+//!     cargo run --release -p sim --example traffic_bench -- --scale la
 //!
 //! `--layout grid` (default) is the generated street grid with avenues. `--layout organic` is a
 //! radial town drawn street by street through `Command::BuildRoad`, the way a player builds:
 //! rings joined by spokes, with gaps, T-junctions and 5-way junctions, and no avenues.
 //! `--max-despawns N` exits with an error if more than N cars hit the stuck limit.
+//! `--warmup N` runs N ticks before timing starts, so start-up path bursts don't skew the mean.
+//!
+//! `--scale la` is the scale target from ADR 0012: the City of Los Angeles at rush hour, about
+//! 250k cars driving at once on about 10,000 km of street. It sets `--grid 200` (8,600 km),
+//! `--agents 250000`, `--warmup 6000` and `--ticks 6000`; explicit flags still override.
 //!
 //! The browser runs 10 ticks per sim second, so a tick under 10 ms leaves room for 10x speed.
 
@@ -30,9 +36,15 @@ fn main() {
     let arg = |name: &str, default: u32| -> u32 {
         value(name).and_then(|v| v.parse().ok()).unwrap_or(default)
     };
-    let agents = arg("--agents", 50_000);
-    let grid = arg("--grid", 60);
+    let la = match value("--scale").map(String::as_str) {
+        None => false,
+        Some("la") => true,
+        Some(other) => panic!("unknown --scale {other}"),
+    };
+    let agents = arg("--agents", if la { 250_000 } else { 50_000 });
+    let grid = arg("--grid", if la { 200 } else { 60 });
     let ticks = arg("--ticks", 6_000);
+    let warmup = arg("--warmup", if la { 6_000 } else { 0 });
     let max_despawns = value("--max-despawns").and_then(|v| v.parse::<u64>().ok());
     let layout = value("--layout").map_or("grid", String::as_str);
 
@@ -48,21 +60,27 @@ fn main() {
     };
     world.apply(Command::SpawnAgents { count: agents });
     println!(
-        "{layout}: {} nodes, {} roads | {agents} agents | {ticks} ticks ({:.0} sim min)",
+        "{layout}: {} nodes, {} roads | {agents} agents | {warmup} warmup + {ticks} timed ticks ({:.0} sim min)",
         world.roads.node_count(),
         world.roads.road_count(),
-        ticks as f32 * dt / 60.0
+        (warmup + ticks) as f32 * dt / 60.0
     );
 
+    for _ in 0..warmup {
+        world.tick();
+    }
     let mut times = Vec::with_capacity(ticks as usize);
-    let mut peak_driving = 0;
+    let (mut peak_driving, mut driving_sum, mut driving_samples) = (0, 0u64, 0u64);
     let start = Instant::now();
     for i in 0..ticks {
         let t = Instant::now();
         world.tick();
         times.push(t.elapsed().as_secs_f64() * 1000.0);
         if i % 100 == 0 {
-            peak_driving = peak_driving.max(world.stats().driving);
+            let driving = world.stats().driving;
+            peak_driving = peak_driving.max(driving);
+            driving_sum += u64::from(driving);
+            driving_samples += 1;
         }
     }
     let wall = start.elapsed().as_secs_f64();
@@ -78,12 +96,16 @@ fn main() {
         pct(1.0)
     );
     println!(
-        "speed     {:.0}x realtime (sim {:.0}s in {wall:.1}s wall)",
+        "speed     {:.0}x realtime (sim {:.0}s in {wall:.1}s wall) | 10x needs 10 ms/tick in WASM, about 4 ms native",
         ticks as f64 * dt as f64 / wall,
         ticks as f64 * dt as f64
     );
     println!(
-        "traffic   peak driving {peak_driving} | trips {} | paths ok {} failed {} | stuck despawns {} | detours {}",
+        "traffic   mean driving {} | peak driving {peak_driving}",
+        driving_sum / driving_samples.max(1)
+    );
+    println!(
+        "          trips {} | paths ok {} failed {} | stuck despawns {} | detours {}",
         s.trips_completed, s.paths_found, s.paths_failed, s.despawned_stuck, s.detours
     );
     if let Some(max) = max_despawns

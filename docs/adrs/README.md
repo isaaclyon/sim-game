@@ -17,6 +17,7 @@ rewriting history; mark the old one `Superseded by NNNN`.
 | [0009](0009-intersection-rules.md) | Intersection rules | Accepted; ms/tick target superseded by 0011 |
 | [0010](0010-congestion-aware-routing-and-detours.md) | Congestion-aware routing and detours | Accepted |
 | [0011](0011-absolute-tick-budget.md) | Absolute tick budget for traffic | Accepted |
+| [0012](0012-la-scale-target.md) | Scale target: Los Angeles at rush hour, 10x speed | Accepted |
 
 ADRs are only for decisions that are hard to reverse. See [AGENTS.md](AGENTS.md) for when to
 write one and how.

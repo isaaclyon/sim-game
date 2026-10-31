@@ -150,8 +150,9 @@ councilor for a new district is happy with what they build.
 
 ## M7 – Scale and Steam (1.0)
 
-- Profile at 200k+ agents: culled or delta snapshots, shader-side vehicle interpolation, wasm
-  threads if a profile calls for them (ADR 0002).
+- Reach the scale target in ADR 0012: a Los Angeles-sized city at rush hour (about 250k cars
+  driving) at 10x speed, measured with `traffic_bench --scale la`. Culled or delta snapshots,
+  shader-side vehicle interpolation, wasm threads if a profile calls for them (ADR 0002).
 - Multi-lane roads and lane changes, highways and interchanges.
 - Electron or Tauri wrapper, settings menu, keybinding options.
 - Steam page, achievements, workshop (only if mods are in scope). **ADR** for mod support.
