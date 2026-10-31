@@ -1,12 +1,11 @@
 # Roadmap
 
-**Core fantasy: be the mayor of a town that becomes a city.** You start as a village, building
-every road by hand. As the town grows you hand districts to councilors and step back to steer,
-zooming in to hand-build whenever you want.
+**Core fantasy: grow a village into a city yourself.** You lay the roads and paint the zones,
+and the player is always able to build the whole city by hand.
 
-**Signature: delegation.** What sets this apart from Cities: Skylines is that you don't have to
-place every road. You draw a district, give a councilor a brief ("dense housing", "industry
-hub"), and they lay roads and zones inside it. You can override anything they do.
+**Novel feature: councilors.** An optional helper, not the core of the game. Draw a district,
+give a councilor a brief ("dense housing", "industry hub"), and they lay roads and zones inside
+it while you work elsewhere. You can override anything they do, or never hire one at all.
 
 **Arc: village to city, in eras.** Population unlocks each era. Old buildings stay until demand
 redevelops them, so the old core and the new streets sit side by side. Version one has two eras,
@@ -113,7 +112,7 @@ relaxed.
 
 ## M6 – Eras and councilors
 
-The signature milestone: the village becomes a town, and the town gets too big to build alone.
+The village becomes a town, with councilors as an optional helper for players who want one.
 
 - **Eras.** Village (dirt roads, cottages, small shops) and town (paved streets, shopfronts,
   apartments). Reaching a population threshold unlocks the town era. **ADR** for how eras attach
@@ -121,15 +120,15 @@ The signature milestone: the village becomes a town, and the town gets too big t
 - **Gradual redevelopment.** Village buildings stay until demand replaces them with town-era
   ones. Mark buildings or areas as heritage to protect them.
 - **Era-tied transit.** The town era brings buses and trams, with simple stops and lines.
-- **Councilors.** Each era after the village adds one councilor slot. Draw a district, give the
-  councilor a brief (dense housing, shops, industry hub, green), and they lay roads and zones
-  inside it over time. Their plans show as ghosts as they build; you can override or bulldoze
-  anything. **ADR** for the councilor planner: it runs inside the sim and issues ordinary
-  commands, so it stays deterministic and replays from a save.
+- **Councilors (optional).** Each era after the village adds one councilor slot. Draw a
+  district, give the councilor a brief (dense housing, shops, industry hub, green), and they lay
+  roads and zones inside it over time. Their plans show as ghosts as they build; you can
+  override or bulldoze anything. **ADR** for the councilor planner: it runs inside the sim and
+  issues ordinary commands, so it stays deterministic and replays from a save.
 - Councilor UI: district outline, brief picker, progress, and a way to recall them.
 
-Done when: a player takes a village to a town by hand, hires a councilor for a new district,
-and is happy with what the councilor builds while they work elsewhere.
+Done when: a player can take a village to a town entirely by hand, and a player who hires a
+councilor for a new district is happy with what they build.
 
 ## M7 – Scale and Steam (1.0)
 
