@@ -16,14 +16,18 @@ What to build next and why lives in `docs/ROADMAP.md`. Work on the current miles
 
 ## Snapshot formats
 - Agents: `[x, y, heading, speed_ratio]` per agent (`SNAPSHOT_STRIDE`), speed_ratio < 0 = hidden.
-- Roads: `[ax, ay, bx, by, speed_limit]` per active road, packed (not indexed by road ID).
-- Bulldoze preview: `[ax, ay, bx, by]` of the selected segment; empty = no target. Read-only.
-  Road/lane IDs are never reused after deletion (ADR 0013). Lane counts include tombstone slots.
+- Roads: `[ax, ay, bx, by, speed_limit]` per active rendered segment; curves emit multiple
+  segments. Packed in road ID order, not indexed by road ID (ADR 0015).
+- Bulldoze preview: `[x, y]` per centreline sample of the selected road; empty = no target.
+  Read-only. Road/lane IDs are never reused after deletion (ADR 0013). Lane counts include
+  tombstone slots.
 - Signals: `[x, y, heading, state]` per signalised approach (`SIGNAL_STRIDE`), state 0 = red,
   1 = green, 2 = protected-left green.
-- Road preview: `[x, y, join]` per stop of the road `BuildRoad` would build, join 0 = new end,
-  1 = existing node, 2 = splits a road; empty = refused. Answers `previewRoad`, or `previewSnap`
-  with one stop (where a road would start). Changes nothing.
+- Road preview: `[x, y, join]` per sample of the road `BuildRoad` / `BuildCurve` would build,
+  join -1 = interior curve sample (no marker), 0 = new end, 1 = existing node, 2 = splits a road;
+  empty = refused. Answers `previewRoad` / `previewCurve`, or `previewSnap` with one stop
+  (where a road would start). Echoes the request revision so outdated previews can be discarded.
+  Changes nothing.
 - Zones: one byte per zone cell, row-major, plus layout `[origin_x, origin_y, cell_size, cols,
   rows]`; byte 0 = none, 1/2 = residential low/high, 3/4 commercial, 5/6 industrial (ADR 0014).
   Sent whole when the zone grid's version changes.

@@ -36,11 +36,24 @@ worker.onmessage = (e: MessageEvent<FromWorker>) => {
   } else if (msg.type === 'roadPreview' || msg.type === 'bulldozePreview') {
     previewInFlight = false;
     if (msg.revision === previewRevision && previewEnd) {
-      if (msg.type === 'roadPreview' && roadTool)
-        renderer.setPreview(msg.stops, roadStart, previewEnd);
+      if (msg.type === 'roadPreview' && roadTool) {
+        renderer.setPreview(msg.stops, roadStart, previewRequestedEnd);
+        refused = roadStart !== null && msg.stops.length === 0;
+        updateRoadHelp();
+      }
       if (msg.type === 'bulldozePreview' && bulldozeTool) renderer.setBulldozePreview(msg.segment);
     }
     sendPreview();
+  } else if (msg.type === 'buildResult') {
+    if (pendingBuild?.id !== msg.id) return;
+    if (msg.success) {
+      roadStart = pendingBuild.end;
+      roadControl = null;
+    }
+    pendingBuild = null;
+    refused = !msg.success;
+    invalidatePreview();
+    updateRoadHelp();
   } else if (msg.type === 'zones') {
     renderer.setZones(msg.cells, msg.layout);
   } else {
@@ -68,9 +81,11 @@ function setSpeed(s: number) {
 for (const b of speedButtons) b.onclick = () => setSpeed(Number(b.dataset.speed));
 byId('spawn').onclick = () => send({ type: 'spawn', count: 5000 });
 
-// --- road tool: click to start, click to place (chains), Esc or right-click to stop ---
+// Straight: start → end. Curve: start → bend control → end. Both chain after success.
 const roadButton = byId('road');
-let roadTool = false;
+const curveButton = byId('curve');
+const roadHelp = byId('road-help');
+let roadTool: 'straight' | 'curve' | null = null;
 const bulldozeButton = byId('bulldoze');
 let bulldozeTool = false;
 // --- zone brush: pick a zone, then drag a rectangle; every cell inside takes that zone ---
@@ -86,8 +101,12 @@ const ZONE_NAMES = [
 ];
 let zone: Zone | null = null;
 let zoneStart: THREE.Vector3 | null = null;
-let previewRevision = 0;
 let roadStart: THREE.Vector3 | null = null;
+let roadControl: THREE.Vector3 | null = null;
+let refused = false;
+let nextBuildId = 0;
+let pendingBuild: { id: number; end: THREE.Vector3 } | null = null;
+let previewRevision = 0;
 // The sim works out where a road snaps; the preview asks it: where the road would start while
 // hovering, then the whole road once it has a start. Only one question is in flight at a time,
 // and only the latest cursor position is asked about, so a busy worker never falls behind the
@@ -95,22 +114,53 @@ let roadStart: THREE.Vector3 | null = null;
 let previewEnd: THREE.Vector3 | null = null;
 let previewWanted = false;
 let previewInFlight = false;
+let previewRequestedEnd: THREE.Vector3 | null = null;
+function updateRoadHelp() {
+  const stage = !roadStart
+    ? 'Click the road start.'
+    : roadTool === 'curve' && !roadControl
+      ? 'Click the bend control point, then the road end.'
+      : 'Click the road end.';
+  roadHelp.textContent = bulldozeTool
+    ? 'Click a highlighted road to remove it. Esc or right-click cancels.'
+    : !roadTool
+      ? ''
+      : pendingBuild
+        ? 'Building road…'
+        : `${refused ? 'Cannot build here. Move the end away from overlaps or short joins. ' : ''}${stage} Esc or right-click cancels.`;
+}
+function invalidatePreview() {
+  previewRevision++;
+  previewEnd = null;
+  previewWanted = false;
+  renderer.setPreview(null, null, null);
+}
 function sendPreview() {
-  if (previewInFlight || !previewWanted || (!roadTool && !bulldozeTool) || !previewEnd) return;
+  if (!previewWanted || (!roadTool && !bulldozeTool) || !previewEnd || pendingBuild) return;
+  const [a, b, c] = [roadStart, previewEnd, roadControl];
+  if (a && roadTool === 'curve' && !c) {
+    // A control guide, not a road. Only the sim evaluates the actual Bézier curve.
+    previewWanted = false;
+    renderer.setPreview(new Float32Array([a.x, a.z, 0, b.x, b.z, -1]), a, b);
+    return;
+  }
+  if (previewInFlight) return;
   previewWanted = false;
   previewInFlight = true;
-  const [a, b] = [roadStart, previewEnd];
+  previewRequestedEnd = b;
   const revision = previewRevision;
   send(
     bulldozeTool
-      ? { type: 'previewBulldoze', x: b.x, y: b.z, revision }
+      ? { type: 'previewBulldoze', revision, x: b.x, y: b.z }
       : a
-        ? { type: 'previewRoad', ax: a.x, ay: a.z, bx: b.x, by: b.z, revision }
-        : { type: 'previewSnap', x: b.x, y: b.z, revision },
+        ? c
+          ? { type: 'previewCurve', revision, ax: a.x, ay: a.z, cx: c.x, cy: c.z, bx: b.x, by: b.z }
+          : { type: 'previewRoad', revision, ax: a.x, ay: a.z, bx: b.x, by: b.z }
+        : { type: 'previewSnap', revision, x: b.x, y: b.z },
   );
 }
-function setTool(tool: 'road' | 'bulldoze' | null, brush: Zone | null = null) {
-  roadTool = tool === 'road';
+function setTool(tool: typeof roadTool | 'bulldoze', brush: Zone | null = null) {
+  roadTool = tool === 'bulldoze' ? null : tool;
   bulldozeTool = tool === 'bulldoze';
   zone = tool ? null : brush;
   zoneStart = null;
@@ -121,16 +171,21 @@ function setTool(tool: 'road' | 'bulldoze' | null, brush: Zone | null = null) {
     b.classList.toggle('active', on);
     b.setAttribute('aria-pressed', String(on));
   }
-  previewRevision++;
-  previewWanted = false;
   roadStart = null;
-  previewEnd = null;
-  renderer.setPreview(null, null, null);
-  roadButton.classList.toggle('active', roadTool);
-  bulldozeButton.classList.toggle('active', bulldozeTool);
-  roadButton.setAttribute('aria-pressed', String(roadTool));
-  bulldozeButton.setAttribute('aria-pressed', String(bulldozeTool));
+  roadControl = null;
+  pendingBuild = null;
+  refused = false;
+  invalidatePreview();
+  for (const [button, mode] of [
+    [roadButton, 'straight'],
+    [curveButton, 'curve'],
+    [bulldozeButton, 'bulldoze'],
+  ] as const) {
+    button.classList.toggle('active', tool === mode);
+    button.setAttribute('aria-pressed', String(tool === mode));
+  }
   renderer.renderer.domElement.style.cursor = tool || zone !== null ? 'crosshair' : '';
+  updateRoadHelp();
 }
 function setZone(z: Zone) {
   setTool(null, zone === z ? null : z);
@@ -140,7 +195,8 @@ for (const b of zoneButtons) b.onclick = () => setZone(Number(b.dataset.zone) as
 function zoneKey(low: Zone, high: Zone) {
   setTool(null, zone === low ? high : low);
 }
-roadButton.onclick = () => setTool(roadTool ? null : 'road');
+roadButton.onclick = () => setTool(roadTool === 'straight' ? null : 'straight');
+curveButton.onclick = () => setTool(roadTool === 'curve' ? null : 'curve');
 bulldozeButton.onclick = () => setTool(bulldozeTool ? null : 'bulldoze');
 
 const canvas = renderer.renderer.domElement;
@@ -168,27 +224,37 @@ canvas.addEventListener('pointerup', (e) => {
   }
   if (!roadTool && !bulldozeTool) return;
   if (e.button === 2) return setTool(null);
+  if (pendingBuild) return;
   // Treat it as a click only if the pointer barely moved, so panning still works.
   if (e.button !== 0 || Math.hypot(e.clientX - downX, e.clientY - downY) > 4) return;
   const p = renderer.pick(e.clientX, e.clientY);
   if (!p) return;
-  previewRevision++;
-  if (bulldozeTool) {
-    send({ type: 'deleteRoad', x: p.x, y: p.z });
-  } else {
-    if (roadStart) send({ type: 'buildRoad', ax: roadStart.x, ay: roadStart.z, bx: p.x, by: p.z });
-    roadStart = p;
+  if (bulldozeTool) send({ type: 'deleteRoad', x: p.x, y: p.z });
+  else if (!roadStart) roadStart = p;
+  else if (roadTool === 'curve' && !roadControl) roadControl = p;
+  else {
+    const id = ++nextBuildId;
+    pendingBuild = { id, end: p };
+    const a = roadStart;
+    const c = roadControl;
+    send(
+      c
+        ? { type: 'buildCurve', id, ax: a.x, ay: a.z, cx: c.x, cy: c.z, bx: p.x, by: p.z }
+        : { type: 'buildRoad', id, ax: a.x, ay: a.z, bx: p.x, by: p.z },
+    );
   }
-  previewEnd = null;
-  renderer.setPreview(null, null, null);
+  refused = false;
+  invalidatePreview();
+  updateRoadHelp();
 });
 canvas.addEventListener('pointermove', (e) => {
   if (zone !== null && zoneStart) {
     renderer.setZoneDrag(zoneStart, renderer.pick(e.clientX, e.clientY), zone);
     return;
   }
-  if (!roadTool && !bulldozeTool) return;
-  // Keep accepting replies while moving; otherwise a busy worker never draws a preview.
+  if ((!roadTool && !bulldozeTool) || pendingBuild) return;
+  // Keep the latest completed preview visible during movement. Only a change of tool or
+  // construction stage invalidates an in-flight response; cursor updates queue the next one.
   previewEnd = renderer.pick(e.clientX, e.clientY);
   previewWanted = true;
   sendPreview();
@@ -202,7 +268,8 @@ canvas.addEventListener('pointerleave', () => {
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
 addEventListener('keydown', (e) => {
-  if (e.key === 'r' || e.key === 'R') setTool(roadTool ? null : 'road');
+  if (e.key === 'r' || e.key === 'R') setTool(roadTool === 'straight' ? null : 'straight');
+  else if (e.key === 'v' || e.key === 'V') setTool(roadTool === 'curve' ? null : 'curve');
   else if (e.key === 'b' || e.key === 'B') setTool(bulldozeTool ? null : 'bulldoze');
   else if (e.key === 'z' || e.key === 'Z') zoneKey(Zone.ResidentialLow, Zone.ResidentialHigh);
   else if (e.key === 'x' || e.key === 'X') zoneKey(Zone.CommercialLow, Zone.CommercialHigh);
@@ -241,8 +308,6 @@ function frame() {
       `trips      ${fmt(stats.tripsCompleted)}\n` +
       `stuck      ${fmt(stats.despawnedStuck)}   no path ${fmt(stats.pathsFailed)}\n` +
       `road edits ${fmt(stats.despawnedByEdit)} cars removed\n` +
-      (roadTool ? `\nROAD TOOL: click to place, Esc to stop` : '') +
-      (bulldozeTool ? `\nBULLDOZE: click a highlighted road to remove it, Esc to stop` : '') +
       (zone !== null
         ? `\nZONE: ${ZONE_NAMES[zone]}. Drag a rectangle to paint, Esc to stop` +
           `\n(Z/X/C pick a zone, press again for the other density; U unzones)`

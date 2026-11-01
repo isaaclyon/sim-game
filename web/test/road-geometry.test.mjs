@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { initSync, Sim } from '../src/pkg/sim_wasm.js';
 import { buildRoadGeometry } from '../src/road-geometry.ts';
+
+initSync({ module: readFileSync(new URL('../src/pkg/sim_wasm_bg.wasm', import.meta.url)) });
 
 function geometry(roads) {
   return buildRoadGeometry(new Float32Array(roads.flat()));
@@ -75,6 +79,30 @@ test('bends, T-junctions and crossings get a gap-free pad only at the shared end
       assert.ok(covers(mesh, 3.99 * Math.cos(angle), 3.99 * Math.sin(angle)));
     }
     mesh.dispose();
+  }
+});
+
+test('sampled roads preserve exact shared endpoints for asphalt pads', () => {
+  for (const curved of [false, true]) {
+    const sim = new Sim(1, 0, 0);
+    assert.ok(
+      curved
+        ? sim.build_curve(-100, -100, -50, -20, 0.1, 0.1)
+        : sim.build_road(-100, -100, 0.1, 0.1),
+    );
+    const first = sim.road_segments();
+    assert.ok(sim.build_road(0.1, 0.1, 100, -100));
+    const segments = sim.road_segments();
+    assert.deepEqual(
+      [...segments.slice(first.length - 3, first.length - 1)],
+      [...segments.slice(first.length, first.length + 2)],
+    );
+    const mesh = buildRoadGeometry(segments);
+    const n = segments.length / 5;
+    assert.equal(mesh.getAttribute('position').count, n * 6 + (n - 1) * 36);
+    assert.ok(covers(mesh, 0.1, 3.9), 'the shared junction has no shoulder gap');
+    mesh.dispose();
+    sim.free();
   }
 });
 

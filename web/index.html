@@ -19,18 +19,24 @@
         padding: 6px 10px; font: 12px ui-monospace, Menlo, monospace; cursor: pointer;
         white-space: nowrap;
       }
+      #toolbar button:hover { border-color: #6b7b8f; }
+      #toolbar button:focus-visible { outline: 2px solid #c9d4df; outline-offset: 2px; }
+      #road-help { position: fixed; bottom: 54px; left: 50%; transform: translateX(-50%); color: #c9d4df; background: #0f1419; padding: 6px 10px; font: 12px/1.5 ui-monospace, monospace; text-align: center; }
+      #road-help:empty { display: none; }
       #toolbar button.active { background: #2f6fb0; border-color: #4a8bd0; color: white; }
     </style>
   </head>
   <body>
     <div id="hud">loading…</div>
+    <div id="road-help" role="status" aria-live="polite"></div>
     <div id="toolbar">
       <button type="button" data-speed="0">pause</button>
       <button type="button" data-speed="1" class="active">1×</button>
       <button type="button" data-speed="3">3×</button>
       <button type="button" data-speed="10">10×</button>
       <button type="button" id="spawn">+5k cars</button>
-      <button type="button" id="road" aria-pressed="false">road tool (R)</button>
+      <button type="button" id="road" aria-pressed="false">straight road (R)</button>
+      <button type="button" id="curve" aria-pressed="false">curved road (V)</button>
       <button type="button" id="bulldoze" aria-pressed="false">bulldoze (B)</button>
       <button type="button" data-zone="1" aria-pressed="false" title="residential, low density (Z)">res low</button>
       <button type="button" data-zone="2" aria-pressed="false" title="residential, high density (Z twice)">res high</button>

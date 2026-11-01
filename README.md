@@ -11,14 +11,34 @@ Needs Rust (with the `wasm32-unknown-unknown` target), `wasm-pack`, and Node 24+
 cd web && npm install && npm run dev
 ```
 
-Controls: left-drag pans, right-drag orbits, wheel zooms to cursor. `R` toggles the road tool
-(click, click, ... Esc to stop). `B` toggles bulldoze: hover to highlight a road segment,
-click to remove both directions, Esc or right-click to stop. Both tools also work while paused.
+Controls: left-drag pans, right-drag orbits, wheel zooms to cursor. `R` toggles straight roads
+(click start, click end). `V` toggles curved roads (click start, click bend control, click end).
+The bend control pulls the curve toward it; it is not a point the road passes through.
+Both construction tools continue from the last successful end. `B` toggles bulldoze: hover to
+highlight a whole road between junctions, then click to remove both directions. All tools work
+while paused. Esc or right-click cancels. Space pauses, 1/2/3 set speed.
 Cars whose remaining route uses a deleted road park and retry; other traffic continues.
 The zone brush paints residential (`Z`), commercial (`X`) or industrial (`C`); press the key
 again to switch between low and high density, or use the tool bar. `U` unzones. Drag a
 rectangle to paint it (left-drag paints instead of panning while the brush is on).
-Space pauses, 1/2/3 set speed.
+
+## Roads
+
+Curved roads use quadratic Bézier centrelines. Cars travel by distance along the curve and
+face its local direction. Junction rules use the direction at each end, not the straight line
+between endpoints. Splitting a curve preserves its shape and existing road/lane ids.
+
+The sim calculates previews, snapping, crossings and rendered line segments. White preview
+markers join existing nodes; yellow markers split roads. A red preview means the build is
+refused. Construction refuses overlaps, pieces under 10 m, loops, repeated crossings of the
+same road, a second road between the same two junctions, and invalid or cusp-shaped curves. Coordinates must be finite and within ±1,000 km.
+A refused build changes nothing and keeps the selected start and bend control for another try.
+
+Internally, curves share a distance lookup table between their two lanes. Sampling uses a
+2 cm chord-deviation target; position and heading queries evaluate the Bézier itself. Straight
+roads keep their direct geometry queries and do not allocate a distance table. The road
+snapshot keeps its five-float segment format, with multiple segments per curve. Preview
+samples use join code -1 between actual junctions.
 
 Roads render as eight-metre-wide asphalt ribbons with simple pads at shared endpoints.
 Streets and avenues share one asphalt color; their simulation speed limits are unchanged.

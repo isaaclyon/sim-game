@@ -86,6 +86,7 @@ pub struct Junctions {
     control: Vec<Control>,
     // Per lane.
     heading: Vec<f32>,
+    departure: Vec<f32>,
     /// Angle around the node at which the lane arrives, pointing back along its road.
     arrive: Vec<f32>,
     /// Where the lane's movement chords start (as an in-lane) and end (as an out-lane) on the
@@ -138,10 +139,19 @@ impl Junctions {
         self.seen_version = Some(net.version);
         let (nodes, lanes) = (net.node_count(), net.lane_count());
 
-        self.heading = (0..lanes as LaneId).map(|l| net.lane_heading(l)).collect();
+        self.heading = (0..lanes as LaneId)
+            .map(|l| net.lane_heading(l, net.lane_len[l as usize]))
+            .collect();
+        self.departure = (0..lanes as LaneId)
+            .map(|l| net.lane_heading(l, 0.0))
+            .collect();
         self.arrive = self.heading.iter().map(|&h| wrap(h + PI)).collect();
         self.chord_in = self.arrive.iter().map(|&a| wrap(a + LANE_ANGLE)).collect();
-        self.chord_out = self.heading.iter().map(|&h| wrap(h - LANE_ANGLE)).collect();
+        self.chord_out = self
+            .departure
+            .iter()
+            .map(|&h| wrap(h - LANE_ANGLE))
+            .collect();
         let old_control = std::mem::take(&mut self.control);
         let old_groups = std::mem::take(&mut self.groups);
         self.control = (0..nodes as NodeId)
@@ -210,13 +220,28 @@ impl Junctions {
         }
     }
 
+    /// Keep reservations at the old far end attached to the same geometry. A car may have
+    /// left the edited road already while its crossing reservation still protects it.
+    pub(crate) fn remap_split(&mut self, road: crate::road::RoadId, rest: crate::road::RoadId) {
+        for crossings in &mut self.crossings {
+            for c in crossings {
+                if c.from == 2 * road {
+                    c.from = 2 * rest;
+                }
+                if c.to == 2 * road + 1 {
+                    c.to = 2 * rest + 1;
+                }
+            }
+        }
+    }
+
     /// Angle around the node at which `lane` arrives (pointing back along its road).
     fn arrive_angle(&self, lane: LaneId) -> f32 {
         self.arrive[lane as usize]
     }
 
     pub fn turn(&self, from: LaneId, to: LaneId) -> Turn {
-        let t = wrap(self.heading[to as usize] - self.heading[from as usize] + PI) - PI;
+        let t = wrap(self.departure[to as usize] - self.heading[from as usize] + PI) - PI;
         if t.abs() < FRAC_PI_4 {
             Turn::Straight
         } else if t < 0.0 && t > -5.0 * PI / 6.0 {
@@ -551,7 +576,12 @@ impl Junctions {
                     (true, false) => 1.0,
                     (true, true) => 2.0,
                 };
-                out.extend([x, y, self.heading[lane as usize], state]);
+                out.extend([
+                    x,
+                    y,
+                    net.lane_heading(lane, self.stop[lane as usize]),
+                    state,
+                ]);
             }
         }
     }
@@ -606,6 +636,49 @@ mod tests {
     const OUT_N: LaneId = 2;
     const OUT_W: LaneId = 4;
     const OUT_S: LaneId = 6;
+
+    #[test]
+    fn splitting_curve_preserves_reservations_at_the_old_far_end() {
+        let mut net = RoadNetwork::default();
+        let a = net.add_node(0.0, 0.0);
+        let b = net.add_node(200.0, 0.0);
+        let c = net.add_node(300.0, 0.0);
+        net.add_curve(a, b, (100.0, 100.0), STREET_SPEED);
+        net.add_road(b, c, STREET_SPEED);
+        net.rebuild_adjacency();
+        let mut j = Junctions::default();
+        j.sync(&net);
+        j.crossings[b as usize] = vec![
+            Crossing {
+                from: 0,
+                to: 2,
+                until: 50,
+            },
+            Crossing {
+                from: 3,
+                to: 1,
+                until: 60,
+            },
+        ];
+        let incoming = j.chord_in[0];
+        let outgoing = j.chord_out[1];
+        let mid = net.add_node(100.0, 50.0);
+        let rest = net.split_road(0, mid);
+        j.remap_split(0, rest);
+        net.rebuild_adjacency();
+        j.sync(&net);
+        let crossings = &j.crossings[b as usize];
+        assert_eq!(
+            (crossings[0].from, crossings[0].to, crossings[0].until),
+            (2 * rest, 2, 50)
+        );
+        assert_eq!(
+            (crossings[1].from, crossings[1].to, crossings[1].until),
+            (3, 2 * rest + 1, 60)
+        );
+        assert!((j.chord_in[2 * rest as usize] - incoming).abs() < 1e-5);
+        assert!((j.chord_out[2 * rest as usize + 1] - outgoing).abs() < 1e-5);
+    }
 
     #[test]
     fn control_follows_shape() {

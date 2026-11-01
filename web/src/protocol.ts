@@ -5,7 +5,17 @@ export type ToWorker =
   | { type: 'init'; seed: number; cols: number; rows: number; agents: number }
   | { type: 'setSpeed'; speed: number }
   | { type: 'spawn'; count: number }
-  | { type: 'buildRoad'; ax: number; ay: number; bx: number; by: number }
+  | { type: 'buildRoad'; id: number; ax: number; ay: number; bx: number; by: number }
+  | {
+      type: 'buildCurve';
+      id: number;
+      ax: number;
+      ay: number;
+      cx: number;
+      cy: number;
+      bx: number;
+      by: number;
+    }
   | { type: 'deleteRoad'; x: number; y: number }
   /**
    * Zones every cell whose centre is inside the rectangle with these corners (ADR 0014).
@@ -14,9 +24,19 @@ export type ToWorker =
   | { type: 'paintZone'; ax: number; ay: number; bx: number; by: number; zone: Zone }
   | { type: 'previewBulldoze'; x: number; y: number; revision: number }
   /** Asks where a road would snap. Changes nothing; answered with `roadPreview`. */
-  | { type: 'previewRoad'; ax: number; ay: number; bx: number; by: number; revision: number }
+  | { type: 'previewRoad'; revision: number; ax: number; ay: number; bx: number; by: number }
+  | {
+      type: 'previewCurve';
+      revision: number;
+      ax: number;
+      ay: number;
+      cx: number;
+      cy: number;
+      bx: number;
+      by: number;
+    }
   /** Asks where a road started here would start. Answered with a one-stop `roadPreview`. */
-  | { type: 'previewSnap'; x: number; y: number; revision: number };
+  | { type: 'previewSnap'; revision: number; x: number; y: number };
 
 /** Zone cell values, matching the sim's `Zone` (ADR 0014). Density is part of the zone. */
 export const Zone = {
@@ -45,12 +65,13 @@ export interface Stats {
 }
 
 export type FromWorker =
-  /** `segments` is `[ax, ay, bx, by, speedLimit]` per active road, packed (not indexed by road ID). */
+  /** `segments` is `[ax, ay, bx, by, speedLimit]` per active rendered segment (many per curve), not per road ID. */
   | { type: 'roads'; segments: Float32Array; bounds: [number, number, number, number] }
   /**
    * `stops` is `[x, y, join]` per stop of the previewed road, in order; join is 0 = new end,
-   * 1 = existing node, 2 = splits an existing road. Empty means the road would be refused.
-   * Answers `previewRoad`, or `previewSnap` with exactly one stop.
+   * 1 = existing node, 2 = splits an existing road, -1 = interior curve sample (no marker).
+   * Empty means refused. Answers `previewRoad` / `previewCurve`, or `previewSnap` with one stop.
+   * `revision` echoes the construction stage so cancelled or previous-stage previews are discarded.
    */
   | { type: 'roadPreview'; stops: Float32Array; revision: number }
   /**
@@ -59,7 +80,8 @@ export type FromWorker =
    * Sent at start and whenever a paint changes a cell.
    */
   | { type: 'zones'; cells: Uint8Array; layout: [number, number, number, number, number] }
-  /** Selected segment `[ax, ay, bx, by]`, or empty on a miss. Sim-owned hit testing. */
+  | { type: 'buildResult'; id: number; success: boolean }
+  /** Selected road's `[x, y]` centreline samples, or empty on a miss. Sim-owned hit testing. */
   | { type: 'bulldozePreview'; segment: Float32Array; revision: number }
   /**
    * `agents` is `[x, y, heading, speedRatio]` per agent id; speedRatio < 0 means hidden.

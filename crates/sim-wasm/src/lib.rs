@@ -58,6 +58,31 @@ impl Sim {
         self.world.apply(Command::BuildRoad { ax, ay, bx, by })
     }
 
+    pub fn build_curve(&mut self, ax: f32, ay: f32, cx: f32, cy: f32, bx: f32, by: f32) -> bool {
+        self.world.apply(Command::BuildCurve {
+            ax,
+            ay,
+            cx,
+            cy,
+            bx,
+            by,
+        })
+    }
+
+    pub fn curve_preview(
+        &mut self,
+        ax: f32,
+        ay: f32,
+        cx: f32,
+        cy: f32,
+        bx: f32,
+        by: f32,
+    ) -> Vec<f32> {
+        self.world
+            .write_curve_preview(ax, ay, cx, cy, bx, by, &mut self.buf);
+        self.buf.clone()
+    }
+
     pub fn delete_road(&mut self, x: f32, y: f32) -> bool {
         self.world.apply(Command::DeleteRoad { x, y })
     }
@@ -91,7 +116,7 @@ impl Sim {
         self.world.zones.layout().to_vec()
     }
 
-    /// `[ax, ay, bx, by]` of the selected segment, or empty on a miss.
+    /// `[x, y]` per centreline sample of the selected road, or empty on a miss.
     pub fn bulldoze_preview(&mut self, x: f32, y: f32) -> Vec<f32> {
         self.world.write_bulldoze_preview(x, y, &mut self.buf);
         self.buf.clone()
@@ -127,7 +152,7 @@ impl Sim {
         self.buf.clone()
     }
 
-    /// `[ax, ay, bx, by, speed_limit]` per active road, packed in road ID order.
+    /// `[ax, ay, bx, by, speed_limit]` per active rendered segment; curves have multiple segments.
     pub fn road_segments(&mut self) -> Vec<f32> {
         self.world.write_road_segments(&mut self.buf);
         self.buf.clone()

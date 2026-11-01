@@ -1,6 +1,6 @@
 # 0013. Road deletion uses tombstones
 
-- Status: Accepted
+- Status: Bulldoze preview shape superseded by [0015](0015-curved-road-snapshots.md); otherwise accepted
 - Date: 2026-10-31
 
 ## Context

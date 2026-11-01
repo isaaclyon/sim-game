@@ -9,6 +9,7 @@
 //   interpolation and orientation into a vertex shader fed by the raw snapshot.
 // - Picking is a ray against the ground plane. Add three-mesh-bvh once we pick against meshes.
 // - Roads share one static mesh, rebuilt only when the road snapshot changes.
+// - Curve sampling belongs to the sim.
 
 import CameraControls from 'camera-controls';
 import * as THREE from 'three';
@@ -117,7 +118,7 @@ export class Renderer {
     });
   }
 
-  /** `segments` packs `[ax, ay, bx, by, speedLimit]` per active road, not per road ID. */
+  /** `segments` is `[ax, ay, bx, by, speedLimit]` per active rendered segment (many per curve), not per road ID. */
   setRoads(segments: Float32Array, bounds: [number, number, number, number], fitCamera: boolean) {
     const geom = buildRoadGeometry(segments);
     if (this.roads) {
@@ -268,8 +269,9 @@ export class Renderer {
   /**
    * Draws the road the sim would build from `a` to `b`. `stops` is `[x, y, join]` per stop
    * (see `roadPreview` in protocol.ts): the line follows the stops, with a marker where it joins
-   * the network. Empty `stops` means refused: a red straight line. A single stop is where a
-   * road would start, drawn as a marker even for a new end. `null` hides the preview.
+   * the network. Join -1 marks interior curve samples without a marker. Empty `stops` means
+   * refused: a red straight line. A single stop is where a road would start, drawn as a marker
+   * even for a new end. `null` hides the preview.
    */
   setPreview(stops: Float32Array | null, a: THREE.Vector3 | null, b: THREE.Vector3 | null) {
     const line: THREE.Vector3[] = [];
@@ -354,13 +356,17 @@ export class Renderer {
     (this.zoneDrag.material as THREE.LineBasicMaterial).color.set(ZONE_OUTLINE[zone] ?? 0xffffff);
   }
 
-  /** Draw only the segment selected by the sim, in the destructive-action color. */
+  /** Draw the full centreline selected by the sim, in the destructive-action color. */
   setBulldozePreview(segment: Float32Array) {
     this.setPreview(null, null, null);
-    if (segment.length !== 4) return;
-    const a = new THREE.Vector3(segment[0], 0.5, segment[1]);
-    const b = new THREE.Vector3(segment[2], 0.5, segment[3]);
-    this.setPreview(new Float32Array(), a, b);
+    const line: THREE.Vector3[] = [];
+    for (let i = 0; i < segment.length; i += 2) {
+      line.push(new THREE.Vector3(segment[i], 0.5, segment[i + 1]));
+    }
+    (this.preview.material as THREE.LineBasicMaterial).color.copy(PREVIEW_REFUSED_COLOR);
+    this.preview.geometry.dispose();
+    this.preview.geometry = new THREE.BufferGeometry().setFromPoints(line);
+    this.preview.visible = line.length > 1;
   }
 
   render() {
