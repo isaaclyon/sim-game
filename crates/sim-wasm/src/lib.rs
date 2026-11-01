@@ -1,5 +1,6 @@
 //! Thin wasm-bindgen wrapper. Logic belongs in `sim`; this crate only converts types.
 
+use sim::road::RoadClass;
 use sim::{Command, Config, World, Zone};
 use wasm_bindgen::prelude::*;
 
@@ -54,11 +55,34 @@ impl Sim {
         self.world.apply(Command::SpawnAgents { count })
     }
 
-    pub fn build_road(&mut self, ax: f32, ay: f32, bx: f32, by: f32) -> bool {
-        self.world.apply(Command::BuildRoad { ax, ay, bx, by })
+    /// `class` is 0 = street, 1 = main road, 2 = alley. Unknown values build nothing.
+    pub fn build_road(&mut self, ax: f32, ay: f32, bx: f32, by: f32, class: u8) -> bool {
+        let Some(class) = RoadClass::from_u8(class) else {
+            return false;
+        };
+        self.world.apply(Command::BuildRoad {
+            ax,
+            ay,
+            bx,
+            by,
+            class,
+        })
     }
 
-    pub fn build_curve(&mut self, ax: f32, ay: f32, cx: f32, cy: f32, bx: f32, by: f32) -> bool {
+    #[allow(clippy::too_many_arguments)] // Mirrors the coordinate-only WASM command boundary.
+    pub fn build_curve(
+        &mut self,
+        ax: f32,
+        ay: f32,
+        cx: f32,
+        cy: f32,
+        bx: f32,
+        by: f32,
+        class: u8,
+    ) -> bool {
+        let Some(class) = RoadClass::from_u8(class) else {
+            return false;
+        };
         self.world.apply(Command::BuildCurve {
             ax,
             ay,
@@ -66,6 +90,7 @@ impl Sim {
             cy,
             bx,
             by,
+            class,
         })
     }
 
@@ -177,7 +202,9 @@ impl Sim {
         self.buf.clone()
     }
 
-    /// `[ax, ay, bx, by, speed_limit]` per active rendered segment; curves have multiple segments.
+    /// `[ax, ay, bx, by, class]` per active rendered segment (class 0 = street, 1 = main road,
+    /// 2 = alley);
+    /// curves have multiple segments.
     pub fn road_segments(&mut self) -> Vec<f32> {
         self.world.write_road_segments(&mut self.buf);
         self.buf.clone()

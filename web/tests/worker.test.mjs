@@ -45,7 +45,7 @@ test('curve preview, build and bulldoze agree across the worker boundary while p
   const preview = w.messages.at(-1);
   assert.equal(preview.revision, 10);
   assert.ok(preview.stops.length > 6);
-  await w.send({ type: 'buildCurve', ...coords, id: 20 });
+  await w.send({ type: 'buildCurve', ...coords, class: 0, id: 20 });
   const result = w.messages.at(-1);
   assert.equal(result.type, 'buildResult');
   assert.equal(result.id, 20);
@@ -66,11 +66,11 @@ test('curve preview, build and bulldoze agree across the worker boundary while p
   assert.deepEqual(w.messages.at(-2).segments, before);
   assert.equal(w.messages.at(-1).type, 'frame');
   assert.equal(w.messages.at(-1).stats.tick, 0);
-  await w.send({ type: 'buildCurve', ...coords, id: 21 });
+  await w.send({ type: 'buildCurve', ...coords, class: 0, id: 21 });
   assert.equal(w.messages.at(-1).success, true, 'a deleted curve does not block rebuilding');
   assert.deepEqual(w.messages.at(-2).segments.slice(before.length), added);
   const count = w.messages.length;
-  await w.send({ type: 'buildCurve', ...coords, id: 22 });
+  await w.send({ type: 'buildCurve', ...coords, class: 0, id: 22 });
   assert.equal(w.messages.length, count + 1, 'refused builds do not publish a changed network');
   assert.equal(w.messages.at(-1).id, 22);
   assert.equal(w.messages.at(-1).success, false);

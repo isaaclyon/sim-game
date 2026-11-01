@@ -1,5 +1,5 @@
 import type * as THREE from 'three';
-import { type FromWorker, type Stats, type ToWorker, Zone } from './protocol';
+import { type FromWorker, RoadClass, type Stats, type ToWorker, Zone } from './protocol';
 import { Renderer } from './renderer';
 
 const byId = (id: string): HTMLElement => {
@@ -98,6 +98,9 @@ const roadButton = byId('road');
 const curveButton = byId('curve');
 const roadHelp = byId('road-help');
 let roadTool: 'straight' | 'curve' | null = null;
+// Main road (M) is a setting of both road tools, kept until switched off.
+const mainRoadButton = byId('main-road');
+let roadClass: RoadClass = RoadClass.Street;
 const bulldozeButton = byId('bulldoze');
 let bulldozeTool = false;
 // --- zone brush: pick a zone, then drag a rectangle; every cell inside takes that zone ---
@@ -157,7 +160,7 @@ function updateRoadHelp() {
       ? ''
       : pendingBuild
         ? 'Building road…'
-        : `${refused ? 'Cannot build here. Move the end away from overlaps or short joins. ' : ''}${stage} Esc or right-click cancels.`;
+        : `${roadClass === RoadClass.Main ? 'Main road. ' : ''}${refused ? 'Cannot build here. Move the end away from overlaps or short joins. ' : ''}${stage} Esc or right-click cancels.`;
 }
 function invalidatePreview() {
   previewRevision++;
@@ -217,6 +220,15 @@ function setTool(tool: typeof roadTool | 'bulldoze', brush: Zone | null = null) 
   renderer.renderer.domElement.style.cursor = tool || zone !== null ? 'crosshair' : '';
   updateRoadHelp();
 }
+/** Toggles main road for the road tools, picking the straight road tool if none is active. */
+function toggleMainRoad() {
+  roadClass = roadClass === RoadClass.Main ? RoadClass.Street : RoadClass.Main;
+  const on = roadClass === RoadClass.Main;
+  mainRoadButton.classList.toggle('active', on);
+  mainRoadButton.setAttribute('aria-pressed', String(on));
+  if (!roadTool) setTool('straight');
+  else updateRoadHelp();
+}
 function setZone(z: Zone) {
   setTool(null, zone === z ? null : z);
 }
@@ -228,6 +240,7 @@ function zoneKey(low: Zone, high: Zone) {
 roadButton.onclick = () => setTool(roadTool === 'straight' ? null : 'straight');
 curveButton.onclick = () => setTool(roadTool === 'curve' ? null : 'curve');
 bulldozeButton.onclick = () => setTool(bulldozeTool ? null : 'bulldoze');
+mainRoadButton.onclick = toggleMainRoad;
 
 const canvas = renderer.renderer.domElement;
 let downX = 0;
@@ -274,10 +287,21 @@ canvas.addEventListener('pointerup', (e) => {
     pendingBuild = { id, end: p };
     const a = roadStart;
     const c = roadControl;
+    const cls = roadClass;
     send(
       c
-        ? { type: 'buildCurve', id, ax: a.x, ay: a.z, cx: c.x, cy: c.z, bx: p.x, by: p.z }
-        : { type: 'buildRoad', id, ax: a.x, ay: a.z, bx: p.x, by: p.z },
+        ? {
+            type: 'buildCurve',
+            id,
+            ax: a.x,
+            ay: a.z,
+            cx: c.x,
+            cy: c.z,
+            bx: p.x,
+            by: p.z,
+            class: cls,
+          }
+        : { type: 'buildRoad', id, ax: a.x, ay: a.z, bx: p.x, by: p.z, class: cls },
     );
   }
   refused = false;
@@ -314,6 +338,7 @@ addEventListener('keydown', (e) => {
   if (e.key === 'r' || e.key === 'R') setTool(roadTool === 'straight' ? null : 'straight');
   else if (e.key === 'v' || e.key === 'V') setTool(roadTool === 'curve' ? null : 'curve');
   else if (e.key === 'b' || e.key === 'B') setTool(bulldozeTool ? null : 'bulldoze');
+  else if (e.key === 'm' || e.key === 'M') toggleMainRoad();
   else if (e.key === 'z' || e.key === 'Z') zoneKey(Zone.ResidentialLow, Zone.ResidentialHigh);
   else if (e.key === 'x' || e.key === 'X') zoneKey(Zone.CommercialLow, Zone.CommercialHigh);
   else if (e.key === 'c' || e.key === 'C') zoneKey(Zone.IndustrialLow, Zone.IndustrialHigh);
