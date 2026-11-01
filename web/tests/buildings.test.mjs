@@ -31,6 +31,31 @@ test('WASM sends sim-owned building footprints, heights and original zones', () 
   s.free();
 });
 
+test('industrial snapshots carry varied roofs and halls and preserve them after repainting', () => {
+  const s = new Sim(1, 3, 3);
+  assert.ok(s.fill_block(50, 50, 6));
+  s.tick(610);
+  const data = s.building_snapshot();
+  const roofs = new Set();
+  const heights = new Set();
+  let i = 0;
+  while (i < data.length) {
+    assert.equal(data[i], 6);
+    assert.ok(data[i + 2] >= 0 && data[i + 2] <= 3);
+    roofs.add(data[i + 2]);
+    heights.add(data[i + 1]);
+    assert.ok(data[i + 3] >= 3);
+    i += 4 + 2 * data[i + 3];
+  }
+  assert.equal(i, data.length);
+  assert.ok(roofs.size > 1);
+  assert.ok(heights.size > 1);
+  s.fill_block(50, 50, 1);
+  s.tick(610);
+  assert.deepEqual(s.building_snapshot(), data);
+  s.free();
+});
+
 async function worker() {
   let now = 0;
   let step;
