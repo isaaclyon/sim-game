@@ -141,7 +141,7 @@ async function tools() {
     move,
     click,
     reply: (data) => worker.onmessage({ data }),
-    key: (key) => events.keydown({ key }),
+    key: (key, options = {}) => events.keydown({ key, ...options }),
   };
 }
 
@@ -169,6 +169,36 @@ test('normal startup has no synthetic traffic and HUD displays authoritative pop
   });
   t.frame();
   assert.match(t.elements.hud.textContent, /population 1,234/);
+});
+
+test('toolbar shortcuts leave modified, repeated and native control keys alone', async () => {
+  const t = await tools();
+  for (const options of [
+    { ctrlKey: true },
+    { metaKey: true },
+    { altKey: true },
+    { repeat: true },
+    { isComposing: true },
+  ]) {
+    t.key('r', options);
+    assert.notEqual(t.elements.road.attributes['aria-pressed'], 'true');
+  }
+  t.key('R');
+  assert.equal(t.elements.road.attributes['aria-pressed'], 'true');
+  t.key('r', { repeat: true });
+  assert.equal(t.elements.road.attributes['aria-pressed'], 'true');
+  const before = t.messages.length;
+  const button = { closest: (selector) => (selector.includes('button') ? button : null) };
+  t.key(' ', { target: button });
+  assert.equal(t.messages.length, before, 'Space on a button must only activate that button');
+  const input = { closest: (selector) => (selector.includes('input') ? input : null) };
+  t.key('z', { target: input });
+  assert.equal(t.elements.road.attributes['aria-pressed'], 'true', 'typing must not switch tools');
+  t.key(' ');
+  assert.equal(t.messages.at(-1).type, 'setSpeed');
+  assert.equal(t.messages.at(-1).speed, 0);
+  t.key('Escape');
+  assert.equal(t.elements.road.attributes['aria-pressed'], 'false');
 });
 
 test('zoning shortcuts and drags stay exclusive with curved roads and bulldozing', async () => {

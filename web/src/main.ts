@@ -336,6 +336,13 @@ canvas.addEventListener('pointerleave', () => {
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
 addEventListener('keydown', (e) => {
+  // Keep browser shortcuts, held keys and text entry from toggling tools.
+  if (e.ctrlKey || e.metaKey || e.altKey || e.repeat || e.isComposing) return;
+  const target = e.target as HTMLElement | null;
+  if (target?.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])'))
+    return;
+  // Space activates a focused button natively; it must not also pause the sim.
+  if (e.key === ' ' && target?.closest('button, a[href], [role="button"]')) return;
   if (e.key === 'r' || e.key === 'R') setTool(roadTool === 'straight' ? null : 'straight');
   else if (e.key === 'v' || e.key === 'V') setTool(roadTool === 'curve' ? null : 'curve');
   else if (e.key === 'b' || e.key === 'B') setTool(bulldozeTool ? null : 'bulldoze');
