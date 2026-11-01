@@ -149,6 +149,69 @@ fn growth_and_pending_work_are_deterministic_and_snapshots_are_read_only() {
 }
 
 #[test]
+fn opening_a_block_clears_its_buildings_immediately() {
+    let mut w = town(Zone::CommercialHigh);
+    advance(&mut w, 61);
+    assert!(!snapshot(&w).is_empty());
+    assert!(w.apply(Command::DeleteRoad { x: 60.0, y: 0.0 }));
+    assert!(snapshot(&w).is_empty());
+}
+
+#[test]
+fn curved_street_buildings_follow_lots_without_replacing_them_with_boxes() {
+    let mut w = World::generate(Config::default(), 0, 0);
+    for (ax, ay, bx, by) in [
+        (0.0, 0.0, 120.0, 0.0),
+        (120.0, 0.0, 120.0, 120.0),
+        (0.0, 120.0, 0.0, 0.0),
+    ] {
+        assert!(w.apply(Command::BuildRoad {
+            ax,
+            ay,
+            bx,
+            by,
+            class: RoadClass::Street
+        }));
+    }
+    assert!(w.apply(Command::BuildCurve {
+        ax: 120.0,
+        ay: 120.0,
+        cx: 60.0,
+        cy: 180.0,
+        bx: 0.0,
+        by: 120.0,
+        class: RoadClass::Street
+    }));
+    assert!(w.apply(Command::FillBlock {
+        x: 50.0,
+        y: 50.0,
+        zone: Zone::CommercialHigh
+    }));
+    advance(&mut w, 61);
+    assert!(w.buildings.active_buildings().count() > 3);
+    assert!(
+        w.buildings
+            .active_buildings()
+            .any(|b| w.buildings.footprint(b).len() > 4)
+    );
+}
+
+#[test]
+fn growth_does_not_consume_traffic_randomness() {
+    let mut a = World::generate(Config::default(), 3, 3);
+    let mut b = town(Zone::ResidentialLow);
+    for w in [&mut a, &mut b] {
+        assert!(w.apply(Command::SpawnAgents { count: 100 }));
+        advance(w, 61);
+    }
+    let (mut left, mut right) = (Vec::new(), Vec::new());
+    a.write_agent_snapshot(&mut left);
+    b.write_agent_snapshot(&mut right);
+    assert_eq!(left, right);
+    assert_eq!(a.stats().trips_completed, b.stats().trips_completed);
+}
+
+#[test]
 fn unzoned_towns_never_grow_buildings() {
     let mut w = World::generate(Config::default(), 3, 3);
     advance(&mut w, 120);
