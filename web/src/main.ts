@@ -246,11 +246,14 @@ mainRoadButton.onclick = toggleMainRoad;
 const canvas = renderer.renderer.domElement;
 let downX = 0;
 let downY = 0;
+// Keyboard panning during a zone press moves the ground under the cursor: that is a drag.
+let zoneKeyPanned = false;
 canvas.addEventListener('pointerdown', (e) => {
   downX = e.clientX;
   downY = e.clientY;
   if (zone === null || e.button !== 0) return;
   zoneStart = renderer.pick(e.clientX, e.clientY);
+  zoneKeyPanned = false;
   blockRevision++;
   // Keep getting moves and the release even if the drag leaves the canvas.
   canvas.setPointerCapture(e.pointerId);
@@ -262,7 +265,7 @@ canvas.addEventListener('pointerup', (e) => {
     if (e.button === 0 && zoneStart && end) {
       const [a, b] = [zoneStart, end];
       // A click fills the block under it; a drag paints the rectangle.
-      if (Math.hypot(e.clientX - downX, e.clientY - downY) <= 4)
+      if (!zoneKeyPanned && Math.hypot(e.clientX - downX, e.clientY - downY) <= 4)
         send({ type: 'fillBlock', x: b.x, y: b.z, zone });
       else send({ type: 'paintZone', ax: a.x, ay: a.z, bx: b.x, by: b.z, zone });
     }
@@ -360,6 +363,7 @@ function panWithKeys(seconds: number) {
   if (length === 0) return;
   const step = (KEY_PAN_SPEED * Math.min(seconds, MAX_PAN_STEP)) / length;
   renderer.panGround(right * step, forward * step);
+  if (zoneStart) zoneKeyPanned = true;
 }
 // Keyup can go missing when the page loses focus or a modifier is down, so release on those.
 addEventListener('keyup', (e) => heldPanKeys.delete(e.key.toLowerCase()));

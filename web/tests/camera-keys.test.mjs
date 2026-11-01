@@ -145,3 +145,20 @@ test('panning works paused and with tools, and keeps tool previews under the cur
   step(t, 16);
   assert.equal(t.messages.length, left, 'nothing to refresh once the cursor leaves');
 });
+
+test('keyboard panning during a zone press paints the rectangle it shows', async () => {
+  const t = await tools();
+  t.key('z');
+  t.down(10, 10);
+  t.up(10, 10);
+  assert.equal(t.messages.at(-1).type, 'fillBlock', 'a still click fills the block');
+  t.down(10, 10);
+  t.key('w');
+  step(t, 16);
+  t.keyup('w');
+  t.up(10, 10);
+  assert.equal(t.messages.at(-1).type, 'paintZone', 'the camera moved, so it was a drag');
+  t.down(10, 10);
+  t.up(10, 10);
+  assert.equal(t.messages.at(-1).type, 'fillBlock', 'the next still click fills again');
+});

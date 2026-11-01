@@ -57,3 +57,18 @@ test('keyboard panning stays on the ground at any orbit and pitch', () => {
     assert.ok(Math.abs(moved.dot(look) - 0.04 * distance) < 1e-6, 'W moves where it looks');
   }
 });
+
+test('a long keyboard pan leaves no pending camera transitions behind', () => {
+  const { c } = controls(0.4, 0.8);
+  let waiting = 0;
+  const add = c.addEventListener.bind(c);
+  c.addEventListener = (type, listener) => {
+    if (type === 'rest') waiting++;
+    add(type, listener);
+  };
+  for (let frame = 0; frame < 1000; frame++) {
+    panAlongGround(c, 0.001, 0.002);
+    c.update(1 / 144);
+  }
+  assert.equal(waiting, 0);
+});
