@@ -369,14 +369,20 @@ export class Renderer {
     (this.zoneDrag.material as THREE.LineBasicMaterial).color.set(ZONE_OUTLINE[zone] ?? 0xffffff);
   }
 
-  /** Draws lot edges over the zones: `[ax, ay, bx, by]` per segment (see `lots` in protocol.ts). */
-  setLots(segments: Float32Array) {
-    const pos = new Float32Array((segments.length / 4) * 6);
-    for (let i = 0, j = 0; i < segments.length; i += 4, j += 6) {
-      pos.set([segments[i], 0.1, segments[i + 1], segments[i + 2], 0.1, segments[i + 3]], j);
+  /** Draws lot edges over the zones: `[n, x0, y0, …]` per lot (see `lots` in protocol.ts). */
+  setLots(rings: Float32Array) {
+    const pos: number[] = [];
+    for (let i = 0; i < rings.length; ) {
+      const n = rings[i];
+      const at = (k: number) => i + 1 + 2 * (k % n);
+      for (let k = 0; k < n; k++) {
+        const [a, b] = [at(k), at(k + 1)];
+        pos.push(rings[a], 0.1, rings[a + 1], rings[b], 0.1, rings[b + 1]);
+      }
+      i += 1 + 2 * n;
     }
     const geom = new THREE.BufferGeometry();
-    geom.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
     if (!this.lots) {
       // Drawn just after the zones and before the roads, which cover lot edges under them.
       const material = new THREE.LineBasicMaterial({

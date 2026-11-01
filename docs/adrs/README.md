@@ -21,8 +21,9 @@ rewriting history; mark the old one `Superseded by NNNN`.
 | [0013](0013-road-deletion-tombstones.md) | Road deletion uses tombstones | Bulldoze preview shape superseded by 0015; otherwise accepted |
 | [0014](0014-zone-grid.md) | Zones live on a fixed grid, independent of blocks | Accepted |
 | [0015](0015-curved-road-snapshots.md) | Curved roads use simulation-sampled segment snapshots | Accepted; road speed field superseded by 0017 |
-| [0016](0016-blocks-lots-and-alleys.md) | Blocks are derived road faces; lots are zone-cell sets; the sim adds alleys | Accepted |
+| [0016](0016-blocks-lots-and-alleys.md) | Blocks are derived road faces; lots are zone-cell sets; the sim adds alleys | Accepted; lots superseded by 0018 |
 | [0017](0017-road-classes-and-main-road-routing.md) | Road classes and main-road routing | Accepted |
+| [0018](0018-lots-cut-along-roads.md) | Lots are shapes cut along roads; buildings take their shape from lots | Accepted |
 
 ADRs are only for decisions that are hard to reverse. See [AGENTS.md](AGENTS.md) for when to
 write one and how.

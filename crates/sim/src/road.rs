@@ -370,6 +370,30 @@ impl RoadNetwork {
         b
     }
 
+    /// A perfect `cols` × `rows` lattice of junctions `spacing` apart: every street present,
+    /// no jitter, no avenues. The cleanest case for traffic and lots.
+    pub fn generate_lattice(cols: u32, rows: u32, spacing: f32) -> Self {
+        let mut net = Self::default();
+        for r in 0..rows {
+            for c in 0..cols {
+                net.add_node(c as f32 * spacing, r as f32 * spacing);
+            }
+        }
+        for r in 0..rows {
+            for c in 0..cols {
+                let id = r * cols + c;
+                if c + 1 < cols {
+                    net.add_road(id, id + 1, RoadClass::Street);
+                }
+                if r + 1 < rows {
+                    net.add_road(id, id + cols, RoadClass::Street);
+                }
+            }
+        }
+        net.rebuild_adjacency();
+        net
+    }
+
     /// Jittered grid with some streets removed, so it reads as a town rather than a lattice.
     /// Every fifth row and column is a main road (an avenue), which long trips ride.
     pub fn generate_grid(cols: u32, rows: u32, spacing: f32, rng: &mut Rng) -> Self {

@@ -129,7 +129,7 @@ test('a click fills the block under it, and its lots are sent', async () => {
   await w.init;
   await w.send({ type: 'setSpeed', speed: 0 });
   const lots = w.messages.find((msg) => msg.type === 'lots');
-  assert.equal(lots.segments.length, 0, 'no lots before zoning');
+  assert.equal(lots.rings.length, 0, 'no lots before zoning');
   // The generated town's first block lies between its first two parallel roads.
   const roads = w.messages.find((msg) => msg.type === 'roads').segments;
   const [x0, y0] = [Math.min(roads[0], roads[2]), Math.min(roads[1], roads[3])];
@@ -148,7 +148,14 @@ test('a click fills the block under it, and its lots are sent', async () => {
   const zones = w.messages.findLast((msg) => msg.type === 'zones');
   assert.ok(zones.cells.some((c) => c === 1));
   const cut = w.messages.findLast((msg) => msg.type === 'lots');
-  assert.ok(cut.segments.length > 0 && cut.segments.length % 4 === 0);
+  assert.ok(cut.rings.length > 0);
+  // Every ring is a point count of at least three, then that many points, end to end.
+  let i = 0;
+  while (i < cut.rings.length) {
+    assert.ok(cut.rings[i] >= 3);
+    i += 1 + 2 * cut.rings[i];
+  }
+  assert.equal(i, cut.rings.length);
   assert.equal(w.messages.at(-1).type, 'frame');
   assert.equal(w.messages.at(-1).stats.tick, 0, 'filling does not advance time');
 });

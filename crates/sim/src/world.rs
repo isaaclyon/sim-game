@@ -428,9 +428,9 @@ impl World {
         }
     }
 
-    /// Writes `[ax, ay, bx, by]` per lot outline segment, along zone cell edges.
+    /// Writes `[n, x0, y0, …]` per lot: its outline's point count, then its points.
     pub fn write_lot_outlines(&self, out: &mut Vec<f32>) {
-        self.lots.write_outlines(&self.zones, out);
+        self.lots.write_outlines(out);
     }
 
     /// Writes `[x, y, heading, state]` per signalised approach, at its stop line. State is
@@ -470,6 +470,9 @@ impl World {
         mix(self.lots.len() as u64);
         for lot in self.lots.active_lots() {
             mix(lot as u64);
+            for p in self.lots.outline(lot) {
+                mix(((p.0.to_bits() as u64) << 32) | p.1.to_bits() as u64);
+            }
         }
         h
     }
@@ -657,9 +660,9 @@ impl World {
         (divided, split)
     }
 
-    /// Recuts lots in the blocks of `scope` (ADR 0016). With `retire`, after a road edit: lots
-    /// there that no longer match are retired. Without, after zoning: only zoned blocks with no
-    /// lots yet are cut.
+    /// Recuts lots in the blocks of `scope` (ADR 0016, ADR 0018). With `retire`, after a road
+    /// edit: lots there that no longer match are retired. Either way, new lots are added where
+    /// at least half their cells are zoned and no lot holds them yet.
     fn update_lots(&mut self, scope: Scope, retire: bool) {
         if self.lots.active_lots().next().is_none() && !self.zones.any_zoned() {
             return;
@@ -678,19 +681,27 @@ impl World {
                 continue;
             }
             let cells = self.blocks.cells(b, &self.zones);
-            if cells.iter().all(|c| self.zones.zone(c.index) == Zone::None)
-                || (!retire && cells.iter().any(|c| self.lots.owner(c.index).is_some()))
-            {
+            let has_lots = cells.iter().any(|c| self.lots.owner(c.index).is_some());
+            if !has_lots && cells.iter().all(|c| self.zones.zone(c.index) == Zone::None) {
                 continue;
             }
-            for plan in self.blocks.cut(&cells, self.zones.cols) {
+            for plan in self.blocks.cut(b, &self.zones) {
                 match self.lots.matching(&plan) {
                     Some(lot) => {
                         // Its block may have grown or shrunk around it.
                         self.lots.set_block(lot, br);
                         kept.insert(lot);
                     }
-                    None => plans.push((plan, br)),
+                    None => {
+                        let zoned = plan
+                            .cells
+                            .iter()
+                            .filter(|&&c| self.zones.zone(c) != Zone::None)
+                            .count();
+                        if zoned > 0 && 2 * zoned >= plan.cells.len() {
+                            plans.push((plan, br));
+                        }
+                    }
                 }
             }
         }
