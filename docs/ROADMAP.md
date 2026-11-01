@@ -41,7 +41,7 @@ A growing city makes traffic. The traffic model has to hold up before anything g
   gap in ADR 0006).
 - Snapping: new roads join existing nodes and split segments they cross.
 - Curved roads (Bézier), behind the existing `lane_point` / `lane_heading` queries.
-- Road deletion (bulldoze). **ADR** for tombstones or a free list (ADR 0005 leaves this open).
+- Road deletion (bulldoze): implemented with tombstones ([ADR 0013](adrs/0013-road-deletion-tombstones.md)).
 - Road meshes in place of lines: asphalt ribbons with simple intersection pads.
 
 Done when: 50k agents drive for a sim-hour on a hand-drawn network with near-zero gridlock

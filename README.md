@@ -12,7 +12,10 @@ cd web && npm install && npm run dev
 ```
 
 Controls: left-drag pans, right-drag orbits, wheel zooms to cursor. `R` toggles the road tool
-(click, click, ... Esc to stop). Space pauses, 1/2/3 set speed.
+(click, click, ... Esc to stop). `B` toggles bulldoze: hover to highlight a road segment,
+click to remove both directions, Esc or right-click to stop. Both tools also work while paused.
+Cars whose remaining route uses a deleted road park and retry; other traffic continues.
+Space pauses, 1/2/3 set speed.
 
 ## Layout
 

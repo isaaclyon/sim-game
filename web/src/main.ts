@@ -27,9 +27,19 @@ worker.onmessage = (e: MessageEvent<FromWorker>) => {
   if (msg.type === 'roads') {
     renderer.setRoads(msg.segments, msg.bounds, !roadsSeen);
     roadsSeen = true;
-  } else if (msg.type === 'roadPreview') {
+    // Retry a hover sent before WASM was ready, or after the topology changed.
+    if (previewEnd) {
+      previewRevision++;
+      previewWanted = true;
+      sendPreview();
+    }
+  } else if (msg.type === 'roadPreview' || msg.type === 'bulldozePreview') {
     previewInFlight = false;
-    if (roadTool && previewEnd) renderer.setPreview(msg.stops, roadStart, previewEnd);
+    if (msg.revision === previewRevision && previewEnd) {
+      if (msg.type === 'roadPreview' && roadTool)
+        renderer.setPreview(msg.stops, roadStart, previewEnd);
+      if (msg.type === 'bulldozePreview' && bulldozeTool) renderer.setBulldozePreview(msg.segment);
+    }
     sendPreview();
   } else {
     const now = performance.now();
@@ -59,6 +69,9 @@ byId('spawn').onclick = () => send({ type: 'spawn', count: 5000 });
 // --- road tool: click to start, click to place (chains), Esc or right-click to stop ---
 const roadButton = byId('road');
 let roadTool = false;
+const bulldozeButton = byId('bulldoze');
+let bulldozeTool = false;
+let previewRevision = 0;
 let roadStart: THREE.Vector3 | null = null;
 // The sim works out where a road snaps; the preview asks it: where the road would start while
 // hovering, then the whole road once it has a start. Only one question is in flight at a time,
@@ -68,24 +81,35 @@ let previewEnd: THREE.Vector3 | null = null;
 let previewWanted = false;
 let previewInFlight = false;
 function sendPreview() {
-  if (previewInFlight || !previewWanted || !roadTool || !previewEnd) return;
+  if (previewInFlight || !previewWanted || (!roadTool && !bulldozeTool) || !previewEnd) return;
   previewWanted = false;
   previewInFlight = true;
   const [a, b] = [roadStart, previewEnd];
+  const revision = previewRevision;
   send(
-    a
-      ? { type: 'previewRoad', ax: a.x, ay: a.z, bx: b.x, by: b.z }
-      : { type: 'previewSnap', x: b.x, y: b.z },
+    bulldozeTool
+      ? { type: 'previewBulldoze', x: b.x, y: b.z, revision }
+      : a
+        ? { type: 'previewRoad', ax: a.x, ay: a.z, bx: b.x, by: b.z, revision }
+        : { type: 'previewSnap', x: b.x, y: b.z, revision },
   );
 }
-function setRoadTool(on: boolean) {
-  roadTool = on;
+function setTool(tool: 'road' | 'bulldoze' | null) {
+  roadTool = tool === 'road';
+  bulldozeTool = tool === 'bulldoze';
+  previewRevision++;
+  previewWanted = false;
   roadStart = null;
   previewEnd = null;
   renderer.setPreview(null, null, null);
-  roadButton.classList.toggle('active', on);
+  roadButton.classList.toggle('active', roadTool);
+  bulldozeButton.classList.toggle('active', bulldozeTool);
+  roadButton.setAttribute('aria-pressed', String(roadTool));
+  bulldozeButton.setAttribute('aria-pressed', String(bulldozeTool));
+  renderer.renderer.domElement.style.cursor = tool ? 'crosshair' : '';
 }
-roadButton.onclick = () => setRoadTool(!roadTool);
+roadButton.onclick = () => setTool(roadTool ? null : 'road');
+bulldozeButton.onclick = () => setTool(bulldozeTool ? null : 'bulldoze');
 
 const canvas = renderer.renderer.domElement;
 let downX = 0;
@@ -95,28 +119,41 @@ canvas.addEventListener('pointerdown', (e) => {
   downY = e.clientY;
 });
 canvas.addEventListener('pointerup', (e) => {
-  if (!roadTool) return;
-  if (e.button === 2) return setRoadTool(false);
+  if (!roadTool && !bulldozeTool) return;
+  if (e.button === 2) return setTool(null);
   // Treat it as a click only if the pointer barely moved, so panning still works.
   if (e.button !== 0 || Math.hypot(e.clientX - downX, e.clientY - downY) > 4) return;
   const p = renderer.pick(e.clientX, e.clientY);
   if (!p) return;
-  if (roadStart) send({ type: 'buildRoad', ax: roadStart.x, ay: roadStart.z, bx: p.x, by: p.z });
-  roadStart = p;
+  previewRevision++;
+  if (bulldozeTool) {
+    send({ type: 'deleteRoad', x: p.x, y: p.z });
+  } else {
+    if (roadStart) send({ type: 'buildRoad', ax: roadStart.x, ay: roadStart.z, bx: p.x, by: p.z });
+    roadStart = p;
+  }
   previewEnd = null;
   renderer.setPreview(null, null, null);
 });
 canvas.addEventListener('pointermove', (e) => {
-  if (!roadTool) return;
+  if (!roadTool && !bulldozeTool) return;
+  // Keep accepting replies while moving; otherwise a busy worker never draws a preview.
   previewEnd = renderer.pick(e.clientX, e.clientY);
   previewWanted = true;
   sendPreview();
 });
+canvas.addEventListener('pointerleave', () => {
+  previewRevision++;
+  previewEnd = null;
+  previewWanted = false;
+  renderer.setPreview(null, null, null);
+});
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
 addEventListener('keydown', (e) => {
-  if (e.key === 'r' || e.key === 'R') setRoadTool(!roadTool);
-  else if (e.key === 'Escape') setRoadTool(false);
+  if (e.key === 'r' || e.key === 'R') setTool(roadTool ? null : 'road');
+  else if (e.key === 'b' || e.key === 'B') setTool(bulldozeTool ? null : 'bulldoze');
+  else if (e.key === 'Escape') setTool(null);
   else if (e.key === ' ') setSpeed(speed === 0 ? 1 : 0);
   else if (e.key === '1') setSpeed(1);
   else if (e.key === '2') setSpeed(3);
@@ -149,7 +186,8 @@ function frame() {
       `trips      ${fmt(stats.tripsCompleted)}\n` +
       `stuck      ${fmt(stats.despawnedStuck)}   no path ${fmt(stats.pathsFailed)}\n` +
       `road edits ${fmt(stats.despawnedByEdit)} cars removed\n` +
-      (roadTool ? `\nROAD TOOL: click to place, Esc to stop` : '');
+      (roadTool ? `\nROAD TOOL: click to place, Esc to stop` : '') +
+      (bulldozeTool ? `\nBULLDOZE: click a highlighted road to remove it, Esc to stop` : '');
   }
   requestAnimationFrame(frame);
 }
