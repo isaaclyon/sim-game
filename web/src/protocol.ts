@@ -86,10 +86,9 @@ export type FromWorker =
   | { type: 'zones'; cells: Uint8Array; layout: [number, number, number, number, number] }
   /**
    * `segments` is `[ax, ay, bx, by]` per lot outline segment, along zone cell edges (ADR 0016).
-   * `areas` is `[ax, ay, bx, by]` per edge of each lot's building area, four per lot that has
-   * one. Sent at start and whenever lots change.
+   * Sent at start and whenever lots change.
    */
-  | { type: 'lots'; segments: Float32Array; areas: Float32Array }
+  | { type: 'lots'; segments: Float32Array }
   /** `[x, y]` per outline sample of the block under the cursor, closed; empty outside blocks. */
   | { type: 'blockPreview'; outline: Float32Array; revision: number }
   | { type: 'buildResult'; id: number; success: boolean }

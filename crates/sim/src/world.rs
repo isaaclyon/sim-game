@@ -415,11 +415,6 @@ impl World {
         self.lots.write_outlines(&self.zones, out);
     }
 
-    /// Writes `[ax, ay, bx, by]` per edge of each lot's building area.
-    pub fn write_building_areas(&self, out: &mut Vec<f32>) {
-        self.lots.write_building_areas(out);
-    }
-
     /// Writes `[x, y, heading, state]` per signalised approach, at its stop line. State is
     /// 0 = red, 1 = green, 2 = protected-left green; heading is the approach's travel direction.
     pub fn write_signal_snapshot(&self, out: &mut Vec<f32>) {
@@ -680,7 +675,7 @@ impl World {
             }
         }
         for (plan, br) in plans {
-            changed |= self.lots.push(plan, br, &self.zones);
+            changed |= self.lots.push(plan, br, self.zones.cells.len());
         }
         if changed {
             self.lots.version = self.lots.version.wrapping_add(1);

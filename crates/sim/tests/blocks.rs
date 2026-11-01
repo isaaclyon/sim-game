@@ -3,7 +3,7 @@
 use std::collections::BTreeSet;
 
 use sim::block::{LOT_REACH, ROAD_HALF_WIDTH};
-use sim::lot::{LotId, MIN_AREA_SIDE};
+use sim::lot::LotId;
 use sim::rng::Rng;
 use sim::road::{ALLEY_SPEED, RoadNetwork};
 use sim::{Command, Config, World, Zone};
@@ -71,7 +71,6 @@ fn check_lots(w: &World) -> BTreeSet<LotId> {
             assert!(d <= LOT_REACH + 0.01, "lot cell out of reach ({d} m)");
         }
         assert_one_piece(w, lot);
-        check_building_area(w, lot);
     }
     lots
 }
@@ -95,33 +94,6 @@ fn assert_one_piece(w: &World, lot: LotId) {
         cells.len(),
         "lot {lot} is in more than one piece"
     );
-}
-
-/// A building area, if any, is at least 8 x 8 m and lies inside its lot.
-fn check_building_area(w: &World, lot: LotId) {
-    let l = lot as usize;
-    let (bw, bd) = (w.lots.area_w[l], w.lots.area_d[l]);
-    if bw == 0.0 {
-        return;
-    }
-    assert!(bw >= MIN_AREA_SIDE && bd >= MIN_AREA_SIDE, "{bw} x {bd}");
-    let (vx, vy) = (w.lots.facing_x[l], w.lots.facing_y[l]);
-    for i in 0..=4 {
-        for j in 0..=4 {
-            // Points across the area, pulled 1 cm in from its edges.
-            let su = (i as f32 / 2.0 - 1.0) * (1.0 - 0.02 / bw);
-            let sv = (j as f32 / 2.0 - 1.0) * (1.0 - 0.02 / bd);
-            let x = w.lots.area_x[l] - vy * bw / 2.0 * su + vx * bd / 2.0 * sv;
-            let y = w.lots.area_y[l] + vx * bw / 2.0 * su + vy * bd / 2.0 * sv;
-            let c = ((x - w.zones.x0) / 8.0).floor() as u32;
-            let r = ((y - w.zones.y0) / 8.0).floor() as u32;
-            assert_eq!(
-                w.lots.owner(r * w.zones.cols + c),
-                Some(lot),
-                "lot {lot}'s building area leaves it at ({x}, {y})"
-            );
-        }
-    }
 }
 
 #[test]
@@ -277,11 +249,6 @@ fn lots_fill_a_zoned_block_and_face_their_road() {
     let mut outlines = Vec::new();
     w.write_lot_outlines(&mut outlines);
     assert!(!outlines.is_empty() && outlines.len() % 4 == 0);
-    // On a plain square block every lot has room for a building.
-    assert!(lots.iter().all(|&l| w.lots.area_w[l as usize] > 0.0));
-    let mut areas = Vec::new();
-    w.write_building_areas(&mut areas);
-    assert_eq!(areas.len(), lots.len() * 16, "four edges per lot");
 
     // Unzoning keeps the lots and their ids (buildings empty out instead, #17).
     let version = w.lots.version;

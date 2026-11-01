@@ -62,7 +62,7 @@ worker.onmessage = (e: MessageEvent<FromWorker>) => {
   } else if (msg.type === 'zones') {
     renderer.setZones(msg.cells, msg.layout);
   } else if (msg.type === 'lots') {
-    renderer.setLots(msg.segments, msg.areas);
+    renderer.setLots(msg.segments);
   } else if (msg.type === 'blockPreview') {
     blockInFlight = false;
     if (msg.revision === blockRevision && zone !== null && !zoneStart && blockHover)

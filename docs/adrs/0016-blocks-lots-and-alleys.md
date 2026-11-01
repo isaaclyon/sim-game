@@ -44,14 +44,8 @@ Pieces with fewer than two cells (corner leftovers) join a lot of the same block
 touch, or have no lot if none does. No land within reach is dropped for being oddly shaped.
 Deeper cells are the block's interior and have no lot. Lot edges along curves are therefore as
 exact as 8 m cells, which ADR 0014 anticipated. Each lot records its frontage road, the
-centreline point its own cells front on average, the unit direction it faces (toward that
-road), its cells, its building area and the bounding box of the block it was cut from.
-
-**Building area.** Lots can be jagged, so each lot also records where a building can stand:
-the largest rectangle inside the lot with one side parallel to its road (facing it), found on
-a 2 m grid, at least 8 m by 8 m. Ties go to the rectangle centred nearest the road. It is
-stored as centre, width along the road and depth toward it; a lot where no 8 m square fits
-at its road's angle has none and stays open land. The rest of the lot is yard. A lot's zone is not stored: it is the most
+centreline point its own cells front on average, the unit direction it faces (toward that road), its cells
+and the bounding box of the block it was cut from. A lot's zone is not stored: it is the most
 common zone among its cells, ties going to the lower zone value.
 
 **Lot ids are append-only with tombstones**, like roads (ADR 0013). A per-cell owner grid,
@@ -81,12 +75,12 @@ alley may run through them. Lots across the street keep their ids; where an alle
 road they face, they switch to the piece their front point lies on.
 
 **Buildings (#16)** will live in their own struct-of-arrays, each on one lot id, at most one per
-lot, inside that lot's building area. Retiring a lot (a road edit) removes its building; zoning changes never retire lots.
+lot. Retiring a lot (a road edit) removes its building; zoning changes never retire lots.
 
 **Snapshots** (read-only):
 
 - Lots: `[ax, ay, bx, by]` per lot outline segment, along zone cell edges where the owning lot
-  changes, and `[ax, ay, bx, by]` per building area edge, sent when the lots version changes.
+  changes, sent when the lots version changes.
 - Block preview: `[x, y]` per outline sample of the block under the cursor, empty if none.
 
 Lot slot count and active lot ids are part of `state_hash`, because lot ids depend on history.
@@ -99,9 +93,7 @@ Lot slot count and active lot ids are part of `state_hash`, because lot ids depe
 - The owner grid costs 4 bytes per zone cell once used: about 4 MB on the default map, 40 MB
   at the ADR 0012 scale. A sparse store can replace it without changing this decision.
 - Corner lots split along the corner's bisector; isolated single-cell leftovers have no lot.
-- Building areas are smaller than their lots on curves and at angles to the grid; a lot on a
-  road at about 45 degrees needs more than one cell of width to hold one.
 - Lot ids depend on the order of edits, so saves (M4) must store lots, or the command log.
 - Lot zone is coarse at mixed edges; a lot half-zoned and half-unzoned can come out unzoned.
-- Changing lot shape rules (widths, reach, building area grid and minimum) changes which cells form which lots; worlds replayed
+- Changing lot shape rules (widths, reach) changes which cells form which lots; worlds replayed
   from a command log will cut different lots, so treat those numbers as part of this contract.
