@@ -690,36 +690,34 @@ impl World {
         } else {
             Vec::new()
         };
-        let mut kept = BTreeSet::new();
-        let mut plans = Vec::new();
-        for b in 0..self.blocks.len() {
-            let br = self.blocks.rect(b);
-            if !scope.has(br) {
-                continue;
-            }
-            let cells = self.blocks.cells(b, &self.zones);
-            let has_lots = cells.iter().any(|c| self.lots.owner(c.index).is_some());
-            if !has_lots && cells.iter().all(|c| self.zones.zone(c.index) == Zone::None) {
-                continue;
-            }
-            for plan in self.blocks.cut(b, &self.zones, &self.lots, self.cfg.seed) {
-                match self.lots.matching(&plan) {
-                    Some(lot) => {
-                        // Its block may have grown or shrunk around it.
-                        self.lots.set_block(lot, br);
-                        kept.insert(lot);
-                    }
-                    None => {
-                        let zoned = plan
-                            .cells
-                            .iter()
-                            .filter(|&&c| self.zones.zone(c) != Zone::None)
-                            .count();
-                        if zoned > 0 && 2 * zoned >= plan.cells.len() {
-                            plans.push((plan, br));
-                        }
-                    }
+        let cut = |lots: &Lots| {
+            let mut plans = Vec::new();
+            for b in 0..self.blocks.len() {
+                let br = self.blocks.rect(b);
+                if !scope.has(br) {
+                    continue;
                 }
+                let cells = self.blocks.cells(b, &self.zones);
+                let has_lots = cells.iter().any(|c| lots.owner(c.index).is_some());
+                if !has_lots && cells.iter().all(|c| self.zones.zone(c.index) == Zone::None) {
+                    continue;
+                }
+                plans.extend(
+                    self.blocks
+                        .cut(b, &self.zones, lots, self.cfg.seed)
+                        .into_iter()
+                        .map(|plan| (plan, br)),
+                );
+            }
+            plans
+        };
+        let mut plans = cut(&self.lots);
+        let mut kept = BTreeSet::new();
+        for (plan, br) in &plans {
+            if let Some(lot) = self.lots.matching(plan) {
+                // Its block may have grown or shrunk around it.
+                self.lots.set_block(lot, *br);
+                kept.insert(lot);
             }
         }
         let mut changed = false;
@@ -729,8 +727,20 @@ impl World {
                 changed = true;
             }
         }
+        if changed {
+            // Reconstruction only preserves matching IDs. Once changed lots release their
+            // cells, cut replacements by the current zone, not the retired site's grouping.
+            plans = cut(&self.lots);
+        }
         for (plan, br) in plans {
-            changed |= self.lots.push(plan, br, self.zones.cells.len());
+            let zoned = plan
+                .cells
+                .iter()
+                .filter(|&&c| self.zones.zone(c) != Zone::None)
+                .count();
+            if zoned > 0 && 2 * zoned >= plan.cells.len() {
+                changed |= self.lots.push(plan, br, self.zones.cells.len());
+            }
         }
         if changed {
             self.lots.version = self.lots.version.wrapping_add(1);

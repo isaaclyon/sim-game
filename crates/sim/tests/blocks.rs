@@ -657,8 +657,6 @@ fn lots_from_facing_roads_meet_on_one_line_without_slivers() {
     assert_eq!(unlotted(&w), 0, "every zoned cell has a lot");
 }
 
-/// A perfect lattice zoned whole: every block is cut the same way, into rectangles facing
-/// two of its sides, with no alleys.
 #[test]
 fn industrial_blocks_mix_small_medium_and_factory_sized_lots() {
     let mut w = empty();
@@ -704,6 +702,38 @@ fn industrial_curves_keep_connected_lots_and_stable_ids_after_repainting() {
         ids,
         "an unchanged curved factory site keeps its identity"
     );
+}
+
+#[test]
+fn road_edits_give_replacement_lots_the_current_zones_sizes() {
+    for zone in [Zone::IndustrialHigh, Zone::ResidentialLow] {
+        let mut w = empty();
+        rect(&mut w, 0.0, 0.0, 240.0, 120.0);
+        fill(&mut w, 40.0, 40.0, Zone::IndustrialHigh);
+        fill(&mut w, 40.0, 40.0, zone);
+        let old_slots = w.lots.len();
+        // This joins and splits a frontage road from outside the block.
+        road(&mut w, 120.0, 0.0, 120.0, -80.0);
+        check_lots(&w);
+        let replacements: Vec<_> = w
+            .lots
+            .active_lots()
+            .filter(|&l| l as usize >= old_slots)
+            .map(|l| w.lots.frontage[l as usize])
+            .collect();
+        assert!(!replacements.is_empty());
+        if zone == Zone::ResidentialLow {
+            assert!(
+                replacements.iter().all(|&v| v < 24.0),
+                "retired factory plots must not become oversized house plots: {replacements:?}"
+            );
+        } else {
+            assert!(
+                replacements.iter().filter(|&&v| v >= 24.0).count() >= 2,
+                "replacement industry still needs a mix of site sizes: {replacements:?}"
+            );
+        }
+    }
 }
 
 #[test]
@@ -767,6 +797,8 @@ fn industrial_lot_sizes_do_not_swallow_other_zones_or_change_on_repaint() {
     );
 }
 
+/// A perfect lattice zoned whole: every block is cut the same way, into rectangles facing
+/// two of its sides, with no alleys.
 #[test]
 fn a_perfect_grid_cuts_every_block_the_same_way() {
     let cfg = Config::default();

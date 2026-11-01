@@ -21,8 +21,10 @@ Mixed-zone edges and insufficient space keep smaller lots. Reach and alley rules
 
 On recuts, first reconstruct groups belonging to the same existing lot, regardless of its
 current zone. The existing road, cells, front point and outline matching rules then determine
-whether its ID survives. Zoning alone never combines or subdivides existing lots. Road edits
-still retire changed lots and their buildings. Lot IDs remain append-only.
+whether its ID survives. Retire unmatched lots before cutting their replacement sites, so
+new sites follow the current zone instead of inheriting retired owners' grouping. Zoning
+alone never combines or subdivides existing lots. Road edits still remove the buildings on
+retired lots. Lot IDs remain append-only.
 
 Industrial buildings remain one hall per lot. Use road-aligned boxes with varied proportions
 and yard space, falling back to an inset lot shape where a box cannot fit. Frontage sets the
