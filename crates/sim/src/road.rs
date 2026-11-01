@@ -10,6 +10,8 @@ use crate::rng::Rng;
 
 pub type NodeId = u32;
 pub type LaneId = u32;
+/// Index of a two-way road; it owns lanes `2k` and `2k + 1`.
+pub type RoadId = u32;
 
 /// Street speed limit, m/s (50 km/h).
 pub const STREET_SPEED: f32 = 13.9;
@@ -85,6 +87,36 @@ impl RoadNetwork {
         self.adjacency_dirty = true;
         self.version += 1;
         true
+    }
+
+    pub fn has_road(&self, a: NodeId, b: NodeId) -> bool {
+        self.roads.contains(&(a.min(b), a.max(b)))
+    }
+
+    /// The nodes road `road` runs between, in the direction of its lane `2k`.
+    pub fn road_ends(&self, road: RoadId) -> (NodeId, NodeId) {
+        let lane = road as usize * 2;
+        (self.lane_from[lane], self.lane_to[lane])
+    }
+
+    /// Splits `road` at `mid`, a new node on it. The road keeps its id and lanes but now ends at
+    /// `mid`, and a new road with the same speed runs on from `mid` to the old far end. Returns
+    /// the new road. Ids stay valid, but the old road's lanes are shorter and lead somewhere
+    /// else, so cars and routes on them are the caller's to deal with.
+    pub fn split_road(&mut self, road: RoadId, mid: NodeId) -> RoadId {
+        let (a, b) = self.road_ends(road);
+        let (fwd, back) = (road as usize * 2, road as usize * 2 + 1);
+        self.roads.remove(&(a.min(b), a.max(b)));
+        self.roads.insert((a.min(mid), a.max(mid)));
+        self.lane_to[fwd] = mid;
+        self.lane_from[back] = mid;
+        let len = self.distance(a, mid);
+        self.lane_len[fwd] = len;
+        self.lane_len[back] = len;
+        let rest = self.road_count() as RoadId;
+        let added = self.add_road(mid, b, self.lane_speed[fwd]);
+        debug_assert!(added, "mid is a new node");
+        rest
     }
 
     pub fn distance(&self, a: NodeId, b: NodeId) -> f32 {

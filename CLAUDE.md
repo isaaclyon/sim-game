@@ -19,6 +19,9 @@ What to build next and why lives in `docs/ROADMAP.md`. Work on the current miles
 - Roads: `[ax, ay, bx, by, speed_limit]` per road.
 - Signals: `[x, y, heading, state]` per signalised approach (`SIGNAL_STRIDE`), state 0 = red,
   1 = green, 2 = protected-left green.
+- Road preview: `[x, y, join]` per stop of the road `BuildRoad` would build, join 0 = new end,
+  1 = existing node, 2 = splits a road; empty = refused. Answers `previewRoad`, or `previewSnap`
+  with one stop (where a road would start). Changes nothing.
 Change both sides (Rust writer, `protocol.ts` doc, `renderer.ts` reader) together.
 
 ## Checks before finishing a change

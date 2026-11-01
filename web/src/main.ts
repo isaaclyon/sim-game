@@ -27,6 +27,10 @@ worker.onmessage = (e: MessageEvent<FromWorker>) => {
   if (msg.type === 'roads') {
     renderer.setRoads(msg.segments, msg.bounds, !roadsSeen);
     roadsSeen = true;
+  } else if (msg.type === 'roadPreview') {
+    previewInFlight = false;
+    if (roadTool && previewEnd) renderer.setPreview(msg.stops, roadStart, previewEnd);
+    sendPreview();
   } else {
     const now = performance.now();
     if (curr) frameGap = frameGap * 0.8 + (now - currAt) * 0.2;
@@ -56,10 +60,29 @@ byId('spawn').onclick = () => send({ type: 'spawn', count: 5000 });
 const roadButton = byId('road');
 let roadTool = false;
 let roadStart: THREE.Vector3 | null = null;
+// The sim works out where a road snaps; the preview asks it: where the road would start while
+// hovering, then the whole road once it has a start. Only one question is in flight at a time,
+// and only the latest cursor position is asked about, so a busy worker never falls behind the
+// mouse.
+let previewEnd: THREE.Vector3 | null = null;
+let previewWanted = false;
+let previewInFlight = false;
+function sendPreview() {
+  if (previewInFlight || !previewWanted || !roadTool || !previewEnd) return;
+  previewWanted = false;
+  previewInFlight = true;
+  const [a, b] = [roadStart, previewEnd];
+  send(
+    a
+      ? { type: 'previewRoad', ax: a.x, ay: a.z, bx: b.x, by: b.z }
+      : { type: 'previewSnap', x: b.x, y: b.z },
+  );
+}
 function setRoadTool(on: boolean) {
   roadTool = on;
   roadStart = null;
-  renderer.setPreview(null, null);
+  previewEnd = null;
+  renderer.setPreview(null, null, null);
   roadButton.classList.toggle('active', on);
 }
 roadButton.onclick = () => setRoadTool(!roadTool);
@@ -80,9 +103,14 @@ canvas.addEventListener('pointerup', (e) => {
   if (!p) return;
   if (roadStart) send({ type: 'buildRoad', ax: roadStart.x, ay: roadStart.z, bx: p.x, by: p.z });
   roadStart = p;
+  previewEnd = null;
+  renderer.setPreview(null, null, null);
 });
 canvas.addEventListener('pointermove', (e) => {
-  if (roadTool && roadStart) renderer.setPreview(roadStart, renderer.pick(e.clientX, e.clientY));
+  if (!roadTool) return;
+  previewEnd = renderer.pick(e.clientX, e.clientY);
+  previewWanted = true;
+  sendPreview();
 });
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
@@ -120,6 +148,7 @@ function frame() {
       `driving    ${fmt(stats.driving)}   parked ${fmt(stats.parked)}\n` +
       `trips      ${fmt(stats.tripsCompleted)}\n` +
       `stuck      ${fmt(stats.despawnedStuck)}   no path ${fmt(stats.pathsFailed)}\n` +
+      `road edits ${fmt(stats.despawnedByEdit)} cars removed\n` +
       (roadTool ? `\nROAD TOOL: click to place, Esc to stop` : '');
   }
   requestAnimationFrame(frame);

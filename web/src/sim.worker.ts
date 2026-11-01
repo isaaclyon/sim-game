@@ -38,6 +38,7 @@ function readStats(s: Sim): Stats {
     tripsCompleted: st.trips_completed,
     pathsFailed: st.paths_failed,
     despawnedStuck: st.despawned_stuck,
+    despawnedByEdit: st.despawned_by_edit,
   };
   st.free();
   return out;
@@ -93,5 +94,17 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
     case 'buildRoad':
       if (sim?.build_road(msg.ax, msg.ay, msg.bx, msg.by)) sendRoadsIfChanged(sim);
       break;
+    case 'previewRoad': {
+      if (!sim) break;
+      const stops = sim.road_preview(msg.ax, msg.ay, msg.bx, msg.by);
+      post({ type: 'roadPreview', stops }, [stops.buffer]);
+      break;
+    }
+    case 'previewSnap': {
+      if (!sim) break;
+      const stops = sim.snap_preview(msg.x, msg.y);
+      post({ type: 'roadPreview', stops }, [stops.buffer]);
+      break;
+    }
   }
 };

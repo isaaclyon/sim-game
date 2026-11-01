@@ -9,6 +9,7 @@ pub mod junction;
 pub mod path;
 pub mod rng;
 pub mod road;
+pub mod snap;
 pub mod traffic;
 pub mod world;
 

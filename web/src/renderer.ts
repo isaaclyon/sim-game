@@ -31,6 +31,13 @@ const AVENUE_COLOR = new THREE.Color(0x6b7b8f);
 const CAR_LENGTH = 4.5;
 const CAR_WIDTH = 2;
 const CAR_HEIGHT = 1.5;
+const PREVIEW_COLOR = new THREE.Color(0x4a8bd0);
+const PREVIEW_REFUSED_COLOR = new THREE.Color(0xe5484d);
+/** Snap markers, indexed by join: new end (not drawn), existing node, split road. */
+const JOIN_COLORS = [null, new THREE.Color(0xffffff), new THREE.Color(0xf5c542)];
+/** The hover marker before a road has a start: new ends get one too, so the start is visible. */
+const JOIN_MARKER = [PREVIEW_COLOR, JOIN_COLORS[1], JOIN_COLORS[2]];
+const MARKER_PX = 10;
 
 export class Renderer {
   readonly renderer: THREE.WebGLRenderer;
@@ -42,6 +49,7 @@ export class Renderer {
   private cars?: THREE.InstancedMesh;
   private signals?: THREE.InstancedMesh;
   private readonly preview: THREE.Line;
+  private readonly markers: THREE.Points;
   private readonly matrix = new THREE.Matrix4();
   private readonly quat = new THREE.Quaternion();
   private readonly pos = new THREE.Vector3();
@@ -74,11 +82,17 @@ export class Renderer {
 
     this.preview = new THREE.Line(
       new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]),
-      new THREE.LineBasicMaterial({ color: 0x4a8bd0 }),
+      new THREE.LineBasicMaterial({ color: PREVIEW_COLOR }),
     );
     this.preview.visible = false;
     this.preview.frustumCulled = false;
     this.scene.add(this.preview);
+    this.markers = new THREE.Points(
+      new THREE.BufferGeometry(),
+      new THREE.PointsMaterial({ size: MARKER_PX, sizeAttenuation: false, vertexColors: true }),
+    );
+    this.markers.frustumCulled = false;
+    this.scene.add(this.markers);
 
     addEventListener('resize', () => {
       this.camera.aspect = innerWidth / innerHeight;
@@ -241,11 +255,38 @@ export class Renderer {
     return ray.ray.intersectPlane(new THREE.Plane(this.up, 0), new THREE.Vector3());
   }
 
-  setPreview(a: THREE.Vector3 | null, b: THREE.Vector3 | null) {
-    this.preview.visible = !!(a && b);
-    if (a && b) {
-      this.preview.geometry.setFromPoints([a.clone().setY(0.5), b.clone().setY(0.5)]);
+  /**
+   * Draws the road the sim would build from `a` to `b`. `stops` is `[x, y, join]` per stop
+   * (see `roadPreview` in protocol.ts): the line follows the stops, with a marker where it joins
+   * the network. Empty `stops` means refused: a red straight line. A single stop is where a
+   * road would start, drawn as a marker even for a new end. `null` hides the preview.
+   */
+  setPreview(stops: Float32Array | null, a: THREE.Vector3 | null, b: THREE.Vector3 | null) {
+    const line: THREE.Vector3[] = [];
+    const markers: number[] = [];
+    const colors: number[] = [];
+    const material = this.preview.material as THREE.LineBasicMaterial;
+    if (stops && stops.length > 0) {
+      material.color.copy(PREVIEW_COLOR);
+      for (let i = 0; i < stops.length; i += 3) {
+        line.push(new THREE.Vector3(stops[i], 0.5, stops[i + 1]));
+        const c = stops.length === 3 ? JOIN_MARKER[stops[2]] : JOIN_COLORS[stops[i + 2]];
+        if (!c) continue;
+        markers.push(stops[i], 1, stops[i + 1]);
+        colors.push(c.r, c.g, c.b);
+      }
+    } else if (stops && a && b) {
+      material.color.copy(PREVIEW_REFUSED_COLOR);
+      line.push(a.clone().setY(0.5), b.clone().setY(0.5));
     }
+    this.preview.visible = line.length > 1;
+    this.preview.geometry.dispose();
+    this.preview.geometry = new THREE.BufferGeometry().setFromPoints(line);
+    const geom = new THREE.BufferGeometry();
+    geom.setAttribute('position', new THREE.Float32BufferAttribute(markers, 3));
+    geom.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    this.markers.geometry.dispose();
+    this.markers.geometry = geom;
   }
 
   render() {
