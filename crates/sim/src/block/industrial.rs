@@ -1,5 +1,5 @@
 //! Combine new industrial strips, or reconstruct an existing lot during a recut (ADR 0019).
-use super::Piece;
+use super::lots::Piece;
 use crate::lot::{LotId, Lots};
 use crate::poly;
 use crate::rng::Rng;

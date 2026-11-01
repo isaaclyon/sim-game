@@ -13,6 +13,9 @@ fi
 echo "==> secrets: gitleaks (full history)"
 command -v gitleaks >/dev/null || { echo "gitleaks not installed: brew install gitleaks" >&2; exit 1; }
 gitleaks git --redact --no-banner --log-level warn .
+echo "==> files: line limit"
+node --test scripts/*.test.mjs
+node scripts/line-limit.mjs
 echo "==> rust: fmt";      cargo fmt --all --check
 echo "==> rust: clippy";   cargo clippy --workspace --all-targets --locked -- -D warnings
 echo "==> rust: clippy (wasm32)"
