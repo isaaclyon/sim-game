@@ -182,6 +182,7 @@ impl World {
             mix(a.cleared[i] as u64);
         }
         self.hash_residents(&mut mix);
+        self.hash_closures(&mut mix);
         mix(self.rng.state());
         for entry in self.wake.clone().into_sorted_vec() {
             mix(entry.0.0);

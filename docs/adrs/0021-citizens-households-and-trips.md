@@ -1,6 +1,6 @@
 # 0021. Citizens, households, homes, jobs and trips
 
-- Status: Accepted
+- Status: Accepted; residents of repainted buildings superseded by [0023](0023-gradual-closure-of-rezoned-buildings.md)
 - Date: 2026-11-01
 
 ## Context

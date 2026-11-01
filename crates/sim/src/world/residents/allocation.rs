@@ -6,10 +6,12 @@ use crate::zone::Zone;
 use std::cmp::Reverse;
 
 impl World {
-    /// Original use is retained on repaint; only new assignments are blocked.
+    /// Original use is retained on repaint; only new assignments are blocked. The closing
+    /// flag (ADR 0023) is a cheap first test; the zone and access tests remain authoritative.
     pub fn building_accepts_assignments(&self, b: BuildingId) -> bool {
         let i = b as usize;
         self.buildings.active.get(i) == Some(&true)
+            && !self.building_closing(b)
             && self.lots.zone(self.buildings.lot[i], &self.zones) == self.buildings.zone[i]
             && self.building_node(b).is_some()
     }
@@ -65,6 +67,9 @@ impl World {
                     self.homes.building.push(b as u32);
                     self.homes.capacity.push(capacity);
                     self.homes.household.push(None);
+                    if !self.building_closing(b as u32) {
+                        self.residents.vacant.insert(h);
+                    }
                     let delay = 5 + self.residents.rng.below(41);
                     self.residents.arrivals.push(Reverse((
                         self.totals.tick + self.secs_to_ticks(delay as f32),
@@ -101,6 +106,7 @@ impl World {
             self.households.home.push(home);
             self.households.members.push(Vec::new());
             self.homes.household[h] = Some(household);
+            self.residents.vacant.remove(&home);
             let size = household_size(self.homes.capacity[h], &mut self.residents.rng);
             for _ in 0..size {
                 let c = self.citizens.push(household, b, &mut self.residents.rng);
