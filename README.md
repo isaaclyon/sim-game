@@ -17,6 +17,13 @@ click to remove both directions, Esc or right-click to stop. Both tools also wor
 Cars whose remaining route uses a deleted road park and retry; other traffic continues.
 Space pauses, 1/2/3 set speed.
 
+Roads render as eight-metre-wide asphalt ribbons with simple pads at shared endpoints.
+Streets and avenues share one asphalt color; their simulation speed limits are unchanged.
+The view preserves the simulation's right-hand traffic.
+
+Run `scripts/check.sh` for the full checks, including road geometry tests. To run just those
+frontend tests, use `cd web && npm test`.
+
 ## Layout
 
 - `crates/sim` – the simulation. No I/O, no clock, no randomness except the seeded `Rng`.

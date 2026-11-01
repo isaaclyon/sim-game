@@ -7,7 +7,7 @@
     "dev": "npm run wasm && vite",
     "build": "npm run wasm && tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-vm-modules --test tests/*.test.mjs",
+    "test": "node --experimental-vm-modules --test test/*.test.mjs tests/*.test.mjs",
     "lint": "biome check .",
     "fix": "biome check --write ."
   },
