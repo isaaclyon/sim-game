@@ -28,7 +28,11 @@ test('normal startup has no synthetic traffic and HUD displays authoritative pop
   });
   t.frame();
   assert.match(t.elements.hud.textContent, /population 1,234/);
-  assert.match(t.elements.hud.textContent, /WASD or drag pans/, 'camera help is on screen');
+  assert.match(
+    t.elements.hud.textContent,
+    /WASD or drag pans, Q\/E turns/,
+    'camera help is on screen',
+  );
 });
 
 test('toolbar shortcuts leave modified, repeated and native control keys alone', async () => {

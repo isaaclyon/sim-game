@@ -14,7 +14,7 @@
 import CameraControls from 'camera-controls';
 import * as THREE from 'three';
 import { buildBuildingGeometry } from './building-geometry';
-import { panAlongGround } from './camera';
+import { KeyCamera } from './camera';
 import { buildRoadGeometry } from './road-geometry';
 import { createSimScene } from './scene';
 
@@ -58,6 +58,8 @@ export class Renderer {
   readonly scene = createSimScene();
   readonly camera: THREE.PerspectiveCamera;
   readonly controls: CameraControls;
+  /** Held-key camera motion; main.ts reports the keys each frame. */
+  readonly keyCamera: KeyCamera;
   private readonly clock = new THREE.Clock();
   private roads?: THREE.Mesh;
   private buildings?: THREE.Mesh;
@@ -92,6 +94,7 @@ export class Renderer {
     this.controls.minPolarAngle = 0;
     this.controls.maxPolarAngle = THREE.MathUtils.degToRad(70);
     this.controls.minDistance = 30;
+    this.keyCamera = new KeyCamera(this.controls);
 
     this.scene.add(new THREE.HemisphereLight(0xdde6ef, 0x20262d, 2.5));
     const sun = new THREE.DirectionalLight(0xffffff, 1.2);
@@ -275,11 +278,6 @@ export class Renderer {
     this.controls.mouseButtons.left = pans
       ? CameraControls.ACTION.TRUCK
       : CameraControls.ACTION.NONE;
-  }
-
-  /** Keyboard panning: see `panAlongGround`. */
-  panGround(right: number, forward: number) {
-    panAlongGround(this.controls, right, forward);
   }
 
   /** Ground-plane point in scene-local (sim x, y as x, z), or null if the ray misses. */

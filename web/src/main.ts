@@ -246,7 +246,7 @@ mainRoadButton.onclick = toggleMainRoad;
 const canvas = renderer.renderer.domElement;
 let downX = 0;
 let downY = 0;
-// Keyboard panning during a zone press moves the ground under the cursor: that is a drag.
+// Keyboard camera motion during a zone press moves the ground under the cursor: a drag.
 let zoneKeyPanned = false;
 canvas.addEventListener('pointerdown', (e) => {
   downX = e.clientX;
@@ -343,50 +343,50 @@ canvas.addEventListener('pointerleave', () => {
 });
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
-// --- keyboard camera: held W/A/S/D pan along the ground, relative to the view ---
-/** Screen-relative [right, forward] per key. */
-const PAN_KEYS: Record<string, [number, number]> = { w: [0, 1], a: [-1, 0], s: [0, -1], d: [1, 0] };
-/** Camera distances per second, so the ground seems to move at the same pace at any zoom. */
-const KEY_PAN_SPEED = 1;
-/** Longest frame step that pans, so a stalled or background tab cannot jump the camera. */
-const MAX_PAN_STEP = 0.1;
+// --- keyboard camera: held W/A/S/D pan along the ground, Q/E turn, relative to the view ---
+/** [right, forward, turn left] per key; speeds and easing live in `KeyCamera`. */
+const CAMERA_KEYS: Record<string, [number, number, number]> = {
+  w: [0, 1, 0],
+  a: [-1, 0, 0],
+  s: [0, -1, 0],
+  d: [1, 0, 0],
+  q: [0, 0, 1],
+  e: [0, 0, -1],
+};
 const TEXT_ENTRY = 'input, textarea, select, [contenteditable]:not([contenteditable="false"])';
-const heldPanKeys = new Set<string>();
-function panWithKeys(seconds: number) {
-  let right = 0;
-  let forward = 0;
-  for (const key of heldPanKeys) {
-    right += PAN_KEYS[key][0];
-    forward += PAN_KEYS[key][1];
-  }
-  const length = Math.hypot(right, forward);
-  if (length === 0) return;
-  const step = (KEY_PAN_SPEED * Math.min(seconds, MAX_PAN_STEP)) / length;
-  renderer.panGround(right * step, forward * step);
-  if (zoneStart) zoneKeyPanned = true;
+const heldCameraKeys = new Set<string>();
+function moveWithKeys(seconds: number) {
+  const input = [0, 0, 0];
+  for (const key of heldCameraKeys) for (let i = 0; i < 3; i++) input[i] += CAMERA_KEYS[key][i];
+  if (renderer.keyCamera.update(input[0], input[1], input[2], seconds) && zoneStart)
+    zoneKeyPanned = true;
 }
-// Keyup can go missing when the page loses focus or a modifier is down, so release on those.
-addEventListener('keyup', (e) => heldPanKeys.delete(e.key.toLowerCase()));
-addEventListener('blur', () => heldPanKeys.clear());
+function stopKeyCamera() {
+  heldCameraKeys.clear();
+  renderer.keyCamera.stop();
+}
+// Keyup can go missing when the page loses focus or a modifier is down, so stop on those.
+addEventListener('keyup', (e) => heldCameraKeys.delete(e.key.toLowerCase()));
+addEventListener('blur', stopKeyCamera);
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden') heldPanKeys.clear();
+  if (document.visibilityState === 'hidden') stopKeyCamera();
 });
 addEventListener('focusin', (e) => {
-  if ((e.target as HTMLElement | null)?.closest?.(TEXT_ENTRY)) heldPanKeys.clear();
+  if ((e.target as HTMLElement | null)?.closest?.(TEXT_ENTRY)) stopKeyCamera();
 });
 
 addEventListener('keydown', (e) => {
   // Keep browser shortcuts, held keys and text entry from toggling tools or panning.
   if (e.ctrlKey || e.metaKey || e.altKey) {
-    heldPanKeys.clear();
+    stopKeyCamera();
     return;
   }
   if (e.isComposing) return;
   const target = e.target as HTMLElement | null;
   if (target?.closest(TEXT_ENTRY)) return;
-  const panKey = e.key.toLowerCase();
-  if (Object.hasOwn(PAN_KEYS, panKey)) {
-    heldPanKeys.add(panKey);
+  const cameraKey = e.key.toLowerCase();
+  if (Object.hasOwn(CAMERA_KEYS, cameraKey)) {
+    heldCameraKeys.add(cameraKey);
     return;
   }
   if (e.repeat) return;
@@ -416,7 +416,7 @@ let lastFrame = performance.now();
 function frame() {
   const now = performance.now();
   fps = fps * 0.95 + (1000 / Math.max(now - lastFrame, 1)) * 0.05;
-  panWithKeys((now - lastFrame) / 1000);
+  moveWithKeys((now - lastFrame) / 1000);
   lastFrame = now;
   if (curr) {
     const t = speed === 0 ? 1 : Math.min((now - currAt) / frameGap, 1);
@@ -435,7 +435,7 @@ function frame() {
       `trips      ${fmt(stats.tripsCompleted)}\n` +
       `stuck      ${fmt(stats.despawnedStuck)}   no path ${fmt(stats.pathsFailed)}\n` +
       `road edits ${fmt(stats.despawnedByEdit)} cars removed\n` +
-      `camera     WASD or drag pans, right-drag orbits, wheel zooms\n` +
+      `camera     WASD or drag pans, Q/E turns, right-drag orbits, wheel zooms\n` +
       (zone !== null
         ? `\nZONE: ${ZONE_NAMES[zone]}. Click a block to fill it, drag a rectangle to paint, Esc to stop` +
           `\n(Z/X/C pick a zone, press again for the other density; U unzones)`

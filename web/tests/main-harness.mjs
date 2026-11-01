@@ -52,9 +52,15 @@ export async function tools() {
     render() {
       return clock.cameraMoved;
     }
-    panGround(right, forward) {
-      pans.push([right, forward]);
-    }
+    keyCamera = {
+      update(right, forward, turn, seconds) {
+        pans.push([right, forward, turn, seconds]);
+        return right !== 0 || forward !== 0 || turn !== 0;
+      },
+      stop() {
+        pans.push('stop');
+      },
+    };
     drawAgents() {}
     drawSignals() {}
     renderer = { domElement: canvas };
