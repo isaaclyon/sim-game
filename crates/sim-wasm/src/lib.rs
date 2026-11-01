@@ -22,6 +22,7 @@ pub struct SimStats {
     pub trips_completed: f64,
     pub paths_failed: f64,
     pub despawned_stuck: f64,
+    pub despawned_by_edit: f64,
 }
 
 #[wasm_bindgen]
@@ -55,6 +56,20 @@ impl Sim {
 
     pub fn build_road(&mut self, ax: f32, ay: f32, bx: f32, by: f32) -> bool {
         self.world.apply(Command::BuildRoad { ax, ay, bx, by })
+    }
+
+    /// `[x, y, join]` per stop of the road `build_road` would build; see
+    /// `World::write_road_preview`. Empty if it would be refused.
+    pub fn road_preview(&mut self, ax: f32, ay: f32, bx: f32, by: f32) -> Vec<f32> {
+        self.world.write_road_preview(ax, ay, bx, by, &mut self.buf);
+        self.buf.clone()
+    }
+
+    /// `[x, y, join]` for where a road started here would start; see
+    /// `World::write_snap_preview`.
+    pub fn snap_preview(&mut self, x: f32, y: f32) -> Vec<f32> {
+        self.world.write_snap_preview(x, y, &mut self.buf);
+        self.buf.clone()
     }
 
     pub fn roads_version(&self) -> u32 {
@@ -96,6 +111,7 @@ impl Sim {
             trips_completed: s.trips_completed as f64,
             paths_failed: s.paths_failed as f64,
             despawned_stuck: s.despawned_stuck as f64,
+            despawned_by_edit: s.despawned_by_edit as f64,
         }
     }
 }

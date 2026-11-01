@@ -7,11 +7,10 @@ use crate::agents::{AgentId, AgentState, Agents};
 use crate::junction::{Junctions, Verdict};
 use crate::path::Pathfinder;
 use crate::rng::Rng;
-use crate::road::{LaneId, RoadNetwork, STREET_SPEED};
+use crate::road::{LaneId, NodeId, RoadId, RoadNetwork, STREET_SPEED};
+use crate::snap::{self, Join};
 use crate::traffic::Traffic;
 
-/// Road endpoints within this many metres of an existing node connect to it.
-const SNAP_RADIUS: f32 = 15.0;
 /// Distance from the road centreline to the middle of each lane, metres.
 const LANE_OFFSET: f32 = 2.0;
 /// Floats per agent in `write_agent_snapshot`.
@@ -80,6 +79,8 @@ pub struct Stats {
     pub paths_found: u64,
     pub paths_failed: u64,
     pub despawned_stuck: u64,
+    /// Cars removed because a new road split a road on their route.
+    pub despawned_by_edit: u64,
     /// Cars that turned off a route blocked by a full lane.
     pub detours: u64,
 }
@@ -224,6 +225,24 @@ impl World {
         }
     }
 
+    /// Writes `[x, y, join]` for where a road started at `(x, y)` would start, as in
+    /// `write_road_preview`. Changes nothing.
+    pub fn write_snap_preview(&self, x: f32, y: f32, out: &mut Vec<f32>) {
+        out.clear();
+        let s = snap::snap_end(&self.roads, x, y);
+        out.extend([s.x, s.y, join_code(s.join)]);
+    }
+
+    /// Writes `[x, y, join]` per stop of the road `BuildRoad` would build between these points,
+    /// in order; nothing if it would be refused. Join is 0 = new end, 1 = existing node,
+    /// 2 = splits an existing road. Changes nothing, so the frontend can call it every frame.
+    pub fn write_road_preview(&self, ax: f32, ay: f32, bx: f32, by: f32, out: &mut Vec<f32>) {
+        out.clear();
+        for s in snap::plan_road(&self.roads, ax, ay, bx, by).unwrap_or_default() {
+            out.extend([s.x, s.y, join_code(s.join)]);
+        }
+    }
+
     /// Writes `[x, y, heading, state]` per signalised approach, at its stop line. State is
     /// 0 = red, 1 = green, 2 = protected-left green; heading is the approach's travel direction.
     pub fn write_signal_snapshot(&self, out: &mut Vec<f32>) {
@@ -269,17 +288,66 @@ impl World {
         true
     }
 
+    /// Builds a street along `snap::plan_road`: joining nodes near its ends, and splitting the
+    /// roads it crosses or ends beside so they meet at a junction.
     fn build_road(&mut self, ax: f32, ay: f32, bx: f32, by: f32) -> bool {
-        let a = self.roads.nearest_node(ax, ay, SNAP_RADIUS);
-        let b = self.roads.nearest_node(bx, by, SNAP_RADIUS);
-        if a.is_some() && a == b {
+        let Some(stops) = snap::plan_road(&self.roads, ax, ay, bx, by) else {
             return false;
+        };
+        let mut split = Vec::new();
+        let nodes: Vec<NodeId> = stops
+            .iter()
+            .map(|s| match s.join {
+                Join::Node(n) => n,
+                Join::New => self.roads.add_node(s.x, s.y),
+                Join::Split(road) => {
+                    // The plan splits each road at most once, so `road` still has its old ends.
+                    let n = self.roads.add_node(s.x, s.y);
+                    self.roads.split_road(road, n);
+                    split.push(road);
+                    n
+                }
+            })
+            .collect();
+        for leg in nodes.windows(2) {
+            // False where the plan follows an existing road, which is kept as it is.
+            self.roads.add_road(leg[0], leg[1], STREET_SPEED);
         }
-        let a = a.unwrap_or_else(|| self.roads.add_node(ax, ay));
-        let b = b.unwrap_or_else(|| self.roads.add_node(bx, by));
-        let built = self.roads.add_road(a, b, STREET_SPEED);
         self.sync_roads();
-        built
+        self.remove_cars_using(&split);
+        true
+    }
+
+    /// Removes cars whose remaining route uses a lane of `roads`, which were just split: those
+    /// lanes now end somewhere else. They wait and start a new trip, like a stuck despawn.
+    /// Junction reservations on those lanes are left to expire; a split keeps a lane's
+    /// heading, which is all a reservation looks at.
+    fn remove_cars_using(&mut self, roads: &[RoadId]) {
+        if roads.is_empty() {
+            return;
+        }
+        let uses = |lanes: &[LaneId]| lanes.iter().any(|l| roads.contains(&(l / 2)));
+        for agent in 0..self.agents.len() as AgentId {
+            let a = agent as usize;
+            let state = self.agents.state[a];
+            // Only cars with a current route; a parked car's old route is stale.
+            if !matches!(state, AgentState::Driving | AgentState::Entering)
+                || !uses(&self.agents.path[a][self.agents.path_idx[a] as usize..])
+            {
+                continue;
+            }
+            if state == AgentState::Driving {
+                let lane = self.agents.lane[a] as usize;
+                self.traffic.queues[lane].retain(|&b| b != agent);
+                self.agents.node[a] = self.roads.lane_to[lane];
+                self.agents.cleared[a] = false;
+            }
+            self.totals.despawned_by_edit += 1;
+            self.park(agent, RETRY_AFTER_S);
+        }
+        let state = &self.agents.state;
+        self.entering
+            .retain(|&agent| state[agent as usize] == AgentState::Entering);
     }
 
     fn sync_roads(&mut self) {
@@ -462,6 +530,15 @@ impl World {
     }
 }
 
+/// How a preview stop joins the network, as the frontend reads it.
+fn join_code(join: Join) -> f32 {
+    match join {
+        Join::New => 0.0,
+        Join::Node(_) => 1.0,
+        Join::Split(_) => 2.0,
+    }
+}
+
 impl World {
     /// Ends the trip of `agent`, the front car on `lane`.
     fn arrive(&mut self, lane: LaneId, agent: AgentId) {
@@ -555,26 +632,217 @@ mod tests {
 
     #[test]
     fn build_road_snaps_to_existing_nodes() {
-        let mut world = World::generate(Config::default(), 3, 3);
-        let nodes = world.roads.node_count();
-        let (x0, y0) = (world.roads.node_x[0], world.roads.node_y[0]);
-        let (x8, y8) = (world.roads.node_x[8], world.roads.node_y[8]);
-        assert!(world.apply(Command::BuildRoad {
-            ax: x0 + 3.0,
-            ay: y0,
-            bx: x8,
-            by: y8 - 3.0
-        }));
-        assert_eq!(world.roads.node_count(), nodes, "both ends should snap");
-        assert!(
-            !world.apply(Command::BuildRoad {
-                ax: x0,
-                ay: y0,
-                bx: x8,
-                by: y8
-            }),
-            "duplicate"
+        let mut world = roads(&[(0.0, 0.0, 100.0, 0.0), (0.0, 200.0, 100.0, 200.0)]);
+        assert!(build(&mut world, 3.0, 0.0, 100.0, 197.0));
+        assert_eq!(world.roads.node_count(), 4, "both ends should snap");
+        assert_eq!(world.roads.road_count(), 3);
+        assert!(!build(&mut world, 0.0, 0.0, 100.0, 200.0), "duplicate");
+    }
+
+    /// A world with one straight two-way road per `(ax, ay, bx, by)`, each with its own nodes.
+    fn roads(segments: &[(f32, f32, f32, f32)]) -> World {
+        let mut net = RoadNetwork::default();
+        for &(ax, ay, bx, by) in segments {
+            let (a, b) = (net.add_node(ax, ay), net.add_node(bx, by));
+            net.add_road(a, b, STREET_SPEED);
+        }
+        World::new(Config::default(), net, Rng::new(1))
+    }
+
+    fn build(world: &mut World, ax: f32, ay: f32, bx: f32, by: f32) -> bool {
+        world.apply(Command::BuildRoad { ax, ay, bx, by })
+    }
+
+    fn node_at(world: &World, x: f32, y: f32) -> NodeId {
+        world
+            .roads
+            .nearest_node(x, y, 0.5)
+            .unwrap_or_else(|| panic!("no node at ({x}, {y})"))
+    }
+
+    #[test]
+    fn crossing_roads_meet_at_a_new_junction() {
+        let mut world = roads(&[(-100.0, 0.0, 100.0, 0.0)]);
+        assert!(build(&mut world, 0.0, -100.0, 0.0, 100.0));
+        assert_eq!(world.roads.node_count(), 5);
+        assert_eq!(world.roads.road_count(), 4);
+        let centre = node_at(&world, 0.0, 0.0);
+        assert_eq!(world.roads.out_lanes(centre).len(), 4);
+        // The old road's ends are now reachable from the new road's ends.
+        let (west, north) = (node_at(&world, -100.0, 0.0), node_at(&world, 0.0, 100.0));
+        let mut path = Vec::new();
+        assert!(Pathfinder::default().find(&world.roads, &[], west, north, &mut path));
+        assert_eq!(path.len(), 2);
+    }
+
+    #[test]
+    fn road_ending_beside_a_road_makes_a_t_junction() {
+        let mut world = roads(&[(-100.0, 0.0, 100.0, 0.0)]);
+        assert!(build(&mut world, 0.0, -100.0, 0.0, -6.0));
+        assert_eq!(world.roads.node_count(), 4);
+        assert_eq!(world.roads.road_count(), 3);
+        assert_eq!(world.roads.out_lanes(node_at(&world, 0.0, 0.0)).len(), 3);
+    }
+
+    #[test]
+    fn crossing_near_a_junction_joins_it() {
+        let mut world = roads(&[(0.0, 0.0, 100.0, 0.0)]);
+        assert!(build(&mut world, 5.0, -50.0, 5.0, 50.0));
+        assert_eq!(world.roads.node_count(), 4, "no node 5 m from the end");
+        assert_eq!(world.roads.road_count(), 3);
+        assert_eq!(world.roads.out_lanes(0).len(), 3);
+    }
+
+    #[test]
+    fn road_passing_through_a_junction_does_not_run_along_its_roads() {
+        // Roads east and north-east from the origin. The new road crosses the east road 12 m
+        // out, so it joins the origin, then would cross the north-east road 39 m out.
+        let mut net = RoadNetwork::default();
+        let (c, e, ne) = (
+            net.add_node(0.0, 0.0),
+            net.add_node(100.0, 0.0),
+            net.add_node(60.0, 100.0),
         );
+        net.add_road(c, e, STREET_SPEED);
+        net.add_road(c, ne, STREET_SPEED);
+        let mut world = World::new(Config::default(), net, Rng::new(1));
+        let mut out = Vec::new();
+        world.write_road_preview(0.0, -50.0, 36.0, 100.0, &mut out);
+        let joins: Vec<f32> = out.chunks(3).map(|s| s[2]).collect();
+        assert_eq!(joins, [0.0, 1.0, 0.0], "through the origin, no split");
+        assert!(build(&mut world, 0.0, -50.0, 36.0, 100.0));
+        assert_eq!(world.roads.road_count(), 4);
+        assert_eq!(world.roads.out_lanes(c).len(), 4);
+    }
+
+    #[test]
+    fn road_on_top_of_a_road_is_refused() {
+        let mut world = roads(&[(-100.0, 0.0, 100.0, 0.0)]);
+        assert!(!build(&mut world, -50.0, 1.0, 50.0, 1.0), "both ends on it");
+        assert!(!build(&mut world, -50.0, 3.0, 150.0, 3.0), "runs along it");
+        assert!(!build(&mut world, -100.0, 0.0, 100.0, 0.0), "duplicate");
+        assert_eq!(world.roads.node_count(), 2);
+        assert_eq!(world.roads.road_count(), 1);
+    }
+
+    #[test]
+    fn crossings_too_close_together_are_refused() {
+        let mut world = roads(&[(-100.0, 0.0, 100.0, 0.0), (-100.0, 6.0, 100.0, 6.0)]);
+        assert!(!build(&mut world, 0.0, -100.0, 0.0, 100.0));
+        assert_eq!(world.roads.road_count(), 2);
+    }
+
+    #[test]
+    fn splitting_a_road_removes_cars_that_use_it() {
+        // West road (lanes 0 east, 1 west) and east road (lanes 2 east, 3 west), meeting at x=0.
+        let mut net = RoadNetwork::default();
+        let (w, c, e) = (
+            net.add_node(-200.0, 0.0),
+            net.add_node(0.0, 0.0),
+            net.add_node(200.0, 0.0),
+        );
+        net.add_road(w, c, STREET_SPEED);
+        net.add_road(c, e, STREET_SPEED);
+        let mut world = World::new(Config::default(), net, Rng::new(1));
+        let drive = |world: &mut World, path: Vec<LaneId>| {
+            let agent = world.agents.push(world.roads.lane_from[path[0] as usize]);
+            let a = agent as usize;
+            world.agents.dest[a] = world.roads.lane_to[*path.last().unwrap() as usize];
+            world.agents.path[a] = path.clone();
+            world.traffic.enter(path[0], agent, &mut world.agents);
+            agent as usize
+        };
+        let on_west = drive(&mut world, vec![0, 2]);
+        let heading_west = drive(&mut world, vec![3, 1]);
+        let east_only = drive(&mut world, vec![2]);
+        assert!(build(&mut world, -100.0, -100.0, -100.0, 100.0));
+        let s = world.stats();
+        assert_eq!(s.despawned_by_edit, 2, "{s:?}");
+        assert_eq!(world.agents.state[on_west], AgentState::Parked);
+        assert_eq!(world.agents.state[heading_west], AgentState::Parked);
+        assert_eq!(world.agents.state[east_only], AgentState::Driving);
+        assert!(
+            world
+                .traffic
+                .queues
+                .iter()
+                .all(|q| !q.contains(&(on_west as AgentId)))
+        );
+        for _ in 0..600 {
+            world.tick();
+        }
+        assert!(world.stats().trips_completed >= 1);
+    }
+
+    #[test]
+    fn building_across_busy_traffic_keeps_it_running() {
+        let mut world = small_world(3);
+        for _ in 0..1_500 {
+            world.tick();
+        }
+        let b = world.roads.bounds();
+        let (w, h) = (b[2] - b[0], b[3] - b[1]);
+        // Long diagonals, crossing many streets each. A few may cross a jittered street at too
+        // sharp an angle and be refused, which is fine; most must build.
+        let mut built = 0;
+        for k in 0..4 {
+            let f = k as f32 / 8.0;
+            let (y0, y1) = (b[1] + f * h, b[1] + (f + 0.5) * h);
+            let (x0, x1) = (b[0] + f * w, b[0] + (f + 0.5) * w);
+            built += build(&mut world, b[0] + 7.0, y0, b[2] - 7.0, y1) as u32;
+            built += build(&mut world, x0, b[1] + 7.0, x1, b[3] - 7.0) as u32;
+            for _ in 0..300 {
+                world.tick();
+            }
+        }
+        assert!(built >= 5, "built {built} of 8");
+        let trips = world.stats().trips_completed;
+        for _ in 0..1_500 {
+            world.tick();
+        }
+        let s = world.stats();
+        assert!(s.despawned_by_edit > 0, "{s:?}");
+        assert!(s.trips_completed > trips + 200, "{s:?}");
+        assert_eq!(
+            s.parked + s.awaiting_path + s.entering + s.driving,
+            s.agents
+        );
+        // Every queued car is on the lane it thinks it is on.
+        for (lane, q) in world.traffic.queues.iter().enumerate() {
+            for &agent in q {
+                assert_eq!(world.agents.lane[agent as usize] as usize, lane);
+                assert_eq!(world.agents.state[agent as usize], AgentState::Driving);
+            }
+        }
+    }
+
+    #[test]
+    fn hover_shows_where_a_road_would_start() {
+        let world = roads(&[(-100.0, 0.0, 100.0, 0.0)]);
+        let mut out = Vec::new();
+        world.write_snap_preview(0.0, 6.0, &mut out);
+        assert_eq!(out, [0.0, 0.0, 2.0], "on the road, splitting it");
+        world.write_snap_preview(-95.0, 4.0, &mut out);
+        assert_eq!(out, [-100.0, 0.0, 1.0], "at its end");
+        world.write_snap_preview(0.0, 50.0, &mut out);
+        assert_eq!(out, [0.0, 50.0, 0.0], "a new end");
+    }
+
+    #[test]
+    fn preview_shows_what_gets_built() {
+        let world = roads(&[(-100.0, 0.0, 100.0, 0.0)]);
+        let mut out = Vec::new();
+        world.write_road_preview(0.0, -100.0, 0.0, 100.0, &mut out);
+        assert_eq!(
+            out,
+            [0.0, -100.0, 0.0, 0.0, 0.0, 2.0, 0.0, 100.0, 0.0],
+            "[x, y, join] per stop: new end, split, new end"
+        );
+        world.write_road_preview(-50.0, 1.0, 50.0, 1.0, &mut out);
+        assert!(out.is_empty(), "refused");
+        let before = world.roads.version;
+        world.write_road_preview(0.0, -100.0, 0.0, 100.0, &mut out);
+        assert_eq!(world.roads.version, before, "preview changes nothing");
     }
 
     /// A four-way junction at the origin with 100 m arms east, north, west and south. Arm `k`
