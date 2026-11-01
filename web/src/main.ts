@@ -246,11 +246,14 @@ mainRoadButton.onclick = toggleMainRoad;
 const canvas = renderer.renderer.domElement;
 let downX = 0;
 let downY = 0;
+// Keyboard camera motion during a zone press moves the ground under the cursor: a drag.
+let zoneKeyPanned = false;
 canvas.addEventListener('pointerdown', (e) => {
   downX = e.clientX;
   downY = e.clientY;
   if (zone === null || e.button !== 0) return;
   zoneStart = renderer.pick(e.clientX, e.clientY);
+  zoneKeyPanned = false;
   blockRevision++;
   // Keep getting moves and the release even if the drag leaves the canvas.
   canvas.setPointerCapture(e.pointerId);
@@ -262,7 +265,7 @@ canvas.addEventListener('pointerup', (e) => {
     if (e.button === 0 && zoneStart && end) {
       const [a, b] = [zoneStart, end];
       // A click fills the block under it; a drag paints the rectangle.
-      if (Math.hypot(e.clientX - downX, e.clientY - downY) <= 4)
+      if (!zoneKeyPanned && Math.hypot(e.clientX - downX, e.clientY - downY) <= 4)
         send({ type: 'fillBlock', x: b.x, y: b.z, zone });
       else send({ type: 'paintZone', ax: a.x, ay: a.z, bx: b.x, by: b.z, zone });
     }
@@ -309,7 +312,10 @@ canvas.addEventListener('pointerup', (e) => {
   invalidatePreview();
   updateRoadHelp();
 });
-canvas.addEventListener('pointermove', (e) => {
+// The last cursor position over the canvas, so previews can follow a moving camera.
+let pointer: { clientX: number; clientY: number } | null = null;
+function hover(e: { clientX: number; clientY: number }) {
+  pointer = e;
   if (zone !== null) {
     if (zoneStart) renderer.setZoneDrag(zoneStart, renderer.pick(e.clientX, e.clientY), zone);
     else {
@@ -325,8 +331,10 @@ canvas.addEventListener('pointermove', (e) => {
   previewEnd = renderer.pick(e.clientX, e.clientY);
   previewWanted = true;
   sendPreview();
-});
+}
+canvas.addEventListener('pointermove', hover);
 canvas.addEventListener('pointerleave', () => {
+  pointer = null;
   if (!zoneStart) hideBlockOutline();
   previewRevision++;
   previewEnd = null;
@@ -335,12 +343,53 @@ canvas.addEventListener('pointerleave', () => {
 });
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
+// --- keyboard camera: held W/A/S/D pan along the ground, Q/E turn, relative to the view ---
+/** [right, forward, turn left] per key; speeds and easing live in `KeyCamera`. */
+const CAMERA_KEYS: Record<string, [number, number, number]> = {
+  w: [0, 1, 0],
+  a: [-1, 0, 0],
+  s: [0, -1, 0],
+  d: [1, 0, 0],
+  q: [0, 0, 1],
+  e: [0, 0, -1],
+};
+const TEXT_ENTRY = 'input, textarea, select, [contenteditable]:not([contenteditable="false"])';
+const heldCameraKeys = new Set<string>();
+function moveWithKeys(seconds: number) {
+  const input = [0, 0, 0];
+  for (const key of heldCameraKeys) for (let i = 0; i < 3; i++) input[i] += CAMERA_KEYS[key][i];
+  if (renderer.keyCamera.update(input[0], input[1], input[2], seconds) && zoneStart)
+    zoneKeyPanned = true;
+}
+function stopKeyCamera() {
+  heldCameraKeys.clear();
+  renderer.keyCamera.stop();
+}
+// Keyup can go missing when the page loses focus or a modifier is down, so stop on those.
+addEventListener('keyup', (e) => heldCameraKeys.delete(e.key.toLowerCase()));
+addEventListener('blur', stopKeyCamera);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') stopKeyCamera();
+});
+addEventListener('focusin', (e) => {
+  if ((e.target as HTMLElement | null)?.closest?.(TEXT_ENTRY)) stopKeyCamera();
+});
+
 addEventListener('keydown', (e) => {
-  // Keep browser shortcuts, held keys and text entry from toggling tools.
-  if (e.ctrlKey || e.metaKey || e.altKey || e.repeat || e.isComposing) return;
-  const target = e.target as HTMLElement | null;
-  if (target?.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])'))
+  // Keep browser shortcuts, held keys and text entry from toggling tools or panning.
+  if (e.ctrlKey || e.metaKey || e.altKey) {
+    stopKeyCamera();
     return;
+  }
+  if (e.isComposing) return;
+  const target = e.target as HTMLElement | null;
+  if (target?.closest(TEXT_ENTRY)) return;
+  const cameraKey = e.key.toLowerCase();
+  if (Object.hasOwn(CAMERA_KEYS, cameraKey)) {
+    heldCameraKeys.add(cameraKey);
+    return;
+  }
+  if (e.repeat) return;
   // Space activates a focused button natively; it must not also pause the sim.
   if (e.key === ' ' && target?.closest('button, a[href], [role="button"]')) return;
   if (e.key === 'r' || e.key === 'R') setTool(roadTool === 'straight' ? null : 'straight');
@@ -367,12 +416,14 @@ let lastFrame = performance.now();
 function frame() {
   const now = performance.now();
   fps = fps * 0.95 + (1000 / Math.max(now - lastFrame, 1)) * 0.05;
+  moveWithKeys((now - lastFrame) / 1000);
   lastFrame = now;
   if (curr) {
     const t = speed === 0 ? 1 : Math.min((now - currAt) / frameGap, 1);
     renderer.drawAgents(prev, curr, t);
   }
-  renderer.render();
+  // A camera move slides the ground under a still cursor; ask again what the cursor is over.
+  if (renderer.render() && pointer) hover(pointer);
   if (stats) {
     const hh = String(Math.floor(stats.secondOfDay / 3600)).padStart(2, '0');
     const mm = String(Math.floor((stats.secondOfDay % 3600) / 60)).padStart(2, '0');
@@ -384,6 +435,7 @@ function frame() {
       `trips      ${fmt(stats.tripsCompleted)}\n` +
       `stuck      ${fmt(stats.despawnedStuck)}   no path ${fmt(stats.pathsFailed)}\n` +
       `road edits ${fmt(stats.despawnedByEdit)} cars removed\n` +
+      `camera     WASD or drag pans, Q/E turns, right-drag orbits, wheel zooms\n` +
       (zone !== null
         ? `\nZONE: ${ZONE_NAMES[zone]}. Click a block to fill it, drag a rectangle to paint, Esc to stop` +
           `\n(Z/X/C pick a zone, press again for the other density; U unzones)`

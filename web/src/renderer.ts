@@ -14,6 +14,7 @@
 import CameraControls from 'camera-controls';
 import * as THREE from 'three';
 import { buildBuildingGeometry } from './building-geometry';
+import { KeyCamera } from './camera';
 import { buildRoadGeometry } from './road-geometry';
 import { createSimScene } from './scene';
 
@@ -57,6 +58,8 @@ export class Renderer {
   readonly scene = createSimScene();
   readonly camera: THREE.PerspectiveCamera;
   readonly controls: CameraControls;
+  /** Held-key camera motion; main.ts reports the keys each frame. */
+  readonly keyCamera: KeyCamera;
   private readonly clock = new THREE.Clock();
   private roads?: THREE.Mesh;
   private buildings?: THREE.Mesh;
@@ -91,6 +94,7 @@ export class Renderer {
     this.controls.minPolarAngle = 0;
     this.controls.maxPolarAngle = THREE.MathUtils.degToRad(70);
     this.controls.minDistance = 30;
+    this.keyCamera = new KeyCamera(this.controls);
 
     this.scene.add(new THREE.HemisphereLight(0xdde6ef, 0x20262d, 2.5));
     const sun = new THREE.DirectionalLight(0xffffff, 1.2);
@@ -431,8 +435,10 @@ export class Renderer {
     this.preview.visible = line.length > 1;
   }
 
-  render() {
-    this.controls.update(this.clock.getDelta());
+  /** Draws a frame; true if the camera moved. */
+  render(): boolean {
+    const moved = this.controls.update(this.clock.getDelta());
     this.renderer.render(this.scene, this.camera);
+    return moved;
   }
 }

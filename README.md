@@ -11,7 +11,9 @@ Needs Rust (with the `wasm32-unknown-unknown` target), `wasm-pack`, and Node 24+
 cd web && npm install && npm run dev
 ```
 
-Controls: left-drag pans, right-drag orbits, wheel zooms to cursor. `R` toggles straight roads
+Controls: hold W/A/S/D or left-drag to pan, hold Q/E to turn left/right, right-drag orbits,
+wheel zooms to cursor. Held keys move relative to the view, speed up smoothly, glide to a stop
+when released, pan faster when zoomed out, and also work while paused or with a tool on. `R` toggles straight roads
 (click start, click end). `V` toggles curved roads (click start, click bend control, click end).
 The bend control pulls the curve toward it; it is not a point the road passes through.
 Both construction tools continue from the last successful end. `B` toggles bulldoze: hover to
