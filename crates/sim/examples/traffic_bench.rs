@@ -3,10 +3,14 @@
 //!     cargo run --release -p sim --example traffic_bench -- --agents 50000 --ticks 36000
 //!     cargo run --release -p sim --example traffic_bench -- --layout organic --max-despawns 9 --seed 2
 //!     cargo run --release -p sim --example traffic_bench -- --scale la
+//!     cargo run --release -p sim --example traffic_bench -- --layout perfect --zone
 //!
 //! `--layout grid` (default) is the generated street grid with avenues. `--layout organic` is a
 //! radial town drawn street by street through `Command::BuildRoad`, the way a player builds:
 //! rings joined by spokes, with gaps, T-junctions and 5-way junctions, and no avenues.
+//! `--layout perfect` is a `--grid` × `--grid` lattice of identical square blocks with no
+//! jitter, no gaps and no avenues: the cleanest case for traffic and lots.
+//! `--zone` paints the whole map residential before timing and reports how long that took.
 //! `--max-despawns N` exits with an error if more than N cars hit the stuck limit.
 //! `--warmup N` runs N ticks before timing starts, so start-up path bursts don't skew the mean.
 //!
@@ -24,7 +28,7 @@ use std::time::Instant;
 
 use sim::rng::Rng;
 use sim::road::RoadNetwork;
-use sim::{Command, Config, World};
+use sim::{Command, Config, World, Zone};
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -56,8 +60,29 @@ fn main() {
     let mut world = match layout {
         "grid" => World::generate(cfg, grid, grid),
         "organic" => organic_town(cfg),
+        "perfect" => {
+            let net = RoadNetwork::generate_lattice(grid, grid, cfg.grid_spacing);
+            let seed = cfg.seed;
+            World::new(cfg, net, Rng::new(seed))
+        }
         other => panic!("unknown --layout {other}"),
     };
+    if args.iter().any(|a| a == "--zone") {
+        let [ax, ay, bx, by] = world.roads.bounds();
+        let t = Instant::now();
+        world.apply(Command::PaintZone {
+            ax,
+            ay,
+            bx,
+            by,
+            zone: Zone::ResidentialLow,
+        });
+        println!(
+            "zoning    whole map in {:.0} ms | {} lots",
+            t.elapsed().as_secs_f64() * 1000.0,
+            world.lots.active_lots().count()
+        );
+    }
     world.apply(Command::SpawnAgents { count: agents });
     println!(
         "{layout}: {} nodes, {} roads | {agents} agents | {warmup} warmup + {ticks} timed ticks ({:.0} sim min)",

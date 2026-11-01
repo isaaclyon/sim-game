@@ -648,3 +648,59 @@ fn lots_from_facing_roads_meet_on_one_line_without_slivers() {
     check_lots(&w);
     assert_eq!(unlotted(&w), 0, "every zoned cell has a lot");
 }
+
+/// A perfect lattice zoned whole: every block is cut the same way, with no alleys.
+#[test]
+fn a_perfect_grid_cuts_every_block_the_same_way() {
+    let cfg = Config::default();
+    let spacing = cfg.grid_spacing;
+    let n = 5;
+    let mut w = World::new(
+        cfg,
+        RoadNetwork::generate_lattice(n, n, spacing),
+        Rng::new(1),
+    );
+    let roads = w.roads.road_count();
+    let e = (n - 1) as f32 * spacing;
+    assert!(w.apply(Command::PaintZone {
+        ax: 0.0,
+        ay: 0.0,
+        bx: e,
+        by: e,
+        zone: Zone::ResidentialLow,
+    }));
+    let lots = check_lots(&w);
+    assert_eq!(unlotted(&w), 0);
+    assert_eq!(
+        w.roads.road_count(),
+        roads,
+        "blocks this size need no alley"
+    );
+
+    // Each block's lots, moved to the block's own corner, rounded to 10 cm and sorted.
+    let mut blocks: Vec<Vec<Vec<(i32, i32)>>> = vec![Vec::new(); ((n - 1) * (n - 1)) as usize];
+    for &l in &lots {
+        let o = w.lots.outline(l);
+        let (cx, cy) = centroid(o);
+        let (bx, by) = ((cx / spacing).floor(), (cy / spacing).floor());
+        let mut shape: Vec<(i32, i32)> = o
+            .iter()
+            .map(|p| {
+                let x = ((p.0 - bx * spacing) * 10.0).round() as i32;
+                let y = ((p.1 - by * spacing) * 10.0).round() as i32;
+                (x, y)
+            })
+            .collect();
+        // Start every outline at its smallest point, so equal shapes compare equal.
+        let first = (0..shape.len()).min_by_key(|&i| shape[i]).unwrap_or(0);
+        shape.rotate_left(first);
+        blocks[(by as u32 * (n - 1) + bx as u32) as usize].push(shape);
+    }
+    for b in &mut blocks {
+        b.sort();
+    }
+    assert!(blocks[0].len() >= 16, "{} lots in a block", blocks[0].len());
+    for (i, b) in blocks.iter().enumerate() {
+        assert_eq!(b, &blocks[0], "block {i} is cut differently from block 0");
+    }
+}
