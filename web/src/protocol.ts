@@ -113,6 +113,15 @@ export type FromWorker =
    * points (ADR 0018). Sent at start and whenever lots change.
    */
   | { type: 'lots'; rings: Float32Array }
+  /**
+   * `[zone, height, roof, n, x0, y0, …]` per active building, packed in building ID order, not
+   * indexed by ID. Height is metres; n is the footprint point count, counter-clockwise,
+   * without a repeated closing point. Zone is the original use, not the repainted zone.
+   * Roof is a stable palette index (0–3 for industry; 0 for other uses).
+   * Growth is coalesced to at most four snapshots per real second. Start, edits and pause
+   * flush immediately, so paused road edits never leave displaced buildings visible.
+   */
+  | { type: 'buildings'; data: Float32Array }
   /** `[x, y]` per outline sample of the block under the cursor, closed; empty outside blocks. */
   | { type: 'blockPreview'; outline: Float32Array; revision: number }
   | { type: 'buildResult'; id: number; success: boolean }

@@ -3,10 +3,13 @@
 //! Blocks are derived from the road graph every time they are needed and have no stable ids.
 //! A block is a bounded face of the graph, traced along the sampled road centrelines.
 
+mod industrial;
+
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
 
 use crate::geometry::{Point, Shape, dist, lerp, project};
+use crate::lot::Lots;
 use crate::poly::{self, Ring};
 use crate::road::{LaneId, RoadId, RoadNetwork};
 use crate::zone::{Zone, ZoneGrid};
@@ -232,6 +235,7 @@ struct Piece {
     span: (f32, f32),
     ring: Ring,
     rect: Rect,
+    cells: Vec<u32>,
 }
 
 /// Every road's sampled centreline with distances along it, and the network's bounded faces.
@@ -494,7 +498,13 @@ impl Blocks {
     /// `LOT_REACH`), divided from its neighbours along corner bisectors and clipped to the
     /// land off the roads. Earlier lots keep land later ones would overlap. Slivers join the
     /// lot they share the longest edge with. Lots come out in (road, side, stretch) order.
-    pub(crate) fn cut(&self, i: usize, grid: &ZoneGrid) -> Vec<LotPlan> {
+    pub(crate) fn cut(
+        &self,
+        i: usize,
+        grid: &ZoneGrid,
+        existing: &Lots,
+        seed: u64,
+    ) -> Vec<LotPlan> {
         let rect = self.rect[i];
         let roads = self.roads_near(rect);
         let land = self.land(i, &roads);
@@ -559,6 +569,7 @@ impl Blocks {
                         span: (edges[k], edges[k + 1]),
                         ring,
                         rect,
+                        cells: Vec::new(),
                     };
                     if big {
                         lots.push(piece);
@@ -591,14 +602,19 @@ impl Blocks {
             }
         }
         let mut claimed = BTreeSet::new();
-        lots.into_iter()
+        for p in &mut lots {
+            let outline = despike(p.ring.iter().map(|&q| poly::to_point(q)).collect());
+            p.cells = grid
+                .cells_in(p.rect)
+                .filter(|&c| poly::contains(&outline, grid.centre(c)) && claimed.insert(c))
+                .collect();
+            p.cells.sort_unstable();
+            p.ring = poly::ring(outline);
+        }
+        industrial::coalesce(lots, grid, existing, seed)
+            .into_iter()
             .map(|p| {
-                let outline = despike(p.ring.iter().map(|&q| poly::to_point(q)).collect());
-                let mut cells: Vec<u32> = grid
-                    .cells_in(p.rect)
-                    .filter(|&c| poly::contains(&outline, grid.centre(c)) && claimed.insert(c))
-                    .collect();
-                cells.sort_unstable();
+                let outline = p.ring.into_iter().map(poly::to_point).collect();
                 let (s0, s1) = p.span;
                 let (front, dir) = self.point_at(p.road, (s0 + s1) / 2.0);
                 // Facing the road: right of travel for lots on its left, and vice versa.
@@ -613,7 +629,7 @@ impl Blocks {
                     facing,
                     frontage: s1 - s0,
                     outline,
-                    cells,
+                    cells: p.cells,
                 }
             })
             .collect()

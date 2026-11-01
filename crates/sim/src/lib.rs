@@ -6,6 +6,7 @@
 
 pub mod agents;
 pub mod block;
+pub mod building;
 pub mod clock;
 mod geometry;
 pub mod junction;
