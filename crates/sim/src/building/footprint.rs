@@ -18,43 +18,43 @@ pub(super) fn make(lots: &Lots, lot: LotId, roads: &RoadNetwork, zone: Zone) -> 
     let land = poly::ring(lots.outline(lot).iter().copied());
     let facing = (lots.facing_x[l], lots.facing_y[l]);
     let front = (lots.front_x[l], lots.front_y[l]);
+    // Every footprint type must clear frontage and corner roads. Lots themselves use a
+    // fixed 4 m kerb, while main roads render 6 m wide on either side.
+    let road = lots.road[l];
+    let (a, b) = roads.road_ends(road);
+    let nearby: BTreeSet<_> = [a, b]
+        .into_iter()
+        .flat_map(|n| roads.out_lanes(n))
+        .map(|&lane| lane / 2)
+        .chain([road])
+        .collect();
+    let mut streets = Vec::new();
+    for r in nearby {
+        let half_width = if roads.road_class(r) == RoadClass::Main {
+            6.0
+        } else {
+            ROAD_HALF_WIDTH
+        };
+        for (_, a, _, b) in roads.shape(r).segments() {
+            streets.push(street_band(a, b, half_width + 0.8));
+        }
+    }
+    // Party walls stay on lot boundaries; only edges near streets recede.
+    let clear = largest(poly::subtract(std::slice::from_ref(&land), &streets))?;
     let ring = match zone {
-        Zone::ResidentialLow => house(&land, front, facing, lots.frontage[l]),
+        Zone::ResidentialLow => house(&clear, front, facing, lots.frontage[l]),
         Zone::IndustrialLow | Zone::IndustrialHigh => {
             // Integer offsets are deterministic, including at concave corners.
             let style = IntOutlineStyle::new(-768); // 3 m on poly's 1/256 m grid.
-            let inset = land
+            let inset = clear
                 .validate_outline(&style)
                 .ok()
-                .and_then(|()| land.outline(&style).ok());
+                .and_then(|()| clear.outline(&style).ok());
             inset
                 .and_then(largest)
-                .or_else(|| house(&land, front, facing, lots.frontage[l]))
+                .or_else(|| house(&clear, front, facing, lots.frontage[l]))
         }
-        Zone::ResidentialHigh | Zone::CommercialLow | Zone::CommercialHigh => {
-            // Leave party walls on lot boundaries intact. Only street-facing edges recede.
-            let road = lots.road[l];
-            let (a, b) = roads.road_ends(road);
-            let nearby: BTreeSet<_> = [a, b]
-                .into_iter()
-                .flat_map(|n| roads.out_lanes(n))
-                .map(|&lane| lane / 2)
-                .chain([road])
-                .collect();
-            let mut streets = Vec::new();
-            for r in nearby {
-                let half_width = if roads.road_class(r) == RoadClass::Main {
-                    6.0
-                } else {
-                    ROAD_HALF_WIDTH
-                };
-                for (_, a, _, b) in roads.shape(r).segments() {
-                    streets.push(street_band(a, b, half_width + 0.8));
-                }
-            }
-            largest(poly::subtract(std::slice::from_ref(&land), &streets))
-                .or_else(|| house(&land, front, facing, lots.frontage[l]))
-        }
+        Zone::ResidentialHigh | Zone::CommercialLow | Zone::CommercialHigh => Some(clear),
         Zone::None => None,
     }?;
     Some(ring.into_iter().map(poly::to_point).collect())
@@ -176,7 +176,10 @@ mod tests {
                     assert!(bounds[0] > 10.0 && bounds[2] < 26.0);
                     assert!(bounds[1] >= 8.0 && bounds[3] < 60.0);
                 }
-                Zone::IndustrialLow => assert_eq!(bounds, [13.0, 7.0, 23.0, 57.0]),
+                Zone::IndustrialLow => {
+                    assert_eq!([bounds[0], bounds[2], bounds[3]], [13.0, 23.0, 57.0]);
+                    assert!((bounds[1] - 7.8).abs() < 0.01);
+                }
                 _ => {
                     assert_eq!((bounds[0], bounds[2]), (10.0, 26.0));
                     assert!((bounds[1] - 4.8).abs() < 0.01);
@@ -229,6 +232,24 @@ mod tests {
             ring.iter().all(|p| p.1 >= 6.79),
             "main-road asphalt is 12 m wide"
         );
+    }
+
+    #[test]
+    fn corner_houses_clear_a_main_road_beside_the_lot() {
+        let (lots, _) = lot(vec![(10.0, 4.0), (26.0, 4.0), (26.0, 60.0), (10.0, 60.0)]);
+        let mut roads = RoadNetwork::default();
+        let a = roads.add_node(6.0, 0.0);
+        let b = roads.add_node(100.0, 0.0);
+        let c = roads.add_node(6.0, 100.0);
+        roads.add_road(a, b, RoadClass::Street);
+        roads.add_road(a, c, RoadClass::Main);
+        roads.rebuild_adjacency();
+        let ring = make(&lots, 0, &roads, Zone::ResidentialLow).unwrap();
+        assert!(
+            ring.iter().all(|p| p.0 >= 12.79),
+            "the house must not extend into side-road asphalt"
+        );
+        assert_eq!(ring.len(), 4, "shrinking a house must keep it a box");
     }
 
     #[test]
