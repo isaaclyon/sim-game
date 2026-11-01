@@ -21,6 +21,12 @@ pub const LOT_WIDTH: f32 = 16.0;
 pub const MIN_LOT_AREA: f32 = 100.0;
 /// Gaps between lots smaller than this, square metres, join a lot; bigger ones are interior.
 pub const MAX_GAP_AREA: f32 = 1000.0;
+/// Outline corners sharper than this cosine (about 10°) cutting off less than `SPIKE_AREA`
+/// square metres are spikes: hair-thin strips where two lots' back lines nearly agree.
+const SPIKE_COS: f32 = 0.985;
+const SPIKE_AREA: f32 = 2.0;
+/// Spacing, metres, of the points along a road side that trace the back of its lots.
+const BACK_STEP: f32 = 2.0;
 /// Corners turning back sharper than this (`1 + cos` of the turn) end lots square instead of
 /// along the corner's bisector: dead ends and hairpins.
 const MIN_MITRE: f32 = 0.05;
@@ -121,6 +127,30 @@ fn join(lots: &mut [Piece], piece: Ring) {
         lots[j].rect = poly::bounds(&ring);
         lots[j].ring = ring;
     }
+}
+
+/// `ring` without spikes and repeated points.
+fn despike(mut ring: Vec<Point>) -> Vec<Point> {
+    let mut i = 0;
+    let mut since = 0;
+    while ring.len() > 3 && since < ring.len() {
+        let n = ring.len();
+        let (p, c, q) = (ring[(i + n - 1) % n], ring[i % n], ring[(i + 1) % n]);
+        let (a, b) = (sub(p, c), sub(q, c));
+        let (la, lb) = (a.0.hypot(a.1), b.0.hypot(b.1));
+        let sharp = la * lb < 1e-9
+            || ((a.0 * b.0 + a.1 * b.1) > SPIKE_COS * la * lb
+                && cross(a, b).abs() / 2.0 < SPIKE_AREA);
+        if sharp {
+            ring.remove(i % n);
+            i = (i + n - 2) % (n - 1);
+            since = 0;
+        } else {
+            i = (i + 1) % n;
+            since += 1;
+        }
+    }
+    ring
 }
 
 /// The part of polygon `pts` on the side of the line through `p` along `dir` that `keep`
@@ -525,7 +555,7 @@ impl Blocks {
         let mut claimed = BTreeSet::new();
         lots.into_iter()
             .map(|p| {
-                let outline: Vec<Point> = p.ring.iter().map(|&q| poly::to_point(q)).collect();
+                let outline = despike(p.ring.iter().map(|&q| poly::to_point(q)).collect());
                 let mut cells: Vec<u32> = grid
                     .cells_in(p.rect)
                     .filter(|&c| poly::contains(&outline, grid.centre(c)) && claimed.insert(c))
@@ -591,10 +621,11 @@ impl Blocks {
     }
 
     /// Offsets back from `lane`'s side of its road: `(arc, point, unit direction, depth)` at
-    /// the road's ends, its samples and its stretch ends, in order along the road. Each goes
-    /// half way to the road behind, at most `LOT_REACH` from its road, and stops where it
-    /// first crosses another offset of the same side, so lots on curves come to a point
-    /// instead of folding over each other.
+    /// the road's ends, its samples, its stretch ends and every `BACK_STEP` between, in order
+    /// along the road. Each goes back as far as its land is nearer this road than any other
+    /// (so lots from facing roads meet on one line), at most `LOT_REACH` from its road, and
+    /// stops where it first crosses another offset of the same side, so lots on curves come
+    /// to a point instead of folding over each other.
     fn offsets(&self, lane: LaneId, roads: &[RoadId]) -> Vec<(f32, Point, Point, f32)> {
         let road = lane / 2;
         let left = lane.is_multiple_of(2);
@@ -608,33 +639,47 @@ impl Blocks {
             let d = unit(sub(pts[j + 1], pts[j]));
             if left { left_of(d) } else { (d.1, -d.0) }
         };
-        let mut at: Vec<(f32, Point, Point)> = vec![(0.0, pts[0], self.offset_at(lane, 0.0, true))];
-        let mut k = 1;
-        for j in 1..pts.len() {
-            while k < n && (k as f32 * w) < arc[j] - 1e-3 {
-                let s = k as f32 * w;
-                at.push((s, self.point_at(road, s).0, self.offset_at(lane, s, false)));
-                k += 1;
-            }
-            if j == pts.len() - 1 {
-                at.push((len, pts[j], self.offset_at(lane, len, true)));
-            } else {
-                at.push((arc[j], pts[j], mitre(normal(j - 1), normal(j))));
-                if k < n && (k as f32 * w - arc[j]).abs() <= 1e-3 {
-                    k += 1;
-                }
+        // Unit inward normal at each road point: the pieces' normals blended at curve points.
+        let vertex: Vec<Point> = (0..pts.len())
+            .map(|j| match j {
+                0 => normal(0),
+                j if j == pts.len() - 1 => normal(j - 1),
+                j => unit(mitre(normal(j - 1), normal(j))),
+            })
+            .collect();
+        // Where offsets start: the road's points, its stretch ends and every `BACK_STEP`.
+        let mut at: Vec<f32> = arc.to_vec();
+        at.extend((1..n).map(|k| k as f32 * w));
+        at.sort_by(f32::total_cmp);
+        at.dedup_by(|b, a| *b - *a <= 1e-3);
+        let mut dense = Vec::with_capacity(at.len() * 4);
+        for (i, &s0) in at.iter().enumerate() {
+            dense.push(s0);
+            if let Some(&s1) = at.get(i + 1) {
+                let extra = ((s1 - s0) / BACK_STEP).ceil() as u32;
+                dense.extend((1..extra).map(|e| s0 + (s1 - s0) * e as f32 / extra as f32));
             }
         }
-        let mut out: Vec<(f32, Point, Point, f32)> = at
-            .into_iter()
+        let last = dense.len() - 1;
+        let dense = dense.into_iter().enumerate().map(|(i, s)| {
+            if i == 0 || i == last {
+                let s = if i == 0 { 0.0 } else { len };
+                return (s, self.point_at(road, s).0, self.offset_at(lane, s, true));
+            }
+            let j = arc.partition_point(|&v| v <= s).clamp(1, arc.len() - 1);
+            let f = ((s - arc[j - 1]) / (arc[j] - arc[j - 1]).max(1e-6)).clamp(0.0, 1.0);
+            (
+                s,
+                self.point_at(road, s).0,
+                unit(lerp(vertex[j - 1], vertex[j], f)),
+            )
+        });
+        let mut out: Vec<(f32, Point, Point, f32)> = dense
             .map(|(s, p, m)| {
                 let m_len = m.0.hypot(m.1);
                 let u = (m.0 / m_len, m.1 / m_len);
                 let reach = LOT_REACH * m_len;
-                let t = self
-                    .ray_from(roads, p, u, 1.0)
-                    .map_or(reach, |t| (t / 2.0).min(reach));
-                (s, p, u, t)
+                (s, p, u, self.nearer(roads, p, u, 1.0 / m_len).min(reach))
             })
             .collect();
         let full: Vec<f32> = out.iter().map(|o| o.3).collect();
@@ -822,6 +867,59 @@ impl Blocks {
             }
         }
         out
+    }
+
+    /// How far a ray from `p` along unit `u` goes before a point on it is as near one of
+    /// `roads` as it is to the road through `p`, whose distance grows `k` metres per metre
+    /// along the ray. `f32::MAX` if never.
+    fn nearer(&self, roads: &[RoadId], p: Point, u: Point, k: f32) -> f32 {
+        let mut best = f32::MAX;
+        let mut try_t = |t: f32, a: Point, b: Point| {
+            if t > 1e-3 && t < best {
+                let q = (p.0 + u.0 * t, p.1 + u.1 * t);
+                let d = dist(q, lerp(a, b, project(a, b, q)));
+                if (d - k * t).abs() <= 1e-3 * t.max(1.0) {
+                    best = t;
+                }
+            }
+        };
+        for &r in roads {
+            for w in self.road_points(r).windows(2) {
+                let (a, b) = (w[0], w[1]);
+                let len = dist(a, b);
+                if len < 1e-6 {
+                    continue;
+                }
+                // The segment's line: n·(p + u t - a) = ±k t.
+                let n = left_of(((b.0 - a.0) / len, (b.1 - a.1) / len));
+                let (c, nu) = (n.0 * (p.0 - a.0) + n.1 * (p.1 - a.1), n.0 * u.0 + n.1 * u.1);
+                for sign in [1.0, -1.0] {
+                    let den = sign * k - nu;
+                    // Near zero, the ray runs along the line's bisector: no crossing.
+                    if den.abs() > 1e-4 {
+                        try_t(c / den, a, b);
+                    }
+                }
+                // Its ends: |p + u t - e|² = k² t².
+                for e in [a, b] {
+                    let g = sub(p, e);
+                    let (qa, qb, qc) = (1.0 - k * k, u.0 * g.0 + u.1 * g.1, g.0 * g.0 + g.1 * g.1);
+                    if qa.abs() < 1e-6 {
+                        if qb < 0.0 {
+                            try_t(-qc / (2.0 * qb), a, b);
+                        }
+                    } else {
+                        let disc = qb * qb - qa * qc;
+                        if disc >= 0.0 {
+                            let r = disc.sqrt();
+                            try_t((-qb - r) / qa, a, b);
+                            try_t((-qb + r) / qa, a, b);
+                        }
+                    }
+                }
+            }
+        }
+        best
     }
 
     /// Where a ray from `p` along `d` first meets one of `roads`.

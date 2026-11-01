@@ -66,6 +66,8 @@ fn check_lots(w: &World) -> BTreeSet<LotId> {
         assert!(o.len() >= 3, "lot {lot} has no shape");
         assert!(area(o) >= MIN_LOT_AREA - 0.5, "lot {lot} is {} m²", area(o));
         assert_simple(lot, o);
+        // Spikes and slivers, where lots from two roads meet, have hair-thin corners.
+        assert!(sharpest(o) > 5.0, "lot {lot} has a {}° corner", sharpest(o));
         for &c in w.lots.cells(lot) {
             assert!(seen.insert(c), "cell {c} is in two lots");
             assert_eq!(w.lots.owner(c), Some(lot));
@@ -140,10 +142,16 @@ fn area(o: &[(f32, f32)]) -> f32 {
         / 2.0
 }
 
+/// The centre of the lot's area.
 fn centroid(o: &[(f32, f32)]) -> (f32, f32) {
-    let n = o.len() as f32;
-    o.iter()
-        .fold((0.0, 0.0), |c, p| (c.0 + p.0 / n, c.1 + p.1 / n))
+    let (mut a, mut cx, mut cy) = (0.0, 0.0, 0.0);
+    for (p, q) in o.iter().zip(o.iter().cycle().skip(1)) {
+        let c = p.0 * q.1 - q.0 * p.1;
+        a += c;
+        cx += (p.0 + q.0) * c;
+        cy += (p.1 + q.1) * c;
+    }
+    (cx / (3.0 * a), cy / (3.0 * a))
 }
 
 fn bounds(o: &[(f32, f32)]) -> [f32; 4] {
@@ -600,4 +608,43 @@ fn repainting_without_changing_the_interior_does_not_bring_an_alley_back() {
         zone: Zone::ResidentialLow,
     }));
     assert_eq!(w.roads.road_count(), roads, "a bulldozed alley stays gone");
+}
+
+/// The sharpest corner of the outline, degrees.
+fn sharpest(o: &[(f32, f32)]) -> f32 {
+    let n = o.len();
+    (0..n)
+        .map(|i| {
+            let (p, c, q) = (o[(i + n - 1) % n], o[i], o[(i + 1) % n]);
+            let (a, b) = ((p.0 - c.0, p.1 - c.1), (q.0 - c.0, q.1 - c.1));
+            let cos = (a.0 * b.0 + a.1 * b.1) / (a.0.hypot(a.1) * b.0.hypot(b.1));
+            cos.clamp(-1.0, 1.0).acos().to_degrees()
+        })
+        .fold(f32::MAX, f32::min)
+}
+
+#[test]
+fn lots_from_facing_roads_meet_on_one_line_without_slivers() {
+    let mut w = empty();
+    // A skewed four-sided block, and one with a straight side facing a sagging curve.
+    let q = [(0.0, 0.0), (112.0, -4.0), (122.0, 100.0), (-3.0, 96.0)];
+    for i in 0..4 {
+        let (a, b) = (q[i], q[(i + 1) % 4]);
+        road(&mut w, a.0, a.1, b.0, b.1);
+    }
+    road(&mut w, 200.0, 100.0, 420.0, 115.0);
+    road(&mut w, 420.0, 115.0, 440.0, 20.0);
+    road(&mut w, 200.0, 20.0, 200.0, 100.0);
+    assert!(w.apply(Command::BuildCurve {
+        ax: 200.0,
+        ay: 20.0,
+        cx: 320.0,
+        cy: -60.0,
+        bx: 440.0,
+        by: 20.0,
+    }));
+    assert!(fill(&mut w, 50.0, 50.0, Zone::ResidentialLow));
+    assert!(fill(&mut w, 320.0, 60.0, Zone::ResidentialLow));
+    check_lots(&w);
+    assert_eq!(unlotted(&w), 0, "every zoned cell has a lot");
 }

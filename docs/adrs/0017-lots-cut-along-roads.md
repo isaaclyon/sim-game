@@ -36,11 +36,12 @@ unchanged. The grid says what land is for; lots say how it is divided.
    the kerbs, curves included.
 2. Each road side bordering the block is cut into stretches of about 16 m, as now. A
    stretch's lot runs from the kerb straight back from the road, its sides along the road's
-   normal at the stretch ends (so lots on curves are wedges). Its depth is half the distance to
-   the nearest road behind it along that normal, at most 64 m (the 0016 reach), so lots from
-   opposite sides meet near the block's middle with no gap. On the inside of a curve, where
-   the normals of one road side converge, each stops where it first crosses another, so the
-   wedges come to a point instead of folding over each other.
+   normal at the stretch ends (so lots on curves are wedges; normals are blended between a
+   curve's sample points so neighbouring wedges don't cross early). Its back follows the
+   line where land stops being nearer this road than any other road (the far side of the same
+   road included), traced every 2 m, at most 64 m (the 0016 reach) from the road. Lots from
+   facing roads therefore meet on one shared line with no gap, and on the inside of a curve,
+   or where a road bends back on itself, wedges meet down the middle.
 3. Where two roads meet at a block corner, the angle bisector at that corner divides their
    lots.
 4. Each lot is clipped to the block's land. Lots are cut in (road, side, stretch) order; a
@@ -50,6 +51,9 @@ unchanged. The grid says what land is for; lots say how it is divided.
    the lots leave smaller than 1,000 m² (inside curves, between converging wedges) join a
    neighbour the same way. A join that would leave a hole in the lot is skipped; the piece
    tries its other neighbours.
+6. Two lots tracing the same shared line from different sample points leave hair-thin strips
+   along it. Corners sharper than about 10° that enclose under 2 m² are removed from the final
+   outline, so lots have no spikes; the land lost is negligible.
 
 Land deeper than the lot depth stays the block's interior and drives alleys and connector
 streets exactly as in ADR 0016.
