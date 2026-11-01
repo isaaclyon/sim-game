@@ -12,6 +12,7 @@ let speed = 1;
 let backlogMs = 0;
 let last = performance.now();
 let roadsVersion = -1;
+let zonesVersion = -1;
 
 function post(msg: FromWorker, transfer: Transferable[] = []) {
   self.postMessage(msg, { transfer });
@@ -24,6 +25,15 @@ function sendRoadsIfChanged(s: Sim) {
   const segments = s.road_segments();
   const [x0, y0, x1, y1] = s.bounds();
   post({ type: 'roads', segments, bounds: [x0, y0, x1, y1] }, [segments.buffer]);
+}
+
+function sendZonesIfChanged(s: Sim) {
+  const version = s.zones_version();
+  if (version === zonesVersion) return;
+  zonesVersion = version;
+  const cells = s.zone_cells();
+  const [x0, y0, cell, cols, rows] = s.zone_layout();
+  post({ type: 'zones', cells, layout: [x0, y0, cell, cols, rows] }, [cells.buffer]);
 }
 
 function readStats(s: Sim): Stats {
@@ -86,6 +96,7 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
       tickMs = sim.dt() * 1000;
       sim.spawn_agents(msg.agents);
       sendRoadsIfChanged(sim);
+      sendZonesIfChanged(sim);
       last = performance.now();
       step();
       break;
@@ -103,6 +114,9 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
         sendRoadsIfChanged(sim);
         sendFrame(sim); // Cars and signals also change while paused.
       }
+      break;
+    case 'paintZone':
+      if (sim?.paint_zone(msg.ax, msg.ay, msg.bx, msg.by, msg.zone)) sendZonesIfChanged(sim);
       break;
     case 'previewBulldoze': {
       const segment = sim?.bulldoze_preview(msg.x, msg.y) ?? new Float32Array();

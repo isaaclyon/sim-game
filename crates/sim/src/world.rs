@@ -10,6 +10,7 @@ use crate::rng::Rng;
 use crate::road::{LaneId, NodeId, RoadId, RoadNetwork, STREET_SPEED};
 use crate::snap::{self, Join};
 use crate::traffic::Traffic;
+use crate::zone::{Zone, ZoneGrid};
 
 /// Distance from the road centreline to the middle of each lane, metres.
 const LANE_OFFSET: f32 = 2.0;
@@ -63,9 +64,28 @@ impl Default for Config {
 /// so the seed plus a command log is enough to replay a session.
 #[derive(Clone, Debug)]
 pub enum Command {
-    SpawnAgents { count: u32 },
-    BuildRoad { ax: f32, ay: f32, bx: f32, by: f32 },
-    DeleteRoad { x: f32, y: f32 },
+    SpawnAgents {
+        count: u32,
+    },
+    BuildRoad {
+        ax: f32,
+        ay: f32,
+        bx: f32,
+        by: f32,
+    },
+    DeleteRoad {
+        x: f32,
+        y: f32,
+    },
+    /// Sets every zone cell whose centre is inside the rectangle with these corners. `Zone::None`
+    /// unzones. See ADR 0014.
+    PaintZone {
+        ax: f32,
+        ay: f32,
+        bx: f32,
+        by: f32,
+        zone: Zone,
+    },
 }
 
 #[derive(Clone, Copy, Default, Debug)]
@@ -89,6 +109,7 @@ pub struct Stats {
 pub struct World {
     pub cfg: Config,
     pub roads: RoadNetwork,
+    pub zones: ZoneGrid,
     pub agents: Agents,
     traffic: Traffic,
     pub junctions: Junctions,
@@ -109,6 +130,7 @@ impl World {
     pub fn new(cfg: Config, roads: RoadNetwork, rng: Rng) -> Self {
         let mut world = Self {
             cfg,
+            zones: ZoneGrid::covering(roads.bounds()),
             roads,
             agents: Agents::default(),
             traffic: Traffic::default(),
@@ -143,6 +165,13 @@ impl World {
             Command::SpawnAgents { count } => self.spawn_agents(count),
             Command::BuildRoad { ax, ay, bx, by } => self.build_road(ax, ay, bx, by),
             Command::DeleteRoad { x, y } => self.delete_road(x, y),
+            Command::PaintZone {
+                ax,
+                ay,
+                bx,
+                by,
+                zone,
+            } => self.zones.paint(ax, ay, bx, by, zone),
         }
     }
 
@@ -289,6 +318,11 @@ impl World {
             mix(a.cleared[i] as u64);
         }
         self.junctions.hash_into(&mut mix);
+        for chunk in self.zones.cells.chunks(8) {
+            let mut word = [0u8; 8];
+            word[..chunk.len()].copy_from_slice(chunk);
+            mix(u64::from_le_bytes(word));
+        }
         h
     }
 
@@ -630,6 +664,29 @@ mod tests {
         let mut world = World::generate(cfg, 12, 12);
         world.apply(Command::SpawnAgents { count: 2_000 });
         world
+    }
+
+    #[test]
+    fn painting_zones_is_hashed_and_survives_road_edits() {
+        let mut world = roads(&[(0.0, 0.0, 100.0, 0.0), (0.0, 100.0, 100.0, 100.0)]);
+        let before = world.state_hash();
+        let paint = |zone| Command::PaintZone {
+            ax: 0.0,
+            ay: 0.0,
+            bx: 100.0,
+            by: 100.0,
+            zone,
+        };
+        assert!(world.apply(paint(Zone::ResidentialHigh)));
+        assert_ne!(world.state_hash(), before);
+        assert!(!world.apply(paint(Zone::ResidentialHigh)));
+        // Zones may cover roads; building or bulldozing a road leaves them alone.
+        assert!(build(&mut world, 50.0, 0.0, 50.0, 100.0));
+        assert!(world.apply(Command::DeleteRoad { x: 20.0, y: 0.0 }));
+        assert_eq!(world.zones.zone_at(50.0, 0.0), Some(Zone::ResidentialHigh));
+        assert_eq!(world.zones.zone_at(20.0, 50.0), Some(Zone::ResidentialHigh));
+        assert!(world.apply(paint(Zone::None)));
+        assert_eq!(world.zones.zone_at(20.0, 50.0), Some(Zone::None));
     }
 
     #[test]

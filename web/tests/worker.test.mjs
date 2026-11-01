@@ -56,3 +56,26 @@ test('every preview request gets a reply even during WASM initialization', async
   assert.equal(w.messages.at(-1).type, 'frame', 'paused edits refresh cars and signals');
   assert.equal(w.messages.at(-1).stats.tick, 0, 'deletion does not advance time');
 });
+
+test('the worker sends the zone grid on start and after each paint that changes it', async () => {
+  const w = await worker();
+  w.ready();
+  await w.init;
+  const first = w.messages.find((msg) => msg.type === 'zones');
+  const [x0, y0, cell, cols, rows] = first.layout;
+  assert.equal(cell, 8);
+  assert.equal(first.cells.length, cols * rows);
+  assert.ok(first.cells.every((c) => c === 0));
+  // Residential high density over the first 3 x 2 cells.
+  await w.send({ type: 'paintZone', ax: x0, ay: y0, bx: x0 + 24, by: y0 + 16, zone: 2 });
+  const painted = w.messages.at(-1);
+  assert.equal(painted.type, 'zones');
+  assert.deepEqual([...painted.cells.slice(0, 4)], [2, 2, 2, 0]);
+  assert.deepEqual([...painted.cells.slice(cols, cols + 4)], [2, 2, 2, 0]);
+  assert.equal(painted.cells[2 * cols], 0);
+  const count = w.messages.length;
+  await w.send({ type: 'paintZone', ax: x0, ay: y0, bx: x0 + 24, by: y0 + 16, zone: 2 });
+  assert.equal(w.messages.length, count, 'a paint that changes nothing sends nothing');
+  await w.send({ type: 'paintZone', ax: x0, ay: y0, bx: x0 + 24, by: y0 + 16, zone: 9 });
+  assert.equal(w.messages.length, count, 'unknown zones are refused');
+});

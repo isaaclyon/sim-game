@@ -15,6 +15,9 @@ Controls: left-drag pans, right-drag orbits, wheel zooms to cursor. `R` toggles 
 (click, click, ... Esc to stop). `B` toggles bulldoze: hover to highlight a road segment,
 click to remove both directions, Esc or right-click to stop. Both tools also work while paused.
 Cars whose remaining route uses a deleted road park and retry; other traffic continues.
+The zone brush paints residential (`Z`), commercial (`X`) or industrial (`C`); press the key
+again to switch between low and high density, or use the tool bar. `U` unzones. Drag a
+rectangle to paint it (left-drag paints instead of panning while the brush is on).
 Space pauses, 1/2/3 set speed.
 
 Roads render as eight-metre-wide asphalt ribbons with simple pads at shared endpoints.
