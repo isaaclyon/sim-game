@@ -127,6 +127,12 @@ impl Sim {
         self.buf.clone()
     }
 
+    /// `[ax, ay, bx, by]` per edge of each lot's building area.
+    pub fn building_areas(&mut self) -> Vec<f32> {
+        self.world.write_building_areas(&mut self.buf);
+        self.buf.clone()
+    }
+
     pub fn zones_version(&self) -> u32 {
         self.world.zones.version
     }

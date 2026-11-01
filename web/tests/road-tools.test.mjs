@@ -69,8 +69,8 @@ async function tools() {
     setBlockOutline(outline, zone) {
       previews.push({ type: 'block', outline, zone });
     }
-    setLots(segments) {
-      previews.push({ type: 'lots', segments });
+    setLots(segments, areas) {
+      previews.push({ type: 'lots', segments, areas });
     }
   }
   const context = createContext({
@@ -229,8 +229,9 @@ test('the zone brush outlines the block under the cursor, one question at a time
   t.reply({ type: 'blockPreview', outline, revision: again.revision });
   assert.notEqual(t.previews.at(-1).type, 'block', 'nor once the brush is off');
   const segments = new Float32Array([0, 0, 8, 0]);
-  t.reply({ type: 'lots', segments });
-  assert.deepEqual(t.previews.at(-1), { type: 'lots', segments });
+  const areas = new Float32Array([1, 1, 7, 1]);
+  t.reply({ type: 'lots', segments, areas });
+  assert.deepEqual(t.previews.at(-1), { type: 'lots', segments, areas });
 });
 
 test('switching from curve to bulldoze discards a delayed preview and resets construction', async () => {

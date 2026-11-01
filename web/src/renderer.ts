@@ -48,6 +48,8 @@ const ZONE_COLORS = [null, 0x7bd88f, 0x2e9e4f, 0x6fb3ff, 0x2f6fd0, 0xf2c94c, 0xd
   c === null ? null : new THREE.Color(BG).lerp(new THREE.Color(c), 0.45),
 );
 const LOT_COLOR = 0x9aa7b4;
+/** Building areas: where a building could stand on each lot. */
+const AREA_COLOR = 0xf2efe6;
 /** Bright versions for the drag outline, which must stand out. */
 const ZONE_OUTLINE = [0xe5484d, 0x7bd88f, 0x2e9e4f, 0x6fb3ff, 0x2f6fd0, 0xf2c94c, 0xd9822b];
 
@@ -65,6 +67,7 @@ export class Renderer {
   private zones?: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
   private readonly zoneDrag: THREE.LineLoop;
   private lots?: THREE.LineSegments;
+  private areas?: THREE.LineSegments;
   private readonly matrix = new THREE.Matrix4();
   private readonly quat = new THREE.Quaternion();
   private readonly pos = new THREE.Vector3();
@@ -369,30 +372,45 @@ export class Renderer {
     (this.zoneDrag.material as THREE.LineBasicMaterial).color.set(ZONE_OUTLINE[zone] ?? 0xffffff);
   }
 
-  /** Draws lot edges over the zones: `[ax, ay, bx, by]` per segment (see `lots` in protocol.ts). */
-  setLots(segments: Float32Array) {
+  /**
+   * Draws lot edges and building areas over the zones, each `[ax, ay, bx, by]` per segment
+   * (see `lots` in protocol.ts).
+   */
+  setLots(segments: Float32Array, areas: Float32Array) {
+    this.lots = this.groundLines(this.lots, segments, LOT_COLOR, 0.35);
+    this.areas = this.groundLines(this.areas, areas, AREA_COLOR, 0.5);
+  }
+
+  /** Replaces the geometry of flat lines just above the ground, creating them on first use. */
+  private groundLines(
+    lines: THREE.LineSegments | undefined,
+    segments: Float32Array,
+    color: number,
+    opacity: number,
+  ) {
     const pos = new Float32Array((segments.length / 4) * 6);
     for (let i = 0, j = 0; i < segments.length; i += 4, j += 6) {
       pos.set([segments[i], 0.1, segments[i + 1], segments[i + 2], 0.1, segments[i + 3]], j);
     }
     const geom = new THREE.BufferGeometry();
     geom.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    if (!this.lots) {
-      // Drawn just after the zones and before the roads, which cover lot edges under them.
-      const material = new THREE.LineBasicMaterial({
-        color: LOT_COLOR,
-        transparent: true,
-        opacity: 0.35,
-        depthWrite: false,
-      });
-      this.lots = new THREE.LineSegments(geom, material);
-      this.lots.renderOrder = -1;
-      this.lots.frustumCulled = false;
-      this.scene.add(this.lots);
-    } else {
-      this.lots.geometry.dispose();
-      this.lots.geometry = geom;
+    if (lines) {
+      lines.geometry.dispose();
+      lines.geometry = geom;
+      return lines;
     }
+    // Drawn just after the zones and before the roads, which cover lines under them.
+    const material = new THREE.LineBasicMaterial({
+      color,
+      transparent: true,
+      opacity,
+      depthWrite: false,
+    });
+    const created = new THREE.LineSegments(geom, material);
+    created.renderOrder = -1;
+    created.frustumCulled = false;
+    this.scene.add(created);
+    return created;
   }
 
   /** Draw the full centreline selected by the sim, in the destructive-action color. */

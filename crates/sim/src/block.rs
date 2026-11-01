@@ -91,6 +91,48 @@ fn ccw(a: Point, b: Point) -> Ordering {
     })
 }
 
+/// The cells sharing an edge with row-major cell `c` of a grid `cols` wide.
+fn neighbours(c: u32, cols: u32) -> impl Iterator<Item = u32> {
+    [
+        c.checked_sub(cols),
+        (!c.is_multiple_of(cols)).then(|| c - 1),
+        (c % cols != cols - 1).then_some(c + 1),
+        Some(c + cols),
+    ]
+    .into_iter()
+    .flatten()
+}
+
+/// Splits `cells` into pieces whose cells connect through shared edges, each ordered by cell
+/// index, pieces ordered by their lowest cell.
+fn pieces(mut cells: Vec<Cell>, cols: u32) -> Vec<Vec<Cell>> {
+    cells.sort_unstable_by_key(|c| c.index);
+    let mut piece_of = vec![usize::MAX; cells.len()];
+    let find = |i: u32| cells.binary_search_by_key(&i, |c| c.index).ok();
+    let mut out: Vec<Vec<Cell>> = Vec::new();
+    for start in 0..cells.len() {
+        if piece_of[start] != usize::MAX {
+            continue;
+        }
+        let p = out.len();
+        piece_of[start] = p;
+        let mut stack = vec![start];
+        let mut piece = Vec::new();
+        while let Some(k) = stack.pop() {
+            piece.push(cells[k]);
+            for n in neighbours(cells[k].index, cols).filter_map(find) {
+                if piece_of[n] == usize::MAX {
+                    piece_of[n] = p;
+                    stack.push(n);
+                }
+            }
+        }
+        piece.sort_unstable_by_key(|c| c.index);
+        out.push(piece);
+    }
+    out
+}
+
 /// One zone cell of a block, with the road it is closest to.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Cell {
@@ -335,70 +377,65 @@ impl Blocks {
     }
 
     /// Cuts block cells into lots: each road side within reach, in stretches of about
-    /// `LOT_WIDTH`. Lots come out in (road, side, stretch) order.
-    /// Groups too small to be lots join a lot next to them, so corners are not left empty.
+    /// `LOT_WIDTH`. Every lot is one piece: a stretch whose cells fall apart becomes one lot per
+    /// piece, and pieces too small to be lots join a lot they touch, so corners are not left
+    /// empty. Lots come out in (road, side, stretch, lowest cell) order.
     pub(crate) fn cut(&self, cells: &[Cell], cols: u32) -> Vec<LotPlan> {
-        let mut groups: BTreeMap<(RoadId, bool, u32), Vec<u32>> = BTreeMap::new();
+        let mut stretches: BTreeMap<(RoadId, bool, u32), Vec<Cell>> = BTreeMap::new();
         for c in cells.iter().filter(|c| c.dist <= LOT_REACH) {
             let (n, w) = self.stretches(c.road);
             let k = ((c.arc / w) as u32).min(n - 1);
-            groups.entry((c.road, c.left, k)).or_default().push(c.index);
+            stretches.entry((c.road, c.left, k)).or_default().push(*c);
         }
-        let mut groups: Vec<_> = groups.into_iter().collect();
-        let mut owner: BTreeMap<u32, usize> = BTreeMap::new();
+        let mut lots: Vec<(RoadId, bool, Vec<Cell>)> = Vec::new();
         let mut loose: Vec<u32> = Vec::new();
-        for (g, (_, cells)) in groups.iter().enumerate() {
-            if cells.len() >= MIN_LOT_CELLS {
-                owner.extend(cells.iter().map(|&c| (c, g)));
-            } else {
-                loose.extend(cells);
+        for ((road, left, _), group) in stretches {
+            for piece in pieces(group, cols) {
+                if piece.len() >= MIN_LOT_CELLS {
+                    lots.push((road, left, piece));
+                } else {
+                    loose.extend(piece.iter().map(|c| c.index));
+                }
             }
         }
-        for (_, cells) in groups.iter_mut() {
-            if cells.len() < MIN_LOT_CELLS {
-                cells.clear();
-            }
+        let mut owner: BTreeMap<u32, usize> = BTreeMap::new();
+        let mut joined: Vec<Vec<u32>> = vec![Vec::new(); lots.len()];
+        for (l, (_, _, piece)) in lots.iter().enumerate() {
+            owner.extend(piece.iter().map(|c| (c.index, l)));
         }
         loose.sort_unstable();
         // Each pass attaches the loose cells touching a lot; a few passes reach any corner.
         for _ in 0..4 {
-            let mut joined = Vec::new();
-            loose.retain(|&c| {
-                let next = [
-                    c.checked_sub(cols),
-                    (c % cols != 0).then(|| c - 1),
-                    (c % cols != cols - 1).then_some(c + 1),
-                    Some(c + cols),
-                ];
-                match next.into_iter().flatten().find_map(|n| owner.get(&n)) {
-                    Some(&g) => {
-                        joined.push((c, g));
-                        false
-                    }
-                    None => true,
+            let mut attach = Vec::new();
+            loose.retain(|&c| match neighbours(c, cols).find_map(|n| owner.get(&n)) {
+                Some(&l) => {
+                    attach.push((c, l));
+                    false
                 }
+                None => true,
             });
-            if joined.is_empty() {
+            if attach.is_empty() {
                 break;
             }
-            for (c, g) in joined {
-                owner.insert(c, g);
-                groups[g].1.push(c);
+            for (c, l) in attach {
+                owner.insert(c, l);
+                joined[l].push(c);
             }
         }
-        groups
-            .into_iter()
-            .filter(|(_, cells)| !cells.is_empty())
-            .map(|((road, left, k), mut cells)| {
-                cells.sort_unstable();
-                let (_, w) = self.stretches(road);
-                let (front, dir) = self.point_at(road, (k as f32 + 0.5) * w);
+        lots.into_iter()
+            .zip(joined)
+            .map(|((road, left, piece), extra)| {
+                // The front is where the piece's own cells meet the road, on average.
+                let arc = piece.iter().map(|c| c.arc).sum::<f32>() / piece.len() as f32;
+                let (front, dir) = self.point_at(road, arc);
                 // Facing the road: right of travel for lots on its left, and vice versa.
                 let facing = if left {
                     (dir.1, -dir.0)
                 } else {
                     (-dir.1, dir.0)
                 };
+                let mut cells: Vec<u32> = piece.iter().map(|c| c.index).chain(extra).collect();
+                cells.sort_unstable();
                 LotPlan {
                     road,
                     front,
