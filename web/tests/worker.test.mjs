@@ -14,7 +14,20 @@ async function worker() {
   });
   const messages = [];
   const self = { postMessage: (msg) => messages.push(msg) };
-  const context = createContext({ self, performance: { now: () => 0 }, setTimeout: () => {} });
+  // Fake time: `advance(ms)` moves the clock and runs the worker's next step.
+  let now = 0;
+  let nextStep = () => {};
+  const advance = (ms) => {
+    now += ms;
+    nextStep();
+  };
+  const context = createContext({
+    self,
+    performance: { now: () => now },
+    setTimeout: (fn) => {
+      nextStep = fn;
+    },
+  });
   const source = stripTypeScriptTypes(
     readFileSync(new URL('../src/sim.worker.ts', import.meta.url), 'utf8'),
   );
@@ -31,7 +44,7 @@ async function worker() {
   await module.evaluate();
   const send = (data) => self.onmessage({ data });
   const init = send({ type: 'init', seed: 1, cols: 3, rows: 3, agents: 100 });
-  return { send, messages, ready, init };
+  return { send, messages, ready, init, advance };
 }
 
 test('curve preview, build and bulldoze agree across the worker boundary while paused', async () => {
@@ -158,4 +171,24 @@ test('a click fills the block under it, and its lots are sent', async () => {
   assert.equal(i, cut.rings.length);
   assert.equal(w.messages.at(-1).type, 'frame');
   assert.equal(w.messages.at(-1).stats.tick, 0, 'filling does not advance time');
+});
+
+test('frames carry the sim-owned day clock, which pause holds and speed scales', async () => {
+  const w = await worker();
+  w.ready();
+  await w.init;
+  const clock = () => {
+    const { stats } = w.messages.findLast((msg) => msg.type === 'frame');
+    return [stats.day, stats.secondOfDay];
+  };
+  // A tick is f32 0.1 s, a hair over 100 ms, so give each step a little slack.
+  w.advance(1001);
+  assert.deepEqual(clock(), [1, 6 * 3600 + 6], 'one second at 1x is six clock seconds');
+  await w.send({ type: 'setSpeed', speed: 0 });
+  const frames = w.messages.length;
+  w.advance(5000);
+  assert.equal(w.messages.length, frames, 'paused: no ticks, no new frames');
+  await w.send({ type: 'setSpeed', speed: 3 });
+  for (let i = 0; i < 10; i++) w.advance(101);
+  assert.deepEqual(clock(), [1, 6 * 3600 + 24], 'one real second at 3x is 18 clock seconds');
 });

@@ -15,6 +15,9 @@ pub struct Sim {
 #[derive(Clone, Copy)]
 pub struct SimStats {
     pub tick: f64,
+    /// Day clock (see `sim::clock`): 1-based day and seconds since midnight.
+    pub day: u32,
+    pub second_of_day: u32,
     pub agents: u32,
     pub parked: u32,
     pub awaiting_path: u32,
@@ -217,8 +220,11 @@ impl Sim {
 
     pub fn stats(&self) -> SimStats {
         let s = self.world.stats();
+        let clock = sim::clock::clock_at(s.tick, self.world.cfg.dt);
         SimStats {
             tick: s.tick as f64,
+            day: clock.day,
+            second_of_day: clock.second_of_day,
             agents: s.agents,
             parked: s.parked,
             awaiting_path: s.awaiting_path,
