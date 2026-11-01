@@ -67,6 +67,8 @@ function readStats(s: Sim): Stats {
   const st = s.stats();
   const out: Stats = {
     tick: st.tick,
+    day: st.day,
+    secondOfDay: st.second_of_day,
     agents: st.agents,
     parked: st.parked,
     awaitingPath: st.awaiting_path,

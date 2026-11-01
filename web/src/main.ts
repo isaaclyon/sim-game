@@ -368,10 +368,10 @@ function frame() {
   }
   renderer.render();
   if (stats) {
-    const simSecs = stats.tick / 10;
-    const clock = `${Math.floor(simSecs / 60)}m ${Math.floor(simSecs % 60)}s`;
+    const hh = String(Math.floor(stats.secondOfDay / 3600)).padStart(2, '0');
+    const mm = String(Math.floor((stats.secondOfDay % 3600) / 60)).padStart(2, '0');
     hud.textContent =
-      `sim time   ${clock}   speed ${speed}×\n` +
+      `Day ${stats.day}   ${hh}:${mm}   ${speed === 0 ? 'paused' : `${speed}×`}\n` +
       `fps        ${fps.toFixed(0)}   tick ${tickMs.toFixed(2)} ms\n` +
       `agents     ${fmt(stats.agents)}\n` +
       `driving    ${fmt(stats.driving)}   parked ${fmt(stats.parked)}\n` +

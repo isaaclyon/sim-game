@@ -74,6 +74,9 @@ export type Zone = (typeof Zone)[keyof typeof Zone];
 
 export interface Stats {
   tick: number;
+  /** Day clock from the sim (`sim::clock`): 1-based day and seconds since midnight. */
+  day: number;
+  secondOfDay: number;
   agents: number;
   parked: number;
   awaitingPath: number;
