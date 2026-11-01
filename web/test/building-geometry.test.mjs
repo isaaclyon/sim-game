@@ -12,7 +12,7 @@ test('concave buildings have flat roofs at sim height and outward walls', () => 
     [8, 20],
     [0, 20],
   ];
-  const g = buildBuildingGeometry(new Float32Array([2, 18, ring.length, ...ring.flat()]));
+  const g = buildBuildingGeometry(new Float32Array([2, 18, 0, ring.length, ...ring.flat()]));
   const p = g.getAttribute('position');
   const n = g.getAttribute('normal');
   const c = g.getAttribute('color');
@@ -42,11 +42,24 @@ test('concave buildings have flat roofs at sim height and outward walls', () => 
   g.dispose();
 });
 
+test('industrial roofs use stable sim choices, not packed snapshot order', () => {
+  const record = (roof, x) => [5, 7, roof, 4, x, 0, x + 10, 0, x + 10, 10, x, 10];
+  const records = [0, 1, 2, 3].map((roof) => record(roof, roof * 20));
+  const g = buildBuildingGeometry(new Float32Array(records.flat()));
+  const c = g.getAttribute('color').array;
+  const roofs = records.map((_, i) => [...c.slice(i * 90, i * 90 + 3)]);
+  assert.equal(new Set(roofs.map(String)).size, 4);
+  const remaining = buildBuildingGeometry(new Float32Array(records.slice(1).flat()));
+  assert.deepEqual([...remaining.getAttribute('color').array], [...c.slice(90)]);
+  g.dispose();
+  remaining.dispose();
+});
+
 test('six zones render together and an empty snapshot clears all buildings', () => {
   const data = [];
   for (let zone = 1; zone <= 6; zone++) {
     const x = zone * 30;
-    data.push(zone, zone * 3, 4, x, 0, x + 10, 0, x + 10, 10, x, 10);
+    data.push(zone, zone * 3, 0, 4, x, 0, x + 10, 0, x + 10, 10, x, 10);
   }
   const g = buildBuildingGeometry(new Float32Array(data));
   assert.equal(g.getAttribute('position').count, 6 * 30);

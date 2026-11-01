@@ -8,12 +8,19 @@ use crate::block::ROAD_HALF_WIDTH;
 use crate::geometry::Point;
 use crate::lot::{LotId, Lots};
 use crate::poly::{self, Area, Ring};
+use crate::rng::Rng;
 use crate::road::{RoadClass, RoadNetwork};
 use crate::zone::Zone;
 
 const MIN_FOOTPRINT: f32 = 25.0;
 
-pub(super) fn make(lots: &Lots, lot: LotId, roads: &RoadNetwork, zone: Zone) -> Option<Vec<Point>> {
+pub(super) fn make(
+    lots: &Lots,
+    lot: LotId,
+    roads: &RoadNetwork,
+    zone: Zone,
+    rng: &mut Rng,
+) -> Option<Vec<Point>> {
     let l = lot as usize;
     let land = poly::ring(lots.outline(lot).iter().copied());
     let facing = (lots.facing_x[l], lots.facing_y[l]);
@@ -42,17 +49,33 @@ pub(super) fn make(lots: &Lots, lot: LotId, roads: &RoadNetwork, zone: Zone) -> 
     // Party walls stay on lot boundaries; only edges near streets recede.
     let clear = largest(poly::subtract(std::slice::from_ref(&land), &streets))?;
     let ring = match zone {
-        Zone::ResidentialLow => house(&clear, front, facing, lots.frontage[l]),
+        Zone::ResidentialLow => road_box(
+            &clear,
+            front,
+            facing,
+            ((lots.frontage[l] - 4.0).clamp(5.0, 14.0), 14.0),
+            8.0,
+        ),
         Zone::IndustrialLow | Zone::IndustrialHigh => {
             // Integer offsets are deterministic, including at concave corners.
-            let style = IntOutlineStyle::new(-768); // 3 m on poly's 1/256 m grid.
+            let gap = 2.0 + rng.below(3) as f32;
+            let style = IntOutlineStyle::new(-(gap * 256.0) as i32);
             let inset = clear
                 .validate_outline(&style)
                 .ok()
-                .and_then(|()| clear.outline(&style).ok());
-            inset
-                .and_then(largest)
-                .or_else(|| house(&clear, front, facing, lots.frontage[l]))
+                .and_then(|()| clear.outline(&style).ok())
+                .and_then(largest)?;
+            let frontage = lots.frontage[l];
+            let depth = if frontage < 24.0 {
+                rng.range(14.0, 24.0)
+            } else if frontage < 48.0 {
+                rng.range(24.0, 38.0)
+            } else {
+                rng.range(32.0, 48.0)
+            };
+            let width = (frontage * rng.range(0.65, 0.85)).max(5.0);
+            let setback = ROAD_HALF_WIDTH + rng.range(4.0, 9.0);
+            road_box(&inset, front, facing, (width, depth), setback).or(Some(inset))
         }
         Zone::ResidentialHigh | Zone::CommercialLow | Zone::CommercialHigh => Some(clear),
         Zone::None => None,
@@ -83,18 +106,16 @@ fn street_band(a: Point, b: Point, width: f32) -> Ring {
     ])
 }
 
-/// A road-aligned house, normally 4 m behind the kerb with side and back yards.
-/// On irregular lots, try successively smaller boxes at nearby sites. Exact polygon
-/// subtraction (not just corner containment) prevents boxes crossing concave lot edges.
-fn house(land: &Ring, front: Point, facing: Point, frontage: f32) -> Option<Ring> {
+/// Fit a road-aligned box, shrinking it on irregular lots. Exact polygon subtraction
+/// (not just corner containment) prevents boxes crossing concave lot edges.
+fn road_box(land: &Ring, front: Point, facing: Point, size: Point, setback: f32) -> Option<Ring> {
     let right = (-facing.1, facing.0);
-    let width = (frontage - 4.0).clamp(5.0, 14.0);
-    let depth = 14.0;
+    let (width, depth) = size;
     let mut best: Option<Ring> = None;
     let mut best_area = MIN_FOOTPRINT;
     for scale in [1.0, 0.85, 0.7, 0.55, 0.4] {
         let (w, d) = (width * scale, depth * scale);
-        for back in [ROAD_HALF_WIDTH + 4.0, 14.0, 22.0, 30.0] {
+        for back in [setback, setback + 6.0, setback + 14.0, setback + 22.0] {
             for side in [0.0, -width / 4.0, width / 4.0] {
                 let p = (
                     front.0 - facing.0 * back + right.0 * side,
@@ -165,7 +186,7 @@ mod tests {
             Zone::ResidentialHigh,
             Zone::CommercialLow,
         ] {
-            let outline = make(&lots, 0, &roads, zone).unwrap();
+            let outline = make(&lots, 0, &roads, zone, &mut Rng::new(1)).unwrap();
             let r = poly::ring(outline);
             let bounds = poly::bounds(&r);
             assert!(
@@ -177,8 +198,8 @@ mod tests {
                     assert!(bounds[1] >= 8.0 && bounds[3] < 60.0);
                 }
                 Zone::IndustrialLow => {
-                    assert_eq!([bounds[0], bounds[2], bounds[3]], [13.0, 23.0, 57.0]);
-                    assert!((bounds[1] - 7.8).abs() < 0.01);
+                    assert!(bounds[0] >= 12.0 && bounds[2] <= 24.0);
+                    assert!(bounds[1] >= 6.79 && bounds[3] <= 58.0);
                 }
                 _ => {
                     assert_eq!((bounds[0], bounds[2]), (10.0, 26.0));
@@ -207,7 +228,7 @@ mod tests {
                 Zone::IndustrialHigh,
                 Zone::CommercialHigh,
             ] {
-                let ring = make(&lots, 0, &roads, zone).unwrap();
+                let ring = make(&lots, 0, &roads, zone, &mut Rng::new(1)).unwrap();
                 let inside = poly::ring(ring);
                 let outside = poly::subtract(
                     std::slice::from_ref(&inside),
@@ -220,6 +241,31 @@ mod tests {
     }
 
     #[test]
+    fn industrial_yards_vary_without_changing_a_given_seeds_footprint() {
+        let (mut lots, roads) = lot(vec![(0.0, 4.0), (64.0, 4.0), (64.0, 60.0), (0.0, 60.0)]);
+        lots.frontage[0] = 64.0;
+        lots.front_x[0] = 32.0;
+        let make_seed =
+            |seed| make(&lots, 0, &roads, Zone::IndustrialHigh, &mut Rng::new(seed)).unwrap();
+        let first = make_seed(1);
+        assert_eq!(first, make_seed(1));
+        for seed in 2..10 {
+            let ring = make_seed(seed);
+            assert_ne!(ring, first);
+            let bounds = poly::bounds(&poly::ring(ring.clone()));
+            assert!(bounds[0] >= 2.0 && bounds[2] <= 62.0);
+            assert!(bounds[1] >= 6.79 && bounds[3] <= 58.0);
+            assert!(
+                poly::subtract(
+                    &[poly::ring(ring)],
+                    &[poly::ring(lots.outline(0).iter().copied())]
+                )
+                .is_empty()
+            );
+        }
+    }
+
+    #[test]
     fn dense_buildings_clear_the_wider_main_road_surface() {
         let (lots, _) = lot(vec![(10.0, 4.0), (26.0, 4.0), (26.0, 60.0), (10.0, 60.0)]);
         let mut roads = RoadNetwork::default();
@@ -227,7 +273,7 @@ mod tests {
         let b = roads.add_node(100.0, 0.0);
         roads.add_road(a, b, RoadClass::Main);
         roads.rebuild_adjacency();
-        let ring = make(&lots, 0, &roads, Zone::CommercialHigh).unwrap();
+        let ring = make(&lots, 0, &roads, Zone::CommercialHigh, &mut Rng::new(1)).unwrap();
         assert!(
             ring.iter().all(|p| p.1 >= 6.79),
             "main-road asphalt is 12 m wide"
@@ -244,7 +290,7 @@ mod tests {
         roads.add_road(a, b, RoadClass::Street);
         roads.add_road(a, c, RoadClass::Main);
         roads.rebuild_adjacency();
-        let ring = make(&lots, 0, &roads, Zone::ResidentialLow).unwrap();
+        let ring = make(&lots, 0, &roads, Zone::ResidentialLow, &mut Rng::new(1)).unwrap();
         assert!(
             ring.iter().all(|p| p.0 >= 12.79),
             "the house must not extend into side-road asphalt"
@@ -260,7 +306,7 @@ mod tests {
             Zone::IndustrialLow,
             Zone::ResidentialHigh,
         ] {
-            assert!(make(&lots, 0, &roads, zone).is_none());
+            assert!(make(&lots, 0, &roads, zone, &mut Rng::new(1)).is_none());
         }
     }
 }

@@ -222,6 +222,57 @@ fn growth_does_not_consume_traffic_randomness() {
 }
 
 #[test]
+fn industrial_buildings_vary_in_height_and_survive_repainting_and_nearby_road_edits() {
+    let mut w = town(Zone::IndustrialHigh);
+    advance(&mut w, 61);
+    let heights: Vec<_> = w
+        .buildings
+        .active_buildings()
+        .map(|b| w.buildings.height[b as usize])
+        .collect();
+    assert!(heights.windows(2).any(|h| h[0] != h[1]));
+    let before = snapshot(&w);
+    w.apply(Command::FillBlock {
+        x: 50.0,
+        y: 50.0,
+        zone: Zone::ResidentialLow,
+    });
+    assert_eq!(snapshot(&w), before);
+    // A road outside the block refreshes nearby lots, without changing its boundary.
+    w.apply(Command::BuildRoad {
+        ax: 0.0,
+        ay: 0.0,
+        bx: -80.0,
+        by: 0.0,
+        class: RoadClass::Street,
+    });
+    assert_eq!(
+        snapshot(&w),
+        before,
+        "unchanged factory lots must keep their buildings"
+    );
+}
+
+#[test]
+fn industrial_roof_choices_are_varied_persisted_and_hashed() {
+    let mut a = town(Zone::IndustrialHigh);
+    let mut b = town(Zone::IndustrialHigh);
+    advance(&mut a, 61);
+    advance(&mut b, 61);
+    assert_eq!(snapshot(&a), snapshot(&b));
+    assert!(a.buildings.roof.windows(2).any(|r| r[0] != r[1]));
+    let hash = a.state_hash();
+    let id = a.buildings.active_buildings().next().unwrap() as usize;
+    a.buildings.roof[id] = (a.buildings.roof[id] + 1) % 4;
+    assert_ne!(a.state_hash(), hash, "roof choice belongs to sim state");
+    assert_ne!(
+        snapshot(&a),
+        snapshot(&b),
+        "the renderer receives the persisted choice"
+    );
+}
+
+#[test]
 fn unzoned_towns_never_grow_buildings() {
     let mut w = World::generate(Config::default(), 3, 3);
     advance(&mut w, 120);

@@ -18,6 +18,8 @@ pub struct Buildings {
     pub lot: Vec<LotId>,
     pub zone: Vec<Zone>,
     pub height: Vec<f32>,
+    /// Stable palette choice; zero outside industry.
+    pub roof: Vec<u8>,
     pub active: Vec<bool>,
     outline_start: Vec<u32>,
     outline: Vec<Point>,
@@ -100,9 +102,6 @@ impl Buildings {
             let Some((_, zone)) = self.due[l].take() else {
                 continue;
             };
-            let Some(ring) = footprint::make(lots, lot, roads, zone) else {
-                continue;
-            };
             let mut rng = Rng::new(seed.wrapping_add(lot as u64));
             // The first draw sets growth time; use the next so height is independent.
             rng.next_u64();
@@ -111,15 +110,37 @@ impl Buildings {
                 Zone::ResidentialHigh => 3.0 * (4 + rng.below(5)) as f32,
                 Zone::CommercialLow => 4.0 * (1 + rng.below(2)) as f32,
                 Zone::CommercialHigh => 4.0 * (3 + rng.below(5)) as f32,
-                Zone::IndustrialLow => 5.0,
-                Zone::IndustrialHigh => 9.0,
+                Zone::IndustrialLow | Zone::IndustrialHigh => {
+                    let base = if lots.frontage[l] < 24.0 {
+                        4.0
+                    } else if lots.frontage[l] < 48.0 {
+                        6.0
+                    } else {
+                        8.0
+                    };
+                    base + rng.below(4) as f32
+                        + if zone == Zone::IndustrialHigh {
+                            2.0
+                        } else {
+                            0.0
+                        }
+                }
                 Zone::None => unreachable!("unzoned lots are not scheduled"),
+            };
+            let roof = if matches!(zone, Zone::IndustrialLow | Zone::IndustrialHigh) {
+                rng.below(4) as u8
+            } else {
+                0
+            };
+            let Some(ring) = footprint::make(lots, lot, roads, zone, &mut rng) else {
+                continue;
             };
             let id = self.active.len() as BuildingId;
             self.owner[l] = Some(id);
             self.lot.push(lot);
             self.zone.push(zone);
             self.height.push(height);
+            self.roof.push(roof);
             self.active.push(true);
             if self.outline_start.is_empty() {
                 self.outline_start.push(0);
@@ -133,13 +154,18 @@ impl Buildings {
         }
     }
 
-    /// `[zone, height, n, x0, y0, …]` per active building in id order, not indexed by id.
+    /// `[zone, height, roof, n, x0, y0, …]` per active building in id order, not indexed by id.
     pub fn write_snapshot(&self, out: &mut Vec<f32>) {
         out.clear();
         for b in self.active_buildings() {
             let i = b as usize;
             let ring = self.footprint(b);
-            out.extend([self.zone[i] as u8 as f32, self.height[i], ring.len() as f32]);
+            out.extend([
+                self.zone[i] as u8 as f32,
+                self.height[i],
+                self.roof[i] as f32,
+                ring.len() as f32,
+            ]);
             out.extend(ring.iter().flat_map(|p| [p.0, p.1]));
         }
     }
@@ -151,6 +177,7 @@ impl Buildings {
             mix(self.lot[b] as u64);
             mix(self.zone[b] as u64);
             mix(self.height[b].to_bits() as u64);
+            mix(self.roof[b] as u64);
             let ring = self.footprint(b as BuildingId);
             mix(ring.len() as u64);
             for p in ring {

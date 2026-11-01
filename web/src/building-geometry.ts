@@ -5,7 +5,9 @@ import * as THREE from 'three';
 const WALLS = [0, 0xd8c6a5, 0xc3d1be, 0xa5c9d5, 0x87adbf, 0xc8b68d, 0xb8a282];
 const ROOFS = [0, 0xa96e52, 0x718777, 0x537f90, 0x476979, 0x8c8271, 0x736959];
 
-/** Reads [zone, height, n, x0, y0, …] per building. Sim (x,y) becomes local (x,z). */
+const INDUSTRIAL_ROOFS = [0x8c8271, 0x839091, 0x9c7967, 0xb5ad93];
+
+/** Reads [zone, height, roof, n, x0, y0, …] per building. Sim (x,y) becomes local (x,z). */
 export function buildBuildingGeometry(data: Float32Array): THREE.BufferGeometry {
   const positions: number[] = [];
   const colors: number[] = [];
@@ -17,12 +19,15 @@ export function buildBuildingGeometry(data: Float32Array): THREE.BufferGeometry 
   while (offset < data.length) {
     const zone = data[offset++];
     const height = data[offset++];
+    const roofStyle = data[offset++];
     const count = data[offset++];
     const ring: THREE.Vector2[] = [];
     for (let i = 0; i < count; i++) {
       ring.push(new THREE.Vector2(data[offset++], data[offset++]));
     }
-    const roof = new THREE.Color(ROOFS[zone]);
+    const roof = new THREE.Color(
+      zone === 5 || zone === 6 ? INDUSTRIAL_ROOFS[roofStyle] : ROOFS[zone],
+    );
     const wall = new THREE.Color(WALLS[zone]);
     for (const [a, b, c] of THREE.ShapeUtils.triangulateShape(ring, [])) {
       // XY triangulation winds upwards only after reversing it into the XZ plane.

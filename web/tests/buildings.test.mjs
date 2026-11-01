@@ -18,8 +18,9 @@ test('WASM sends sim-owned building footprints, heights and original zones', () 
   while (i < data.length) {
     assert.equal(data[i], 2);
     assert.ok(data[i + 1] >= 12);
-    assert.ok(data[i + 2] >= 3);
-    i += 3 + 2 * data[i + 2];
+    assert.equal(data[i + 2], 0, 'non-industrial roofs keep their original palette');
+    assert.ok(data[i + 3] >= 3);
+    i += 4 + 2 * data[i + 3];
   }
   assert.equal(i, data.length);
   const version = s.buildings_version();

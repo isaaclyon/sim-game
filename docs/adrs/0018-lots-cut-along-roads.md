@@ -1,6 +1,6 @@
 # 0018. Lots are shapes cut along roads; buildings take their shape from lots
 
-- Status: Accepted
+- Status: Industrial frontage and building rules superseded by [0019](0019-industrial-lot-variety.md); otherwise accepted
 - Date: 2026-11-03
 
 ## Context

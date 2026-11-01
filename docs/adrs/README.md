@@ -23,7 +23,8 @@ rewriting history; mark the old one `Superseded by NNNN`.
 | [0015](0015-curved-road-snapshots.md) | Curved roads use simulation-sampled segment snapshots | Accepted; road speed field superseded by 0017 |
 | [0016](0016-blocks-lots-and-alleys.md) | Blocks are derived road faces; lots are zone-cell sets; the sim adds alleys | Accepted; lots superseded by 0018 |
 | [0017](0017-road-classes-and-main-road-routing.md) | Road classes and main-road routing | Accepted |
-| [0018](0018-lots-cut-along-roads.md) | Lots are shapes cut along roads; buildings take their shape from lots | Accepted |
+| [0018](0018-lots-cut-along-roads.md) | Lots are shapes cut along roads; buildings take their shape from lots | Industrial frontage and buildings superseded by 0019; otherwise accepted |
+| [0019](0019-industrial-lot-variety.md) | Industrial lots combine neighbouring frontage strips | Accepted |
 
 ADRs are only for decisions that are hard to reverse. See [AGENTS.md](AGENTS.md) for when to
 write one and how.

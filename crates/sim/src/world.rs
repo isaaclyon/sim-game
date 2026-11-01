@@ -702,7 +702,7 @@ impl World {
             if !has_lots && cells.iter().all(|c| self.zones.zone(c.index) == Zone::None) {
                 continue;
             }
-            for plan in self.blocks.cut(b, &self.zones) {
+            for plan in self.blocks.cut(b, &self.zones, &self.lots, self.cfg.seed) {
                 match self.lots.matching(&plan) {
                     Some(lot) => {
                         // Its block may have grown or shrunk around it.
