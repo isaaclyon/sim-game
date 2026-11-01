@@ -102,7 +102,7 @@ export class Renderer {
     });
   }
 
-  /** `segments` is `[ax, ay, bx, by, speedLimit]` per road. */
+  /** `segments` packs `[ax, ay, bx, by, speedLimit]` per active road, not per road ID. */
   setRoads(segments: Float32Array, bounds: [number, number, number, number], fitCamera: boolean) {
     const geom = buildRoadGeometry(segments);
     if (this.roads) {
@@ -275,6 +275,15 @@ export class Renderer {
     geom.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
     this.markers.geometry.dispose();
     this.markers.geometry = geom;
+  }
+
+  /** Draw only the segment selected by the sim, in the destructive-action color. */
+  setBulldozePreview(segment: Float32Array) {
+    this.setPreview(null, null, null);
+    if (segment.length !== 4) return;
+    const a = new THREE.Vector3(segment[0], 0.5, segment[1]);
+    const b = new THREE.Vector3(segment[2], 0.5, segment[3]);
+    this.setPreview(new Float32Array(), a, b);
   }
 
   render() {

@@ -46,7 +46,7 @@ pub fn plan_road(net: &RoadNetwork, ax: f32, ay: f32, bx: f32, by: f32) -> Optio
     let a = snap_end(net, ax, ay);
     let b = snap_end(net, bx, by);
     let mut stops = vec![(0.0, a)];
-    for road in 0..net.road_count() as RoadId {
+    for road in net.active_roads() {
         if a.join == Join::Split(road) || b.join == Join::Split(road) {
             continue; // An end already joins it there.
         }
@@ -107,7 +107,7 @@ pub fn snap_end(net: &RoadNetwork, x: f32, y: f32) -> Stop {
     }
     let mut best = None;
     let mut best_d = SNAP_RADIUS;
-    for road in 0..net.road_count() as RoadId {
+    for road in net.active_roads() {
         let (p, q) = ends(net, road);
         let u = project(p, q, (x, y));
         let d = dist(lerp(p, q, u), (x, y));
@@ -124,6 +124,24 @@ pub fn snap_end(net: &RoadNetwork, x: f32, y: f32) -> Stop {
             join: Join::New,
         },
     }
+}
+
+/// Nearest active segment in bulldoze reach. Ties keep the lowest road ID.
+pub fn bulldoze_target(net: &RoadNetwork, x: f32, y: f32) -> Option<RoadId> {
+    if !x.is_finite() || !y.is_finite() {
+        return None;
+    }
+    let mut best = None;
+    let mut distance = SNAP_RADIUS;
+    for road in net.active_roads() {
+        let (p, q) = ends(net, road);
+        let d = dist(lerp(p, q, project(p, q, (x, y))), (x, y));
+        if d < distance || (best.is_none() && d <= distance) {
+            distance = d;
+            best = Some(road);
+        }
+    }
+    best
 }
 
 /// The point a fraction `u` along `road`: one of its ends if that is within `SNAP_RADIUS`,
@@ -156,7 +174,7 @@ fn node_stop(net: &RoadNetwork, n: NodeId) -> Stop {
 fn overlaps_any(net: &RoadNetwork, p: (f32, f32), q: (f32, f32)) -> bool {
     let len = dist(p, q);
     let d = ((q.0 - p.0) / len, (q.1 - p.1) / len);
-    (0..net.road_count() as RoadId).any(|road| {
+    net.active_roads().any(|road| {
         let (r0, r1) = ends(net, road);
         let r_len = dist(r0, r1).max(1e-3);
         let r_dir = ((r1.0 - r0.0) / r_len, (r1.1 - r0.1) / r_len);

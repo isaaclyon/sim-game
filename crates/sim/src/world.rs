@@ -65,6 +65,7 @@ impl Default for Config {
 pub enum Command {
     SpawnAgents { count: u32 },
     BuildRoad { ax: f32, ay: f32, bx: f32, by: f32 },
+    DeleteRoad { x: f32, y: f32 },
 }
 
 #[derive(Clone, Copy, Default, Debug)]
@@ -79,7 +80,7 @@ pub struct Stats {
     pub paths_found: u64,
     pub paths_failed: u64,
     pub despawned_stuck: u64,
-    /// Cars removed because a new road split a road on their route.
+    /// Cars removed because a road on their remaining route was split or deleted.
     pub despawned_by_edit: u64,
     /// Cars that turned off a route blocked by a full lane.
     pub detours: u64,
@@ -141,6 +142,7 @@ impl World {
         match cmd {
             Command::SpawnAgents { count } => self.spawn_agents(count),
             Command::BuildRoad { ax, ay, bx, by } => self.build_road(ax, ay, bx, by),
+            Command::DeleteRoad { x, y } => self.delete_road(x, y),
         }
     }
 
@@ -207,13 +209,13 @@ impl World {
         }
     }
 
-    /// Writes `[ax, ay, bx, by, speed_limit]` per road.
+    /// Writes `[ax, ay, bx, by, speed_limit]` per active road, packed in road ID order.
     pub fn write_road_segments(&self, out: &mut Vec<f32>) {
         let r = &self.roads;
         out.clear();
         out.reserve(r.road_count() * 5);
-        for road in 0..r.road_count() {
-            let lane = road * 2;
+        for road in r.active_roads() {
+            let lane = road as usize * 2;
             let (a, b) = (r.lane_from[lane] as usize, r.lane_to[lane] as usize);
             out.extend([
                 r.node_x[a],
@@ -221,6 +223,21 @@ impl World {
                 r.node_x[b],
                 r.node_y[b],
                 r.lane_speed[lane],
+            ]);
+        }
+    }
+
+    /// Writes `[ax, ay, bx, by]` for the bulldoze target, or nothing on a miss.
+    pub fn write_bulldoze_preview(&self, x: f32, y: f32, out: &mut Vec<f32>) {
+        out.clear();
+        if let Some(road) = snap::bulldoze_target(&self.roads, x, y) {
+            let (a, b) = self.roads.road_ends(road);
+            let r = &self.roads;
+            out.extend([
+                r.node_x[a as usize],
+                r.node_y[a as usize],
+                r.node_x[b as usize],
+                r.node_y[b as usize],
             ]);
         }
     }
@@ -258,6 +275,11 @@ impl World {
             h = h.wrapping_mul(0x0000_0100_0000_01b3);
         };
         mix(self.totals.tick);
+        mix(self.roads.lane_count() as u64);
+        mix(self.roads.road_count() as u64);
+        for road in self.roads.active_roads() {
+            mix(road as u64);
+        }
         let a = &self.agents;
         for i in 0..a.len() {
             mix(a.state[i] as u64);
@@ -318,10 +340,19 @@ impl World {
         true
     }
 
-    /// Removes cars whose remaining route uses a lane of `roads`, which were just split: those
-    /// lanes now end somewhere else. They wait and start a new trip, like a stuck despawn.
-    /// Junction reservations on those lanes are left to expire; a split keeps a lane's
-    /// heading, which is all a reservation looks at.
+    fn delete_road(&mut self, x: f32, y: f32) -> bool {
+        let Some(road) = snap::bulldoze_target(&self.roads, x, y) else {
+            return false;
+        };
+        self.roads.remove_road(road);
+        self.remove_cars_using(&[road]);
+        self.sync_roads();
+        true
+    }
+
+    /// Removes cars whose remaining route uses a lane of `roads`, just split or deleted.
+    /// They wait and start a new trip, like a stuck despawn. Junction reservations are left
+    /// to expire; both splits and tombstones keep the headings those reservations use.
     fn remove_cars_using(&mut self, roads: &[RoadId]) {
         if roads.is_empty() {
             return;
@@ -599,6 +630,121 @@ mod tests {
         let mut world = World::generate(cfg, 12, 12);
         world.apply(Command::SpawnAgents { count: 2_000 });
         world
+    }
+
+    #[test]
+    fn bulldoze_keeps_ids_and_removes_routing_and_geometry() {
+        let mut world = roads(&[(0.0, 0.0, 100.0, 0.0), (0.0, 100.0, 100.0, 100.0)]);
+        let before = world.state_hash();
+        let mut preview = Vec::new();
+        world.write_bulldoze_preview(50.0, 4.0, &mut preview);
+        assert_eq!(preview, [0.0, 0.0, 100.0, 0.0]);
+        assert_eq!(world.state_hash(), before);
+        assert!(world.apply(Command::DeleteRoad { x: 50.0, y: 4.0 }));
+        assert_ne!(world.state_hash(), before);
+        let version = world.roads.version;
+        assert!(!world.apply(Command::DeleteRoad { x: 50.0, y: 4.0 }));
+        assert!(!world.apply(Command::DeleteRoad {
+            x: f32::NAN,
+            y: 0.0
+        }));
+        assert_eq!(world.roads.version, version);
+        assert_eq!(world.roads.road_count(), 1);
+        assert_eq!(world.roads.lane_count(), 4);
+        assert_eq!(world.roads.road_ends(1), (2, 3));
+        assert!(world.roads.out_lanes(0).is_empty());
+        assert!(world.roads.out_lanes(1).is_empty());
+        let mut path = Vec::new();
+        assert!(!Pathfinder::default().find(&world.roads, &[], 0, 1, &mut path));
+        world.write_road_segments(&mut preview);
+        assert_eq!(preview, [0.0, 100.0, 100.0, 100.0, STREET_SPEED]);
+        // Deleted geometry neither blocks rebuilding nor gets split by a crossing.
+        assert!(build(&mut world, 50.0, -100.0, 50.0, 50.0));
+        assert_eq!(world.roads.road_count(), 2);
+        assert!(build(&mut world, 0.0, 0.0, 100.0, 0.0));
+        assert!(world.roads.active_roads().all(|r| r != 0));
+    }
+
+    #[test]
+    fn bulldoze_parks_affected_routes_and_updates_signals_while_paused() {
+        let mut world = crossroads(crate::road::AVENUE_SPEED);
+        let on_deleted = wait_at_line(&mut world, 1, 2, 0) as usize;
+        let using_later = wait_at_line(&mut world, 3, 0, 0) as usize;
+        let unaffected = wait_at_line(&mut world, 5, 6, 0) as usize;
+        let entering = world.agents.push(0) as usize;
+        world.agents.path[entering] = vec![0];
+        world.agents.state[entering] = AgentState::Entering;
+        world.entering.push(entering as AgentId);
+        assert!(world.apply(Command::DeleteRoad { x: 50.0, y: 0.0 }));
+        assert_eq!(world.stats().despawned_by_edit, 3);
+        for a in [on_deleted, using_later, entering] {
+            assert_eq!(world.agents.state[a], AgentState::Parked);
+            assert!(
+                world
+                    .traffic
+                    .queues
+                    .iter()
+                    .all(|q| !q.contains(&(a as AgentId)))
+            );
+        }
+        assert!(world.entering.is_empty());
+        assert_eq!(world.agents.state[unaffected], AgentState::Driving);
+        let mut signals = Vec::new();
+        world.write_signal_snapshot(&mut signals);
+        assert!(signals.is_empty(), "three arms no longer need signals");
+        for _ in 0..600 {
+            world.tick();
+        }
+        assert!(world.stats().trips_completed > 0);
+    }
+
+    #[test]
+    fn bulldoze_picking_has_bounded_reach_and_stable_ties() {
+        let mut world = roads(&[(0.0, 0.0, 100.0, 0.0), (0.0, 30.0, 100.0, 30.0)]);
+        assert_eq!(snap::bulldoze_target(&world.roads, 50.0, 15.0), Some(0));
+        assert_eq!(snap::bulldoze_target(&world.roads, -16.0, 0.0), None);
+        assert_eq!(
+            snap::bulldoze_target(&world.roads, 50.0, f32::INFINITY),
+            None
+        );
+        assert!(world.roads.remove_road(0));
+        let version = world.roads.version;
+        assert!(!world.roads.remove_road(0));
+        assert!(!world.roads.remove_road(u32::MAX));
+        assert_eq!(world.roads.version, version);
+        assert_eq!(snap::bulldoze_target(&world.roads, 50.0, 15.0), Some(1));
+        let mid = world.roads.add_node(50.0, 30.0);
+        let rest = world.roads.split_road(1, mid);
+        assert_eq!(
+            rest, 2,
+            "splitting uses the next slot, not the active count"
+        );
+        assert_eq!(world.roads.road_ends(rest), (mid, 3));
+    }
+
+    #[test]
+    fn bulldoze_every_road_is_safe_and_deterministic() {
+        let run = || {
+            let mut world = roads(&[(0.0, 0.0, 100.0, 0.0)]);
+            world.apply(Command::SpawnAgents { count: 50 });
+            for _ in 0..300 {
+                world.tick();
+            }
+            assert!(world.apply(Command::DeleteRoad { x: 50.0, y: 0.0 }));
+            for _ in 0..600 {
+                world.tick();
+            }
+            assert_eq!(world.stats().driving, 0);
+            assert!(!world.apply(Command::SpawnAgents { count: 1 }));
+            assert!(build(&mut world, 0.0, 0.0, 100.0, 0.0));
+            assert_eq!(world.roads.active_roads().collect::<Vec<_>>(), [1]);
+            for _ in 0..600 {
+                world.tick();
+            }
+            assert!(world.stats().trips_completed > 0);
+            world.state_hash()
+        };
+        assert_eq!(run(), run());
     }
 
     #[test]

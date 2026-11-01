@@ -58,6 +58,16 @@ impl Sim {
         self.world.apply(Command::BuildRoad { ax, ay, bx, by })
     }
 
+    pub fn delete_road(&mut self, x: f32, y: f32) -> bool {
+        self.world.apply(Command::DeleteRoad { x, y })
+    }
+
+    /// `[ax, ay, bx, by]` of the selected segment, or empty on a miss.
+    pub fn bulldoze_preview(&mut self, x: f32, y: f32) -> Vec<f32> {
+        self.world.write_bulldoze_preview(x, y, &mut self.buf);
+        self.buf.clone()
+    }
+
     /// `[x, y, join]` per stop of the road `build_road` would build; see
     /// `World::write_road_preview`. Empty if it would be refused.
     pub fn road_preview(&mut self, ax: f32, ay: f32, bx: f32, by: f32) -> Vec<f32> {
@@ -88,7 +98,7 @@ impl Sim {
         self.buf.clone()
     }
 
-    /// `[ax, ay, bx, by, speed_limit]` per road.
+    /// `[ax, ay, bx, by, speed_limit]` per active road, packed in road ID order.
     pub fn road_segments(&mut self) -> Vec<f32> {
         self.world.write_road_segments(&mut self.buf);
         self.buf.clone()

@@ -31,6 +31,7 @@ pub struct RoadNetwork {
     out_start: Vec<u32>,
     out_lanes: Vec<LaneId>,
     roads: BTreeSet<(NodeId, NodeId)>,
+    road_active: Vec<bool>,
     adjacency_dirty: bool,
     /// Bumped on every topology change so the renderer knows when to re-upload roads.
     pub version: u32,
@@ -45,8 +46,29 @@ impl RoadNetwork {
         self.lane_from.len()
     }
 
+    /// Number of active roads, not allocated ID slots.
     pub fn road_count(&self) -> usize {
-        self.lane_count() / 2
+        self.roads.len()
+    }
+
+    pub fn active_roads(&self) -> impl Iterator<Item = RoadId> + '_ {
+        self.road_active
+            .iter()
+            .enumerate()
+            .filter_map(|(r, &active)| active.then_some(r as RoadId))
+    }
+
+    /// Tombstones both lanes without reusing their IDs or discarding their geometry.
+    pub fn remove_road(&mut self, road: RoadId) -> bool {
+        if self.road_active.get(road as usize) != Some(&true) {
+            return false;
+        }
+        self.road_active[road as usize] = false;
+        let (a, b) = self.road_ends(road);
+        self.roads.remove(&(a.min(b), a.max(b)));
+        self.adjacency_dirty = true;
+        self.version += 1;
+        true
     }
 
     pub fn add_node(&mut self, x: f32, y: f32) -> NodeId {
@@ -77,6 +99,7 @@ impl RoadNetwork {
         if a == b || !self.roads.insert((a.min(b), a.max(b))) {
             return false;
         }
+        self.road_active.push(true);
         let len = self.distance(a, b);
         for (from, to) in [(a, b), (b, a)] {
             self.lane_from.push(from);
@@ -113,7 +136,7 @@ impl RoadNetwork {
         let len = self.distance(a, mid);
         self.lane_len[fwd] = len;
         self.lane_len[back] = len;
-        let rest = self.road_count() as RoadId;
+        let rest = self.road_active.len() as RoadId;
         let added = self.add_road(mid, b, self.lane_speed[fwd]);
         debug_assert!(added, "mid is a new node");
         rest
@@ -131,15 +154,20 @@ impl RoadNetwork {
         }
         let n = self.node_count();
         let mut start = vec![0u32; n + 1];
-        for &from in &self.lane_from {
-            start[from as usize + 1] += 1;
+        for (lane, &from) in self.lane_from.iter().enumerate() {
+            if self.road_active[lane / 2] {
+                start[from as usize + 1] += 1;
+            }
         }
         for i in 0..n {
             start[i + 1] += start[i];
         }
         let mut fill = start.clone();
-        let mut out = vec![0; self.lane_count()];
+        let mut out = vec![0; self.road_count() * 2];
         for (lane, &from) in self.lane_from.iter().enumerate() {
+            if !self.road_active[lane / 2] {
+                continue;
+            }
             let slot = &mut fill[from as usize];
             out[*slot as usize] = lane as LaneId;
             *slot += 1;
