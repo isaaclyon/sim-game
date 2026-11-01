@@ -19,6 +19,8 @@ pub const STREET_SPEED: f32 = 13.9;
 /// Avenue speed limit, m/s (72 km/h). Also the fastest limit in the game, which the A*
 /// heuristic relies on.
 pub const AVENUE_SPEED: f32 = 20.0;
+/// Alley speed limit, m/s (30 km/h). The sim lays alleys to reach deep lots (ADR 0016).
+pub const ALLEY_SPEED: f32 = 8.3;
 
 #[derive(Default, Clone)]
 pub struct RoadNetwork {

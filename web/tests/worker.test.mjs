@@ -110,8 +110,9 @@ test('the worker sends the zone grid on start and after each paint that changes 
   assert.ok(first.cells.every((c) => c === 0));
   // Residential high density over the first 3 x 2 cells.
   await w.send({ type: 'paintZone', ax: x0, ay: y0, bx: x0 + 24, by: y0 + 16, zone: 2 });
-  const painted = w.messages.at(-1);
-  assert.equal(painted.type, 'zones');
+  const painted = w.messages.findLast((msg) => msg.type === 'zones');
+  assert.notEqual(painted, first);
+  assert.equal(w.messages.at(-1).type, 'frame', 'zoning can add alleys, which can move cars');
   assert.deepEqual([...painted.cells.slice(0, 4)], [2, 2, 2, 0]);
   assert.deepEqual([...painted.cells.slice(cols, cols + 4)], [2, 2, 2, 0]);
   assert.equal(painted.cells[2 * cols], 0);
@@ -120,4 +121,34 @@ test('the worker sends the zone grid on start and after each paint that changes 
   assert.equal(w.messages.length, count, 'a paint that changes nothing sends nothing');
   await w.send({ type: 'paintZone', ax: x0, ay: y0, bx: x0 + 24, by: y0 + 16, zone: 9 });
   assert.equal(w.messages.length, count, 'unknown zones are refused');
+});
+
+test('a click fills the block under it, and its lots are sent', async () => {
+  const w = await worker();
+  w.ready();
+  await w.init;
+  await w.send({ type: 'setSpeed', speed: 0 });
+  const lots = w.messages.find((msg) => msg.type === 'lots');
+  assert.equal(lots.segments.length, 0, 'no lots before zoning');
+  // The generated town's first block lies between its first two parallel roads.
+  const roads = w.messages.find((msg) => msg.type === 'roads').segments;
+  const [x0, y0] = [Math.min(roads[0], roads[2]), Math.min(roads[1], roads[3])];
+  const [x, y] = [x0 + 50, y0 + 50];
+  await w.send({ type: 'previewBlock', x, y, revision: 3 });
+  const outline = w.messages.at(-1);
+  assert.equal(outline.type, 'blockPreview');
+  assert.equal(outline.revision, 3);
+  assert.ok(outline.outline.length >= 8, 'a closed block has at least four corners');
+  await w.send({ type: 'previewBlock', x: x0 - 500, y: y0 - 500, revision: 4 });
+  assert.equal(w.messages.at(-1).outline.length, 0, 'no block outside the town');
+  const count = w.messages.length;
+  await w.send({ type: 'fillBlock', x: x0 - 500, y: y0 - 500, zone: 1 });
+  assert.equal(w.messages.length, count, 'filling outside every block changes nothing');
+  await w.send({ type: 'fillBlock', x, y, zone: 1 });
+  const zones = w.messages.findLast((msg) => msg.type === 'zones');
+  assert.ok(zones.cells.some((c) => c === 1));
+  const cut = w.messages.findLast((msg) => msg.type === 'lots');
+  assert.ok(cut.segments.length > 0 && cut.segments.length % 4 === 0);
+  assert.equal(w.messages.at(-1).type, 'frame');
+  assert.equal(w.messages.at(-1).stats.tick, 0, 'filling does not advance time');
 });

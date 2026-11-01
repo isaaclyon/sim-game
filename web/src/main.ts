@@ -27,6 +27,11 @@ worker.onmessage = (e: MessageEvent<FromWorker>) => {
   if (msg.type === 'roads') {
     renderer.setRoads(msg.segments, msg.bounds, !roadsSeen);
     roadsSeen = true;
+    // Blocks change with roads, including alleys the sim adds after zoning.
+    if (blockHover) {
+      blockWanted = true;
+      sendBlockPreview();
+    }
     // Retry a hover sent before WASM was ready, or after the topology changed.
     if (previewEnd) {
       previewRevision++;
@@ -56,6 +61,13 @@ worker.onmessage = (e: MessageEvent<FromWorker>) => {
     updateRoadHelp();
   } else if (msg.type === 'zones') {
     renderer.setZones(msg.cells, msg.layout);
+  } else if (msg.type === 'lots') {
+    renderer.setLots(msg.segments);
+  } else if (msg.type === 'blockPreview') {
+    blockInFlight = false;
+    if (msg.revision === blockRevision && zone !== null && !zoneStart && blockHover)
+      renderer.setBlockOutline(msg.outline, zone);
+    sendBlockPreview();
   } else {
     const now = performance.now();
     if (curr) frameGap = frameGap * 0.8 + (now - currAt) * 0.2;
@@ -101,6 +113,24 @@ const ZONE_NAMES = [
 ];
 let zone: Zone | null = null;
 let zoneStart: THREE.Vector3 | null = null;
+// The block under the cursor while the zone brush hovers, asked of the sim like road previews:
+// one question in flight, about the latest position only.
+let blockHover: THREE.Vector3 | null = null;
+let blockWanted = false;
+let blockInFlight = false;
+let blockRevision = 0;
+function sendBlockPreview() {
+  if (!blockWanted || blockInFlight || !blockHover || zone === null || zoneStart) return;
+  blockWanted = false;
+  blockInFlight = true;
+  send({ type: 'previewBlock', x: blockHover.x, y: blockHover.z, revision: blockRevision });
+}
+function hideBlockOutline() {
+  blockRevision++;
+  blockHover = null;
+  blockWanted = false;
+  renderer.setZoneDrag(null, null, 0);
+}
 let roadStart: THREE.Vector3 | null = null;
 let roadControl: THREE.Vector3 | null = null;
 let refused = false;
@@ -164,7 +194,7 @@ function setTool(tool: typeof roadTool | 'bulldoze', brush: Zone | null = null) 
   bulldozeTool = tool === 'bulldoze';
   zone = tool ? null : brush;
   zoneStart = null;
-  renderer.setZoneDrag(null, null, 0);
+  hideBlockOutline();
   renderer.setLeftDragPans(zone === null);
   for (const b of zoneButtons) {
     const on = Number(b.dataset.zone) === zone;
@@ -207,6 +237,7 @@ canvas.addEventListener('pointerdown', (e) => {
   downY = e.clientY;
   if (zone === null || e.button !== 0) return;
   zoneStart = renderer.pick(e.clientX, e.clientY);
+  blockRevision++;
   // Keep getting moves and the release even if the drag leaves the canvas.
   canvas.setPointerCapture(e.pointerId);
 });
@@ -216,10 +247,16 @@ canvas.addEventListener('pointerup', (e) => {
     const end = renderer.pick(e.clientX, e.clientY);
     if (e.button === 0 && zoneStart && end) {
       const [a, b] = [zoneStart, end];
-      send({ type: 'paintZone', ax: a.x, ay: a.z, bx: b.x, by: b.z, zone });
+      // A click fills the block under it; a drag paints the rectangle.
+      if (Math.hypot(e.clientX - downX, e.clientY - downY) <= 4)
+        send({ type: 'fillBlock', x: b.x, y: b.z, zone });
+      else send({ type: 'paintZone', ax: a.x, ay: a.z, bx: b.x, by: b.z, zone });
     }
     zoneStart = null;
     renderer.setZoneDrag(null, null, 0);
+    // The outline comes back on the next move, or when the edit's roads arrive.
+    blockHover = end;
+    blockWanted = true;
     return;
   }
   if (!roadTool && !bulldozeTool) return;
@@ -248,8 +285,13 @@ canvas.addEventListener('pointerup', (e) => {
   updateRoadHelp();
 });
 canvas.addEventListener('pointermove', (e) => {
-  if (zone !== null && zoneStart) {
-    renderer.setZoneDrag(zoneStart, renderer.pick(e.clientX, e.clientY), zone);
+  if (zone !== null) {
+    if (zoneStart) renderer.setZoneDrag(zoneStart, renderer.pick(e.clientX, e.clientY), zone);
+    else {
+      blockHover = renderer.pick(e.clientX, e.clientY);
+      blockWanted = true;
+      sendBlockPreview();
+    }
     return;
   }
   if ((!roadTool && !bulldozeTool) || pendingBuild) return;
@@ -260,6 +302,7 @@ canvas.addEventListener('pointermove', (e) => {
   sendPreview();
 });
 canvas.addEventListener('pointerleave', () => {
+  if (!zoneStart) hideBlockOutline();
   previewRevision++;
   previewEnd = null;
   previewWanted = false;
@@ -309,7 +352,7 @@ function frame() {
       `stuck      ${fmt(stats.despawnedStuck)}   no path ${fmt(stats.pathsFailed)}\n` +
       `road edits ${fmt(stats.despawnedByEdit)} cars removed\n` +
       (zone !== null
-        ? `\nZONE: ${ZONE_NAMES[zone]}. Drag a rectangle to paint, Esc to stop` +
+        ? `\nZONE: ${ZONE_NAMES[zone]}. Click a block to fill it, drag a rectangle to paint, Esc to stop` +
           `\n(Z/X/C pick a zone, press again for the other density; U unzones)`
         : '');
   }
