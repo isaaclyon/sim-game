@@ -1,5 +1,5 @@
 // Three.js scene: roads as asphalt ribbons and pads, vehicles as one instanced box mesh. Sim (x, y) maps
-// to world (x, z) with y up.
+// to scene-local (x, z), then world (x, -z) with y up (see scene.ts).
 //
 // Current choices, all cheap to change:
 // - WebGLRenderer. WebGPURenderer is still experimental; write new shaders in TSL so switching
@@ -13,6 +13,7 @@
 import CameraControls from 'camera-controls';
 import * as THREE from 'three';
 import { buildRoadGeometry } from './road-geometry';
+import { createSimScene } from './scene';
 
 CameraControls.install({ THREE });
 
@@ -41,7 +42,7 @@ const MARKER_PX = 10;
 
 export class Renderer {
   readonly renderer: THREE.WebGLRenderer;
-  readonly scene = new THREE.Scene();
+  readonly scene = createSimScene();
   readonly camera: THREE.PerspectiveCamera;
   readonly controls: CameraControls;
   private readonly clock = new THREE.Clock();
@@ -115,15 +116,15 @@ export class Renderer {
     if (fitCamera) {
       const [x0, y0, x1, y1] = bounds;
       const cx = (x0 + x1) / 2;
-      const cz = (y0 + y1) / 2;
+      const cz = -(y0 + y1) / 2;
       const span = Math.max(x1 - x0, y1 - y0);
       this.controls.setLookAt(cx, span * 0.9, cz + span * 0.5, cx, 0, cz, false);
       this.controls.maxDistance = span * 2;
       const pad = span * 0.25;
       this.controls.setBoundary(
         new THREE.Box3(
-          new THREE.Vector3(x0 - pad, 0, y0 - pad),
-          new THREE.Vector3(x1 + pad, 0, y1 + pad),
+          new THREE.Vector3(x0 - pad, 0, -y1 - pad),
+          new THREE.Vector3(x1 + pad, 0, -y0 + pad),
         ),
       );
     }
@@ -219,7 +220,7 @@ export class Renderer {
         }
       }
       this.pos.set(x, 0, y);
-      // Sim heading is measured from +x toward +y; in world space +y became +z, so negate.
+      // Local +z holds sim +y, so negate here; the scene reflects all positions and headings.
       this.quat.setFromAxisAngle(this.up, -h);
       this.matrix.compose(this.pos, this.quat, this.scale);
       cars.setMatrixAt(drawn, this.matrix);
@@ -233,12 +234,13 @@ export class Renderer {
     if (cars.instanceColor) cars.instanceColor.needsUpdate = true;
   }
 
-  /** Ground-plane point under the cursor, or null if the ray misses. */
+  /** Ground-plane point in scene-local (sim x, y as x, z), or null if the ray misses. */
   pick(clientX: number, clientY: number): THREE.Vector3 | null {
     const ndc = new THREE.Vector2((clientX / innerWidth) * 2 - 1, -(clientY / innerHeight) * 2 + 1);
     const ray = new THREE.Raycaster();
     ray.setFromCamera(ndc, this.camera);
-    return ray.ray.intersectPlane(new THREE.Plane(this.up, 0), new THREE.Vector3());
+    const point = ray.ray.intersectPlane(new THREE.Plane(this.up, 0), new THREE.Vector3());
+    return point ? this.scene.worldToLocal(point) : null;
   }
 
   /**

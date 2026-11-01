@@ -16,6 +16,7 @@ Controls: left-drag pans, right-drag orbits, wheel zooms to cursor. `R` toggles 
 
 Roads render as eight-metre-wide asphalt ribbons with simple pads at shared endpoints.
 Streets and avenues share one asphalt color; their simulation speed limits are unchanged.
+The view preserves the simulation's right-hand traffic.
 
 Run `scripts/check.sh` for the full checks, including road geometry tests. To run just those
 frontend tests, use `cd web && npm test`.
