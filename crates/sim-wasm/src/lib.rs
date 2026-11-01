@@ -121,7 +121,7 @@ impl Sim {
         self.world.lots.version
     }
 
-    /// `[ax, ay, bx, by]` per lot outline segment, along zone cell edges.
+    /// `[n, x0, y0, …]` per lot: its outline's point count, then its points (ADR 0017).
     pub fn lot_outlines(&mut self) -> Vec<f32> {
         self.world.write_lot_outlines(&mut self.buf);
         self.buf.clone()

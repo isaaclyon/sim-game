@@ -10,6 +10,7 @@ mod geometry;
 pub mod junction;
 pub mod lot;
 pub mod path;
+mod poly;
 pub mod rng;
 pub mod road;
 pub mod snap;

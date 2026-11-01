@@ -41,8 +41,8 @@ function sendLotsIfChanged(s: Sim) {
   const version = s.lots_version();
   if (version === lotsVersion) return;
   lotsVersion = version;
-  const segments = s.lot_outlines();
-  post({ type: 'lots', segments }, [segments.buffer]);
+  const rings = s.lot_outlines();
+  post({ type: 'lots', rings }, [rings.buffer]);
 }
 
 /** After an edit: zoning can add alleys, and road edits can recut lots (ADR 0016). */

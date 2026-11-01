@@ -1,6 +1,6 @@
 # 0017. Lots are shapes cut along roads; buildings take their shape from lots
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-11-03
 
 ## Context
@@ -38,13 +38,18 @@ unchanged. The grid says what land is for; lots say how it is divided.
    stretch's lot runs from the kerb straight back from the road, its sides along the road's
    normal at the stretch ends (so lots on curves are wedges). Its depth is half the distance to
    the nearest road behind it along that normal, at most 64 m (the 0016 reach), so lots from
-   opposite sides meet near the block's middle with no gap.
+   opposite sides meet near the block's middle with no gap. On the inside of a curve, where
+   the normals of one road side converge, each stops where it first crosses another, so the
+   wedges come to a point instead of folding over each other.
 3. Where two roads meet at a block corner, the angle bisector at that corner divides their
    lots.
 4. Each lot is clipped to the block's land. Lots are cut in (road, side, stretch) order; a
    lot gives up any part an earlier lot already holds.
 5. A lot is one piece. Pieces smaller than 100 m² join the neighbour they share the longest
-   edge with, so slivers at curves become part of a neighbouring lot rather than waste.
+   edge with, so slivers at curves become part of a neighbouring lot rather than waste. Gaps
+   the lots leave smaller than 1,000 m² (inside curves, between converging wedges) join a
+   neighbour the same way. A join that would leave a hole in the lot is skipped; the piece
+   tries its other neighbours.
 
 Land deeper than the lot depth stays the block's interior and drives alleys and connector
 streets exactly as in ADR 0016.
@@ -72,7 +77,7 @@ ADR 0016. A recut lot keeps its id when its polygon is the same to within 1 cm.
 
 Exact footprint rules and heights are tuning and belong to #16, not this record.
 
-**Snapshots**: lots become `[n, x0, y0, … ]` rings: a point count followed by that many
+**Snapshots**: lots become `[n, x0, y0, …]` rings: a point count followed by that many
 points, per active lot, replacing the outline segments of ADR 0016. Sent whole when the lots
 version changes. Lot polygons are also part of `state_hash`.
 

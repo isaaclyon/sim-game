@@ -2,7 +2,7 @@
 
 use std::collections::BTreeSet;
 
-use sim::block::{LOT_REACH, ROAD_HALF_WIDTH};
+use sim::block::{LOT_REACH, MIN_LOT_AREA, ROAD_HALF_WIDTH};
 use sim::lot::LotId;
 use sim::rng::Rng;
 use sim::road::{ALLEY_SPEED, RoadNetwork};
@@ -56,44 +56,141 @@ fn road_dist(w: &World, x: f32, y: f32) -> f32 {
         .fold(f32::MAX, f32::min)
 }
 
-/// Every active lot's cells are disjoint, zoned-grid cells out of the roads.
+/// Every active lot is one simple shape of at least `MIN_LOT_AREA`, out of the roads, facing
+/// a road it fronts; no two overlap, and each owns the zone cells whose centres it covers.
 fn check_lots(w: &World) -> BTreeSet<LotId> {
-    let mut seen = BTreeSet::new();
     let lots: BTreeSet<LotId> = w.lots.active_lots().collect();
+    let mut seen = BTreeSet::new();
     for &lot in &lots {
-        assert!(w.lots.cells(lot).len() >= 2);
+        let o = w.lots.outline(lot);
+        assert!(o.len() >= 3, "lot {lot} has no shape");
+        assert!(area(o) >= MIN_LOT_AREA - 0.5, "lot {lot} is {} m²", area(o));
+        assert_simple(lot, o);
         for &c in w.lots.cells(lot) {
             assert!(seen.insert(c), "cell {c} is in two lots");
             assert_eq!(w.lots.owner(c), Some(lot));
-            let (x, y) = w.zones.centre(c);
-            let d = road_dist(w, x, y);
-            assert!(d >= ROAD_HALF_WIDTH - 0.01, "lot cell under a road ({d} m)");
-            assert!(d <= LOT_REACH + 0.01, "lot cell out of reach ({d} m)");
+            assert!(
+                inside(o, w.zones.centre(c)),
+                "lot {lot} owns cell {c} outside it"
+            );
         }
-        assert_one_piece(w, lot);
+        for (x, y) in o.iter().copied() {
+            let d = road_dist(w, x, y);
+            assert!(
+                d >= ROAD_HALF_WIDTH - 0.05,
+                "lot {lot} corner under a road ({d} m)"
+            );
+        }
+        let (cx, cy) = centroid(o);
+        assert!(
+            road_dist(w, cx, cy) <= LOT_REACH,
+            "lot {lot} is out of reach"
+        );
+        let l = lot as usize;
+        let edge = o
+            .iter()
+            .zip(o.iter().cycle().skip(1))
+            .map(|(&a, &b)| seg_dist(a, b, (w.lots.front_x[l], w.lots.front_y[l])))
+            .fold(f32::MAX, f32::min);
+        assert!(
+            edge <= ROAD_HALF_WIDTH + 0.5,
+            "lot {lot}'s front is {edge} m from it"
+        );
+    }
+    // No overlaps: a 2 m sample grid hits at most one lot.
+    for &a in &lots {
+        let oa = w.lots.outline(a);
+        let ra = bounds(oa);
+        for &b in lots.range(a + 1..) {
+            let ob = w.lots.outline(b);
+            let rb = bounds(ob);
+            let (x0, y0, x1, y1) = (
+                ra[0].max(rb[0]),
+                ra[1].max(rb[1]),
+                ra[2].min(rb[2]),
+                ra[3].min(rb[3]),
+            );
+            let mut y = y0 + 0.5;
+            while y < y1 {
+                let mut x = x0 + 0.5;
+                while x < x1 {
+                    let p = (x, y);
+                    let deep = |o: &[(f32, f32)]| {
+                        inside(o, p)
+                            && o.iter()
+                                .zip(o.iter().cycle().skip(1))
+                                .all(|(&u, &v)| seg_dist(u, v, p) > 0.05)
+                    };
+                    assert!(!(deep(oa) && deep(ob)), "lots {a} and {b} overlap at {p:?}");
+                    x += 2.0;
+                }
+                y += 2.0;
+            }
+        }
     }
     lots
 }
 
-/// The lot's cells all connect through shared edges.
-fn assert_one_piece(w: &World, lot: LotId) {
-    let cells = w.lots.cells(lot);
-    let cols = w.zones.cols;
-    let mut seen = BTreeSet::from([cells[0]]);
-    let mut stack = vec![cells[0]];
-    while let Some(c) = stack.pop() {
-        for n in [c.wrapping_sub(1), c + 1, c.wrapping_sub(cols), c + cols] {
-            let side = n / cols == c / cols || n % cols == c % cols;
-            if side && cells.binary_search(&n).is_ok() && seen.insert(n) {
-                stack.push(n);
-            }
+fn area(o: &[(f32, f32)]) -> f32 {
+    o.iter()
+        .zip(o.iter().cycle().skip(1))
+        .map(|(a, b)| a.0 * b.1 - b.0 * a.1)
+        .sum::<f32>()
+        .abs()
+        / 2.0
+}
+
+fn centroid(o: &[(f32, f32)]) -> (f32, f32) {
+    let n = o.len() as f32;
+    o.iter()
+        .fold((0.0, 0.0), |c, p| (c.0 + p.0 / n, c.1 + p.1 / n))
+}
+
+fn bounds(o: &[(f32, f32)]) -> [f32; 4] {
+    o.iter()
+        .fold([f32::MAX, f32::MAX, f32::MIN, f32::MIN], |r, p| {
+            [r[0].min(p.0), r[1].min(p.1), r[2].max(p.0), r[3].max(p.1)]
+        })
+}
+
+fn inside(o: &[(f32, f32)], p: (f32, f32)) -> bool {
+    let mut c = false;
+    for (a, b) in o.iter().zip(o.iter().cycle().skip(1)) {
+        if (a.1 > p.1) != (b.1 > p.1) && p.0 < a.0 + (p.1 - a.1) / (b.1 - a.1) * (b.0 - a.0) {
+            c = !c;
         }
     }
-    assert_eq!(
-        seen.len(),
-        cells.len(),
-        "lot {lot} is in more than one piece"
-    );
+    c
+}
+
+fn seg_dist(a: (f32, f32), b: (f32, f32), p: (f32, f32)) -> f32 {
+    let (dx, dy) = (b.0 - a.0, b.1 - a.1);
+    let len2 = dx * dx + dy * dy;
+    let t = if len2 > 0.0 {
+        (((p.0 - a.0) * dx + (p.1 - a.1) * dy) / len2).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    (a.0 + dx * t - p.0).hypot(a.1 + dy * t - p.1)
+}
+
+/// The outline is one ring whose edges cross only where neighbours meet.
+fn assert_simple(lot: LotId, o: &[(f32, f32)]) {
+    let n = o.len();
+    let cross = |a: (f32, f32), b: (f32, f32), c: (f32, f32)| {
+        (b.0 - a.0) * (c.1 - a.1) - (b.1 - a.1) * (c.0 - a.0)
+    };
+    for i in 0..n {
+        for j in i + 2..n {
+            if i == 0 && j == n - 1 {
+                continue;
+            }
+            let (a, b, c, d) = (o[i], o[(i + 1) % n], o[j], o[(j + 1) % n]);
+            let proper =
+                cross(a, b, c) * cross(a, b, d) < 0.0 && cross(c, d, a) * cross(c, d, b) < 0.0;
+            assert!(!proper, "lot {lot} crosses itself");
+        }
+    }
 }
 
 #[test]
@@ -234,13 +331,7 @@ fn lots_fill_a_zoned_block_and_face_their_road() {
     for &l in &lots {
         let l = l as usize;
         assert_eq!(w.lots.zone(l as LotId, &w.zones), Zone::ResidentialLow);
-        let cells = w.lots.cells(l as LotId);
-        let (mut cx, mut cy) = (0.0, 0.0);
-        for &c in cells {
-            let (x, y) = w.zones.centre(c);
-            cx += x / cells.len() as f32;
-            cy += y / cells.len() as f32;
-        }
+        let (cx, cy) = centroid(w.lots.outline(l as LotId));
         let (fx, fy) = (w.lots.facing_x[l], w.lots.facing_y[l]);
         assert!((fx.hypot(fy) - 1.0).abs() < 1e-4);
         let toward = (w.lots.front_x[l] - cx) * fx + (w.lots.front_y[l] - cy) * fy;

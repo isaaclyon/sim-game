@@ -1,11 +1,16 @@
-//! Lots: the pieces of blocks that buildings will stand on (ADR 0016).
+//! Lots: the pieces of blocks that buildings will stand on (ADR 0016, ADR 0017).
 //!
-//! A lot is a set of zone cells facing one road. Ids are append-only; a retired lot keeps its
-//! slot and record, like a deleted road (ADR 0013).
+//! A lot is a polygon cut along one road, plus the zone cells whose centre lies inside it.
+//! Ids are append-only; a retired lot keeps its slot and record, like a deleted road
+//! (ADR 0013).
 
 use crate::block::{LotPlan, Rect};
+use crate::geometry::Point;
 use crate::road::RoadId;
 use crate::zone::{Zone, ZoneGrid};
+
+/// A recut lot whose outline points all lie this close to an old lot's keeps its id, metres.
+const SAME_OUTLINE: f32 = 0.01;
 
 pub type LotId = u32;
 const NO_LOT: LotId = LotId::MAX;
@@ -14,6 +19,8 @@ const NO_LOT: LotId = LotId::MAX;
 pub struct Lots {
     /// The road the lot faces.
     pub road: Vec<RoadId>,
+    /// Length of the stretch of road the lot was cut from, metres.
+    pub frontage: Vec<f32>,
     /// Centreline point at the middle of the lot's stretch of road.
     pub front_x: Vec<f32>,
     pub front_y: Vec<f32>,
@@ -23,6 +30,9 @@ pub struct Lots {
     pub active: Vec<bool>,
     /// Bounding box of the block the lot was cut from.
     block: Vec<Rect>,
+    // CSR: lot l's outline is outline[outline_start[l]..outline_start[l + 1]].
+    outline_start: Vec<u32>,
+    outline: Vec<Point>,
     // CSR: lot l owns cells[cell_start[l]..cell_start[l + 1]].
     cell_start: Vec<u32>,
     cells: Vec<u32>,
@@ -55,6 +65,12 @@ impl Lots {
         &self.cells[self.cell_start[l] as usize..self.cell_start[l + 1] as usize]
     }
 
+    /// `lot`'s outline, counter-clockwise, without repeating the first point.
+    pub fn outline(&self, lot: LotId) -> &[Point] {
+        let l = lot as usize;
+        &self.outline[self.outline_start[l] as usize..self.outline_start[l + 1] as usize]
+    }
+
     /// The active lot owning zone cell `index`.
     pub fn owner(&self, index: u32) -> Option<LotId> {
         self.owner
@@ -84,14 +100,20 @@ impl Lots {
         self.block[lot as usize] = block;
     }
 
-    /// The active lot identical to `plan`, if any.
+    /// The active lot identical to `plan`, if any: same road, front point and cells, and an
+    /// outline the same to within `SAME_OUTLINE`.
     pub(crate) fn matching(&self, plan: &LotPlan) -> Option<LotId> {
-        let lot = self.owner(plan.cells[0])?;
+        let lot = self.owner(*plan.cells.first()?)?;
         let l = lot as usize;
+        let old = self.outline(lot);
         (self.road[l] == plan.road
             && (self.front_x[l], self.front_y[l]) == plan.front
-            && self.cells(lot) == plan.cells)
-            .then_some(lot)
+            && self.cells(lot) == plan.cells
+            && old.len() == plan.outline.len()
+            && old.iter().zip(&plan.outline).all(|(a, b)| {
+                (a.0 - b.0).abs() <= SAME_OUTLINE && (a.1 - b.1).abs() <= SAME_OUTLINE
+            }))
+        .then_some(lot)
     }
 
     pub(crate) fn retire(&mut self, lot: LotId) {
@@ -115,6 +137,7 @@ impl Lots {
         }
         if self.cell_start.is_empty() {
             self.cell_start.push(0);
+            self.outline_start.push(0);
         }
         if plan.cells.iter().any(|&c| self.owner[c as usize] != NO_LOT) {
             return false;
@@ -124,67 +147,28 @@ impl Lots {
             self.owner[c as usize] = id;
         }
         self.road.push(plan.road);
+        self.frontage.push(plan.frontage);
         self.front_x.push(plan.front.0);
         self.front_y.push(plan.front.1);
         self.facing_x.push(plan.facing.0);
         self.facing_y.push(plan.facing.1);
         self.active.push(true);
         self.block.push(block);
+        self.outline.extend_from_slice(&plan.outline);
+        self.outline_start.push(self.outline.len() as u32);
         self.cells.extend_from_slice(&plan.cells);
         self.cell_start.push(self.cells.len() as u32);
         true
     }
 
-    /// Writes `[ax, ay, bx, by]` per outline segment: zone cell edges where the owning lot
-    /// changes and at least one side is a lot, merged into straight runs.
-    pub fn write_outlines(&self, grid: &ZoneGrid, out: &mut Vec<f32>) {
+    /// Writes `[n, x0, y0, …, x(n-1), y(n-1)]` per active lot: its outline's point count, then
+    /// its points counter-clockwise.
+    pub fn write_outlines(&self, out: &mut Vec<f32>) {
         out.clear();
-        if self.owner.is_empty() {
-            return;
-        }
-        let (cols, rows) = (grid.cols as usize, grid.rows as usize);
-        let size = crate::zone::ZONE_CELL;
-        let at = |c: usize, r: usize| -> LotId {
-            if c < cols && r < rows {
-                self.owner[r * cols + c]
-            } else {
-                NO_LOT
-            }
-        };
-        let edge = |a: LotId, b: LotId| a != b;
-        // Horizontal edges: the line y = y0 + r * size, between rows r - 1 and r.
-        for r in 0..=rows {
-            let mut run: Option<usize> = None;
-            for c in 0..=cols {
-                let below = if r > 0 { at(c, r - 1) } else { NO_LOT };
-                let on = c < cols && edge(below, at(c, r));
-                match (on, run) {
-                    (true, None) => run = Some(c),
-                    (false, Some(s)) => {
-                        let y = grid.y0 + r as f32 * size;
-                        out.extend([grid.x0 + s as f32 * size, y, grid.x0 + c as f32 * size, y]);
-                        run = None;
-                    }
-                    _ => {}
-                }
-            }
-        }
-        // Vertical edges: the line x = x0 + c * size, between columns c - 1 and c.
-        for c in 0..=cols {
-            let mut run: Option<usize> = None;
-            for r in 0..=rows {
-                let left = if c > 0 { at(c - 1, r) } else { NO_LOT };
-                let on = r < rows && edge(left, at(c, r));
-                match (on, run) {
-                    (true, None) => run = Some(r),
-                    (false, Some(s)) => {
-                        let x = grid.x0 + c as f32 * size;
-                        out.extend([x, grid.y0 + s as f32 * size, x, grid.y0 + r as f32 * size]);
-                        run = None;
-                    }
-                    _ => {}
-                }
-            }
+        for lot in self.active_lots() {
+            let ring = self.outline(lot);
+            out.push(ring.len() as f32);
+            out.extend(ring.iter().flat_map(|p| [p.0, p.1]));
         }
     }
 }
