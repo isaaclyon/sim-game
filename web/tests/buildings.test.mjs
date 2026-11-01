@@ -44,15 +44,17 @@ test('industrial snapshots carry varied roofs and halls and preserve them after 
     assert.ok(data[i + 2] >= 0 && data[i + 2] <= 3);
     roofs.add(data[i + 2]);
     heights.add(data[i + 1]);
-    assert.ok(data[i + 3] >= 3);
+    assert.equal(data[i + 3], 4, 'industrial halls stay rectangular');
     i += 4 + 2 * data[i + 3];
   }
   assert.equal(i, data.length);
   assert.ok(roofs.size > 1);
   assert.ok(heights.size > 1);
   s.fill_block(50, 50, 1);
-  s.tick(610);
   assert.deepEqual(s.building_snapshot(), data);
+  s.tick(610);
+  // Vacant corner lots may now fit houses; existing halls must remain unchanged.
+  assert.deepEqual(s.building_snapshot().subarray(0, data.length), data);
   s.free();
 });
 

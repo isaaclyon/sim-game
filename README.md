@@ -33,7 +33,8 @@ about a minute at normal speed. Low-density homes have yards; apartments and sho
 shapes and share side walls. Newly zoned industrial land mixes small workshop lots, wider
 warehouses and occasional factory-sized sites, with varied hall sizes, heights, yards and roof
 colours. Larger sites need adjoining land of the same industrial zone; curves and small blocks
-may leave smaller lots. Repainting preserves existing lot sizes and buildings. Density changes
+may leave smaller lots. Industrial halls stay rectangular; corners too narrow for a hall stay
+open rather than growing pointed sheds. Repainting preserves existing lot sizes and buildings. Density changes
 building height. Very small or awkward lots can stay open. A partly painted lot also stays
 empty if unzoned cells outnumber or tie its most common zone; click to fill the whole block
 to zone those gaps. Growth pauses with the simulation.

@@ -1,6 +1,6 @@
 # 0019. Industrial lots combine neighbouring frontage strips
 
-- Status: Accepted
+- Status: Industrial footprint fallback superseded by [0020](0020-rectangular-industrial-halls.md); otherwise accepted
 - Date: 2026-11-01
 
 ## Context

@@ -254,6 +254,39 @@ fn industrial_buildings_vary_in_height_and_survive_repainting_and_nearby_road_ed
 }
 
 #[test]
+fn industrial_halls_never_take_the_pointed_shape_of_corner_lots() {
+    for zone in [Zone::IndustrialLow, Zone::IndustrialHigh] {
+        let mut w = World::generate(Config::default(), 6, 6);
+        assert!(w.apply(Command::PaintZone {
+            ax: -100.0,
+            ay: -100.0,
+            bx: 800.0,
+            by: 800.0,
+            zone,
+        }));
+        advance(&mut w, 61);
+        assert!(w.buildings.active_buildings().count() > 30);
+        for b in w.buildings.active_buildings() {
+            let ring = w.buildings.footprint(b);
+            assert_eq!(
+                ring.len(),
+                4,
+                "industrial hall {b} must be a box, not a lot-shaped wedge"
+            );
+            for i in 0..4 {
+                let a = ring[i];
+                let p = ring[(i + 1) % 4];
+                let q = ring[(i + 2) % 4];
+                let u = (p.0 - a.0, p.1 - a.1);
+                let v = (q.0 - p.0, q.1 - p.1);
+                let cosine = (u.0 * v.0 + u.1 * v.1).abs() / (u.0.hypot(u.1) * v.0.hypot(v.1));
+                assert!(cosine < 0.002, "industrial hall {b} has a pointed corner");
+            }
+        }
+    }
+}
+
+#[test]
 fn industrial_roof_choices_are_varied_persisted_and_hashed() {
     let mut a = town(Zone::IndustrialHigh);
     let mut b = town(Zone::IndustrialHigh);

@@ -75,7 +75,8 @@ pub(super) fn make(
             };
             let width = (frontage * rng.range(0.65, 0.85)).max(5.0);
             let setback = ROAD_HALF_WIDTH + rng.range(4.0, 9.0);
-            road_box(&inset, front, facing, (width, depth), setback).or(Some(inset))
+            // A pointed lot can be a yard, but must not turn into a wedge-shaped shed.
+            road_box(&inset, front, facing, (width, depth), setback)
         }
         Zone::ResidentialHigh | Zone::CommercialLow | Zone::CommercialHigh => Some(clear),
         Zone::None => None,
@@ -228,7 +229,14 @@ mod tests {
                 Zone::IndustrialHigh,
                 Zone::CommercialHigh,
             ] {
-                let ring = make(&lots, 0, &roads, zone, &mut Rng::new(1)).unwrap();
+                let Some(ring) = make(&lots, 0, &roads, zone, &mut Rng::new(1)) else {
+                    assert_eq!(
+                        zone,
+                        Zone::IndustrialHigh,
+                        "awkward industrial sites may stay open"
+                    );
+                    continue;
+                };
                 let inside = poly::ring(ring);
                 let outside = poly::subtract(
                     std::slice::from_ref(&inside),
