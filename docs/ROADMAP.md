@@ -51,7 +51,7 @@ despawns, and the road tool feels good with snapping, curves and bulldozing.
 
 - Zoning brush: residential, commercial and industrial, each with a low- and high-density
   brush (houses vs. apartments, corner shops vs. stores). You choose density; it doesn't creep
-  up on its own.
+  up on its own. Zones live on a fixed grid ([ADR 0014](adrs/0014-zone-grid.md)).
 - Block-filling lots: zoning paints whole blocks, and the sim cuts lots to fill the space
   between roads, including odd shapes left by curves. Where a block is too deep to reach from
   its edges, the sim adds alleys and small connector streets to reach interior lots. These
