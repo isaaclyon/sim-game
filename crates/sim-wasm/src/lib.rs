@@ -1,6 +1,6 @@
 //! Thin wasm-bindgen wrapper. Logic belongs in `sim`; this crate only converts types.
 
-use sim::{Command, Config, World};
+use sim::{Command, Config, World, Zone};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
@@ -60,6 +60,35 @@ impl Sim {
 
     pub fn delete_road(&mut self, x: f32, y: f32) -> bool {
         self.world.apply(Command::DeleteRoad { x, y })
+    }
+
+    /// `zone` is the cell byte (ADR 0014): 0 = none, 1/2 residential, 3/4 commercial,
+    /// 5/6 industrial, low/high. Unknown values change nothing.
+    pub fn paint_zone(&mut self, ax: f32, ay: f32, bx: f32, by: f32, zone: u8) -> bool {
+        let Some(zone) = Zone::from_u8(zone) else {
+            return false;
+        };
+        self.world.apply(Command::PaintZone {
+            ax,
+            ay,
+            bx,
+            by,
+            zone,
+        })
+    }
+
+    pub fn zones_version(&self) -> u32 {
+        self.world.zones.version
+    }
+
+    /// One byte per zone cell, row-major from the grid origin; see `zone_layout`.
+    pub fn zone_cells(&self) -> Vec<u8> {
+        self.world.zones.cells.clone()
+    }
+
+    /// `[origin_x, origin_y, cell_size, cols, rows]` of the zone grid.
+    pub fn zone_layout(&self) -> Vec<f32> {
+        self.world.zones.layout().to_vec()
     }
 
     /// `[ax, ay, bx, by]` of the selected segment, or empty on a miss.
