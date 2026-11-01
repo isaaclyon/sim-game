@@ -16,8 +16,8 @@ What to build next and why lives in `docs/ROADMAP.md`. Work on the current miles
 
 ## Snapshot formats
 - Agents: `[x, y, heading, speed_ratio]` per agent (`SNAPSHOT_STRIDE`), speed_ratio < 0 = hidden.
-- Roads: `[ax, ay, bx, by, speed_limit]` per active rendered segment; curves emit multiple
-  segments. Packed in road ID order, not indexed by road ID (ADR 0015).
+- Roads: `[ax, ay, bx, by, class]` per active rendered segment, class 0 = street, 1 = main road;
+  curves emit multiple segments. Packed in road ID order, not indexed by road ID (ADR 0015, 0016).
 - Bulldoze preview: `[x, y]` per centreline sample of the selected road; empty = no target.
   Read-only. Road/lane IDs are never reused after deletion (ADR 0013). Lane counts include
   tombstone slots.

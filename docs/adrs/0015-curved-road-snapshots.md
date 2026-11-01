@@ -1,6 +1,6 @@
 # 0015. Curved roads use simulation-sampled segment snapshots
 
-- Status: Accepted
+- Status: Accepted; the road record's `speed_limit` field is now a road class, per [0016](0016-road-classes-and-main-road-routing.md)
 - Date: 2026-11-01
 
 ## Context
