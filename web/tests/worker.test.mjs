@@ -1,0 +1,100 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { stripTypeScriptTypes } from 'node:module';
+import test from 'node:test';
+import { createContext, SourceTextModule, SyntheticModule } from 'node:vm';
+import { initSync, Sim } from '../src/pkg/sim_wasm.js';
+
+initSync({ module: readFileSync(new URL('../src/pkg/sim_wasm_bg.wasm', import.meta.url)) });
+
+async function worker() {
+  let ready;
+  const initialized = new Promise((resolve) => {
+    ready = resolve;
+  });
+  const messages = [];
+  const self = { postMessage: (msg) => messages.push(msg) };
+  const context = createContext({ self, performance: { now: () => 0 }, setTimeout: () => {} });
+  const source = stripTypeScriptTypes(
+    readFileSync(new URL('../src/sim.worker.ts', import.meta.url), 'utf8'),
+  );
+  const module = new SourceTextModule(source, { context });
+  const wasm = new SyntheticModule(
+    ['default', 'Sim'],
+    function () {
+      this.setExport('default', () => initialized);
+      this.setExport('Sim', Sim);
+    },
+    { context },
+  );
+  await module.link(() => wasm);
+  await module.evaluate();
+  const send = (data) => self.onmessage({ data });
+  const init = send({ type: 'init', seed: 1, cols: 3, rows: 3, agents: 100 });
+  return { send, messages, ready, init };
+}
+
+test('curve preview, build and bulldoze agree across the worker boundary while paused', async () => {
+  const w = await worker();
+  w.ready();
+  await w.init;
+  await w.send({ type: 'setSpeed', speed: 0 });
+  const before = w.messages.find((msg) => msg.type === 'roads').segments;
+  const coords = { ax: -1000, ay: -1000, cx: -900, cy: -900, bx: -800, by: -1000 };
+  await w.send({ type: 'previewCurve', ...coords, revision: 10 });
+  const preview = w.messages.at(-1);
+  assert.equal(preview.revision, 10);
+  assert.ok(preview.stops.length > 6);
+  await w.send({ type: 'buildCurve', ...coords, id: 20 });
+  const result = w.messages.at(-1);
+  assert.equal(result.type, 'buildResult');
+  assert.equal(result.id, 20);
+  assert.equal(result.success, true);
+  const added = w.messages.at(-2).segments.slice(before.length);
+  assert.equal(added.length / 5, preview.stops.length / 3 - 1);
+  await w.send({ type: 'previewBulldoze', x: -900, y: -950, revision: 11 });
+  const selected = w.messages.at(-1);
+  assert.equal(selected.revision, 11);
+  assert.equal(selected.segment.length / 2, added.length / 5 + 1);
+  for (let i = 0; i < added.length / 5; i++) {
+    assert.deepEqual(
+      [...selected.segment.slice(i * 2, i * 2 + 4)],
+      [...added.slice(i * 5, i * 5 + 4)],
+    );
+  }
+  await w.send({ type: 'deleteRoad', x: -900, y: -950 });
+  assert.deepEqual(w.messages.at(-2).segments, before);
+  assert.equal(w.messages.at(-1).type, 'frame');
+  assert.equal(w.messages.at(-1).stats.tick, 0);
+  await w.send({ type: 'buildCurve', ...coords, id: 21 });
+  assert.equal(w.messages.at(-1).success, true, 'a deleted curve does not block rebuilding');
+  assert.deepEqual(w.messages.at(-2).segments.slice(before.length), added);
+  const count = w.messages.length;
+  await w.send({ type: 'buildCurve', ...coords, id: 22 });
+  assert.equal(w.messages.length, count + 1, 'refused builds do not publish a changed network');
+  assert.equal(w.messages.at(-1).id, 22);
+  assert.equal(w.messages.at(-1).success, false);
+});
+
+test('every preview request gets a reply even during WASM initialization', async () => {
+  const w = await worker();
+  for (const type of ['previewBulldoze', 'previewSnap', 'previewRoad', 'previewCurve']) {
+    await w.send({ type, x: 0, y: 0, ax: 0, ay: 0, bx: 100, by: 0, revision: 7 });
+    assert.equal(w.messages.at(-1)?.revision, 7);
+    const reply = w.messages.pop();
+    assert.equal((reply.segment ?? reply.stops).length, 0);
+  }
+  w.ready();
+  await w.init;
+  const roads = w.messages.find((msg) => msg.type === 'roads').segments;
+  const x = (roads[0] + roads[2]) / 2;
+  const y = (roads[1] + roads[3]) / 2;
+  await w.send({ type: 'previewBulldoze', x, y, revision: 8 });
+  assert.equal(w.messages.at(-1).segment.length, 4);
+  await w.send({ type: 'setSpeed', speed: 0 });
+  await w.send({ type: 'deleteRoad', x, y });
+  assert.equal(w.messages.at(-2).type, 'roads');
+  assert.equal(w.messages.at(-2).segments.length, roads.length - 5);
+  assert.equal(w.messages.at(-1).type, 'frame', 'paused edits refresh cars and signals');
+  assert.equal(w.messages.at(-1).stats.tick, 0, 'deletion does not advance time');
+});

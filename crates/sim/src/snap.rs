@@ -56,7 +56,7 @@ pub(crate) fn plan(net: &RoadNetwork, mut shape: Shape) -> Option<Plan> {
         return None;
     }
     let mut stops = vec![(0.0, a)];
-    for road in 0..net.road_count() as RoadId {
+    for road in net.active_roads() {
         for (t, u) in intersections(shape, net.shape(road)) {
             // Parameter error scales with road length and coordinate magnitude. Compare
             // positions so float rounding cannot turn an endpoint into a second crossing.
@@ -122,7 +122,9 @@ pub(crate) fn plan(net: &RoadNetwork, mut shape: Shape) -> Option<Plan> {
             if shape.control.is_some() {
                 return None;
             }
-            let lane = (0..net.lane_count() as u32)
+            let lane = net
+                .active_roads()
+                .flat_map(|r| [r * 2, r * 2 + 1])
                 .find(|&l| net.lane_from[l as usize] == m && net.lane_to[l as usize] == n)?;
             leg = net.shape(lane / 2);
             if !lane.is_multiple_of(2) {
@@ -152,7 +154,7 @@ pub fn snap_end(net: &RoadNetwork, x: f32, y: f32) -> Stop {
     }
     let mut best = None;
     let mut best_d = SNAP_RADIUS;
-    for road in 0..net.road_count() as RoadId {
+    for road in net.active_roads() {
         let shape = net.shape(road);
         let u = shape.nearest((x, y));
         let d = dist(shape.point(u), (x, y));
@@ -171,6 +173,26 @@ pub fn snap_end(net: &RoadNetwork, x: f32, y: f32) -> Stop {
     }
 }
 
+/// Nearest active centreline in bulldoze reach. Ties keep the lowest road ID.
+pub fn bulldoze_target(net: &RoadNetwork, x: f32, y: f32) -> Option<RoadId> {
+    if !x.is_finite() || !y.is_finite() {
+        return None;
+    }
+    let mut best = None;
+    let mut distance = SNAP_RADIUS;
+    for road in net.active_roads() {
+        let shape = net.shape(road);
+        let d = dist(shape.point(shape.nearest((x, y))), (x, y));
+        if d < distance || (best.is_none() && d <= distance) {
+            distance = d;
+            best = Some(road);
+        }
+    }
+    best
+}
+
+/// The point a fraction `u` along `road`: one of its ends if that is within `SNAP_RADIUS`,
+/// otherwise a split.
 fn on_road(net: &RoadNetwork, road: RoadId, u: f32) -> Stop {
     let shape = net.shape(road);
     let at = shape.point(u);
@@ -194,7 +216,7 @@ fn node_stop(net: &RoadNetwork, n: NodeId) -> Stop {
 }
 
 fn overlaps_any(net: &RoadNetwork, shape: Shape) -> bool {
-    (0..net.road_count() as RoadId).any(|road| {
+    net.active_roads().any(|road| {
         let other = net.shape(road);
         shape
             .segments()

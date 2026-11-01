@@ -1,4 +1,4 @@
-# 0013. Curved roads use simulation-sampled segment snapshots
+# 0014. Curved roads use simulation-sampled segment snapshots
 
 - Status: Accepted
 - Date: 2026-11-01
@@ -13,7 +13,8 @@ under ADR 0005; rendering samples are not additional roads or junctions.
 ## Decision
 
 - Replace only ADR 0003's road snapshot cardinality: `[ax, ay, bx, by, speed_limit]` is now
-  **per rendered segment**, not per road. Straight roads emit one segment; curves emit several.
+  **per active rendered segment**, not per road. Straight roads emit one segment; curves emit several.
+  Deleted roads emit nothing, preserving ADR 0013's tombstone and packed-snapshot contracts.
   The sim samples them and the worker still sends them only when `roads.version` changes.
   Snapshot record indices are not road ids.
 - Construction previews remain simulation-owned `[x, y, join]` samples. Join `-1` identifies
@@ -21,6 +22,10 @@ under ADR 0005; rendering samples are not additional roads or junctions.
   meanings (new end, existing node, split road). An empty preview means refused.
 - `BuildCurve` supplies start, one quadratic Bézier control point and end through the same
   command boundary as `BuildRoad`. Both use the same construction planner as their previews.
+- Extend ADR 0013's bulldoze snapshot from one endpoint pair to `[x, y]` per centreline sample.
+  Straight roads still emit two points. Picking measures distance to the actual curve, not its
+  endpoint chord; deletion removes the whole selected road between junctions, in both directions.
+  The renderer draws all returned samples so the highlight shows exactly what will disappear.
 - Keep the rest of ADR 0003: the sim owns state, the frontend sends commands and draws
   snapshots, and the worker owns the clock. Agent and signal snapshot formats are unchanged.
 
@@ -29,7 +34,8 @@ under ADR 0005; rendering samples are not additional roads or junctions.
 - Rendering, preview and simulation geometry cannot disagree because of separate curve
   implementations. The frontend does not need a Bézier dependency.
 - Curved networks send more road and preview records, but do not add graph nodes for sampling.
-- Picking a road for future editing cannot infer its id from a rendered segment's index;
-  it must query the sim or use a future explicitly identified snapshot format.
+- Picking a road cannot infer its id from a rendered segment's index; bulldozing queries the
+  sim. Other editing tools must also query the sim or use an explicitly identified snapshot.
 - The Rust writers, TypeScript protocol comments, renderer and project instructions change
-  together. This partially supersedes ADR 0003, not its simulation/rendering separation.
+  together. This partially supersedes ADR 0003's road cardinality and ADR 0013's bulldoze
+  preview shape, not simulation/rendering separation or stable deletion IDs.

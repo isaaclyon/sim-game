@@ -14,8 +14,10 @@ cd web && npm install && npm run dev
 Controls: left-drag pans, right-drag orbits, wheel zooms to cursor. `R` toggles straight roads
 (click start, click end). `C` toggles curved roads (click start, click bend control, click end).
 The bend control pulls the curve toward it; it is not a point the road passes through.
-Both tools continue from the last successful end. Esc or right-click cancels. Space pauses,
-1/2/3 set speed.
+Both construction tools continue from the last successful end. `B` toggles bulldoze: hover to
+highlight a whole road between junctions, then click to remove both directions. All tools work
+while paused. Esc or right-click cancels. Space pauses, 1/2/3 set speed.
+Cars whose remaining route uses a deleted road park and retry; other traffic continues.
 
 ## Roads
 
@@ -34,6 +36,13 @@ Internally, curves share a distance lookup table between their two lanes. Sampli
 roads keep their direct geometry queries and do not allocate a distance table. The road
 snapshot keeps its five-float segment format, with multiple segments per curve. Preview
 samples use join code -1 between actual junctions.
+
+Roads render as eight-metre-wide asphalt ribbons with simple pads at shared endpoints.
+Streets and avenues share one asphalt color; their simulation speed limits are unchanged.
+The view preserves the simulation's right-hand traffic.
+
+Run `scripts/check.sh` for the full checks, including road geometry tests. To run just those
+frontend tests, use `cd web && npm test`.
 
 ## Layout
 

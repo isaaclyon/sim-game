@@ -24,6 +24,14 @@ pub(crate) fn project(a: Point, b: Point, p: Point) -> f32 {
 
 impl Shape {
     pub fn point(self, t: f32) -> Point {
+        // Shared node coordinates must match exactly for the renderer's junction pads.
+        // Interpolation can otherwise round an endpoint away from its stored position.
+        if t == 0.0 {
+            return self.a;
+        }
+        if t == 1.0 {
+            return self.b;
+        }
         match self.control {
             Some(c) => lerp(lerp(self.a, c, t), lerp(c, self.b, t), t),
             None => lerp(self.a, self.b, t),

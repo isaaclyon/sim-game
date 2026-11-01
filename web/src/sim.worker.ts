@@ -44,6 +44,15 @@ function readStats(s: Sim): Stats {
   return out;
 }
 
+function sendFrame(s: Sim, perTick = 0) {
+  const agents = s.agent_snapshot();
+  const signals = s.signal_snapshot();
+  post({ type: 'frame', agents, signals, stats: readStats(s), tickMs: perTick }, [
+    agents.buffer,
+    signals.buffer,
+  ]);
+}
+
 function step() {
   const now = performance.now();
   backlogMs += (now - last) * speed;
@@ -62,12 +71,7 @@ function step() {
       sim.tick(n);
       const perTick = (performance.now() - t0) / n;
       sendRoadsIfChanged(sim);
-      const agents = sim.agent_snapshot();
-      const signals = sim.signal_snapshot();
-      post({ type: 'frame', agents, signals, stats: readStats(sim), tickMs: perTick }, [
-        agents.buffer,
-        signals.buffer,
-      ]);
+      sendFrame(sim, perTick);
     }
   }
   setTimeout(step, 4);
@@ -102,6 +106,17 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
       post({ type: 'buildResult', id: msg.id, success });
       break;
     }
+    case 'deleteRoad':
+      if (sim?.delete_road(msg.x, msg.y)) {
+        sendRoadsIfChanged(sim);
+        sendFrame(sim); // Cars and signals also change while paused.
+      }
+      break;
+    case 'previewBulldoze': {
+      const segment = sim?.bulldoze_preview(msg.x, msg.y) ?? new Float32Array();
+      post({ type: 'bulldozePreview', segment, revision: msg.revision }, [segment.buffer]);
+      break;
+    }
     case 'previewRoad':
     case 'previewCurve': {
       const stops = sim
@@ -109,12 +124,12 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
           ? sim.curve_preview(msg.ax, msg.ay, msg.cx, msg.cy, msg.bx, msg.by)
           : sim.road_preview(msg.ax, msg.ay, msg.bx, msg.by)
         : new Float32Array();
-      post({ type: 'roadPreview', id: msg.id, stops }, [stops.buffer]);
+      post({ type: 'roadPreview', revision: msg.revision, stops }, [stops.buffer]);
       break;
     }
     case 'previewSnap': {
       const stops = sim?.snap_preview(msg.x, msg.y) ?? new Float32Array();
-      post({ type: 'roadPreview', id: msg.id, stops }, [stops.buffer]);
+      post({ type: 'roadPreview', stops, revision: msg.revision }, [stops.buffer]);
       break;
     }
   }

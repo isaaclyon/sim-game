@@ -16,7 +16,11 @@ What to build next and why lives in `docs/ROADMAP.md`. Work on the current miles
 
 ## Snapshot formats
 - Agents: `[x, y, heading, speed_ratio]` per agent (`SNAPSHOT_STRIDE`), speed_ratio < 0 = hidden.
-- Roads: `[ax, ay, bx, by, speed_limit]` per rendered segment; curved roads emit multiple segments.
+- Roads: `[ax, ay, bx, by, speed_limit]` per active rendered segment; curves emit multiple
+  segments. Packed in road ID order, not indexed by road ID (ADR 0014).
+- Bulldoze preview: `[x, y]` per centreline sample of the selected road; empty = no target.
+  Read-only. Road/lane IDs are never reused after deletion (ADR 0013). Lane counts include
+  tombstone slots.
 - Signals: `[x, y, heading, state]` per signalised approach (`SIGNAL_STRIDE`), state 0 = red,
   1 = green, 2 = protected-left green.
 - Road preview: `[x, y, join]` per sample of the road `BuildRoad` / `BuildCurve` would build,
@@ -28,7 +32,8 @@ Change both sides (Rust writer, `protocol.ts` doc, `renderer.ts` reader) togethe
 
 ## Checks before finishing a change
 - `scripts/check.sh` (same as CI): gitleaks over full history, rustfmt, clippy `-D warnings` (host + wasm32), `cargo test -p sim`,
-  Biome lint/format, `tsc`. `scripts/check.sh --fix` applies formatting and safe fixes first.
+  WASM worker and frontend geometry tests (Node 24+), Biome lint/format, `tsc`.
+  `scripts/check.sh --fix` applies formatting and safe fixes first.
 - The repo is public. `.githooks/pre-commit` runs gitleaks on staged changes; enable it per clone
   with `git config core.hooksPath .githooks`. Never bypass it with `--no-verify`.
 - `clippy.toml` bans `HashMap`/`HashSet` and `Instant::now`/`SystemTime::now` to protect

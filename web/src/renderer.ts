@@ -1,5 +1,5 @@
-// Three.js scene: roads as line segments, vehicles as one instanced box mesh. Sim (x, y) maps
-// to world (x, z) with y up.
+// Three.js scene: roads as asphalt ribbons and pads, vehicles as one instanced box mesh. Sim (x, y) maps
+// to scene-local (x, z), then world (x, -z) with y up (see scene.ts).
 //
 // Current choices, all cheap to change:
 // - WebGLRenderer. WebGPURenderer is still experimental; write new shaders in TSL so switching
@@ -8,10 +8,13 @@
 // - Vehicle matrices are written on the CPU each frame. If that becomes the bottleneck, move
 //   interpolation and orientation into a vertex shader fed by the raw snapshot.
 // - Picking is a ray against the ground plane. Add three-mesh-bvh once we pick against meshes.
-// - Road meshes may want BatchedMesh and earcut. Curve sampling belongs to the sim.
+// - Roads share one static mesh, rebuilt only when the road snapshot changes.
+// - Curve sampling belongs to the sim.
 
 import CameraControls from 'camera-controls';
 import * as THREE from 'three';
+import { buildRoadGeometry } from './road-geometry';
+import { createSimScene } from './scene';
 
 CameraControls.install({ THREE });
 
@@ -26,8 +29,7 @@ const SIGNAL_COLORS = [
 const SIGNAL_SIZE = 1.5;
 const SIGNAL_HEIGHT = 4;
 const BG = 0x0f1419;
-const STREET_COLOR = new THREE.Color(0x3a4654);
-const AVENUE_COLOR = new THREE.Color(0x6b7b8f);
+const ASPHALT_COLOR = 0x3a4654;
 const CAR_LENGTH = 4.5;
 const CAR_WIDTH = 2;
 const CAR_HEIGHT = 1.5;
@@ -41,11 +43,11 @@ const MARKER_PX = 10;
 
 export class Renderer {
   readonly renderer: THREE.WebGLRenderer;
-  readonly scene = new THREE.Scene();
+  readonly scene = createSimScene();
   readonly camera: THREE.PerspectiveCamera;
   readonly controls: CameraControls;
   private readonly clock = new THREE.Clock();
-  private roads?: THREE.LineSegments;
+  private roads?: THREE.Mesh;
   private cars?: THREE.InstancedMesh;
   private signals?: THREE.InstancedMesh;
   private readonly preview: THREE.Line;
@@ -101,43 +103,29 @@ export class Renderer {
     });
   }
 
-  /** `segments` is `[ax, ay, bx, by, speedLimit]` per rendered segment (many per curve). */
+  /** `segments` is `[ax, ay, bx, by, speedLimit]` per active rendered segment (many per curve), not per road ID. */
   setRoads(segments: Float32Array, bounds: [number, number, number, number], fitCamera: boolean) {
-    const n = segments.length / 5;
-    const positions = new Float32Array(n * 6);
-    const colors = new Float32Array(n * 6);
-    for (let i = 0; i < n; i++) {
-      const s = i * 5;
-      positions.set([segments[s], 0, segments[s + 1], segments[s + 2], 0, segments[s + 3]], i * 6);
-      const c = segments[s + 4] > 15 ? AVENUE_COLOR : STREET_COLOR;
-      colors.set([c.r, c.g, c.b, c.r, c.g, c.b], i * 6);
-    }
-    const geom = new THREE.BufferGeometry();
-    geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    geom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    const geom = buildRoadGeometry(segments);
     if (this.roads) {
       this.roads.geometry.dispose();
       this.roads.geometry = geom;
     } else {
-      this.roads = new THREE.LineSegments(
-        geom,
-        new THREE.LineBasicMaterial({ vertexColors: true }),
-      );
+      this.roads = new THREE.Mesh(geom, new THREE.MeshBasicMaterial({ color: ASPHALT_COLOR }));
       this.scene.add(this.roads);
     }
 
     if (fitCamera) {
       const [x0, y0, x1, y1] = bounds;
       const cx = (x0 + x1) / 2;
-      const cz = (y0 + y1) / 2;
+      const cz = -(y0 + y1) / 2;
       const span = Math.max(x1 - x0, y1 - y0);
       this.controls.setLookAt(cx, span * 0.9, cz + span * 0.5, cx, 0, cz, false);
       this.controls.maxDistance = span * 2;
       const pad = span * 0.25;
       this.controls.setBoundary(
         new THREE.Box3(
-          new THREE.Vector3(x0 - pad, 0, y0 - pad),
-          new THREE.Vector3(x1 + pad, 0, y1 + pad),
+          new THREE.Vector3(x0 - pad, 0, -y1 - pad),
+          new THREE.Vector3(x1 + pad, 0, -y0 + pad),
         ),
       );
     }
@@ -233,7 +221,7 @@ export class Renderer {
         }
       }
       this.pos.set(x, 0, y);
-      // Sim heading is measured from +x toward +y; in world space +y became +z, so negate.
+      // Local +z holds sim +y, so negate here; the scene reflects all positions and headings.
       this.quat.setFromAxisAngle(this.up, -h);
       this.matrix.compose(this.pos, this.quat, this.scale);
       cars.setMatrixAt(drawn, this.matrix);
@@ -247,12 +235,13 @@ export class Renderer {
     if (cars.instanceColor) cars.instanceColor.needsUpdate = true;
   }
 
-  /** Ground-plane point under the cursor, or null if the ray misses. */
+  /** Ground-plane point in scene-local (sim x, y as x, z), or null if the ray misses. */
   pick(clientX: number, clientY: number): THREE.Vector3 | null {
     const ndc = new THREE.Vector2((clientX / innerWidth) * 2 - 1, -(clientY / innerHeight) * 2 + 1);
     const ray = new THREE.Raycaster();
     ray.setFromCamera(ndc, this.camera);
-    return ray.ray.intersectPlane(new THREE.Plane(this.up, 0), new THREE.Vector3());
+    const point = ray.ray.intersectPlane(new THREE.Plane(this.up, 0), new THREE.Vector3());
+    return point ? this.scene.worldToLocal(point) : null;
   }
 
   /**
@@ -288,6 +277,19 @@ export class Renderer {
     geom.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
     this.markers.geometry.dispose();
     this.markers.geometry = geom;
+  }
+
+  /** Draw the full centreline selected by the sim, in the destructive-action color. */
+  setBulldozePreview(segment: Float32Array) {
+    this.setPreview(null, null, null);
+    const line: THREE.Vector3[] = [];
+    for (let i = 0; i < segment.length; i += 2) {
+      line.push(new THREE.Vector3(segment[i], 0.5, segment[i + 1]));
+    }
+    (this.preview.material as THREE.LineBasicMaterial).color.copy(PREVIEW_REFUSED_COLOR);
+    this.preview.geometry.dispose();
+    this.preview.geometry = new THREE.BufferGeometry().setFromPoints(line);
+    this.preview.visible = line.length > 1;
   }
 
   render() {

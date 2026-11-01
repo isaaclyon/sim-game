@@ -19,6 +19,7 @@ echo "==> rust: clippy (wasm32)"
 cargo clippy -p sim-wasm --target wasm32-unknown-unknown --locked -- -D warnings
 echo "==> rust: test";     cargo test -p sim --locked
 echo "==> web: wasm";      (cd web && npm run --silent wasm)
+echo "==> web: test";      (cd web && npm test)
 echo "==> web: biome";     (cd web && npx biome ci .)
 echo "==> web: typecheck"; (cd web && npm run --silent typecheck)
 echo "All checks passed."
