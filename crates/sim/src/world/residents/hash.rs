@@ -3,6 +3,7 @@ impl World {
     pub(in crate::world) fn hash_residents(&self, mix: &mut impl FnMut(u64)) {
         mix(self.residents.rng.state());
         mix(self.residents.population as u64);
+        mix(self.residents.employed as u64);
         mix(self.residents.registered as u64);
         mix(self
             .residents

@@ -3,6 +3,7 @@ use crate::citizen::Activity;
 use crate::{Command, Config, Zone};
 
 mod allocation;
+mod employment;
 mod occupancy;
 mod schedules;
 mod trips;

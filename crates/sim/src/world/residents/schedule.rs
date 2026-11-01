@@ -37,6 +37,7 @@ impl World {
             if let Some(b) = self.choose_destination(c, true) {
                 self.citizens.job[i] = Some(b);
                 self.residents.workers[b as usize] += 1;
+                self.residents.employed += 1;
             } else {
                 self.schedule_search(c, 120.0);
             }
