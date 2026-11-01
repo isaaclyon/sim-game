@@ -72,3 +72,41 @@ test('a long keyboard pan leaves no pending camera transitions behind', () => {
   }
   assert.equal(waiting, 0);
 });
+
+test('after a mouse pan settles, keyboard panning stops adding camera transitions', () => {
+  const { c } = controls(0.4, 0.8);
+  let waiting = 0;
+  const add = c.addEventListener.bind(c);
+  c.addEventListener = (type, listener) => {
+    if (type === 'rest') waiting++;
+    add(type, listener);
+  };
+  c.truck(200, 0, true);
+  for (let frame = 0; frame < 144 * 5; frame++) {
+    panAlongGround(c, 0.001, 0.002);
+    c.update(1 / 144);
+  }
+  const settled = waiting;
+  assert.ok(settled > 0 && settled < 144 * 5, 'transitions only while the mouse pan settles');
+  for (let frame = 0; frame < 1000; frame++) {
+    panAlongGround(c, 0.001, 0.002);
+    c.update(1 / 144);
+  }
+  assert.equal(waiting, settled);
+});
+
+test('keyboard panning keeps an unfinished mouse pan gliding instead of jumping', () => {
+  const { c, camera } = controls(0.4, 0.8);
+  const screenRight = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0);
+  c.truck(200, 0, true); // what a mouse drag leaves behind: a target still being eased toward
+  c.update(1 / 60);
+  const now = c.getTarget(new THREE.Vector3(), false);
+  const gap = c.getTarget(new THREE.Vector3(), true).sub(now);
+  assert.ok(gap.length() > 50, 'the mouse pan is still settling');
+  panAlongGround(c, 0, 0.01);
+  const moved = c.getTarget(new THREE.Vector3(), false).sub(now);
+  assert.ok(Math.abs(moved.dot(screenRight)) < 1e-6, 'no sideways jump to the mouse pan end');
+  assert.ok(Math.abs(moved.length() - 0.01 * c.distance) < 1e-6, 'only the keyboard step');
+  const after = c.getTarget(new THREE.Vector3(), true).sub(c.getTarget(new THREE.Vector3(), false));
+  assert.ok(after.distanceTo(gap) < 1e-6, 'the rest of the mouse pan still eases in');
+});
