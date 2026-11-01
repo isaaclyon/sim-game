@@ -8,7 +8,8 @@ fn first_departures_are_staggered_and_daily_departure_keeps_clock_rate() {
     let times: BTreeSet<_> = w.citizens.departure.iter().copied().collect();
     assert!(times.len() > 1);
     assert!(times.iter().all(|&t| (7 * 3600..9 * 3600).contains(&t)));
-    w.citizens.job[0] = Some(distant(&w, 0));
+    let job = distant(&w, 0);
+    assign_job(&mut w, 0, job);
     // Late return after midnight: next departure is still the next local morning.
     w.totals.tick = w.secs_to_ticks(19.0 * 3600.0 / 6.0);
     w.schedule_day(0);
@@ -21,10 +22,8 @@ fn first_departures_are_staggered_and_daily_departure_keeps_clock_rate() {
 fn daily_work_repeats_without_overlapping_trips_or_growing_vehicle_slots() {
     let mut w = town();
     isolate(&mut w);
-    w.release_job(0);
     let job = distant(&w, 0);
-    w.citizens.job[0] = Some(job);
-    w.residents.workers[job as usize] += 1;
+    assign_job(&mut w, 0, job);
     w.schedule_day(0);
     let slots = w.agents.len();
     let mut work_arrivals = 0;
