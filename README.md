@@ -12,12 +12,15 @@ cd web && npm install && npm run dev
 ```
 
 Controls: left-drag pans, right-drag orbits, wheel zooms to cursor. `R` toggles straight roads
-(click start, click end). `C` toggles curved roads (click start, click bend control, click end).
+(click start, click end). `V` toggles curved roads (click start, click bend control, click end).
 The bend control pulls the curve toward it; it is not a point the road passes through.
 Both construction tools continue from the last successful end. `B` toggles bulldoze: hover to
 highlight a whole road between junctions, then click to remove both directions. All tools work
 while paused. Esc or right-click cancels. Space pauses, 1/2/3 set speed.
 Cars whose remaining route uses a deleted road park and retry; other traffic continues.
+The zone brush paints residential (`Z`), commercial (`X`) or industrial (`C`); press the key
+again to switch between low and high density, or use the tool bar. `U` unzones. Drag a
+rectangle to paint it (left-drag paints instead of panning while the brush is on).
 
 ## Roads
 

@@ -4,6 +4,8 @@ import { stripTypeScriptTypes } from 'node:module';
 import test from 'node:test';
 import { createContext, SourceTextModule, SyntheticModule } from 'node:vm';
 
+import { Zone } from '../src/protocol.ts';
+
 // Exercise main.ts's event handlers without a WebGL context or a running clock.
 async function tools() {
   function element() {
@@ -13,6 +15,7 @@ async function tools() {
       events: {},
       attributes: {},
       classList: { toggle() {} },
+      setPointerCapture() {},
       setAttribute(key, value) {
         this.attributes[key] = value;
       },
@@ -24,7 +27,13 @@ async function tools() {
   const elements = Object.fromEntries(
     ['hud', 'spawn', 'road', 'curve', 'bulldoze', 'road-help'].map((id) => [id, element()]),
   );
+  const zoneButtons = Object.values(Zone).map((zone) => ({
+    ...element(),
+    dataset: { zone: String(zone) },
+  }));
   const canvas = element();
+  const pans = [];
+  const zoneDrags = [];
   const messages = [];
   const previews = [];
   const events = {};
@@ -45,12 +54,25 @@ async function tools() {
     setPreview(stops) {
       previews.push({ type: 'road', stops });
     }
+    setLeftDragPans(on) {
+      pans.push(on);
+    }
+    setZoneDrag(a, b, zone) {
+      zoneDrags.push({ a, b, zone });
+    }
+    setZones(cells, layout) {
+      previews.push({ type: 'zones', cells, layout });
+    }
     setBulldozePreview(segment) {
       previews.push({ type: 'bulldoze', segment });
     }
   }
   const context = createContext({
-    document: { body: {}, getElementById: (id) => elements[id], querySelectorAll: () => [] },
+    document: {
+      body: {},
+      getElementById: (id) => elements[id],
+      querySelectorAll: (selector) => (selector === '[data-zone]' ? zoneButtons : []),
+    },
     URL,
     Worker,
     performance: { now: () => 0 },
@@ -69,15 +91,22 @@ async function tools() {
       },
     },
   );
-  await module.link(
-    () =>
-      new SyntheticModule(
-        ['Renderer'],
-        function () {
-          this.setExport('Renderer', Renderer);
-        },
-        { context },
-      ),
+  await module.link((specifier) =>
+    specifier === './protocol'
+      ? new SyntheticModule(
+          ['Zone'],
+          function () {
+            this.setExport('Zone', Zone);
+          },
+          { context },
+        )
+      : new SyntheticModule(
+          ['Renderer'],
+          function () {
+            this.setExport('Renderer', Renderer);
+          },
+          { context },
+        ),
   );
   await module.evaluate();
   const move = (x, y) => canvas.events.pointermove({ clientX: x, clientY: y });
@@ -90,6 +119,11 @@ async function tools() {
     elements,
     messages,
     previews,
+    zoneButtons,
+    pans,
+    zoneDrags,
+    down: (x, y) => canvas.events.pointerdown({ clientX: x, clientY: y, button: 0 }),
+    up: (x, y) => canvas.events.pointerup({ clientX: x, clientY: y, button: 0 }),
     move,
     click,
     reply: (data) => worker.onmessage({ data }),
@@ -97,9 +131,69 @@ async function tools() {
   };
 }
 
+test('zoning shortcuts and drags stay exclusive with curved roads and bulldozing', async () => {
+  const t = await tools();
+  t.key('v');
+  t.click(0, 0);
+  t.click(100, 100);
+  t.move(200, 0);
+  const old = t.messages.at(-1);
+  for (const [key, low] of [
+    ['z', Zone.ResidentialLow],
+    ['x', Zone.CommercialLow],
+    ['c', Zone.IndustrialLow],
+  ]) {
+    t.key(key);
+    assert.equal(t.elements.curve.attributes['aria-pressed'], 'false');
+    assert.equal(t.pans.at(-1), false, 'painting disables left-drag panning');
+    for (const expected of [low, low + 1]) {
+      if (expected !== low) t.key(key);
+      t.down(10, 20);
+      t.move(50, 60);
+      assert.equal(t.zoneDrags.at(-1).zone, expected);
+      t.up(50, 60);
+      const paint = t.messages.at(-1);
+      assert.equal(paint.type, 'paintZone');
+      assert.equal(paint.zone, expected);
+      assert.deepEqual([paint.ax, paint.ay, paint.bx, paint.by], [10, 20, 50, 60]);
+    }
+  }
+  t.reply({
+    type: 'roadPreview',
+    revision: old.revision,
+    stops: new Float32Array([0, 0, 0, 200, 0, 0]),
+  });
+  assert.equal(t.previews.at(-1).stops, null, 'late curve previews cannot cover the zone brush');
+  t.key('u');
+  t.click(10, 20);
+  assert.equal(t.messages.at(-1).zone, Zone.None);
+  t.down(10, 20);
+  t.key('v');
+  t.up(50, 60);
+  assert.equal(t.pans.at(-1), true);
+  assert.equal(t.zoneDrags.at(-1).a, null, 'switching tools clears the drag');
+  t.click(0, 0);
+  t.click(100, 100);
+  t.click(200, 0);
+  assert.equal(t.messages.at(-1).type, 'buildCurve', 'V still builds a curve after zoning');
+  t.zoneButtons.find((b) => Number(b.dataset.zone) === Zone.ResidentialLow).onclick();
+  t.key('b');
+  assert.equal(t.pans.at(-1), true);
+  assert.ok(t.zoneButtons.every((b) => b.attributes['aria-pressed'] === 'false'));
+  t.click(100, 50);
+  assert.equal(t.messages.at(-1).type, 'deleteRoad');
+  const cells = new Uint8Array([1]);
+  t.reply({ type: 'zones', cells, layout: [0, 0, 8, 1, 1] });
+  assert.equal(
+    t.previews.at(-1).cells,
+    cells,
+    'zone snapshots remain separate from traffic frames',
+  );
+});
+
 test('switching from curve to bulldoze discards a delayed preview and resets construction', async () => {
   const t = await tools();
-  t.key('c');
+  t.key('v');
   t.click(0, 0);
   t.click(100, 100);
   t.move(200, 0);

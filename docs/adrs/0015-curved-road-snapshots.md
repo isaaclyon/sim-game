@@ -1,4 +1,4 @@
-# 0014. Curved roads use simulation-sampled segment snapshots
+# 0015. Curved roads use simulation-sampled segment snapshots
 
 - Status: Accepted
 - Date: 2026-11-01

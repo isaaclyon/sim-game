@@ -40,6 +40,15 @@ const JOIN_COLORS = [null, new THREE.Color(0xffffff), new THREE.Color(0xf5c542)]
 /** The hover marker before a road has a start: new ends get one too, so the start is visible. */
 const JOIN_MARKER = [PREVIEW_COLOR, JOIN_COLORS[1], JOIN_COLORS[2]];
 const MARKER_PX = 10;
+/**
+ * Zone overlay colors, indexed by `Zone` value; low density light, high density dark. Mixed
+ * with the background so the overlay can be opaque: nothing else is drawn under it.
+ */
+const ZONE_COLORS = [null, 0x7bd88f, 0x2e9e4f, 0x6fb3ff, 0x2f6fd0, 0xf2c94c, 0xd9822b].map((c) =>
+  c === null ? null : new THREE.Color(BG).lerp(new THREE.Color(c), 0.45),
+);
+/** Bright versions for the drag outline, which must stand out. */
+const ZONE_OUTLINE = [0xe5484d, 0x7bd88f, 0x2e9e4f, 0x6fb3ff, 0x2f6fd0, 0xf2c94c, 0xd9822b];
 
 export class Renderer {
   readonly renderer: THREE.WebGLRenderer;
@@ -52,6 +61,8 @@ export class Renderer {
   private signals?: THREE.InstancedMesh;
   private readonly preview: THREE.Line;
   private readonly markers: THREE.Points;
+  private zones?: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
+  private readonly zoneDrag: THREE.LineLoop;
   private readonly matrix = new THREE.Matrix4();
   private readonly quat = new THREE.Quaternion();
   private readonly pos = new THREE.Vector3();
@@ -95,6 +106,10 @@ export class Renderer {
     );
     this.markers.frustumCulled = false;
     this.scene.add(this.markers);
+    this.zoneDrag = new THREE.LineLoop(new THREE.BufferGeometry(), new THREE.LineBasicMaterial());
+    this.zoneDrag.visible = false;
+    this.zoneDrag.frustumCulled = false;
+    this.scene.add(this.zoneDrag);
 
     addEventListener('resize', () => {
       this.camera.aspect = innerWidth / innerHeight;
@@ -235,6 +250,13 @@ export class Renderer {
     if (cars.instanceColor) cars.instanceColor.needsUpdate = true;
   }
 
+  /** Left drag pans the camera, unless a tool needs the drag (the zone brush). */
+  setLeftDragPans(pans: boolean) {
+    this.controls.mouseButtons.left = pans
+      ? CameraControls.ACTION.TRUCK
+      : CameraControls.ACTION.NONE;
+  }
+
   /** Ground-plane point in scene-local (sim x, y as x, z), or null if the ray misses. */
   pick(clientX: number, clientY: number): THREE.Vector3 | null {
     const ndc = new THREE.Vector2((clientX / innerWidth) * 2 - 1, -(clientY / innerHeight) * 2 + 1);
@@ -277,6 +299,61 @@ export class Renderer {
     geom.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
     this.markers.geometry.dispose();
     this.markers.geometry = geom;
+  }
+
+  /**
+   * Draws the zone grid as colored ground under the roads. `cells` is one `Zone` byte per cell,
+   * row-major; `layout` is `[originX, originY, cellSize, cols, rows]` (see `zones` in protocol.ts).
+   */
+  setZones(cells: Uint8Array, layout: [number, number, number, number, number]) {
+    const [x0, y0, size, cols, rows] = layout;
+    const rgba = new Uint8Array(cols * rows * 4);
+    for (let i = 0; i < cells.length; i++) {
+      const c = ZONE_COLORS[cells[i]];
+      if (!c) continue;
+      rgba.set([c.r * 255, c.g * 255, c.b * 255, 255], i * 4);
+    }
+    // Row 0 of the texture is the grid's first row, at v = 0, which the geometry puts at y0.
+    const texture = new THREE.DataTexture(rgba, cols, rows);
+    texture.magFilter = THREE.NearestFilter;
+    texture.minFilter = THREE.NearestFilter;
+    texture.needsUpdate = true;
+    if (!this.zones) {
+      const [x1, y1] = [x0 + cols * size, y0 + rows * size];
+      const geom = new THREE.BufferGeometry();
+      geom.setAttribute(
+        'position',
+        new THREE.Float32BufferAttribute([x0, 0, y0, x1, 0, y0, x1, 0, y1, x0, 0, y1], 3),
+      );
+      geom.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, 1, 0, 1, 1, 0, 1], 2));
+      geom.setIndex([0, 1, 2, 0, 2, 3]);
+      // Unzoned texels are discarded. No depth write and drawn first, so roads cover it.
+      const material = new THREE.MeshBasicMaterial({
+        alphaTest: 0.5,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      });
+      this.zones = new THREE.Mesh(geom, material);
+      this.zones.renderOrder = -1;
+      this.zones.frustumCulled = false;
+      this.scene.add(this.zones);
+    }
+    this.zones.material.map?.dispose();
+    this.zones.material.map = texture;
+    this.zones.material.needsUpdate = true;
+  }
+
+  /** Outlines the rectangle the zone brush would paint from `a` to `b`; `null` hides it. */
+  setZoneDrag(a: THREE.Vector3 | null, b: THREE.Vector3 | null, zone: number) {
+    this.zoneDrag.visible = !!(a && b);
+    if (!a || !b) return;
+    const corners = [a.x, a.z, b.x, a.z, b.x, b.z, a.x, b.z];
+    const points = [];
+    for (let i = 0; i < corners.length; i += 2)
+      points.push(new THREE.Vector3(corners[i], 0.5, corners[i + 1]));
+    this.zoneDrag.geometry.dispose();
+    this.zoneDrag.geometry = new THREE.BufferGeometry().setFromPoints(points);
+    (this.zoneDrag.material as THREE.LineBasicMaterial).color.set(ZONE_OUTLINE[zone] ?? 0xffffff);
   }
 
   /** Draw the full centreline selected by the sim, in the destructive-action color. */

@@ -17,6 +17,7 @@
       #toolbar button {
         background: #1c2530; color: #c9d4df; border: 1px solid #2e3a47; border-radius: 6px;
         padding: 6px 10px; font: 12px ui-monospace, Menlo, monospace; cursor: pointer;
+        white-space: nowrap;
       }
       #toolbar button:hover { border-color: #6b7b8f; }
       #toolbar button:focus-visible { outline: 2px solid #c9d4df; outline-offset: 2px; }
@@ -35,8 +36,15 @@
       <button type="button" data-speed="10">10×</button>
       <button type="button" id="spawn">+5k cars</button>
       <button type="button" id="road" aria-pressed="false">straight road (R)</button>
-      <button type="button" id="curve" aria-pressed="false">curved road (C)</button>
+      <button type="button" id="curve" aria-pressed="false">curved road (V)</button>
       <button type="button" id="bulldoze" aria-pressed="false">bulldoze (B)</button>
+      <button type="button" data-zone="1" aria-pressed="false" title="residential, low density (Z)">res low</button>
+      <button type="button" data-zone="2" aria-pressed="false" title="residential, high density (Z twice)">res high</button>
+      <button type="button" data-zone="3" aria-pressed="false" title="commercial, low density (X)">com low</button>
+      <button type="button" data-zone="4" aria-pressed="false" title="commercial, high density (X twice)">com high</button>
+      <button type="button" data-zone="5" aria-pressed="false" title="industrial, low density (C)">ind low</button>
+      <button type="button" data-zone="6" aria-pressed="false" title="industrial, high density (C twice)">ind high</button>
+      <button type="button" data-zone="0" aria-pressed="false" title="remove zoning (U)">unzone (U)</button>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>

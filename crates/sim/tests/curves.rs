@@ -113,6 +113,32 @@ fn extending_a_rebuilt_road_follows_the_active_curve() {
 }
 
 #[test]
+fn painted_zones_survive_curve_builds_splits_and_deletion() {
+    let mut w = empty();
+    assert!(w.apply(Command::PaintZone {
+        ax: -40.0,
+        ay: -40.0,
+        bx: 240.0,
+        by: 100.0,
+        zone: sim::Zone::ResidentialHigh,
+    }));
+    let cells = w.zones.cells.clone();
+    let layout = w.zones.layout();
+    let version = w.zones.version;
+    assert!(w.apply(curve()));
+    assert!(w.apply(Command::BuildRoad {
+        ax: 100.0,
+        ay: -100.0,
+        bx: 100.0,
+        by: 100.0,
+    }));
+    assert!(w.apply(Command::DeleteRoad { x: 50.0, y: 37.5 }));
+    assert_eq!(w.zones.cells, cells);
+    assert_eq!(w.zones.layout(), layout);
+    assert_eq!(w.zones.version, version);
+}
+
+#[test]
 fn curve_queries_use_distance_tangents_and_reverse_lanes() {
     let mut net = RoadNetwork::default();
     let a = net.add_node(0.0, 0.0);

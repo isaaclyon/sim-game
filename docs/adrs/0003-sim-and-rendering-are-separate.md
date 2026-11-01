@@ -1,6 +1,6 @@
 # 0003. Sim and rendering are separate: commands in, snapshots out
 
-- Status: Superseded by [0014](0014-curved-road-snapshots.md) for road snapshot cardinality; all other decisions remain accepted
+- Status: Superseded by [0015](0015-curved-road-snapshots.md) for road snapshot cardinality; all other decisions remain accepted
 - Date: 2026-10-30
 
 ## Context

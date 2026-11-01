@@ -1,5 +1,5 @@
 import type * as THREE from 'three';
-import type { FromWorker, Stats, ToWorker } from './protocol';
+import { type FromWorker, type Stats, type ToWorker, Zone } from './protocol';
 import { Renderer } from './renderer';
 
 const byId = (id: string): HTMLElement => {
@@ -54,6 +54,8 @@ worker.onmessage = (e: MessageEvent<FromWorker>) => {
     refused = !msg.success;
     invalidatePreview();
     updateRoadHelp();
+  } else if (msg.type === 'zones') {
+    renderer.setZones(msg.cells, msg.layout);
   } else {
     const now = performance.now();
     if (curr) frameGap = frameGap * 0.8 + (now - currAt) * 0.2;
@@ -86,6 +88,19 @@ const roadHelp = byId('road-help');
 let roadTool: 'straight' | 'curve' | null = null;
 const bulldozeButton = byId('bulldoze');
 let bulldozeTool = false;
+// --- zone brush: pick a zone, then drag a rectangle; every cell inside takes that zone ---
+const zoneButtons = [...document.querySelectorAll<HTMLButtonElement>('[data-zone]')];
+const ZONE_NAMES = [
+  'unzone',
+  'residential low',
+  'residential high',
+  'commercial low',
+  'commercial high',
+  'industrial low',
+  'industrial high',
+];
+let zone: Zone | null = null;
+let zoneStart: THREE.Vector3 | null = null;
 let roadStart: THREE.Vector3 | null = null;
 let roadControl: THREE.Vector3 | null = null;
 let refused = false;
@@ -144,9 +159,18 @@ function sendPreview() {
         : { type: 'previewSnap', revision, x: b.x, y: b.z },
   );
 }
-function setRoadTool(tool: typeof roadTool | 'bulldoze') {
+function setTool(tool: typeof roadTool | 'bulldoze', brush: Zone | null = null) {
   roadTool = tool === 'bulldoze' ? null : tool;
   bulldozeTool = tool === 'bulldoze';
+  zone = tool ? null : brush;
+  zoneStart = null;
+  renderer.setZoneDrag(null, null, 0);
+  renderer.setLeftDragPans(zone === null);
+  for (const b of zoneButtons) {
+    const on = Number(b.dataset.zone) === zone;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-pressed', String(on));
+  }
   roadStart = null;
   roadControl = null;
   pendingBuild = null;
@@ -160,12 +184,20 @@ function setRoadTool(tool: typeof roadTool | 'bulldoze') {
     button.classList.toggle('active', tool === mode);
     button.setAttribute('aria-pressed', String(tool === mode));
   }
-  renderer.renderer.domElement.style.cursor = tool ? 'crosshair' : '';
+  renderer.renderer.domElement.style.cursor = tool || zone !== null ? 'crosshair' : '';
   updateRoadHelp();
 }
-roadButton.onclick = () => setRoadTool(roadTool === 'straight' ? null : 'straight');
-curveButton.onclick = () => setRoadTool(roadTool === 'curve' ? null : 'curve');
-bulldozeButton.onclick = () => setRoadTool(bulldozeTool ? null : 'bulldoze');
+function setZone(z: Zone) {
+  setTool(null, zone === z ? null : z);
+}
+for (const b of zoneButtons) b.onclick = () => setZone(Number(b.dataset.zone) as Zone);
+/** Z, X and C pick residential, commercial and industrial; pressing again switches density. */
+function zoneKey(low: Zone, high: Zone) {
+  setTool(null, zone === low ? high : low);
+}
+roadButton.onclick = () => setTool(roadTool === 'straight' ? null : 'straight');
+curveButton.onclick = () => setTool(roadTool === 'curve' ? null : 'curve');
+bulldozeButton.onclick = () => setTool(bulldozeTool ? null : 'bulldoze');
 
 const canvas = renderer.renderer.domElement;
 let downX = 0;
@@ -173,10 +205,25 @@ let downY = 0;
 canvas.addEventListener('pointerdown', (e) => {
   downX = e.clientX;
   downY = e.clientY;
+  if (zone === null || e.button !== 0) return;
+  zoneStart = renderer.pick(e.clientX, e.clientY);
+  // Keep getting moves and the release even if the drag leaves the canvas.
+  canvas.setPointerCapture(e.pointerId);
 });
 canvas.addEventListener('pointerup', (e) => {
+  if (zone !== null) {
+    if (e.button === 2) return setTool(null);
+    const end = renderer.pick(e.clientX, e.clientY);
+    if (e.button === 0 && zoneStart && end) {
+      const [a, b] = [zoneStart, end];
+      send({ type: 'paintZone', ax: a.x, ay: a.z, bx: b.x, by: b.z, zone });
+    }
+    zoneStart = null;
+    renderer.setZoneDrag(null, null, 0);
+    return;
+  }
   if (!roadTool && !bulldozeTool) return;
-  if (e.button === 2) return setRoadTool(null);
+  if (e.button === 2) return setTool(null);
   if (pendingBuild) return;
   // Treat it as a click only if the pointer barely moved, so panning still works.
   if (e.button !== 0 || Math.hypot(e.clientX - downX, e.clientY - downY) > 4) return;
@@ -201,6 +248,10 @@ canvas.addEventListener('pointerup', (e) => {
   updateRoadHelp();
 });
 canvas.addEventListener('pointermove', (e) => {
+  if (zone !== null && zoneStart) {
+    renderer.setZoneDrag(zoneStart, renderer.pick(e.clientX, e.clientY), zone);
+    return;
+  }
   if ((!roadTool && !bulldozeTool) || pendingBuild) return;
   // Keep the latest completed preview visible during movement. Only a change of tool or
   // construction stage invalidates an in-flight response; cursor updates queue the next one.
@@ -217,10 +268,14 @@ canvas.addEventListener('pointerleave', () => {
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
 addEventListener('keydown', (e) => {
-  if (e.key === 'r' || e.key === 'R') setRoadTool(roadTool === 'straight' ? null : 'straight');
-  else if (e.key === 'c' || e.key === 'C') setRoadTool(roadTool === 'curve' ? null : 'curve');
-  else if (e.key === 'b' || e.key === 'B') setRoadTool(bulldozeTool ? null : 'bulldoze');
-  else if (e.key === 'Escape') setRoadTool(null);
+  if (e.key === 'r' || e.key === 'R') setTool(roadTool === 'straight' ? null : 'straight');
+  else if (e.key === 'v' || e.key === 'V') setTool(roadTool === 'curve' ? null : 'curve');
+  else if (e.key === 'b' || e.key === 'B') setTool(bulldozeTool ? null : 'bulldoze');
+  else if (e.key === 'z' || e.key === 'Z') zoneKey(Zone.ResidentialLow, Zone.ResidentialHigh);
+  else if (e.key === 'x' || e.key === 'X') zoneKey(Zone.CommercialLow, Zone.CommercialHigh);
+  else if (e.key === 'c' || e.key === 'C') zoneKey(Zone.IndustrialLow, Zone.IndustrialHigh);
+  else if (e.key === 'u' || e.key === 'U') setZone(Zone.None);
+  else if (e.key === 'Escape') setTool(null);
   else if (e.key === ' ') setSpeed(speed === 0 ? 1 : 0);
   else if (e.key === '1') setSpeed(1);
   else if (e.key === '2') setSpeed(3);
@@ -252,7 +307,11 @@ function frame() {
       `driving    ${fmt(stats.driving)}   parked ${fmt(stats.parked)}\n` +
       `trips      ${fmt(stats.tripsCompleted)}\n` +
       `stuck      ${fmt(stats.despawnedStuck)}   no path ${fmt(stats.pathsFailed)}\n` +
-      `road edits ${fmt(stats.despawnedByEdit)} cars removed\n`;
+      `road edits ${fmt(stats.despawnedByEdit)} cars removed\n` +
+      (zone !== null
+        ? `\nZONE: ${ZONE_NAMES[zone]}. Drag a rectangle to paint, Esc to stop` +
+          `\n(Z/X/C pick a zone, press again for the other density; U unzones)`
+        : '');
   }
   requestAnimationFrame(frame);
 }
