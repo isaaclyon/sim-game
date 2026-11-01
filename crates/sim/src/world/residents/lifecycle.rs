@@ -73,6 +73,7 @@ impl World {
     pub(in crate::world) fn release_job(&mut self, c: CitizenId) {
         if let Some(job) = self.citizens.job[c as usize].take() {
             self.residents.workers[job as usize] -= 1;
+            self.residents.employed -= 1;
         }
     }
 

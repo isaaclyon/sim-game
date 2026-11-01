@@ -80,6 +80,10 @@ export interface Stats {
   secondOfDay: number;
   /** Resident individuals, including people at home/work/shop. Not a vehicle count. */
   population: number;
+  /** Residents without an assigned job, from the sim. A disconnected job still counts. */
+  unemployed: number;
+  /** Sim-computed `unemployed` as a percentage of `population`; 0 with no residents. */
+  unemploymentPercent: number;
   /** Allocated vehicle slots, including dormant reservations and departed citizens' slots. */
   agents: number;
   /** Synthetic vehicles waiting between trips; not residents at home or dormant slots. */

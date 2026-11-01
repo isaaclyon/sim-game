@@ -77,6 +77,8 @@ function readStats(s: Sim): Stats {
     secondOfDay: st.second_of_day,
     agents: st.agents,
     population: st.population,
+    unemployed: st.unemployed,
+    unemploymentPercent: st.unemployment_percent,
     parked: st.parked,
     awaitingPath: st.awaiting_path,
     entering: st.entering,

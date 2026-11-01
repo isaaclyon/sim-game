@@ -3,6 +3,7 @@ use crate::citizen::Activity;
 use crate::{Command, Config, Zone};
 
 mod allocation;
+mod employment;
 mod occupancy;
 mod schedules;
 mod trips;
@@ -36,6 +37,15 @@ fn isolate(w: &mut World) {
         w.citizens.activity[i] = Activity::Home;
     }
     w.residents.activities.clear();
+}
+/// Replace a citizen's job the way assignment does, keeping every counter consistent.
+fn assign_job(w: &mut World, c: u32, b: u32) {
+    w.release_job(c);
+    w.citizens.job[c as usize] = Some(b);
+    w.residents.workers[b as usize] += 1;
+    w.residents.employed += 1;
+    let assigned = w.citizens.job.iter().filter(|j| j.is_some()).count() as u32;
+    assert_eq!(w.residents.employed, assigned);
 }
 fn journey(w: &mut World, c: u32, b: u32, activity: Activity) {
     w.citizens.destination[c as usize] = Some(b);

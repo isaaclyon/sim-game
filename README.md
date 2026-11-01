@@ -49,6 +49,9 @@ Demand and gradual redevelopment come in later issues.
 
 Normal play starts with no cars. Completed homes receive households gradually, even without
 jobs. The population counter counts residents, including people who are not travelling.
+Next to it, the HUD shows how many residents have no job and what share of the population
+that is (0% when nobody lives in town). A job at a workplace that is temporarily cut off by
+road edits still counts as a job.
 Houses hold one household of 1–7 adults; apartments provide several separate homes. Home
 capacity scales with usable floor area, while household size uses a weighted distribution
 that keeps small households common. [ADR 0021](docs/adrs/0021-citizens-households-and-trips.md)

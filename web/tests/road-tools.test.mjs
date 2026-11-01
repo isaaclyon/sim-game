@@ -4,30 +4,38 @@ import test from 'node:test';
 import { RoadClass, Zone } from '../src/protocol.ts';
 import { tools } from './main-harness.mjs';
 
-test('normal startup has no synthetic traffic and HUD displays authoritative population', async () => {
+test('normal startup has no synthetic traffic and HUD displays authoritative population and unemployment', async () => {
   const t = await tools();
   assert.equal(t.messages[0].type, 'init');
   assert.equal(t.messages[0].agents, 0);
-  t.reply({
-    type: 'frame',
-    agents: new Float32Array(),
-    signals: new Float32Array(),
-    tickMs: 0,
-    stats: {
-      day: 1,
-      secondOfDay: 21600,
-      population: 1234,
-      agents: 9,
-      parked: 0,
-      driving: 2,
-      tripsCompleted: 0,
-      despawnedStuck: 0,
-      pathsFailed: 0,
-      despawnedByEdit: 0,
-    },
-  });
-  t.frame();
-  assert.match(t.elements.hud.textContent, /population 1,234/);
+  const stats = {
+    day: 1,
+    secondOfDay: 21600,
+    population: 1234,
+    unemployed: 56,
+    unemploymentPercent: 4.538087,
+    agents: 9,
+    parked: 0,
+    driving: 2,
+    tripsCompleted: 0,
+    despawnedStuck: 0,
+    pathsFailed: 0,
+    despawnedByEdit: 0,
+  };
+  const show = (changes) => {
+    t.reply({
+      type: 'frame',
+      agents: new Float32Array(),
+      signals: new Float32Array(),
+      tickMs: 0,
+      stats: { ...stats, ...changes },
+    });
+    t.frame();
+  };
+  show({});
+  assert.match(t.elements.hud.textContent, /population 1,234 {3}unemployed 56 \(4\.5%\)/);
+  show({ population: 0, unemployed: 0, unemploymentPercent: 0 });
+  assert.match(t.elements.hud.textContent, /population 0 {3}unemployed 0 \(0\.0%\)/);
   assert.match(
     t.elements.hud.textContent,
     /WASD or drag pans, Q\/E turns/,

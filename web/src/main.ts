@@ -430,7 +430,7 @@ function frame() {
     hud.textContent =
       `Day ${stats.day}   ${hh}:${mm}   ${speed === 0 ? 'paused' : `${speed}×`}\n` +
       `fps        ${fps.toFixed(0)}   tick ${tickMs.toFixed(2)} ms\n` +
-      `population ${fmt(stats.population)}\n` +
+      `population ${fmt(stats.population)}   unemployed ${fmt(stats.unemployed)} (${stats.unemploymentPercent.toFixed(1)}%)\n` +
       `driving    ${fmt(stats.driving)}   parked ${fmt(stats.parked)}\n` +
       `trips      ${fmt(stats.tripsCompleted)}\n` +
       `stuck      ${fmt(stats.despawnedStuck)}   no path ${fmt(stats.pathsFailed)}\n` +
