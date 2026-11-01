@@ -4,7 +4,7 @@ import { stripTypeScriptTypes } from 'node:module';
 import test from 'node:test';
 import { createContext, SourceTextModule, SyntheticModule } from 'node:vm';
 
-import { Zone } from '../src/protocol.ts';
+import { RoadClass, Zone } from '../src/protocol.ts';
 
 // Exercise main.ts's event handlers without a WebGL context or a running clock.
 async function tools() {
@@ -25,7 +25,10 @@ async function tools() {
     };
   }
   const elements = Object.fromEntries(
-    ['hud', 'spawn', 'road', 'curve', 'bulldoze', 'road-help'].map((id) => [id, element()]),
+    ['hud', 'spawn', 'road', 'curve', 'main-road', 'bulldoze', 'road-help'].map((id) => [
+      id,
+      element(),
+    ]),
   );
   const zoneButtons = Object.values(Zone).map((zone) => ({
     ...element(),
@@ -100,8 +103,9 @@ async function tools() {
   await module.link((specifier) =>
     specifier === './protocol'
       ? new SyntheticModule(
-          ['Zone'],
+          ['RoadClass', 'Zone'],
           function () {
+            this.setExport('RoadClass', RoadClass);
             this.setExport('Zone', Zone);
           },
           { context },
@@ -294,4 +298,28 @@ test('refused curves retain their control, successful curves chain, and late bui
   assert.equal(t.messages.at(-1).type, 'previewBulldoze');
   t.click(350, 50, 2);
   assert.equal(t.elements.bulldoze.attributes['aria-pressed'], 'false');
+});
+
+test('M builds main roads with either road tool until switched off', async () => {
+  const t = await tools();
+  t.key('m');
+  assert.equal(t.elements['main-road'].attributes['aria-pressed'], 'true');
+  assert.equal(t.elements.road.attributes['aria-pressed'], 'true', 'picks the road tool');
+  assert.match(t.elements['road-help'].textContent, /Main road/);
+  t.click(0, 0);
+  t.click(100, 0);
+  const straight = t.messages.at(-1);
+  assert.equal(straight.type, 'buildRoad');
+  assert.equal(straight.class, RoadClass.Main);
+  t.key('v');
+  t.click(0, 0);
+  t.click(50, 50);
+  t.click(100, 0);
+  assert.equal(t.messages.at(-1).class, RoadClass.Main, 'kept across road tools');
+  t.elements['main-road'].onclick();
+  assert.equal(t.elements['main-road'].attributes['aria-pressed'], 'false');
+  t.key('r');
+  t.click(0, 0);
+  t.click(100, 0);
+  assert.equal(t.messages.at(-1).class, RoadClass.Street);
 });

@@ -1,4 +1,4 @@
-//! Polygon operations for lots (ADR 0017).
+//! Polygon operations for lots (ADR 0018).
 //!
 //! Points are snapped to a fixed grid of 1/256 m in whole numbers before any operation, so
 //! results are exact, shared edges match bit for bit and every machine gets the same answer.

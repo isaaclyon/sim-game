@@ -1,5 +1,5 @@
 use sim::rng::Rng;
-use sim::road::{RoadNetwork, STREET_SPEED};
+use sim::road::{RoadClass, RoadNetwork};
 use sim::{Command, Config, World};
 
 fn empty() -> World {
@@ -13,6 +13,7 @@ fn curve() -> Command {
         cy: 100.0,
         bx: 200.0,
         by: 0.0,
+        class: RoadClass::Street,
     }
 }
 fn close(a: (f32, f32), b: (f32, f32)) {
@@ -59,7 +60,8 @@ fn curves_after_deleted_slots_still_render_snap_and_split() {
         ax: -500.0,
         ay: -500.0,
         bx: -300.0,
-        by: -500.0
+        by: -500.0,
+        class: RoadClass::Street
     }));
     assert!(w.apply(curve()));
     assert!(w.apply(Command::DeleteRoad {
@@ -83,7 +85,8 @@ fn curves_after_deleted_slots_still_render_snap_and_split() {
         ax: 100.0,
         ay: -100.0,
         bx: 100.0,
-        by: 50.0
+        by: 50.0,
+        class: RoadClass::Street
     }));
     let n = w.roads.nearest_node(100.0, 50.0, 0.02).unwrap();
     assert_eq!(w.roads.out_lanes(n).len(), 3);
@@ -106,7 +109,8 @@ fn extending_a_rebuilt_road_follows_the_active_curve() {
         cx: 100.0,
         cy: -100.0,
         bx: 200.0,
-        by: 0.0
+        by: 0.0,
+        class: RoadClass::Street
     }));
     let mut preview = Vec::new();
     w.write_road_preview(0.0, 0.0, 300.0, 0.0, &mut preview);
@@ -117,7 +121,8 @@ fn extending_a_rebuilt_road_follows_the_active_curve() {
         ax: 0.0,
         ay: 0.0,
         bx: 300.0,
-        by: 0.0
+        by: 0.0,
+        class: RoadClass::Street
     }));
     assert_eq!(w.roads.road_count(), 2);
 }
@@ -141,6 +146,7 @@ fn painted_zones_survive_curve_builds_splits_and_deletion() {
         ay: -100.0,
         bx: 100.0,
         by: 100.0,
+        class: RoadClass::Street
     }));
     assert!(w.apply(Command::DeleteRoad { x: 50.0, y: 37.5 }));
     assert_eq!(w.zones.cells, cells);
@@ -153,7 +159,7 @@ fn curve_queries_use_distance_tangents_and_reverse_lanes() {
     let mut net = RoadNetwork::default();
     let a = net.add_node(0.0, 0.0);
     let b = net.add_node(200.0, 0.0);
-    assert!(net.add_curve(a, b, (100.0, 100.0), STREET_SPEED));
+    assert!(net.add_curve(a, b, (100.0, 100.0), RoadClass::Street));
     let len = net.lane_len[0];
     assert!((len - 229.5587).abs() < 0.02);
     close(net.lane_point(0, len / 2.0, 0.0), (100.0, 50.0));
@@ -200,7 +206,8 @@ fn crossing_and_t_junction_preserve_curve_shape() {
             ax: 100.0,
             ay: -100.0,
             bx: 100.0,
-            by: end
+            by: end,
+            class: RoadClass::Street
         }));
         let n = w.roads.nearest_node(100.0, 50.0, 0.02).unwrap();
         assert_eq!(w.roads.out_lanes(n).len(), if end == 50.0 { 3 } else { 4 });
@@ -217,7 +224,8 @@ fn curve_crosses_existing_straight_road() {
         ax: 100.0,
         ay: -100.0,
         bx: 100.0,
-        by: 100.0
+        by: 100.0,
+        class: RoadClass::Street
     }));
     assert!(w.apply(curve()));
     let n = w.roads.nearest_node(100.0, 50.0, 0.02).unwrap();
@@ -247,7 +255,8 @@ fn curves_cross_each_other_and_preview_marks_only_real_junctions() {
         cx: 200.0,
         cy: 0.0,
         bx: 100.0,
-        by: 100.0
+        by: 100.0,
+        class: RoadClass::Street
     }));
     assert_eq!(w.roads.road_count(), 4);
     let split = preview
@@ -267,8 +276,8 @@ fn curve_junction_turns_use_local_endpoint_tangents() {
     let a = net.add_node(0.0, 0.0);
     let b = net.add_node(200.0, 0.0);
     let c = net.add_node(300.0, -100.0);
-    net.add_curve(a, b, (100.0, 100.0), STREET_SPEED);
-    net.add_curve(b, c, (250.0, -50.0), STREET_SPEED);
+    net.add_curve(a, b, (100.0, 100.0), RoadClass::Street);
+    net.add_curve(b, c, (250.0, -50.0), RoadClass::Street);
     net.rebuild_adjacency();
     let mut junctions = Junctions::default();
     junctions.sync(&net);
@@ -304,7 +313,8 @@ fn curve_traffic_replays_and_survives_a_split() {
             ax: 100.0,
             ay: -100.0,
             bx: 100.0,
-            by: 100.0
+            by: 100.0,
+            class: RoadClass::Street
         }));
         assert!(w.stats().despawned_by_edit > 0);
         for _ in 0..3000 {
@@ -322,9 +332,9 @@ fn routes_use_curve_length_and_bounds_include_the_bend() {
     let a = net.add_node(0.0, 0.0);
     let b = net.add_node(200.0, 0.0);
     let c = net.add_node(100.0, -100.0);
-    net.add_curve(a, b, (100.0, 500.0), STREET_SPEED);
-    net.add_road(a, c, STREET_SPEED);
-    net.add_road(c, b, STREET_SPEED);
+    net.add_curve(a, b, (100.0, 500.0), RoadClass::Street);
+    net.add_road(a, c, RoadClass::Street);
+    net.add_road(c, b, RoadClass::Street);
     net.rebuild_adjacency();
     let mut path = Vec::new();
     assert!(sim::path::Pathfinder::default().find(&net, &[], a, b, &mut path));
@@ -337,7 +347,7 @@ fn nonuniform_parameter_does_not_change_distance_travelled() {
     let mut net = RoadNetwork::default();
     let a = net.add_node(0.0, 0.0);
     let b = net.add_node(200.0, 0.0);
-    net.add_curve(a, b, (10.0, 0.0), STREET_SPEED);
+    net.add_curve(a, b, (10.0, 0.0), RoadClass::Street);
     for d in 0..=200 {
         close(net.lane_point(0, d as f32, 2.0), (d as f32, -2.0));
     }
@@ -351,6 +361,7 @@ fn curve_cannot_join_then_recross_the_same_road() {
         ay: 0.0,
         bx: 300.0,
         by: 0.0,
+        class: RoadClass::Street,
     });
     let before = w.roads.version;
     assert!(!w.apply(Command::BuildCurve {
@@ -359,7 +370,8 @@ fn curve_cannot_join_then_recross_the_same_road() {
         cx: 100.0,
         cy: 100.0,
         bx: 200.0,
-        by: -100.0
+        by: -100.0,
+        class: RoadClass::Street
     }));
     assert_eq!(w.roads.version, before);
 }
@@ -376,14 +388,16 @@ fn a_second_connection_to_the_same_curve_cannot_silently_lose_its_crossing() {
             cx: 100.0,
             cy: 200.0,
             bx: 200.0,
-            by: 0.0
+            by: 0.0,
+            class: RoadClass::Street
         }));
         let version = w.roads.version;
         assert!(!w.apply(Command::BuildRoad {
             ax: 0.0,
             ay: 0.0,
             bx,
-            by
+            by,
+            class: RoadClass::Street
         }));
         assert_eq!(w.roads.version, version);
     }
@@ -400,7 +414,8 @@ fn curve_t_junctions_work_far_from_the_origin() {
                 cx: offset + 100.0,
                 cy: offset + 100.0,
                 bx: offset + 200.0,
-                by: offset
+                by: offset,
+                class: RoadClass::Street
             }));
             let len = w.roads.lane_len[0];
             let p = w.roads.lane_point(0, len * k as f32 / 20.0, 0.0);
@@ -409,7 +424,8 @@ fn curve_t_junctions_work_far_from_the_origin() {
                     ax: p.0,
                     ay: p.1 - 100.0,
                     bx: p.0,
-                    by: p.1
+                    by: p.1,
+                    class: RoadClass::Street
                 }),
                 "offset {offset}, step {k}"
             );
@@ -426,7 +442,8 @@ fn short_t_junctions_on_large_city_coordinates_are_not_duplicate_crossings() {
         ax: 10000.0,
         ay: 10000.0,
         bx: 10000.0 + 400.0 * x,
-        by: 10000.0 + 400.0 * y
+        by: 10000.0 + 400.0 * y,
+        class: RoadClass::Street
     }));
     let (sx, sy) = (10000.0 + 177.7 * x, 10000.0 + 177.7 * y);
     for command in [
@@ -435,12 +452,14 @@ fn short_t_junctions_on_large_city_coordinates_are_not_duplicate_crossings() {
             ay: sy,
             bx: sx - 25.0 * y,
             by: sy + 25.0 * x,
+            class: RoadClass::Street,
         },
         Command::BuildRoad {
             bx: sx,
             by: sy,
             ax: sx - 25.0 * y,
             ay: sy + 25.0 * x,
+            class: RoadClass::Street,
         },
         Command::BuildCurve {
             ax: sx,
@@ -449,6 +468,7 @@ fn short_t_junctions_on_large_city_coordinates_are_not_duplicate_crossings() {
             cy: sy + 12.0 * x + 5.0 * y,
             bx: sx - 25.0 * y,
             by: sy + 25.0 * x,
+            class: RoadClass::Street,
         },
     ] {
         let mut copy = World::new(Config::default(), w.roads.clone(), Rng::new(1));
@@ -467,7 +487,8 @@ fn refused_curves_are_atomic() {
             cx: c,
             cy: 50.0,
             bx: 200.0,
-            by: 0.0
+            by: 0.0,
+            class: RoadClass::Street
         }));
     }
     assert!(!w.apply(Command::BuildCurve {
@@ -476,7 +497,8 @@ fn refused_curves_are_atomic() {
         cx: 100.0,
         cy: 0.0,
         bx: 0.0,
-        by: 0.0
+        by: 0.0,
+        class: RoadClass::Street
     }));
     assert_eq!(w.roads.node_count(), 0);
     assert!(w.apply(curve()));

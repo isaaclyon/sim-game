@@ -1,6 +1,6 @@
 # 0016. Blocks, lots and alleys
 
-- Status: Accepted; lot shape, lot zone and lot snapshot superseded by [0017](0017-lots-cut-along-roads.md)
+- Status: Accepted; lot shape, lot zone and lot snapshot superseded by [0018](0018-lots-cut-along-roads.md)
 - Date: 2026-11-02
 
 ## Context

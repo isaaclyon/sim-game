@@ -5,7 +5,15 @@ export type ToWorker =
   | { type: 'init'; seed: number; cols: number; rows: number; agents: number }
   | { type: 'setSpeed'; speed: number }
   | { type: 'spawn'; count: number }
-  | { type: 'buildRoad'; id: number; ax: number; ay: number; bx: number; by: number }
+  | {
+      type: 'buildRoad';
+      id: number;
+      ax: number;
+      ay: number;
+      bx: number;
+      by: number;
+      class: RoadClass;
+    }
   | {
       type: 'buildCurve';
       id: number;
@@ -15,6 +23,7 @@ export type ToWorker =
       cy: number;
       bx: number;
       by: number;
+      class: RoadClass;
     }
   | { type: 'deleteRoad'; x: number; y: number }
   /**
@@ -41,6 +50,15 @@ export type ToWorker =
     }
   /** Asks where a road started here would start. Answered with a one-stop `roadPreview`. */
   | { type: 'previewSnap'; revision: number; x: number; y: number };
+
+/** Road classes, matching the sim's `RoadClass` (ADR 0017). Main roads carry long
+ * trips; the sim lays alleys to reach deep lots. */
+export const RoadClass = {
+  Street: 0,
+  Main: 1,
+  Alley: 2,
+} as const;
+export type RoadClass = (typeof RoadClass)[keyof typeof RoadClass];
 
 /** Zone cell values, matching the sim's `Zone` (ADR 0014). Density is part of the zone. */
 export const Zone = {
@@ -69,7 +87,10 @@ export interface Stats {
 }
 
 export type FromWorker =
-  /** `segments` is `[ax, ay, bx, by, speedLimit]` per active rendered segment (many per curve), not per road ID. */
+  /**
+   * `segments` is `[ax, ay, bx, by, class]` per active rendered segment (many per curve), not
+   * per road ID. `class` is a `RoadClass`.
+   */
   | { type: 'roads'; segments: Float32Array; bounds: [number, number, number, number] }
   /**
    * `stops` is `[x, y, join]` per stop of the previewed road, in order; join is 0 = new end,
@@ -86,7 +107,7 @@ export type FromWorker =
   | { type: 'zones'; cells: Uint8Array; layout: [number, number, number, number, number] }
   /**
    * `rings` is `[n, x0, y0, …, x(n-1), y(n-1)]` per lot: its outline's point count, then its
-   * points (ADR 0017). Sent at start and whenever lots change.
+   * points (ADR 0018). Sent at start and whenever lots change.
    */
   | { type: 'lots'; rings: Float32Array }
   /** `[x, y]` per outline sample of the block under the cursor, closed; empty outside blocks. */

@@ -5,7 +5,7 @@ use std::collections::BTreeSet;
 use sim::block::{LOT_REACH, MIN_LOT_AREA, ROAD_HALF_WIDTH};
 use sim::lot::LotId;
 use sim::rng::Rng;
-use sim::road::{ALLEY_SPEED, RoadNetwork};
+use sim::road::{ALLEY_SPEED, RoadClass, RoadNetwork};
 use sim::{Command, Config, World, Zone};
 
 fn empty() -> World {
@@ -13,7 +13,13 @@ fn empty() -> World {
 }
 
 fn road(w: &mut World, ax: f32, ay: f32, bx: f32, by: f32) {
-    assert!(w.apply(Command::BuildRoad { ax, ay, bx, by }));
+    assert!(w.apply(Command::BuildRoad {
+        ax,
+        ay,
+        bx,
+        by,
+        class: RoadClass::Street
+    }));
 }
 
 /// A closed rectangle of four roads.
@@ -266,6 +272,7 @@ fn fill_follows_curved_edges() {
         cy: 200.0,
         bx: 100.0,
         by: 100.0,
+        class: RoadClass::Street
     }));
     assert!(fill(&mut w, 50.0, 130.0, Zone::ResidentialHigh));
     let zone = |x, y| w.zones.zone_at(x, y);
@@ -642,6 +649,7 @@ fn lots_from_facing_roads_meet_on_one_line_without_slivers() {
         cy: -60.0,
         bx: 440.0,
         by: 20.0,
+        class: RoadClass::Street,
     }));
     assert!(fill(&mut w, 50.0, 50.0, Zone::ResidentialLow));
     assert!(fill(&mut w, 320.0, 60.0, Zone::ResidentialLow));

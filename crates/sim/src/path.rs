@@ -1,13 +1,18 @@
 //! A* over the lane graph. Cost is free-flow travel time plus a per-lane congestion delay, so
-//! routes prefer fast avenues until they back up.
+//! routes prefer fast main roads until they back up. Long trips search only main roads in
+//! their middle (ADR 0017).
 
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 
-use crate::road::{AVENUE_SPEED, LaneId, NodeId, RoadNetwork};
+use crate::road::{LaneId, MAIN_SPEED, NodeId, RoadClass, RoadNetwork};
 
 /// Weighted A*: routes cost at most this much more than optimal.
 const HEURISTIC_WEIGHT: f32 = 1.5;
+/// Straight-line distance from a trip's start or end within which it may use local streets.
+/// Farther from both, the search follows main roads only, the way a driver heads for the
+/// nearest main road, rides it, and leaves it near the destination (ADR 0017).
+pub const MAIN_ROAD_REACH: f32 = 500.0;
 
 /// Reusable search state. Buffers persist between searches and a generation stamp marks
 /// which entries are current, so a search never pays to clear per-node arrays.
@@ -55,6 +60,10 @@ impl PartialOrd for Open {
 impl Pathfinder {
     /// Writes the lanes from `from` to `to` into `out`. Returns false if `to` is unreachable.
     /// `delay` is extra seconds per lane (congestion); lanes past its end cost nothing extra.
+    ///
+    /// Farther than `MAIN_ROAD_REACH` from both ends, only main roads are searched. If that
+    /// finds no route (no main road near an end, or none linking them), the search runs again
+    /// over every road, so a reachable destination is always found.
     pub fn find(
         &mut self,
         net: &RoadNetwork,
@@ -63,20 +72,42 @@ impl Pathfinder {
         to: NodeId,
         out: &mut Vec<LaneId>,
     ) -> bool {
+        self.last_expanded = 0;
+        (net.has_main_roads() && self.search(net, delay, from, to, MAIN_ROAD_REACH, out))
+            || self.search(net, delay, from, to, f32::INFINITY, out)
+    }
+
+    /// A* from `from` to `to` that leaves nodes farther than `reach` from both ends only by
+    /// main roads. Adds its expanded nodes to `last_expanded`.
+    fn search(
+        &mut self,
+        net: &RoadNetwork,
+        delay: &[f32],
+        from: NodeId,
+        to: NodeId,
+        reach: f32,
+        out: &mut Vec<LaneId>,
+    ) -> bool {
         out.clear();
         self.begin(net.node_count());
 
+        let (fx, fy) = (net.node_x[from as usize], net.node_y[from as usize]);
         let (tx, ty) = (net.node_x[to as usize], net.node_y[to as usize]);
         // Straight-line distance at the fastest speed limit never overestimates (delays are never
         // negative). Inflating it trades up to HEURISTIC_WEIGHT× route cost for far fewer
         // expansions, which matters once congestion delays make the plain bound loose.
         let h = |node: NodeId| {
             let i = node as usize;
-            (net.node_x[i] - tx).hypot(net.node_y[i] - ty) / AVENUE_SPEED * HEURISTIC_WEIGHT
+            (net.node_x[i] - tx).hypot(net.node_y[i] - ty) / MAIN_SPEED * HEURISTIC_WEIGHT
+        };
+        let reach2 = reach * reach;
+        let local = |node: NodeId| {
+            let (x, y) = (net.node_x[node as usize], net.node_y[node as usize]);
+            let d2 = |px: f32, py: f32| (x - px) * (x - px) + (y - py) * (y - py);
+            d2(fx, fy) <= reach2 || d2(tx, ty) <= reach2
         };
 
         self.open.clear();
-        self.last_expanded = 0;
         self.visit(from, 0.0, LaneId::MAX);
         self.open.push(Open {
             f: h(from),
@@ -99,7 +130,11 @@ impl Pathfinder {
                 continue; // stale heap entry; a cheaper route to this node was found later
             }
             self.last_expanded += 1;
+            let main_only = !local(node);
             for &lane in net.out_lanes(node) {
+                if main_only && net.lane_class(lane) != RoadClass::Main {
+                    continue;
+                }
                 let l = lane as usize;
                 let next = net.lane_to[l];
                 let ng = g + net.lane_len[l] / net.lane_speed[l] + delay.get(l).unwrap_or(&0.0);
@@ -143,7 +178,7 @@ impl Pathfinder {
         // Never overestimates the cost of reaching the trip's end, rejoin or not.
         let h = |node: NodeId| {
             let i = node as usize;
-            (net.node_x[i] - tx).hypot(net.node_y[i] - ty) / AVENUE_SPEED
+            (net.node_x[i] - tx).hypot(net.node_y[i] - ty) / MAIN_SPEED
         };
         let cost = |l: usize| net.lane_len[l] / net.lane_speed[l] + delay.get(l).unwrap_or(&0.0);
         self.begin(net.node_count());
@@ -244,20 +279,19 @@ impl Pathfinder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::road::STREET_SPEED;
 
     #[test]
     fn prefers_faster_route() {
-        // 0 ── 1 ── 2 on slow streets, plus a longer but faster detour 0 ── 3 ── 2.
+        // 0 ── 1 ── 2 on streets, plus a longer but faster main road 0 ── 3 ── 2.
         let mut net = RoadNetwork::default();
         let n0 = net.add_node(0.0, 0.0);
         let n1 = net.add_node(100.0, 0.0);
         let n2 = net.add_node(200.0, 0.0);
         let n3 = net.add_node(100.0, 40.0);
-        net.add_road(n0, n1, STREET_SPEED / 2.0);
-        net.add_road(n1, n2, STREET_SPEED / 2.0);
-        net.add_road(n0, n3, AVENUE_SPEED);
-        net.add_road(n3, n2, AVENUE_SPEED);
+        net.add_road(n0, n1, RoadClass::Street);
+        net.add_road(n1, n2, RoadClass::Street);
+        net.add_road(n0, n3, RoadClass::Main);
+        net.add_road(n3, n2, RoadClass::Main);
         net.rebuild_adjacency();
 
         let mut pf = Pathfinder::default();
@@ -273,10 +307,90 @@ mod tests {
         let a = net.add_node(0.0, 0.0);
         let b = net.add_node(10.0, 0.0);
         let c = net.add_node(50.0, 0.0);
-        net.add_road(a, b, STREET_SPEED);
+        net.add_road(a, b, RoadClass::Street);
         net.rebuild_adjacency();
         let mut path = Vec::new();
         assert!(!Pathfinder::default().find(&net, &[], a, c, &mut path));
+    }
+
+    /// Street grid 100 m apart, `cols` wide and `rows` high, with row `main_row` (if any) a
+    /// main road. Node id is `row * cols + col`.
+    fn town(cols: u32, rows: u32, main_row: Option<u32>) -> RoadNetwork {
+        let mut net = RoadNetwork::default();
+        for r in 0..rows {
+            for c in 0..cols {
+                net.add_node(c as f32 * 100.0, r as f32 * 100.0);
+            }
+        }
+        for r in 0..rows {
+            for c in 0..cols {
+                let n = r * cols + c;
+                if c + 1 < cols {
+                    let class = if main_row == Some(r) {
+                        RoadClass::Main
+                    } else {
+                        RoadClass::Street
+                    };
+                    net.add_road(n, n + 1, class);
+                }
+                if r + 1 < rows {
+                    net.add_road(n, n + cols, RoadClass::Street);
+                }
+            }
+        }
+        net.rebuild_adjacency();
+        net
+    }
+
+    fn classes(net: &RoadNetwork, path: &[LaneId]) -> Vec<RoadClass> {
+        path.iter().map(|&l| net.lane_class(l)).collect()
+    }
+
+    #[test]
+    fn long_trips_ride_the_main_road() {
+        // 2 km along the bottom row. Straight on by street is quicker in free-flow time than
+        // the main road 400 m away, but drivers on long trips head for the main road anyway.
+        let net = town(21, 5, Some(4));
+        let mut pf = Pathfinder::default();
+        let mut path = Vec::new();
+        assert!(pf.find(&net, &[], 0, 20, &mut path));
+        let cls = classes(&net, &path);
+        assert_eq!(cls[0], RoadClass::Street, "a local street to reach it");
+        assert_eq!(
+            *cls.last().unwrap(),
+            RoadClass::Street,
+            "leaves it near the end"
+        );
+        let on_main = cls.iter().filter(|&&c| c == RoadClass::Main).count();
+        assert!(on_main >= 10, "rides it for the middle: {cls:?}");
+        // Off the main road only near either end of the trip.
+        let (start, end) = (0.0, 2000.0);
+        for &lane in &path {
+            let n = net.lane_from[lane as usize] as usize;
+            let x = net.node_x[n];
+            let near = (x - start).abs() <= MAIN_ROAD_REACH || (x - end).abs() <= MAIN_ROAD_REACH;
+            assert!(near || net.lane_class(lane) == RoadClass::Main, "{x} m");
+        }
+    }
+
+    #[test]
+    fn short_trips_stay_on_local_streets() {
+        let net = town(21, 5, Some(4));
+        let mut path = Vec::new();
+        assert!(Pathfinder::default().find(&net, &[], 0, 4, &mut path));
+        assert_eq!(path.len(), 4);
+        assert!(classes(&net, &path).iter().all(|&c| c == RoadClass::Street));
+    }
+
+    #[test]
+    fn trips_far_from_any_main_road_still_find_a_route() {
+        // The main road is 1.2 km away, out of reach of both ends, so the main-road search
+        // fails and the trip falls back to streets.
+        let net = town(21, 13, Some(12));
+        let mut path = Vec::new();
+        assert!(Pathfinder::default().find(&net, &[], 0, 20, &mut path));
+        assert_eq!(path.len(), 20);
+        assert!(classes(&net, &path).iter().all(|&c| c == RoadClass::Street));
     }
 
     /// 3x3 street grid, 100 m apart. Node id is `row * 3 + col`.
@@ -291,10 +405,10 @@ mod tests {
             for c in 0..3 {
                 let n = r * 3 + c;
                 if c < 2 {
-                    net.add_road(n, n + 1, STREET_SPEED);
+                    net.add_road(n, n + 1, RoadClass::Street);
                 }
                 if r < 2 {
-                    net.add_road(n, n + 3, STREET_SPEED);
+                    net.add_road(n, n + 3, RoadClass::Street);
                 }
             }
         }

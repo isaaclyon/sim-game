@@ -27,7 +27,7 @@ use std::f32::consts::TAU;
 use std::time::Instant;
 
 use sim::rng::Rng;
-use sim::road::RoadNetwork;
+use sim::road::{RoadClass, RoadNetwork};
 use sim::{Command, Config, World, Zone};
 
 fn main() {
@@ -133,6 +133,10 @@ fn main() {
         "          trips {} | paths ok {} failed {} | stuck despawns {} | detours {}",
         s.trips_completed, s.paths_found, s.paths_failed, s.despawned_stuck, s.detours
     );
+    println!(
+        "routing   {:.0} nodes expanded per route search",
+        s.path_nodes_expanded as f64 / (s.paths_found + s.paths_failed).max(1) as f64
+    );
     if let Some(max) = max_despawns
         && s.despawned_stuck > max
     {
@@ -170,7 +174,13 @@ fn organic_town(cfg: Config) -> World {
         ring.push(points);
     }
     let mut build = |(ax, ay): (f32, f32), (bx, by): (f32, f32)| {
-        world.apply(Command::BuildRoad { ax, ay, bx, by });
+        world.apply(Command::BuildRoad {
+            ax,
+            ay,
+            bx,
+            by,
+            class: RoadClass::Street,
+        });
     };
     for r in 1..ring.len() {
         let n = ring[r].len();

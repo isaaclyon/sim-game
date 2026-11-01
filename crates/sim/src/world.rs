@@ -10,7 +10,7 @@ use crate::junction::{Junctions, Verdict};
 use crate::lot::Lots;
 use crate::path::Pathfinder;
 use crate::rng::Rng;
-use crate::road::{ALLEY_SPEED, LaneId, NodeId, RoadId, RoadNetwork, STREET_SPEED};
+use crate::road::{LaneId, NodeId, RoadClass, RoadId, RoadNetwork};
 use crate::snap::{self, Join};
 use crate::traffic::Traffic;
 use crate::zone::{Zone, ZoneGrid};
@@ -89,11 +89,13 @@ pub enum Command {
     SpawnAgents {
         count: u32,
     },
+    /// Builds a road of `class`. Where it follows an existing road, that road keeps its class.
     BuildRoad {
         ax: f32,
         ay: f32,
         bx: f32,
         by: f32,
+        class: RoadClass,
     },
     BuildCurve {
         ax: f32,
@@ -102,6 +104,7 @@ pub enum Command {
         cy: f32,
         bx: f32,
         by: f32,
+        class: RoadClass,
     },
     DeleteRoad {
         x: f32,
@@ -136,6 +139,8 @@ pub struct Stats {
     pub trips_completed: u64,
     pub paths_found: u64,
     pub paths_failed: u64,
+    /// Nodes expanded by trip route searches (not detours), a measure of routing cost.
+    pub path_nodes_expanded: u64,
     pub despawned_stuck: u64,
     /// Cars removed because a road on their remaining route was split or deleted.
     pub despawned_by_edit: u64,
@@ -207,11 +212,20 @@ impl World {
     pub fn apply(&mut self, cmd: Command) -> bool {
         match cmd {
             Command::SpawnAgents { count } => self.spawn_agents(count),
-            Command::BuildRoad { ax, ay, bx, by } => self.build_road(Shape {
-                a: (ax, ay),
-                b: (bx, by),
-                control: None,
-            }),
+            Command::BuildRoad {
+                ax,
+                ay,
+                bx,
+                by,
+                class,
+            } => self.build_road(
+                Shape {
+                    a: (ax, ay),
+                    b: (bx, by),
+                    control: None,
+                },
+                class,
+            ),
             Command::BuildCurve {
                 ax,
                 ay,
@@ -219,11 +233,15 @@ impl World {
                 cy,
                 bx,
                 by,
-            } => self.build_road(Shape {
-                a: (ax, ay),
-                b: (bx, by),
-                control: Some((cx, cy)),
-            }),
+                class,
+            } => self.build_road(
+                Shape {
+                    a: (ax, ay),
+                    b: (bx, by),
+                    control: Some((cx, cy)),
+                },
+                class,
+            ),
             Command::DeleteRoad { x, y } => self.delete_road(x, y),
             Command::PaintZone {
                 ax,
@@ -306,16 +324,16 @@ impl World {
         }
     }
 
-    /// Writes `[ax, ay, bx, by, speed_limit]` per active rendered segment (many per curve).
-    /// Packed in road ID order, not indexed by road ID.
+    /// Writes `[ax, ay, bx, by, class]` per active rendered segment (many per curve); class is
+    /// 0 = street, 1 = main road, 2 = alley. Packed in road ID order, not indexed by road ID.
     pub fn write_road_segments(&self, out: &mut Vec<f32>) {
         let r = &self.roads;
         out.clear();
         out.reserve(r.road_count() * 5);
         for road in r.active_roads() {
-            let lane = road as usize * 2;
+            let class = r.road_class(road) as u8 as f32;
             for (_, a, _, b) in r.shape(road).segments() {
-                out.extend([a.0, a.1, b.0, b.1, r.lane_speed[lane]]);
+                out.extend([a.0, a.1, b.0, b.1, class]);
             }
         }
     }
@@ -477,11 +495,11 @@ impl World {
         true
     }
 
-    /// Builds a street along `snap::plan_road`: joining nodes near its ends, and splitting the
-    /// roads it crosses or ends beside so they meet at a junction.
-    fn build_road(&mut self, shape: Shape) -> bool {
+    /// Builds a road of `class` along `snap::plan`: joining nodes near its ends, and splitting
+    /// the roads it crosses or ends beside so they meet at a junction.
+    fn build_road(&mut self, shape: Shape, class: RoadClass) -> bool {
         let mut split = Vec::new();
-        let Some(rect) = self.add_road(shape, STREET_SPEED, &mut split) else {
+        let Some(rect) = self.add_road(shape, class, &mut split) else {
             return false;
         };
         self.sync_roads();
@@ -492,7 +510,12 @@ impl World {
 
     /// Adds the roads `snap::plan` makes of `shape`, pushing the roads it splits onto `split`.
     /// Returns the area it changed. The caller syncs the network and removes affected cars.
-    fn add_road(&mut self, shape: Shape, speed: f32, split: &mut Vec<RoadId>) -> Option<Rect> {
+    fn add_road(
+        &mut self,
+        shape: Shape,
+        class: RoadClass,
+        split: &mut Vec<RoadId>,
+    ) -> Option<Rect> {
         let plan = snap::plan(&self.roads, shape)?;
         let nodes: Vec<NodeId> = plan
             .stops
@@ -514,7 +537,7 @@ impl World {
         for (leg, shape) in nodes.windows(2).zip(plan.legs) {
             rect = block::union(rect, block::shape_rect(shape));
             // False where the plan follows an existing road, which is kept as it is.
-            self.roads.add_shape(leg[0], leg[1], shape.control, speed);
+            self.roads.add_shape(leg[0], leg[1], shape.control, class);
         }
         Some(rect)
     }
@@ -612,8 +635,12 @@ impl World {
             cut.clear();
             for (br, options) in plans {
                 for (shape, alley) in options {
-                    let speed = if alley { ALLEY_SPEED } else { STREET_SPEED };
-                    if self.add_road(shape, speed, &mut split).is_some() {
+                    let class = if alley {
+                        RoadClass::Alley
+                    } else {
+                        RoadClass::Street
+                    };
+                    if self.add_road(shape, class, &mut split).is_some() {
                         if round == 0 {
                             divided.push(br);
                         }
@@ -633,7 +660,7 @@ impl World {
         (divided, split)
     }
 
-    /// Recuts lots in the blocks of `scope` (ADR 0016, ADR 0017). With `retire`, after a road
+    /// Recuts lots in the blocks of `scope` (ADR 0016, ADR 0018). With `retire`, after a road
     /// edit: lots there that no longer match are retired. Either way, new lots are added where
     /// at least half their cells are zoned and no lot holds them yet.
     fn update_lots(&mut self, scope: Scope, retire: bool) {
@@ -781,6 +808,7 @@ impl World {
                 .find(&self.roads, &self.lane_delay, from, to, &mut path)
                 && !path.is_empty();
             self.agents.path[a] = path;
+            self.totals.path_nodes_expanded += u64::from(self.pathfinder.last_expanded);
             if found {
                 self.totals.paths_found += 1;
                 self.agents.path_idx[a] = 0;
@@ -1033,7 +1061,7 @@ mod tests {
         let mut path = Vec::new();
         assert!(!Pathfinder::default().find(&world.roads, &[], 0, 1, &mut path));
         world.write_road_segments(&mut preview);
-        assert_eq!(preview, [0.0, 100.0, 100.0, 100.0, STREET_SPEED]);
+        assert_eq!(preview, [0.0, 100.0, 100.0, 100.0, 0.0]);
         // Deleted geometry neither blocks rebuilding nor gets split by a crossing.
         assert!(build(&mut world, 50.0, -100.0, 50.0, 50.0));
         assert_eq!(world.roads.road_count(), 2);
@@ -1043,7 +1071,7 @@ mod tests {
 
     #[test]
     fn bulldoze_parks_affected_routes_and_updates_signals_while_paused() {
-        let mut world = crossroads(crate::road::AVENUE_SPEED);
+        let mut world = crossroads(RoadClass::Main);
         let on_deleted = wait_at_line(&mut world, 1, 2, 0) as usize;
         let using_later = wait_at_line(&mut world, 3, 0, 0) as usize;
         let unaffected = wait_at_line(&mut world, 5, 6, 0) as usize;
@@ -1166,13 +1194,19 @@ mod tests {
         let mut net = RoadNetwork::default();
         for &(ax, ay, bx, by) in segments {
             let (a, b) = (net.add_node(ax, ay), net.add_node(bx, by));
-            net.add_road(a, b, STREET_SPEED);
+            net.add_road(a, b, RoadClass::Street);
         }
         World::new(Config::default(), net, Rng::new(1))
     }
 
     fn build(world: &mut World, ax: f32, ay: f32, bx: f32, by: f32) -> bool {
-        world.apply(Command::BuildRoad { ax, ay, bx, by })
+        world.apply(Command::BuildRoad {
+            ax,
+            ay,
+            bx,
+            by,
+            class: RoadClass::Street,
+        })
     }
 
     fn node_at(world: &World, x: f32, y: f32) -> NodeId {
@@ -1180,6 +1214,44 @@ mod tests {
             .roads
             .nearest_node(x, y, 0.5)
             .unwrap_or_else(|| panic!("no node at ({x}, {y})"))
+    }
+
+    #[test]
+    fn main_roads_keep_their_class_when_split() {
+        let mut world = roads(&[]);
+        assert!(world.apply(Command::BuildRoad {
+            ax: -100.0,
+            ay: 0.0,
+            bx: 100.0,
+            by: 0.0,
+            class: RoadClass::Main,
+        }));
+        assert!(build(&mut world, 0.0, -100.0, 0.0, 100.0));
+        let r = &world.roads;
+        let classes: Vec<_> = r.active_roads().map(|road| r.road_class(road)).collect();
+        assert_eq!(
+            classes,
+            [
+                RoadClass::Main,
+                RoadClass::Main,
+                RoadClass::Street,
+                RoadClass::Street
+            ]
+        );
+        assert_eq!(r.lane_speed[0], crate::road::MAIN_SPEED);
+        let mut segments = Vec::new();
+        world.write_road_segments(&mut segments);
+        let snapshot: Vec<f32> = segments.chunks(5).map(|s| s[4]).collect();
+        assert_eq!(snapshot, [1.0, 1.0, 0.0, 0.0], "class per segment");
+        // Following an existing road keeps it as it is.
+        assert!(!world.apply(Command::BuildRoad {
+            ax: -100.0,
+            ay: 0.0,
+            bx: 0.0,
+            by: 0.0,
+            class: RoadClass::Street,
+        }));
+        assert_eq!(world.roads.road_class(0), RoadClass::Main);
     }
 
     #[test]
@@ -1225,8 +1297,8 @@ mod tests {
             net.add_node(100.0, 0.0),
             net.add_node(60.0, 100.0),
         );
-        net.add_road(c, e, STREET_SPEED);
-        net.add_road(c, ne, STREET_SPEED);
+        net.add_road(c, e, RoadClass::Street);
+        net.add_road(c, ne, RoadClass::Street);
         let mut world = World::new(Config::default(), net, Rng::new(1));
         let mut out = Vec::new();
         world.write_road_preview(0.0, -50.0, 36.0, 100.0, &mut out);
@@ -1263,8 +1335,8 @@ mod tests {
             net.add_node(0.0, 0.0),
             net.add_node(200.0, 0.0),
         );
-        net.add_road(w, c, STREET_SPEED);
-        net.add_road(c, e, STREET_SPEED);
+        net.add_road(w, c, RoadClass::Street);
+        net.add_road(c, e, RoadClass::Street);
         let mut world = World::new(Config::default(), net, Rng::new(1));
         let drive = |world: &mut World, path: Vec<LaneId>| {
             let agent = world.agents.push(world.roads.lane_from[path[0] as usize]);
@@ -1369,17 +1441,13 @@ mod tests {
 
     /// A four-way junction at the origin with 100 m arms east, north, west and south. Arm `k`
     /// owns lane `2k` (out of the junction) and `2k + 1` (into it).
-    fn crossroads(ew_speed: f32) -> World {
+    fn crossroads(ew: RoadClass) -> World {
         let mut net = RoadNetwork::default();
         let centre = net.add_node(0.0, 0.0);
         for k in 0..4 {
             let angle = k as f32 * std::f32::consts::FRAC_PI_2;
             let arm = net.add_node(100.0 * angle.cos(), 100.0 * angle.sin());
-            net.add_road(
-                centre,
-                arm,
-                if k % 2 == 0 { ew_speed } else { STREET_SPEED },
-            );
+            net.add_road(centre, arm, if k % 2 == 0 { ew } else { RoadClass::Street });
         }
         World::new(Config::default(), net, Rng::new(1))
     }
@@ -1404,7 +1472,7 @@ mod tests {
         // the other had waited longer, and both sat until the stuck limit.
         const LONG: u16 = 300;
         let check = |cars: &[(LaneId, LaneId, u16)]| {
-            let mut world = crossroads(STREET_SPEED);
+            let mut world = crossroads(RoadClass::Street);
             for &(from, to, waited) in cars {
                 wait_at_line(&mut world, from, to, waited);
             }
@@ -1436,7 +1504,7 @@ mod tests {
 
     #[test]
     fn signal_turns_green_for_waiting_traffic() {
-        let mut world = crossroads(crate::road::AVENUE_SPEED);
+        let mut world = crossroads(RoadClass::Main);
         let mut signals = Vec::new();
         world.write_signal_snapshot(&mut signals);
         assert_eq!(signals.len(), 4 * SIGNAL_STRIDE);
@@ -1476,7 +1544,7 @@ mod tests {
         // Ten cars queued at an empty junction, all going straight on. Once the queue is moving,
         // nobody should stop again. Letting only the front car ask, and only once the car ahead
         // had left the junction, made every car stop at the line and start from rest.
-        let mut world = crossroads(STREET_SPEED);
+        let mut world = crossroads(RoadClass::Street);
         let (from, to) = (5, 0); // West arm in, east arm out.
         let cars: Vec<_> = (0..10)
             .map(|k| {

@@ -1,4 +1,4 @@
-# 0017. Lots are shapes cut along roads; buildings take their shape from lots
+# 0018. Lots are shapes cut along roads; buildings take their shape from lots
 
 - Status: Accepted
 - Date: 2026-11-03

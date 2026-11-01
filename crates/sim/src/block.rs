@@ -1,4 +1,4 @@
-//! Blocks: the land enclosed by roads, and how it is cut into lots (ADR 0016, ADR 0017).
+//! Blocks: the land enclosed by roads, and how it is cut into lots (ADR 0016, ADR 0018).
 //!
 //! Blocks are derived from the road graph every time they are needed and have no stable ids.
 //! A block is a bounded face of the graph, traced along the sampled road centrelines.
@@ -489,7 +489,7 @@ impl Blocks {
         best
     }
 
-    /// Cuts block `i` into lots (ADR 0017): each road side around it, in stretches of about
+    /// Cuts block `i` into lots (ADR 0018): each road side around it, in stretches of about
     /// `LOT_WIDTH`, runs straight back from the road to half way to the road behind (at most
     /// `LOT_REACH`), divided from its neighbours along corner bisectors and clipped to the
     /// land off the roads. Earlier lots keep land later ones would overlap. Slivers join the

@@ -16,9 +16,40 @@ pub type RoadId = u32;
 
 /// Street speed limit, m/s (50 km/h).
 pub const STREET_SPEED: f32 = 13.9;
-/// Avenue speed limit, m/s (72 km/h). Also the fastest limit in the game, which the A*
+/// Main road speed limit, m/s (72 km/h). Also the fastest limit in the game, which the A*
 /// heuristic relies on.
-pub const AVENUE_SPEED: f32 = 20.0;
+pub const MAIN_SPEED: f32 = 20.0;
+
+/// What a road is for. Local streets reach places; main roads carry the middle of long trips,
+/// are faster, and win right of way and signals at junctions (ADR 0017).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[repr(u8)]
+pub enum RoadClass {
+    #[default]
+    Street = 0,
+    Main = 1,
+    /// Laid by the sim to reach deep lots (ADR 0017).
+    Alley = 2,
+}
+
+impl RoadClass {
+    pub fn from_u8(v: u8) -> Option<Self> {
+        match v {
+            0 => Some(Self::Street),
+            1 => Some(Self::Main),
+            2 => Some(Self::Alley),
+            _ => None,
+        }
+    }
+
+    pub fn speed(self) -> f32 {
+        match self {
+            Self::Street => STREET_SPEED,
+            Self::Main => MAIN_SPEED,
+            Self::Alley => ALLEY_SPEED,
+        }
+    }
+}
 /// Alley speed limit, m/s (30 km/h). The sim lays alleys to reach deep lots (ADR 0016).
 pub const ALLEY_SPEED: f32 = 8.3;
 
@@ -31,6 +62,7 @@ pub struct RoadNetwork {
     pub lane_len: Vec<f32>,
     pub lane_speed: Vec<f32>,
     // Per road. Straight roads need no distance table.
+    class: Vec<RoadClass>,
     control: Vec<Option<Point>>,
     lengths: Vec<Vec<f32>>,
     // CSR adjacency: lanes leaving node n are out_lanes[out_start[n]..out_start[n + 1]].
@@ -38,6 +70,8 @@ pub struct RoadNetwork {
     out_lanes: Vec<LaneId>,
     roads: BTreeSet<(NodeId, NodeId)>,
     road_active: Vec<bool>,
+    /// Whether any active road is a main road; refreshed with the adjacency.
+    has_main: bool,
     adjacency_dirty: bool,
     /// Bumped on every topology change so the renderer knows when to re-upload roads.
     pub version: u32,
@@ -101,13 +135,13 @@ impl RoadNetwork {
     }
 
     /// Adds a two-way road. Returns false for self-loops and duplicates.
-    pub fn add_road(&mut self, a: NodeId, b: NodeId, speed: f32) -> bool {
-        self.add_shape(a, b, None, speed)
+    pub fn add_road(&mut self, a: NodeId, b: NodeId, class: RoadClass) -> bool {
+        self.add_shape(a, b, None, class)
     }
 
     /// Adds a quadratic Bézier road with one control point. Refuses invalid geometry.
-    pub fn add_curve(&mut self, a: NodeId, b: NodeId, control: Point, speed: f32) -> bool {
-        self.add_shape(a, b, Some(control), speed)
+    pub fn add_curve(&mut self, a: NodeId, b: NodeId, control: Point, class: RoadClass) -> bool {
+        self.add_shape(a, b, Some(control), class)
     }
 
     pub(crate) fn add_shape(
@@ -115,7 +149,7 @@ impl RoadNetwork {
         a: NodeId,
         b: NodeId,
         control: Option<Point>,
-        speed: f32,
+        class: RoadClass,
     ) -> bool {
         let shape = Shape {
             a: (self.node_x[a as usize], self.node_y[a as usize]),
@@ -134,6 +168,7 @@ impl RoadNetwork {
             .last()
             .copied()
             .unwrap_or_else(|| self.distance(a, b));
+        self.class.push(class);
         self.control.push(control);
         self.lengths.push(lengths);
         self.road_active.push(true);
@@ -141,11 +176,28 @@ impl RoadNetwork {
             self.lane_from.push(from);
             self.lane_to.push(to);
             self.lane_len.push(len);
-            self.lane_speed.push(speed);
+            self.lane_speed.push(class.speed());
         }
         self.adjacency_dirty = true;
         self.version += 1;
         true
+    }
+
+    pub fn road_class(&self, road: RoadId) -> RoadClass {
+        self.class[road as usize]
+    }
+
+    pub fn lane_class(&self, lane: LaneId) -> RoadClass {
+        self.class[lane as usize / 2]
+    }
+
+    /// Whether any active road is a main road.
+    pub fn has_main_roads(&self) -> bool {
+        debug_assert!(
+            !self.adjacency_dirty,
+            "call rebuild_adjacency after editing roads"
+        );
+        self.has_main
     }
 
     pub fn has_road(&self, a: NodeId, b: NodeId) -> bool {
@@ -159,7 +211,7 @@ impl RoadNetwork {
     }
 
     /// Splits `road` at `mid`, a new node on it. The road keeps its id and lanes but now ends at
-    /// `mid`, and a new road with the same speed runs on from `mid` to the old far end. Returns
+    /// `mid`, and a new road of the same class runs on from `mid` to the old far end. Returns
     /// the new road. Ids stay valid, but the old road's lanes are shorter and lead somewhere
     /// else, so cars and routes on them are the caller's to deal with.
     pub fn split_road(&mut self, road: RoadId, mid: NodeId) -> RoadId {
@@ -186,7 +238,7 @@ impl RoadNetwork {
         self.lane_len[fwd] = len;
         self.lane_len[back] = len;
         let rest = self.road_active.len() as RoadId;
-        let added = self.add_shape(mid, b, right.control, self.lane_speed[fwd]);
+        let added = self.add_shape(mid, b, right.control, self.class[road as usize]);
         debug_assert!(added, "mid is a new node");
         rest
     }
@@ -223,6 +275,10 @@ impl RoadNetwork {
         }
         self.out_start = start;
         self.out_lanes = out;
+        let main = self
+            .active_roads()
+            .any(|r| self.class[r as usize] == RoadClass::Main);
+        self.has_main = main;
         self.adjacency_dirty = false;
     }
 
@@ -327,10 +383,10 @@ impl RoadNetwork {
             for c in 0..cols {
                 let id = r * cols + c;
                 if c + 1 < cols {
-                    net.add_road(id, id + 1, STREET_SPEED);
+                    net.add_road(id, id + 1, RoadClass::Street);
                 }
                 if r + 1 < rows {
-                    net.add_road(id, id + cols, STREET_SPEED);
+                    net.add_road(id, id + cols, RoadClass::Street);
                 }
             }
         }
@@ -339,7 +395,7 @@ impl RoadNetwork {
     }
 
     /// Jittered grid with some streets removed, so it reads as a town rather than a lattice.
-    /// Every fifth row and column is an avenue, which gives pathfinding something to prefer.
+    /// Every fifth row and column is a main road (an avenue), which long trips ride.
     pub fn generate_grid(cols: u32, rows: u32, spacing: f32, rng: &mut Rng) -> Self {
         const DROP_CHANCE: f32 = 0.12;
         let mut net = Self::default();
@@ -353,23 +409,20 @@ impl RoadNetwork {
         }
         let id = |c: u32, r: u32| r * cols + c;
         let is_avenue = |i: u32| i.is_multiple_of(5);
+        let class = |i: u32| {
+            if is_avenue(i) {
+                RoadClass::Main
+            } else {
+                RoadClass::Street
+            }
+        };
         for r in 0..rows {
             for c in 0..cols {
                 if c + 1 < cols && (is_avenue(r) || rng.unit() > DROP_CHANCE) {
-                    let speed = if is_avenue(r) {
-                        AVENUE_SPEED
-                    } else {
-                        STREET_SPEED
-                    };
-                    net.add_road(id(c, r), id(c + 1, r), speed);
+                    net.add_road(id(c, r), id(c + 1, r), class(r));
                 }
                 if r + 1 < rows && (is_avenue(c) || rng.unit() > DROP_CHANCE) {
-                    let speed = if is_avenue(c) {
-                        AVENUE_SPEED
-                    } else {
-                        STREET_SPEED
-                    };
-                    net.add_road(id(c, r), id(c, r + 1), speed);
+                    net.add_road(id(c, r), id(c, r + 1), class(c));
                 }
             }
         }

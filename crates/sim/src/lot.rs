@@ -1,4 +1,4 @@
-//! Lots: the pieces of blocks that buildings will stand on (ADR 0016, ADR 0017).
+//! Lots: the pieces of blocks that buildings will stand on (ADR 0016, ADR 0018).
 //!
 //! A lot is a polygon cut along one road, plus the zone cells whose centre lies inside it.
 //! Ids are append-only; a retired lot keeps its slot and record, like a deleted road
