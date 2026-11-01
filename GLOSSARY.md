@@ -61,3 +61,10 @@ _Avoid_: zone tool, painter
 **Unzone**:
 Painting with no zone, which returns zone cells to unzoned land.
 _Avoid_: erase, dezone
+
+**Closure**:
+How a building empties out after its lot is repainted to a different zone or density, or
+unzoned. Its workers lose their jobs, its households move or leave one at a time, and the
+empty building is then removed so the lot's current zone can grow. Painting the original
+zone back cancels it (ADR 0023).
+_Avoid_: demolition (road edits remove buildings at once), eviction
