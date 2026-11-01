@@ -13,21 +13,23 @@
         font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre;
         pointer-events: none;
       }
-      #toolbar { position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%); display: flex; gap: 6px; }
+      #controls { position: fixed; bottom: 12px; left: 12px; right: 12px; display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none; }
+      #toolbar { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
       #toolbar button {
         background: #1c2530; color: #c9d4df; border: 1px solid #2e3a47; border-radius: 6px;
         padding: 6px 10px; font: 12px ui-monospace, Menlo, monospace; cursor: pointer;
-        white-space: nowrap;
+        white-space: nowrap; pointer-events: auto;
       }
       #toolbar button:hover { border-color: #6b7b8f; }
       #toolbar button:focus-visible { outline: 2px solid #c9d4df; outline-offset: 2px; }
-      #road-help { position: fixed; bottom: 54px; left: 50%; transform: translateX(-50%); color: #c9d4df; background: #0f1419; padding: 6px 10px; font: 12px/1.5 ui-monospace, monospace; text-align: center; }
+      #road-help { color: #c9d4df; background: #0f1419; padding: 6px 10px; font: 12px/1.5 ui-monospace, monospace; text-align: center; }
       #road-help:empty { display: none; }
       #toolbar button.active { background: #2f6fb0; border-color: #4a8bd0; color: white; }
     </style>
   </head>
   <body>
     <div id="hud">loading…</div>
+    <div id="controls">
     <div id="road-help" role="status" aria-live="polite"></div>
     <div id="toolbar">
       <button type="button" data-speed="0">pause</button>
@@ -46,6 +48,7 @@
       <button type="button" data-zone="5" aria-pressed="false" title="industrial, low density (C)">ind low</button>
       <button type="button" data-zone="6" aria-pressed="false" title="industrial, high density (C twice)">ind high</button>
       <button type="button" data-zone="0" aria-pressed="false" title="remove zoning (U)">unzone (U)</button>
+    </div>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
