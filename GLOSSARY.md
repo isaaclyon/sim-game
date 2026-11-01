@@ -29,6 +29,10 @@ _Avoid_: vehicle count, agent count
 A citizen's journey from one place to another for an activity, such as work, shopping or returning home.
 _Avoid_: route (when you mean the journey rather than its path)
 
+**Citizen inspector**:
+The panel that shows one selected citizen's name, home, job and current trip, and can make the camera follow their car.
+_Avoid_: car inspector, agent inspector
+
 ## Zoning
 
 **Zone**:

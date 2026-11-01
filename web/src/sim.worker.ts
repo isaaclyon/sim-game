@@ -1,7 +1,7 @@
 // Runs the WASM sim on a fixed-timestep clock, off the main thread.
 
 import init, { Sim } from './pkg/sim_wasm';
-import type { FromWorker, Stats, ToWorker } from './protocol';
+import type { Activity, Citizen, FromWorker, Place, Stats, ToWorker, Zone } from './protocol';
 
 /** If the sim falls this far behind, drop the backlog instead of spiralling. */
 const MAX_TICKS_PER_STEP = 20;
@@ -16,6 +16,8 @@ let zonesVersion = -1;
 let lotsVersion = -1;
 let buildingsVersion = -1;
 let buildingsSentAt = -Infinity;
+/** The inspector's selection: a citizen, kept even when its car slot is hidden. */
+let inspected: { selection: number; citizen: number } | null = null;
 /** Full meshes are expensive; faster simulation must not flood the main thread. */
 const BUILDING_SNAPSHOT_INTERVAL_MS = 250;
 
@@ -99,6 +101,35 @@ function sendFrame(s: Sim, perTick = 0) {
     agents.buffer,
     signals.buffer,
   ]);
+  sendCitizen(s);
+}
+
+function place(building: number | undefined, zone: number | undefined): Place | null {
+  return building === undefined ? null : { building, zone: zone as Zone };
+}
+
+/** Details of the selected citizen, sent only while someone is selected. */
+function sendCitizen(s: Sim) {
+  if (!inspected) return;
+  const v = s.citizen_info(inspected.citizen);
+  let citizen: Citizen | null = null;
+  if (v) {
+    citizen = {
+      id: inspected.citizen,
+      name: v.name,
+      resident: v.resident,
+      home: place(v.home, v.home_zone),
+      job: place(v.job, v.job_zone),
+      activity: v.activity as Activity,
+      location: place(v.location, v.location_zone),
+      destination: place(v.destination, v.destination_zone),
+      agent: v.agent ?? null,
+      driving: v.driving,
+    };
+    v.free();
+  }
+  post({ type: 'citizen', selection: inspected.selection, citizen });
+  if (!citizen) inspected = null;
 }
 
 function step() {
@@ -187,6 +218,17 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
           : sim.road_preview(msg.ax, msg.ay, msg.bx, msg.by)
         : new Float32Array();
       post({ type: 'roadPreview', revision: msg.revision, stops }, [stops.buffer]);
+      break;
+    }
+    case 'inspect': {
+      const citizen = msg.agent === null ? undefined : sim?.citizen_of_agent(msg.agent);
+      if (citizen === undefined) {
+        inspected = null;
+        if (msg.agent !== null) post({ type: 'citizen', selection: msg.selection, citizen: null });
+      } else if (sim) {
+        inspected = { selection: msg.selection, citizen };
+        sendCitizen(sim);
+      }
       break;
     }
     case 'previewSnap': {

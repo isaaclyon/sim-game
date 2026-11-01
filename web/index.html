@@ -13,22 +13,39 @@
         font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre;
         pointer-events: none;
       }
+      #inspector {
+        position: fixed; top: 12px; right: 12px; padding: 10px 12px; border-radius: 8px;
+        background: rgba(15, 20, 25, 0.85); color: #c9d4df;
+        font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      #inspector[hidden] { display: none; }
+      #inspector-text { white-space: pre; }
+      #inspector-text::first-line { color: white; font-weight: 600; }
+      #inspector .actions { display: flex; gap: 6px; margin-top: 8px; }
       #controls { position: fixed; bottom: 12px; left: 12px; right: 12px; display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none; }
       #toolbar { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
-      #toolbar button {
+      #toolbar button, #inspector button {
         background: #1c2530; color: #c9d4df; border: 1px solid #2e3a47; border-radius: 6px;
         padding: 6px 10px; font: 12px ui-monospace, Menlo, monospace; cursor: pointer;
         white-space: nowrap; pointer-events: auto;
       }
-      #toolbar button:hover { border-color: #6b7b8f; }
-      #toolbar button:focus-visible { outline: 2px solid #c9d4df; outline-offset: 2px; }
+      #toolbar button:hover, #inspector button:hover:enabled { border-color: #6b7b8f; }
+      #toolbar button:focus-visible, #inspector button:focus-visible { outline: 2px solid #c9d4df; outline-offset: 2px; }
+      #inspector button:disabled { opacity: 0.5; cursor: default; }
       #road-help { color: #c9d4df; background: #0f1419; padding: 6px 10px; font: 12px/1.5 ui-monospace, monospace; text-align: center; }
       #road-help:empty { display: none; }
-      #toolbar button.active { background: #2f6fb0; border-color: #4a8bd0; color: white; }
+      #toolbar button.active, #inspector button[aria-pressed="true"] { background: #2f6fb0; border-color: #4a8bd0; color: white; }
     </style>
   </head>
   <body>
     <div id="hud">loading…</div>
+    <section id="inspector" aria-label="citizen" hidden>
+      <div id="inspector-text" aria-live="polite"></div>
+      <div class="actions">
+        <button type="button" id="follow" aria-pressed="false" title="camera follows this citizen's car (F)">follow (F)</button>
+        <button type="button" id="inspector-close" title="close (Esc)">close (Esc)</button>
+      </div>
+    </section>
     <div id="controls">
     <div id="road-help" role="status" aria-live="polite"></div>
     <div id="toolbar">

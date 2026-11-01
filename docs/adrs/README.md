@@ -27,6 +27,7 @@ rewriting history; mark the old one `Superseded by NNNN`.
 | [0019](0019-industrial-lot-variety.md) | Industrial lots combine neighbouring frontage strips | Industrial footprint fallback superseded by 0020; otherwise accepted |
 | [0020](0020-rectangular-industrial-halls.md) | Industrial halls stay rectangular | Accepted |
 | [0021](0021-citizens-households-and-trips.md) | Citizens, households, homes, jobs and trips | Accepted |
+| [0022](0022-citizen-inspection-query.md) | Citizen inspection is a read-only query for one selected citizen | Accepted |
 
 ADRs are only for decisions that are hard to reverse. See [AGENTS.md](AGENTS.md) for when to
 write one and how.
