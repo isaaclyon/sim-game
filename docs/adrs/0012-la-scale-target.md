@@ -52,6 +52,12 @@ Los Angeles County would be about 600k.
   car count, so the check never touches the queue or the agent arrays, changed nothing
   measurable (6.3 ms before and after, same machine, interleaved runs). The sampled time there
   is likely skid from the queue walk in `Junctions::request` around it.
+- Junctions get about 21,000 requests per tick at LA scale: about 1,200 cars let through, 5,500
+  stopped by a red light, and 10,000-15,000 refused because the exit is full. Most are the same
+  cars asking again every tick. Caching each car's next lane (so counting cars ahead skips each
+  car's path) gained 1-2%, within noise. Checking the light before the exit gained about 7% but
+  changed outcomes (1.7% fewer trips, fewer detours), so it is a gameplay change, not a free win.
+  The large saving would come from cars not re-asking every tick, which is also a design choice.
 - Run-to-run noise on one machine is about 5-15% (the same build measured 6.1-7.8 ms across a
   session), so compare builds with interleaved runs, not against numbers in this file.
 - Snapshots grow to about 4 MB per tick at 250k cars, so culled or delta snapshots (M7) are
