@@ -14,6 +14,7 @@
 import CameraControls from 'camera-controls';
 import * as THREE from 'three';
 import { buildBuildingGeometry } from './building-geometry';
+import { panAlongGround } from './camera';
 import { buildRoadGeometry } from './road-geometry';
 import { createSimScene } from './scene';
 
@@ -276,6 +277,11 @@ export class Renderer {
       : CameraControls.ACTION.NONE;
   }
 
+  /** Keyboard panning: see `panAlongGround`. */
+  panGround(right: number, forward: number) {
+    panAlongGround(this.controls, right, forward);
+  }
+
   /** Ground-plane point in scene-local (sim x, y as x, z), or null if the ray misses. */
   pick(clientX: number, clientY: number): THREE.Vector3 | null {
     const ndc = new THREE.Vector2((clientX / innerWidth) * 2 - 1, -(clientY / innerHeight) * 2 + 1);
@@ -431,8 +437,10 @@ export class Renderer {
     this.preview.visible = line.length > 1;
   }
 
-  render() {
-    this.controls.update(this.clock.getDelta());
+  /** Draws a frame; true if the camera moved. */
+  render(): boolean {
+    const moved = this.controls.update(this.clock.getDelta());
     this.renderer.render(this.scene, this.camera);
+    return moved;
   }
 }
