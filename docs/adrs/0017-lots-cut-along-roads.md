@@ -46,8 +46,11 @@ unchanged. The grid says what land is for; lots say how it is divided.
    lots.
 4. Each lot is clipped to the block's land. Lots are cut in (road, side, stretch) order; a
    lot gives up any part an earlier lot already holds.
-5. A lot is one piece. Pieces smaller than 100 m² join the neighbour they share the longest
-   edge with, so slivers at curves become part of a neighbouring lot rather than waste. Gaps
+5. A lot is one piece. Pieces smaller than 200 m² (about 40% of a typical lot) join the
+   neighbour they share the longest edge with, so slivers at curves and the small triangles
+   left at corners become part of a neighbouring lot rather than waste or tiny lots. A small
+   piece touching only other small pieces retries once they have joined; if none can join,
+   the biggest becomes a lot itself (a whole tiny block, say), so no land is dropped. Gaps
    the lots leave smaller than 1,000 m² (inside curves, between converging wedges) join a
    neighbour the same way. A join that would leave a hole in the lot is skipped; the piece
    tries its other neighbours.

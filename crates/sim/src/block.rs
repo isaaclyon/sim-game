@@ -17,8 +17,9 @@ pub const ROAD_HALF_WIDTH: f32 = 4.0;
 pub const LOT_REACH: f32 = 64.0;
 /// Target frontage of one lot along its road, metres.
 pub const LOT_WIDTH: f32 = 16.0;
-/// Smaller pieces of land, square metres, are slivers that join a neighbouring lot.
-pub const MIN_LOT_AREA: f32 = 100.0;
+/// Smaller pieces of land, square metres, such as the corner triangles left where two roads'
+/// lots meet, join a neighbouring lot. About 40% of a typical 16 m by 30 m lot.
+pub const MIN_LOT_AREA: f32 = 200.0;
 /// Gaps between lots smaller than this, square metres, join a lot; bigger ones are interior.
 pub const MAX_GAP_AREA: f32 = 1000.0;
 /// Outline corners sharper than this cosine (about 10°) cutting off less than `SPIKE_AREA`
@@ -103,30 +104,32 @@ fn ccw(a: Point, b: Point) -> Ordering {
     })
 }
 
-/// Joins `piece` to the lot of `lots` it shares the longest edge with, if any.
-fn join(lots: &mut [Piece], piece: Ring) {
-    let pr = poly::bounds(&piece);
+/// Joins `piece` to the lot of `lots` it shares the longest edge with, if any; false if none.
+fn join(lots: &mut [Piece], piece: &Ring) -> bool {
+    let pr = poly::bounds(piece);
     let mut best: Option<(f32, usize, Ring)> = None;
     for (j, p) in lots.iter().enumerate() {
         if !intersects(p.rect, pr) {
             continue;
         }
-        let mut joined = poly::union(std::slice::from_ref(&p.ring), std::slice::from_ref(&piece));
+        let mut joined = poly::union(std::slice::from_ref(&p.ring), std::slice::from_ref(piece));
         // One piece with no hole: a piece wrapping around another lot can't join this one.
         if joined.len() != 1 || joined[0].len() != 1 {
             continue;
         }
         let ring = joined[0].swap_remove(0);
         let shared =
-            (poly::perimeter(&p.ring) + poly::perimeter(&piece) - poly::perimeter(&ring)) / 2.0;
+            (poly::perimeter(&p.ring) + poly::perimeter(piece) - poly::perimeter(&ring)) / 2.0;
         if shared > 0.1 && best.as_ref().is_none_or(|b| shared > b.0) {
             best = Some((shared, j, ring));
         }
     }
-    if let Some((_, j, ring)) = best {
-        lots[j].rect = poly::bounds(&ring);
-        lots[j].ring = ring;
-    }
+    let Some((_, j, ring)) = best else {
+        return false;
+    };
+    lots[j].rect = poly::bounds(&ring);
+    lots[j].ring = ring;
+    true
 }
 
 /// `ring` without spikes and repeated points.
@@ -504,7 +507,7 @@ impl Blocks {
         lanes.sort_unstable();
         lanes.dedup();
         let mut lots: Vec<Piece> = Vec::new();
-        let mut slivers: Vec<Ring> = Vec::new();
+        let mut slivers: Vec<Piece> = Vec::new();
         for &lane in &lanes {
             let road = lane / 2;
             let (n, _) = self.stretches(road);
@@ -516,7 +519,7 @@ impl Blocks {
                 let near: Vec<Ring> = lots
                     .iter()
                     .map(|p| &p.ring)
-                    .chain(&slivers)
+                    .chain(slivers.iter().map(|p| &p.ring))
                     .filter(|r| intersects(poly::bounds(r), rr))
                     .cloned()
                     .collect();
@@ -526,30 +529,43 @@ impl Blocks {
                 }
                 for mut piece in pieces {
                     let ring = piece.swap_remove(0);
-                    if poly::area(&ring) >= MIN_LOT_AREA {
-                        let rect = poly::bounds(&ring);
-                        lots.push(Piece {
-                            road,
-                            left: lane.is_multiple_of(2),
-                            k,
-                            ring,
-                            rect,
-                        });
+                    let big = poly::area(&ring) >= MIN_LOT_AREA;
+                    let rect = poly::bounds(&ring);
+                    let piece = Piece {
+                        road,
+                        left: lane.is_multiple_of(2),
+                        k,
+                        ring,
+                        rect,
+                    };
+                    if big {
+                        lots.push(piece);
                     } else {
-                        slivers.push(ring);
+                        slivers.push(piece);
                     }
                 }
             }
         }
-        for s in slivers {
-            join(&mut lots, s);
+        // Small pieces join a lot, retrying those that only touch other small pieces. When
+        // none can join, the biggest left (such as a whole tiny block) becomes a lot itself.
+        while !slivers.is_empty() {
+            let before = slivers.len();
+            slivers.retain(|s| !join(&mut lots, &s.ring));
+            if slivers.len() == before {
+                let big = (0..slivers.len())
+                    .max_by(|&a, &b| {
+                        poly::area(&slivers[a].ring).total_cmp(&poly::area(&slivers[b].ring))
+                    })
+                    .unwrap_or(0);
+                lots.push(slivers.remove(big));
+            }
         }
         // Gaps the lots leave, such as inside curves, join a lot too unless they are big
         // enough to be the block's interior.
         let all: Vec<Ring> = lots.iter().map(|p| p.ring.clone()).collect();
         for gap in poly::subtract(&land, &all) {
             if gap.len() == 1 && poly::area(&gap[0]) < MAX_GAP_AREA {
-                join(&mut lots, gap.into_iter().next().unwrap_or_default());
+                join(&mut lots, &gap[0]);
             }
         }
         let mut claimed = BTreeSet::new();
