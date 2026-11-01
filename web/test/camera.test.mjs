@@ -152,6 +152,14 @@ test('keyboard motion follows the same path at any frame rate, without stall jum
   const slow = hold(a.c, [1, 1, 0], new KeyCamera(a.c), 30, 1 / 30);
   const fast = hold(b.c, [1, 1, 0], new KeyCamera(b.c), 144, 1 / 144);
   assert.ok(slow.distanceTo(fast) < 1e-6 * a.c.distance);
+  const turningSlow = controls(0.4, 0.8);
+  const turningFast = controls(0.4, 0.8);
+  const arcSlow = hold(turningSlow.c, [0, 1, 1], new KeyCamera(turningSlow.c), 60, 1 / 30);
+  const arcFast = hold(turningFast.c, [0, 1, 1], new KeyCamera(turningFast.c), 288, 1 / 144);
+  assert.ok(
+    arcSlow.distanceTo(arcFast) < 1e-5 * turningSlow.c.distance,
+    `panning while turning follows the same arc (${arcSlow.distanceTo(arcFast)})`,
+  );
   const straight = controls(0.4, 0.8);
   const ahead = hold(straight.c, [0, 1, 0], new KeyCamera(straight.c), 144, 1 / 144);
   assert.ok(Math.abs(fast.length() - ahead.length()) < 1e-6, 'diagonals are not faster');
