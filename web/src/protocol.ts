@@ -4,6 +4,7 @@
 export type ToWorker =
   | { type: 'init'; seed: number; cols: number; rows: number; agents: number }
   | { type: 'setSpeed'; speed: number }
+  /** Explicit synthetic benchmark traffic, not normal play. */
   | { type: 'spawn'; count: number }
   | {
       type: 'buildRoad';
@@ -77,7 +78,11 @@ export interface Stats {
   /** Day clock from the sim (`sim::clock`): 1-based day and seconds since midnight. */
   day: number;
   secondOfDay: number;
+  /** Resident individuals, including people at home/work/shop. Not a vehicle count. */
+  population: number;
+  /** Allocated vehicle slots, including dormant reservations and departed citizens' slots. */
   agents: number;
+  /** Synthetic vehicles waiting between trips; not residents at home or dormant slots. */
   parked: number;
   awaitingPath: number;
   entering: number;

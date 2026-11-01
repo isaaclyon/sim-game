@@ -91,6 +91,11 @@ impl RoadNetwork {
         self.roads.len()
     }
 
+    /// Tombstone query that remains valid before the adjacency cache is rebuilt.
+    pub fn is_road_active(&self, road: RoadId) -> bool {
+        self.road_active.get(road as usize) == Some(&true)
+    }
+
     pub fn active_roads(&self) -> impl Iterator<Item = RoadId> + '_ {
         self.road_active
             .iter()

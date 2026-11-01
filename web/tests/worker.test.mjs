@@ -7,7 +7,7 @@ import { initSync, Sim } from '../src/pkg/sim_wasm.js';
 
 initSync({ module: readFileSync(new URL('../src/pkg/sim_wasm_bg.wasm', import.meta.url)) });
 
-async function worker() {
+async function worker(agents = 100) {
   let ready;
   const initialized = new Promise((resolve) => {
     ready = resolve;
@@ -43,8 +43,55 @@ async function worker() {
   await module.link(() => wasm);
   await module.evaluate();
   const send = (data) => self.onmessage({ data });
-  const init = send({ type: 'init', seed: 1, cols: 3, rows: 3, agents: 100 });
+  const init = send({ type: 'init', seed: 1, cols: 3, rows: 3, agents });
   return { send, messages, ready, init, advance };
+}
+
+test('normal worker frames report residents separately from cars', async () => {
+  const w = await worker(0);
+  w.ready();
+  await w.init;
+  const frame = () => w.messages.findLast((msg) => msg.type === 'frame');
+  assert.equal(frame().stats.population, 0);
+  assert.equal(frame().stats.agents, 0);
+  await w.send({ type: 'fillBlock', x: 50, y: 50, zone: 1 });
+  for (let i = 0; i < 1200; i++) w.advance(101);
+  assert.ok(frame().stats.population > 0);
+  assert.equal(frame().stats.driving, 0);
+});
+
+for (const type of ['buildRoad', 'buildCurve', 'deleteRoad']) {
+  test(`${type} publishes reduced population immediately when occupied homes are cut while paused`, async () => {
+    const w = await worker(0);
+    w.ready();
+    await w.init;
+    await w.send({ type: 'fillBlock', x: 50, y: 50, zone: 2 });
+    for (let i = 0; i < 1200; i++) w.advance(101);
+    await w.send({ type: 'setSpeed', speed: 0 });
+    const before = w.messages.findLast((msg) => msg.type === 'frame');
+    assert.ok(before.stats.population > 0);
+    const frames = w.messages.filter((msg) => msg.type === 'frame').length;
+    const roads = w.messages.findLast((msg) => msg.type === 'roads').segments;
+    await w.send({
+      type,
+      x: (roads[0] + roads[2]) / 2,
+      y: (roads[1] + roads[3]) / 2,
+      ax: -100,
+      ay: 50,
+      cx: 125,
+      cy: 80,
+      bx: 350,
+      by: 50,
+      class: 0,
+      id: 99,
+    });
+    if (type !== 'deleteRoad') assert.equal(w.messages.at(-1).success, true);
+    assert.equal(w.messages.filter((msg) => msg.type === 'frame').length, frames + 1);
+    const after = w.messages.findLast((msg) => msg.type === 'frame');
+    assert.notEqual(after, before, 'paused construction must publish new statistics');
+    assert.equal(after.stats.tick, before.stats.tick);
+    assert.ok(after.stats.population < before.stats.population);
+  });
 }
 
 test('curve preview, build and bulldoze agree across the worker boundary while paused', async () => {
@@ -63,7 +110,7 @@ test('curve preview, build and bulldoze agree across the worker boundary while p
   assert.equal(result.type, 'buildResult');
   assert.equal(result.id, 20);
   assert.equal(result.success, true);
-  const added = w.messages.at(-2).segments.slice(before.length);
+  const added = w.messages.findLast((msg) => msg.type === 'roads').segments.slice(before.length);
   assert.equal(added.length / 5, preview.stops.length / 3 - 1);
   await w.send({ type: 'previewBulldoze', x: -900, y: -950, revision: 11 });
   const selected = w.messages.at(-1);
@@ -81,7 +128,10 @@ test('curve preview, build and bulldoze agree across the worker boundary while p
   assert.equal(w.messages.at(-1).stats.tick, 0);
   await w.send({ type: 'buildCurve', ...coords, class: 0, id: 21 });
   assert.equal(w.messages.at(-1).success, true, 'a deleted curve does not block rebuilding');
-  assert.deepEqual(w.messages.at(-2).segments.slice(before.length), added);
+  assert.deepEqual(
+    w.messages.findLast((msg) => msg.type === 'roads').segments.slice(before.length),
+    added,
+  );
   const count = w.messages.length;
   await w.send({ type: 'buildCurve', ...coords, class: 0, id: 22 });
   assert.equal(w.messages.length, count + 1, 'refused builds do not publish a changed network');

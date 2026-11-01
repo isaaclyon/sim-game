@@ -66,11 +66,15 @@ impl World {
             .retain(|&agent| state[agent as usize] == AgentState::Entering);
     }
 
-    fn secs_to_ticks(&self, secs: f32) -> u64 {
+    pub(super) fn secs_to_ticks(&self, secs: f32) -> u64 {
         (secs / self.cfg.dt).round().max(1.0) as u64
     }
 
     fn park(&mut self, agent: AgentId, secs: f32) {
+        if let Some(c) = self.agents.citizen[agent as usize] {
+            self.retry_citizen_trip(c);
+            return;
+        }
         self.agents.state[agent as usize] = AgentState::Parked;
         let wake_at = self.totals.tick + self.secs_to_ticks(secs);
         self.wake.push(Reverse((wake_at, agent)));
@@ -100,6 +104,24 @@ impl World {
                 break;
             };
             let a = agent as usize;
+            // The path budget may defer a request across road edits. Resolve current access,
+            // rather than routing from stale junctions retained in the vehicle slot.
+            if let Some(c) = self.agents.citizen[a] {
+                let i = c as usize;
+                let from = self.building_node(self.citizens.location[i]);
+                let to = self.citizens.destination[i].and_then(|b| self.building_node(b));
+                let (Some(from), Some(to)) = (from, to) else {
+                    self.retry_citizen_trip(c);
+                    continue;
+                };
+                if from == to {
+                    self.totals.trips_completed += 1;
+                    self.citizen_arrived(c);
+                    continue;
+                }
+                self.agents.node[a] = from;
+                self.agents.dest[a] = to;
+            }
             let mut path = std::mem::take(&mut self.agents.path[a]);
             let (from, to) = (self.agents.node[a], self.agents.dest[a]);
             let found = self
@@ -247,6 +269,10 @@ impl World {
         let a = agent as usize;
         self.agents.node[a] = self.agents.dest[a];
         self.totals.trips_completed += 1;
+        if let Some(c) = self.agents.citizen[a] {
+            self.citizen_arrived(c);
+            return;
+        }
         let dwell = self.rng.range(self.cfg.dwell_min_s, self.cfg.dwell_max_s);
         self.park(agent, dwell);
     }

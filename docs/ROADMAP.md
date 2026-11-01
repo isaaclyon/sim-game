@@ -62,8 +62,8 @@ despawns, and the road tool feels good with snapping, curves and bulldozing.
 - Repainting or unzoning occupied land doesn't bulldoze it: the old buildings empty out over
   time and the new zone replaces them.
 - Citizens get a home and a workplace. Trips run home → work → shop → home on a daily
-  schedule, replacing random node-to-node trips. **ADR** for the citizen record vs. trip agent
-  split.
+  schedule, replacing random node-to-node trips ([ADR 0021](adrs/0021-citizens-households-and-trips.md)).
+  Households, homes, limited jobs and the resident population counter are implemented.
 - Route choice that feels human:
   - Road classes: trips use local streets to reach a main road, ride it, then leave it near the
     destination. Routing searches the main-road layer for the middle of long trips, which is
