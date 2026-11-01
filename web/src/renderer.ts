@@ -1,4 +1,4 @@
-// Three.js scene: roads as line segments, vehicles as one instanced box mesh. Sim (x, y) maps
+// Three.js scene: roads as asphalt ribbons and pads, vehicles as one instanced box mesh. Sim (x, y) maps
 // to world (x, z) with y up.
 //
 // Current choices, all cheap to change:
@@ -8,10 +8,11 @@
 // - Vehicle matrices are written on the CPU each frame. If that becomes the bottleneck, move
 //   interpolation and orientation into a vertex shader fed by the raw snapshot.
 // - Picking is a ray against the ground plane. Add three-mesh-bvh once we pick against meshes.
-// - Road meshes will likely want BatchedMesh, bezierjs for curves and earcut for polygons.
+// - Roads share one static mesh, rebuilt only when the road snapshot changes.
 
 import CameraControls from 'camera-controls';
 import * as THREE from 'three';
+import { buildRoadGeometry } from './road-geometry';
 
 CameraControls.install({ THREE });
 
@@ -26,8 +27,7 @@ const SIGNAL_COLORS = [
 const SIGNAL_SIZE = 1.5;
 const SIGNAL_HEIGHT = 4;
 const BG = 0x0f1419;
-const STREET_COLOR = new THREE.Color(0x3a4654);
-const AVENUE_COLOR = new THREE.Color(0x6b7b8f);
+const ASPHALT_COLOR = 0x3a4654;
 const CAR_LENGTH = 4.5;
 const CAR_WIDTH = 2;
 const CAR_HEIGHT = 1.5;
@@ -45,7 +45,7 @@ export class Renderer {
   readonly camera: THREE.PerspectiveCamera;
   readonly controls: CameraControls;
   private readonly clock = new THREE.Clock();
-  private roads?: THREE.LineSegments;
+  private roads?: THREE.Mesh;
   private cars?: THREE.InstancedMesh;
   private signals?: THREE.InstancedMesh;
   private readonly preview: THREE.Line;
@@ -103,26 +103,12 @@ export class Renderer {
 
   /** `segments` is `[ax, ay, bx, by, speedLimit]` per road. */
   setRoads(segments: Float32Array, bounds: [number, number, number, number], fitCamera: boolean) {
-    const n = segments.length / 5;
-    const positions = new Float32Array(n * 6);
-    const colors = new Float32Array(n * 6);
-    for (let i = 0; i < n; i++) {
-      const s = i * 5;
-      positions.set([segments[s], 0, segments[s + 1], segments[s + 2], 0, segments[s + 3]], i * 6);
-      const c = segments[s + 4] > 15 ? AVENUE_COLOR : STREET_COLOR;
-      colors.set([c.r, c.g, c.b, c.r, c.g, c.b], i * 6);
-    }
-    const geom = new THREE.BufferGeometry();
-    geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    geom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    const geom = buildRoadGeometry(segments);
     if (this.roads) {
       this.roads.geometry.dispose();
       this.roads.geometry = geom;
     } else {
-      this.roads = new THREE.LineSegments(
-        geom,
-        new THREE.LineBasicMaterial({ vertexColors: true }),
-      );
+      this.roads = new THREE.Mesh(geom, new THREE.MeshBasicMaterial({ color: ASPHALT_COLOR }));
       this.scene.add(this.roads);
     }
 

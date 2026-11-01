@@ -26,7 +26,7 @@ Change both sides (Rust writer, `protocol.ts` doc, `renderer.ts` reader) togethe
 
 ## Checks before finishing a change
 - `scripts/check.sh` (same as CI): gitleaks over full history, rustfmt, clippy `-D warnings` (host + wasm32), `cargo test -p sim`,
-  Biome lint/format, `tsc`. `scripts/check.sh --fix` applies formatting and safe fixes first.
+  Biome lint/format, `tsc`, frontend geometry tests. `scripts/check.sh --fix` applies formatting and safe fixes first.
 - The repo is public. `.githooks/pre-commit` runs gitleaks on staged changes; enable it per clone
   with `git config core.hooksPath .githooks`. Never bypass it with `--no-verify`.
 - `clippy.toml` bans `HashMap`/`HashSet` and `Instant::now`/`SystemTime::now` to protect

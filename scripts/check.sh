@@ -21,4 +21,5 @@ echo "==> rust: test";     cargo test -p sim --locked
 echo "==> web: wasm";      (cd web && npm run --silent wasm)
 echo "==> web: biome";     (cd web && npx biome ci .)
 echo "==> web: typecheck"; (cd web && npm run --silent typecheck)
+echo "==> web: test";      (cd web && npm test)
 echo "All checks passed."
