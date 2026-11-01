@@ -1,6 +1,6 @@
 # 0010. Congestion-aware routing and detours
 
-- Status: Accepted; long trips search only main roads in their middle, per [0017](0017-road-classes-and-main-road-routing.md)
+- Status: Accepted; long trips search only main roads in their middle, per [0017](0017-road-classes-and-main-road-routing.md); cost superseded by [0024](0024-per-driver-route-noise.md)
 - Date: 2026-10-31
 
 ## Context

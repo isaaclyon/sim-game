@@ -116,7 +116,7 @@ fn routes_use_curve_length_and_bounds_include_the_bend() {
     net.add_road(c, b, RoadClass::Street);
     net.rebuild_adjacency();
     let mut path = Vec::new();
-    assert!(sim::path::Pathfinder::default().find(&net, &[], a, b, &mut path));
+    assert!(sim::path::Pathfinder::default().find(&net, &[], None, a, b, &mut path));
     assert_eq!(path, vec![2, 4]);
     assert!(net.bounds()[3] >= 250.0);
 }

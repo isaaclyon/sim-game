@@ -15,6 +15,8 @@ const DETOUR_EVERY_S: f32 = 5.0;
 const DETOUR_MAX_NODES: u32 = 256;
 /// Wait before retrying after a failed path or a stuck despawn, seconds.
 const RETRY_AFTER_S: f32 = 10.0;
+/// Separates the route-taste hash from other hashes of the world seed.
+const ROUTE_TASTE_SALT: u64 = 0x726f_7574;
 
 impl World {
     pub(super) fn spawn_agents(&mut self, count: u32) -> bool {
@@ -124,10 +126,16 @@ impl World {
             }
             let mut path = std::mem::take(&mut self.agents.path[a]);
             let (from, to) = (self.agents.node[a], self.agents.dest[a]);
-            let found = self
-                .pathfinder
-                .find(&self.roads, &self.lane_delay, from, to, &mut path)
-                && !path.is_empty();
+            // A vehicle slot belongs to one driver for life (ADR 0021), so its taste is stable.
+            let driver = crate::rng::mix(self.cfg.seed ^ ROUTE_TASTE_SALT, u64::from(agent));
+            let found = self.pathfinder.find(
+                &self.roads,
+                &self.lane_delay,
+                Some(driver),
+                from,
+                to,
+                &mut path,
+            ) && !path.is_empty();
             self.agents.path[a] = path;
             self.totals.path_nodes_expanded += u64::from(self.pathfinder.last_expanded);
             if found {

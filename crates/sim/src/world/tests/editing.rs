@@ -47,7 +47,7 @@ fn bulldoze_keeps_ids_and_removes_routing_and_geometry() {
     assert!(world.roads.out_lanes(0).is_empty());
     assert!(world.roads.out_lanes(1).is_empty());
     let mut path = Vec::new();
-    assert!(!Pathfinder::default().find(&world.roads, &[], 0, 1, &mut path));
+    assert!(!Pathfinder::default().find(&world.roads, &[], None, 0, 1, &mut path));
     world.write_road_segments(&mut preview);
     assert_eq!(preview, [0.0, 100.0, 100.0, 100.0, 0.0]);
     // Deleted geometry neither blocks rebuilding nor gets split by a crossing.
@@ -197,7 +197,7 @@ fn crossing_roads_meet_at_a_new_junction() {
     // The old road's ends are now reachable from the new road's ends.
     let (west, north) = (node_at(&world, -100.0, 0.0), node_at(&world, 0.0, 100.0));
     let mut path = Vec::new();
-    assert!(Pathfinder::default().find(&world.roads, &[], west, north, &mut path));
+    assert!(Pathfinder::default().find(&world.roads, &[], None, west, north, &mut path));
     assert_eq!(path.len(), 2);
 }
 

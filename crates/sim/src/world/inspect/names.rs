@@ -80,10 +80,7 @@ const SURNAMES: [&str; 64] = [
 
 /// SplitMix64 finaliser: a well-mixed index from `seed`, a per-list salt and an ID.
 fn mix(seed: u64, salt: u64, id: u32) -> usize {
-    let mut z = seed ^ salt ^ u64::from(id).wrapping_mul(0x9e37_79b9_7f4a_7c15);
-    z = (z ^ (z >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
-    z = (z ^ (z >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
-    (z ^ (z >> 31)) as usize
+    crate::rng::mix(seed ^ salt, u64::from(id)) as usize
 }
 
 /// Given name from the citizen, surname from the household. A shared surname is a display

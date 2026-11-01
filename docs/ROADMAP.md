@@ -70,8 +70,8 @@ despawns, and the road tool feels good with snapping, curves and bulldozing.
     destination. Routing searches the main-road layer for the middle of long trips, which is
     also faster.
   - Some randomness: each driver adds a small seeded random change to route costs, so cars
-    don't all pick the same "best" route and traffic spreads out. It replaces or tunes the
-    per-queued-car delay from ADR 0009's work.
+    don't all pick the same "best" route and traffic spreads out. Implemented; the
+    per-queued-car delay stays as it was ([ADR 0024](adrs/0024-per-driver-route-noise.md)).
 - Citizen inspector: click a car to see the citizen's name, home, job and destination; a follow
   camera rides along. Implemented as a read-only query for the selected citizen
   ([ADR 0022](adrs/0022-citizen-inspection-query.md)).
