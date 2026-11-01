@@ -167,10 +167,31 @@ impl World {
         let a = &self.agents;
         for i in 0..a.len() {
             mix(a.state[i] as u64);
+            mix(a.citizen[i].map_or(u64::MAX, u64::from));
+            mix(a.node[i] as u64);
+            mix(a.speed[i].to_bits() as u64);
+            mix(a.stuck_ticks[i] as u64);
+            mix(a.path_idx[i] as u64);
+            mix(a.path[i].len() as u64);
+            for &lane in &a.path[i] {
+                mix(lane as u64);
+            }
             mix(a.lane[i] as u64);
             mix(a.pos[i].to_bits() as u64);
             mix(a.dest[i] as u64);
             mix(a.cleared[i] as u64);
+        }
+        self.hash_residents(&mut mix);
+        mix(self.rng.state());
+        for entry in self.wake.clone().into_sorted_vec() {
+            mix(entry.0.0);
+            mix(entry.0.1 as u64);
+        }
+        for &a in &self.path_queue {
+            mix(a as u64);
+        }
+        for &a in &self.entering {
+            mix(a as u64);
         }
         self.junctions.hash_into(&mut mix);
         self.buildings.hash_into(&mut mix);

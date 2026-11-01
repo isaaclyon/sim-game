@@ -1,8 +1,8 @@
 //! Vehicle agents, stored struct-of-arrays and indexed by `AgentId`.
 //!
-//! Today every agent is a vehicle cycling between trips and parking. Citizen records (home,
-//! job, needs) will live in their own table and only claim an agent while they travel, which is
-//! how population can grow far past the number of moving vehicles.
+//! Synthetic agents cycle between random trips and parking. Citizens lazily reserve a stable
+//! vehicle slot, dormant between trips and never reassigned to another citizen (ADR 0021).
+//! Population comes from the separate resident table, not these allocated slots.
 
 use crate::road::{LaneId, NodeId};
 
@@ -13,6 +13,8 @@ pub type AgentId = u32;
 pub enum AgentState {
     /// Sitting at `node` until its wake-up tick. Costs nothing per tick.
     Parked,
+    /// Reserved citizen vehicle slot, not currently travelling; no random wake timer.
+    Dormant,
     /// Has a destination and is waiting for the pathfinding budget.
     AwaitingPath,
     /// Has a path and is waiting for room on its first lane.
@@ -24,6 +26,7 @@ pub enum AgentState {
 #[derive(Default)]
 pub struct Agents {
     pub state: Vec<AgentState>,
+    pub citizen: Vec<Option<crate::citizen::CitizenId>>,
     /// Where the agent is parked, or where its current trip started.
     pub node: Vec<NodeId>,
     pub dest: Vec<NodeId>,
@@ -50,6 +53,7 @@ impl Agents {
 
     pub fn push(&mut self, node: NodeId) -> AgentId {
         self.state.push(AgentState::Parked);
+        self.citizen.push(None);
         self.node.push(node);
         self.dest.push(node);
         self.lane.push(0);

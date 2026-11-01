@@ -76,6 +76,7 @@ function readStats(s: Sim): Stats {
     day: st.day,
     secondOfDay: st.second_of_day,
     agents: st.agents,
+    population: st.population,
     parked: st.parked,
     awaitingPath: st.awaiting_path,
     entering: st.entering,
@@ -130,11 +131,12 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
       await init();
       sim = new Sim(msg.seed, msg.cols, msg.rows);
       tickMs = sim.dt() * 1000;
-      sim.spawn_agents(msg.agents);
+      if (msg.agents > 0) sim.spawn_agents(msg.agents);
       sendRoadsIfChanged(sim);
       sendZonesIfChanged(sim);
       sendLotsIfChanged(sim);
       sendBuildingsIfChanged(sim, true);
+      sendFrame(sim);
       last = performance.now();
       step();
       break;
@@ -152,11 +154,7 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
           ? sim.build_curve(msg.ax, msg.ay, msg.cx, msg.cy, msg.bx, msg.by, msg.class)
           : sim.build_road(msg.ax, msg.ay, msg.bx, msg.by, msg.class)
         : false;
-      if (success && sim) {
-        sendRoadsIfChanged(sim);
-        sendLotsIfChanged(sim);
-        sendBuildingsIfChanged(sim, true);
-      }
+      if (success && sim) sendEdits(sim);
       post({ type: 'buildResult', id: msg.id, success });
       break;
     }

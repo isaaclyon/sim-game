@@ -1,6 +1,6 @@
 # 0006. Agents, pathfinding and traffic model
 
-- Status: Accepted; the Pathfinding bullet is superseded by [0010](0010-congestion-aware-routing-and-detours.md)
+- Status: Accepted; pathfinding superseded by [0010](0010-congestion-aware-routing-and-detours.md); citizen lifecycle, random trips and stuck recovery superseded by [0021](0021-citizens-households-and-trips.md)
 - Date: 2026-10-30
 
 ## Context

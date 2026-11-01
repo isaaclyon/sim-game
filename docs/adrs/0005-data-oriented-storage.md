@@ -1,6 +1,6 @@
 # 0005. Data-oriented storage with append-only ids
 
-- Status: Accepted
+- Status: Accepted; agent removal contract completed by [0021](0021-citizens-households-and-trips.md)
 - Date: 2026-10-30
 
 ## Context

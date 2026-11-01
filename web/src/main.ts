@@ -82,7 +82,7 @@ worker.onmessage = (e: MessageEvent<FromWorker>) => {
   }
 };
 
-send({ type: 'init', seed: 1, cols: 60, rows: 60, agents: 50_000 });
+send({ type: 'init', seed: 1, cols: 60, rows: 60, agents: 0 });
 
 // --- speed controls ---
 let speed = 1;
@@ -93,7 +93,6 @@ function setSpeed(s: number) {
   for (const b of speedButtons) b.classList.toggle('active', Number(b.dataset.speed) === s);
 }
 for (const b of speedButtons) b.onclick = () => setSpeed(Number(b.dataset.speed));
-byId('spawn').onclick = () => send({ type: 'spawn', count: 5000 });
 
 // Straight: start → end. Curve: start → bend control → end. Both chain after success.
 const roadButton = byId('road');
@@ -380,7 +379,7 @@ function frame() {
     hud.textContent =
       `Day ${stats.day}   ${hh}:${mm}   ${speed === 0 ? 'paused' : `${speed}×`}\n` +
       `fps        ${fps.toFixed(0)}   tick ${tickMs.toFixed(2)} ms\n` +
-      `agents     ${fmt(stats.agents)}\n` +
+      `population ${fmt(stats.population)}\n` +
       `driving    ${fmt(stats.driving)}   parked ${fmt(stats.parked)}\n` +
       `trips      ${fmt(stats.tripsCompleted)}\n` +
       `stuck      ${fmt(stats.despawnedStuck)}   no path ${fmt(stats.pathsFailed)}\n` +

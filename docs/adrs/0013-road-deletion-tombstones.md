@@ -1,6 +1,6 @@
 # 0013. Road deletion uses tombstones
 
-- Status: Bulldoze preview shape superseded by [0015](0015-curved-road-snapshots.md); otherwise accepted
+- Status: Bulldoze preview shape superseded by [0015](0015-curved-road-snapshots.md); citizen-owned car recovery superseded by [0021](0021-citizens-households-and-trips.md); otherwise accepted
 - Date: 2026-10-31
 
 ## Context

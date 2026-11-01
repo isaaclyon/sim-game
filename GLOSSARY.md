@@ -3,6 +3,32 @@
 A city builder where the player lays roads and paints zones, and a deterministic simulation
 grows and runs the city.
 
+## Citizens
+
+**Citizen**:
+An individual resident of the city, whether at home, at another destination or travelling.
+_Avoid_: agent, car (when you mean the person)
+
+**Household**:
+One or more citizens who share a home and move in or relocate together. Members can have different workplaces and daily activities.
+_Avoid_: family (when no family relationships are implied)
+
+**Home**:
+A dwelling that accommodates one household. A house provides one home; an apartment building can provide several.
+_Avoid_: building (when you mean an individual dwelling)
+
+**Home capacity**:
+The maximum number of residents a home accommodates, distinct from how many currently live there.
+_Avoid_: population, occupancy
+
+**Population**:
+The number of citizens who live in the city, including those who are not travelling.
+_Avoid_: vehicle count, agent count
+
+**Trip**:
+A citizen's journey from one place to another for an activity, such as work, shopping or returning home.
+_Avoid_: route (when you mean the journey rather than its path)
+
 ## Zoning
 
 **Zone**:

@@ -1,5 +1,6 @@
 //! The world: owns all sim state and advances it one fixed step at a time.
 
+mod residents;
 mod roads;
 mod snapshot;
 mod trips;
@@ -106,7 +107,11 @@ pub enum Command {
 #[derive(Clone, Copy, Default, Debug)]
 pub struct Stats {
     pub tick: u64,
+    /// Allocated vehicle slots, including dormant citizen reservations and departed tombstones.
     pub agents: u32,
+    /// Resident individuals, including those not travelling.
+    pub population: u32,
+    /// Synthetic vehicles waiting between random trips; dormant citizen slots are excluded.
     pub parked: u32,
     pub awaiting_path: u32,
     pub entering: u32,
@@ -129,6 +134,10 @@ pub struct World {
     pub zones: ZoneGrid,
     pub lots: Lots,
     pub buildings: Buildings,
+    pub citizens: crate::citizen::Citizens,
+    pub households: crate::citizen::Households,
+    pub homes: crate::citizen::Homes,
+    residents: residents::Residents,
     /// Faces of the road network, traced again when `blocks_version` falls behind the roads.
     blocks: Blocks,
     blocks_version: Option<u32>,
@@ -151,6 +160,10 @@ pub struct World {
 impl World {
     pub fn new(cfg: Config, roads: RoadNetwork, rng: Rng) -> Self {
         let mut world = Self {
+            residents: residents::Residents::new(cfg.seed),
+            citizens: Default::default(),
+            households: Default::default(),
+            homes: Default::default(),
             cfg,
             zones: ZoneGrid::covering(roads.bounds()),
             roads,
@@ -246,11 +259,15 @@ impl World {
                 self.cfg.seed,
             );
         }
+        if versions != (self.lots.version, self.zones.version) {
+            self.reconcile_residents();
+        }
         changed
     }
 
     pub fn tick(&mut self) {
         self.sync_roads();
+        self.tick_residents();
         self.wake_parked();
         self.lane_delay.clear();
         self.lane_delay.extend(
@@ -279,8 +296,10 @@ impl World {
     pub fn stats(&self) -> Stats {
         let mut s = self.totals;
         s.agents = self.agents.len() as u32;
+        s.population = self.residents.population;
         for state in &self.agents.state {
             match state {
+                AgentState::Dormant => {}
                 AgentState::Parked => s.parked += 1,
                 AgentState::AwaitingPath => s.awaiting_path += 1,
                 AgentState::Entering => s.entering += 1,

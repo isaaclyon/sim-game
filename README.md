@@ -40,8 +40,32 @@ empty if unzoned cells outnumber or tie its most common zone; click to fill the 
 to zone those gaps. Growth pauses with the simulation.
 This is quick visual growth for testing zoning, not demand-driven development yet.
 Repainting or unzoning keeps existing buildings and their original use, while unzoning stops
-new construction. A road edit that removes a lot removes its building immediately. Citizens,
-demand, and gradual redevelopment come in later issues.
+new construction. A road edit that removes a lot removes its building immediately.
+Demand and gradual redevelopment come in later issues.
+
+## Citizens
+
+Normal play starts with no cars. Completed homes receive households gradually, even without
+jobs. The population counter counts residents, including people who are not travelling.
+Houses hold one household of 1–7 adults; apartments provide several separate homes. Home
+capacity scales with usable floor area, while household size uses a weighted distribution
+that keeps small households common. [ADR 0021](docs/adrs/0021-citizens-households-and-trips.md)
+records the capacity formulas and lifecycle contract.
+
+Residents seek reachable jobs in commercial and industrial buildings. Jobs are limited;
+industrial halls count as one usable floor. Daily trips go to work, optionally shop, then home.
+Unemployed residents sometimes shop during the day. Only commercial buildings offer shopping.
+First activities are staggered shortly after moving in; later departures follow the day clock.
+Time spent at work or shopping starts on arrival, and late trips may finish the next day.
+
+Every normal-play car belongs to one resident's trip. Failed routes wait and retry. Road edits
+and stuck-car recovery return the traveller to their last activity location, never claim arrival.
+Trips between buildings sharing an access junction complete without a visible car. Demolished
+workplaces release jobs. Demolished homes relocate whole households to suitable vacant homes,
+or residents leave town if none exists. Repainting blocks new household/job/shop assignments
+but preserves existing residents, jobs and previously assigned trips until gradual closure is
+implemented. Restoring the exact original zone allows assignments again. The explicit
+`SpawnAgents` / worker `spawn` path still creates synthetic traffic for benchmarks, not gameplay.
 
 ## Roads
 

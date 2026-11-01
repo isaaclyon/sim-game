@@ -25,10 +25,7 @@ async function tools() {
     };
   }
   const elements = Object.fromEntries(
-    ['hud', 'spawn', 'road', 'curve', 'main-road', 'bulldoze', 'road-help'].map((id) => [
-      id,
-      element(),
-    ]),
+    ['hud', 'road', 'curve', 'main-road', 'bulldoze', 'road-help'].map((id) => [id, element()]),
   );
   const zoneButtons = Object.values(Zone).map((zone) => ({
     ...element(),
@@ -41,6 +38,7 @@ async function tools() {
   const previews = [];
   const events = {};
   let worker;
+  let frame;
   class Worker {
     constructor() {
       worker = this;
@@ -50,6 +48,9 @@ async function tools() {
     }
   }
   class Renderer {
+    render() {}
+    drawAgents() {}
+    drawSignals() {}
     renderer = { domElement: canvas };
     pick(x, z) {
       return { x, z };
@@ -85,7 +86,9 @@ async function tools() {
     URL,
     Worker,
     performance: { now: () => 0 },
-    requestAnimationFrame: () => {},
+    requestAnimationFrame: (fn) => {
+      frame = fn;
+    },
     addEventListener: (key, fn) => {
       events[key] = fn;
     },
@@ -127,6 +130,7 @@ async function tools() {
   };
   return {
     elements,
+    frame: () => frame(),
     messages,
     previews,
     zoneButtons,
@@ -140,6 +144,32 @@ async function tools() {
     key: (key, options = {}) => events.keydown({ key, ...options }),
   };
 }
+
+test('normal startup has no synthetic traffic and HUD displays authoritative population', async () => {
+  const t = await tools();
+  assert.equal(t.messages[0].type, 'init');
+  assert.equal(t.messages[0].agents, 0);
+  t.reply({
+    type: 'frame',
+    agents: new Float32Array(),
+    signals: new Float32Array(),
+    tickMs: 0,
+    stats: {
+      day: 1,
+      secondOfDay: 21600,
+      population: 1234,
+      agents: 9,
+      parked: 0,
+      driving: 2,
+      tripsCompleted: 0,
+      despawnedStuck: 0,
+      pathsFailed: 0,
+      despawnedByEdit: 0,
+    },
+  });
+  t.frame();
+  assert.match(t.elements.hud.textContent, /population 1,234/);
+});
 
 test('toolbar shortcuts leave modified, repeated and native control keys alone', async () => {
   const t = await tools();
