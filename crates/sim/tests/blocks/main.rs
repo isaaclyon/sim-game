@@ -2,6 +2,7 @@
 
 mod alleys;
 mod fill;
+mod industrial;
 mod lots;
 
 use std::collections::BTreeSet;

@@ -173,6 +173,7 @@ impl World {
             mix(a.cleared[i] as u64);
         }
         self.junctions.hash_into(&mut mix);
+        self.buildings.hash_into(&mut mix);
         for chunk in self.zones.cells.chunks(8) {
             let mut word = [0u8; 8];
             word[..chunk.len()].copy_from_slice(chunk);

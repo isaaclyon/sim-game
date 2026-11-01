@@ -13,6 +13,7 @@
 
 import CameraControls from 'camera-controls';
 import * as THREE from 'three';
+import { buildBuildingGeometry } from './building-geometry';
 import { buildRoadGeometry } from './road-geometry';
 import { createSimScene } from './scene';
 
@@ -58,6 +59,7 @@ export class Renderer {
   readonly controls: CameraControls;
   private readonly clock = new THREE.Clock();
   private roads?: THREE.Mesh;
+  private buildings?: THREE.Mesh;
   private cars?: THREE.InstancedMesh;
   private signals?: THREE.InstancedMesh;
   private readonly preview: THREE.Line;
@@ -145,6 +147,21 @@ export class Renderer {
           new THREE.Vector3(x1 + pad, 0, -y0 + pad),
         ),
       );
+    }
+  }
+
+  /** Sim-owned footprints and heights; rebuilt only when building geometry changes. */
+  setBuildings(data: Float32Array) {
+    const geometry = buildBuildingGeometry(data);
+    if (this.buildings) {
+      this.buildings.geometry.dispose();
+      this.buildings.geometry = geometry;
+    } else {
+      this.buildings = new THREE.Mesh(
+        geometry,
+        new THREE.MeshLambertMaterial({ vertexColors: true }),
+      );
+      this.scene.add(this.buildings);
     }
   }
 

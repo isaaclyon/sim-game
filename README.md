@@ -17,6 +17,9 @@ The bend control pulls the curve toward it; it is not a point the road passes th
 Both construction tools continue from the last successful end. `B` toggles bulldoze: hover to
 highlight a whole road between junctions, then click to remove both directions. All tools work
 while paused. Esc or right-click cancels. Space pauses, 1/2/3 set speed.
+The HUD shows the sim's day clock and speed (`Day 1   06:00   1×`). The game starts on Day 1 at
+06:00, and each sim second advances the clock six seconds, so a day lasts 4 real hours at 1× and 24
+minutes at 10×. Speed changes how many sim seconds pass per real second; pausing stops the clock.
 Cars whose remaining route uses a deleted road park and retry; other traffic continues.
 The zone brush paints residential (`Z`), commercial (`X`) or industrial (`C`); press the key
 again to switch between low and high density, or use the tool bar. `U` unzones. Click inside a
@@ -24,6 +27,21 @@ block (land enclosed by roads, outlined on hover) to zone all of it, or drag a r
 paint just that (left-drag paints instead of panning while the brush is on). The sim cuts
 zoned blocks into lots facing their roads, and adds alleys or connector streets where a block
 is too deep to reach from its edges; these are ordinary roads you can bulldoze.
+
+Buildings start appearing after a few simulation seconds and fill suitable zoned lots within
+about a minute at normal speed. Low-density homes have yards; apartments and shops follow lot
+shapes and share side walls. Newly zoned industrial land mixes small workshop lots, wider
+warehouses and occasional factory-sized sites, with varied hall sizes, heights, yards and roof
+colours. Larger sites need adjoining land of the same industrial zone; curves and small blocks
+may leave smaller lots. Industrial halls stay rectangular; corners too narrow for a hall stay
+open rather than growing pointed sheds. Repainting preserves existing lot sizes and buildings. Density changes
+building height. Very small or awkward lots can stay open. A partly painted lot also stays
+empty if unzoned cells outnumber or tie its most common zone; click to fill the whole block
+to zone those gaps. Growth pauses with the simulation.
+This is quick visual growth for testing zoning, not demand-driven development yet.
+Repainting or unzoning keeps existing buildings and their original use, while unzoning stops
+new construction. A road edit that removes a lot removes its building immediately. Citizens,
+demand, and gradual redevelopment come in later issues.
 
 ## Roads
 
