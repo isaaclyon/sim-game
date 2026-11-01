@@ -92,18 +92,29 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
       sim?.spawn_agents(msg.count);
       break;
     case 'buildRoad':
-      if (sim?.build_road(msg.ax, msg.ay, msg.bx, msg.by)) sendRoadsIfChanged(sim);
+    case 'buildCurve': {
+      const success = sim
+        ? msg.type === 'buildCurve'
+          ? sim.build_curve(msg.ax, msg.ay, msg.cx, msg.cy, msg.bx, msg.by)
+          : sim.build_road(msg.ax, msg.ay, msg.bx, msg.by)
+        : false;
+      if (success && sim) sendRoadsIfChanged(sim);
+      post({ type: 'buildResult', id: msg.id, success });
       break;
-    case 'previewRoad': {
-      if (!sim) break;
-      const stops = sim.road_preview(msg.ax, msg.ay, msg.bx, msg.by);
-      post({ type: 'roadPreview', stops }, [stops.buffer]);
+    }
+    case 'previewRoad':
+    case 'previewCurve': {
+      const stops = sim
+        ? msg.type === 'previewCurve'
+          ? sim.curve_preview(msg.ax, msg.ay, msg.cx, msg.cy, msg.bx, msg.by)
+          : sim.road_preview(msg.ax, msg.ay, msg.bx, msg.by)
+        : new Float32Array();
+      post({ type: 'roadPreview', id: msg.id, stops }, [stops.buffer]);
       break;
     }
     case 'previewSnap': {
-      if (!sim) break;
-      const stops = sim.snap_preview(msg.x, msg.y);
-      post({ type: 'roadPreview', stops }, [stops.buffer]);
+      const stops = sim?.snap_preview(msg.x, msg.y) ?? new Float32Array();
+      post({ type: 'roadPreview', id: msg.id, stops }, [stops.buffer]);
       break;
     }
   }

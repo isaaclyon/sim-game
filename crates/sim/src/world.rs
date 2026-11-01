@@ -4,6 +4,7 @@ use std::cmp::Reverse;
 use std::collections::{BinaryHeap, VecDeque};
 
 use crate::agents::{AgentId, AgentState, Agents};
+use crate::geometry::Shape;
 use crate::junction::{Junctions, Verdict};
 use crate::path::Pathfinder;
 use crate::rng::Rng;
@@ -63,8 +64,23 @@ impl Default for Config {
 /// so the seed plus a command log is enough to replay a session.
 #[derive(Clone, Debug)]
 pub enum Command {
-    SpawnAgents { count: u32 },
-    BuildRoad { ax: f32, ay: f32, bx: f32, by: f32 },
+    SpawnAgents {
+        count: u32,
+    },
+    BuildRoad {
+        ax: f32,
+        ay: f32,
+        bx: f32,
+        by: f32,
+    },
+    BuildCurve {
+        ax: f32,
+        ay: f32,
+        cx: f32,
+        cy: f32,
+        bx: f32,
+        by: f32,
+    },
 }
 
 #[derive(Clone, Copy, Default, Debug)]
@@ -140,7 +156,23 @@ impl World {
     pub fn apply(&mut self, cmd: Command) -> bool {
         match cmd {
             Command::SpawnAgents { count } => self.spawn_agents(count),
-            Command::BuildRoad { ax, ay, bx, by } => self.build_road(ax, ay, bx, by),
+            Command::BuildRoad { ax, ay, bx, by } => self.build_road(Shape {
+                a: (ax, ay),
+                b: (bx, by),
+                control: None,
+            }),
+            Command::BuildCurve {
+                ax,
+                ay,
+                cx,
+                cy,
+                bx,
+                by,
+            } => self.build_road(Shape {
+                a: (ax, ay),
+                b: (bx, by),
+                control: Some((cx, cy)),
+            }),
         }
     }
 
@@ -194,7 +226,7 @@ impl World {
             if a.state[i] == AgentState::Driving {
                 let lane = a.lane[i];
                 let (x, y) = self.roads.lane_point(lane, a.pos[i], LANE_OFFSET);
-                let heading = self.roads.lane_heading(lane);
+                let heading = self.roads.lane_heading(lane, a.pos[i]);
                 out.extend([
                     x,
                     y,
@@ -207,21 +239,16 @@ impl World {
         }
     }
 
-    /// Writes `[ax, ay, bx, by, speed_limit]` per road.
+    /// Writes `[ax, ay, bx, by, speed_limit]` per rendered segment (many per curve).
     pub fn write_road_segments(&self, out: &mut Vec<f32>) {
         let r = &self.roads;
         out.clear();
         out.reserve(r.road_count() * 5);
         for road in 0..r.road_count() {
             let lane = road * 2;
-            let (a, b) = (r.lane_from[lane] as usize, r.lane_to[lane] as usize);
-            out.extend([
-                r.node_x[a],
-                r.node_y[a],
-                r.node_x[b],
-                r.node_y[b],
-                r.lane_speed[lane],
-            ]);
+            for (_, a, _, b) in r.shape(road as RoadId).segments() {
+                out.extend([a.0, a.1, b.0, b.1, r.lane_speed[lane]]);
+            }
         }
     }
 
@@ -235,11 +262,58 @@ impl World {
 
     /// Writes `[x, y, join]` per stop of the road `BuildRoad` would build between these points,
     /// in order; nothing if it would be refused. Join is 0 = new end, 1 = existing node,
-    /// 2 = splits an existing road. Changes nothing, so the frontend can call it every frame.
+    /// 2 = splits an existing road, -1 = interior sample when following an existing curve.
+    /// Changes nothing, so the frontend can call it every frame.
     pub fn write_road_preview(&self, ax: f32, ay: f32, bx: f32, by: f32, out: &mut Vec<f32>) {
         out.clear();
-        for s in snap::plan_road(&self.roads, ax, ay, bx, by).unwrap_or_default() {
-            out.extend([s.x, s.y, join_code(s.join)]);
+        self.write_build_preview(
+            Shape {
+                a: (ax, ay),
+                b: (bx, by),
+                control: None,
+            },
+            out,
+        );
+    }
+
+    /// Same as road preview, with join -1 for interior curve samples (not junctions).
+    #[allow(clippy::too_many_arguments)] // Mirrors the coordinate-only WASM command boundary.
+    pub fn write_curve_preview(
+        &self,
+        ax: f32,
+        ay: f32,
+        cx: f32,
+        cy: f32,
+        bx: f32,
+        by: f32,
+        out: &mut Vec<f32>,
+    ) {
+        self.write_build_preview(
+            Shape {
+                a: (ax, ay),
+                b: (bx, by),
+                control: Some((cx, cy)),
+            },
+            out,
+        );
+    }
+
+    fn write_build_preview(&self, shape: Shape, out: &mut Vec<f32>) {
+        out.clear();
+        let Some(plan) = snap::plan(&self.roads, shape) else {
+            return;
+        };
+        let first = plan.stops[0];
+        out.extend([first.x, first.y, join_code(first.join)]);
+        for (i, leg) in plan.legs.iter().enumerate() {
+            for (_, _, t, p) in leg.segments() {
+                let join = if t == 1.0 {
+                    join_code(plan.stops[i + 1].join)
+                } else {
+                    -1.0
+                };
+                out.extend([p.0, p.1, join]);
+            }
         }
     }
 
@@ -290,12 +364,13 @@ impl World {
 
     /// Builds a street along `snap::plan_road`: joining nodes near its ends, and splitting the
     /// roads it crosses or ends beside so they meet at a junction.
-    fn build_road(&mut self, ax: f32, ay: f32, bx: f32, by: f32) -> bool {
-        let Some(stops) = snap::plan_road(&self.roads, ax, ay, bx, by) else {
+    fn build_road(&mut self, shape: Shape) -> bool {
+        let Some(plan) = snap::plan(&self.roads, shape) else {
             return false;
         };
         let mut split = Vec::new();
-        let nodes: Vec<NodeId> = stops
+        let nodes: Vec<NodeId> = plan
+            .stops
             .iter()
             .map(|s| match s.join {
                 Join::Node(n) => n,
@@ -303,15 +378,17 @@ impl World {
                 Join::Split(road) => {
                     // The plan splits each road at most once, so `road` still has its old ends.
                     let n = self.roads.add_node(s.x, s.y);
-                    self.roads.split_road(road, n);
+                    let rest = self.roads.split_road(road, n);
+                    self.junctions.remap_split(road, rest);
                     split.push(road);
                     n
                 }
             })
             .collect();
-        for leg in nodes.windows(2) {
+        for (leg, shape) in nodes.windows(2).zip(plan.legs) {
             // False where the plan follows an existing road, which is kept as it is.
-            self.roads.add_road(leg[0], leg[1], STREET_SPEED);
+            self.roads
+                .add_shape(leg[0], leg[1], shape.control, STREET_SPEED);
         }
         self.sync_roads();
         self.remove_cars_using(&split);
@@ -320,8 +397,8 @@ impl World {
 
     /// Removes cars whose remaining route uses a lane of `roads`, which were just split: those
     /// lanes now end somewhere else. They wait and start a new trip, like a stuck despawn.
-    /// Junction reservations on those lanes are left to expire; a split keeps a lane's
-    /// heading, which is all a reservation looks at.
+    /// Reservations retain their original endpoint geometry and expire normally, including
+    /// those for cars which already left the split road and remain in the world.
     fn remove_cars_using(&mut self, roads: &[RoadId]) {
         if roads.is_empty() {
             return;
@@ -921,7 +998,7 @@ mod tests {
         // Arm k's incoming lane is 2k + 1; its straight-on exit is the opposite arm's lane.
         let roads = world.roads.clone();
         let state = |signals: &[f32], lane: LaneId| {
-            let heading = roads.lane_heading(lane);
+            let heading = roads.lane_heading(lane, roads.lane_len[lane as usize]);
             signals
                 .chunks(SIGNAL_STRIDE)
                 .find(|s| (s[2] - heading).abs() < 1e-3)

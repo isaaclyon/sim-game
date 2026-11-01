@@ -8,7 +8,7 @@ rewriting history; mark the old one `Superseded by NNNN`.
 |---|---|---|
 | [0001](0001-record-architecture-decisions.md) | Record architecture decisions | Accepted |
 | [0002](0002-rust-sim-with-browser-frontend.md) | Rust sim compiled to WASM, browser frontend | Accepted |
-| [0003](0003-sim-and-rendering-are-separate.md) | Sim and rendering are separate: commands in, snapshots out | Accepted |
+| [0003](0003-sim-and-rendering-are-separate.md) | Sim and rendering are separate: commands in, snapshots out | Road snapshot cardinality superseded by 0013; otherwise accepted |
 | [0004](0004-deterministic-fixed-timestep-sim.md) | Deterministic fixed-timestep sim | Accepted |
 | [0005](0005-data-oriented-storage.md) | Data-oriented storage with append-only ids | Accepted |
 | [0006](0006-agents-pathfinding-and-traffic-model.md) | Agents, pathfinding and traffic model | Accepted; pathfinding superseded by 0010 |
@@ -18,6 +18,7 @@ rewriting history; mark the old one `Superseded by NNNN`.
 | [0010](0010-congestion-aware-routing-and-detours.md) | Congestion-aware routing and detours | Accepted |
 | [0011](0011-absolute-tick-budget.md) | Absolute tick budget for traffic | Accepted |
 | [0012](0012-la-scale-target.md) | Scale target: Los Angeles at rush hour, 10x speed | Accepted |
+| [0013](0013-curved-road-snapshots.md) | Curved roads use simulation-sampled segment snapshots | Accepted |
 
 ADRs are only for decisions that are hard to reverse. See [AGENTS.md](AGENTS.md) for when to
 write one and how.

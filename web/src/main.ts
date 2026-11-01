@@ -29,8 +29,22 @@ worker.onmessage = (e: MessageEvent<FromWorker>) => {
     roadsSeen = true;
   } else if (msg.type === 'roadPreview') {
     previewInFlight = false;
-    if (roadTool && previewEnd) renderer.setPreview(msg.stops, roadStart, previewEnd);
+    if (roadTool && previewEnd && msg.id === previewRevision) {
+      renderer.setPreview(msg.stops, roadStart, previewRequestedEnd);
+      refused = roadStart !== null && msg.stops.length === 0;
+      updateRoadHelp();
+    }
     sendPreview();
+  } else if (msg.type === 'buildResult') {
+    if (pendingBuild?.id !== msg.id) return;
+    if (msg.success) {
+      roadStart = pendingBuild.end;
+      roadControl = null;
+    }
+    pendingBuild = null;
+    refused = !msg.success;
+    invalidatePreview();
+    updateRoadHelp();
   } else {
     const now = performance.now();
     if (curr) frameGap = frameGap * 0.8 + (now - currAt) * 0.2;
@@ -56,10 +70,17 @@ function setSpeed(s: number) {
 for (const b of speedButtons) b.onclick = () => setSpeed(Number(b.dataset.speed));
 byId('spawn').onclick = () => send({ type: 'spawn', count: 5000 });
 
-// --- road tool: click to start, click to place (chains), Esc or right-click to stop ---
+// Straight: start → end. Curve: start → bend control → end. Both chain after success.
 const roadButton = byId('road');
-let roadTool = false;
+const curveButton = byId('curve');
+const roadHelp = byId('road-help');
+let roadTool: 'straight' | 'curve' | null = null;
 let roadStart: THREE.Vector3 | null = null;
+let roadControl: THREE.Vector3 | null = null;
+let refused = false;
+let nextBuildId = 0;
+let pendingBuild: { id: number; end: THREE.Vector3 } | null = null;
+let previewRevision = 0;
 // The sim works out where a road snaps; the preview asks it: where the road would start while
 // hovering, then the whole road once it has a start. Only one question is in flight at a time,
 // and only the latest cursor position is asked about, so a busy worker never falls behind the
@@ -67,25 +88,65 @@ let roadStart: THREE.Vector3 | null = null;
 let previewEnd: THREE.Vector3 | null = null;
 let previewWanted = false;
 let previewInFlight = false;
+let previewRequestedEnd: THREE.Vector3 | null = null;
+function updateRoadHelp() {
+  const stage = !roadStart
+    ? 'Click the road start.'
+    : roadTool === 'curve' && !roadControl
+      ? 'Click the bend control point, then the road end.'
+      : 'Click the road end.';
+  roadHelp.textContent = !roadTool
+    ? ''
+    : pendingBuild
+      ? 'Building road…'
+      : `${refused ? 'Cannot build here. Move the end away from overlaps or short joins. ' : ''}${stage} Esc or right-click cancels.`;
+}
+function invalidatePreview() {
+  previewRevision++;
+  previewEnd = null;
+  previewWanted = false;
+  renderer.setPreview(null, null, null);
+}
 function sendPreview() {
-  if (previewInFlight || !previewWanted || !roadTool || !previewEnd) return;
+  if (!previewWanted || !roadTool || !previewEnd || pendingBuild) return;
+  const [a, b, c] = [roadStart, previewEnd, roadControl];
+  if (a && roadTool === 'curve' && !c) {
+    // A control guide, not a road. Only the sim evaluates the actual Bézier curve.
+    previewWanted = false;
+    renderer.setPreview(new Float32Array([a.x, a.z, 0, b.x, b.z, -1]), a, b);
+    return;
+  }
+  if (previewInFlight) return;
   previewWanted = false;
   previewInFlight = true;
-  const [a, b] = [roadStart, previewEnd];
+  previewRequestedEnd = b;
+  const id = previewRevision;
   send(
     a
-      ? { type: 'previewRoad', ax: a.x, ay: a.z, bx: b.x, by: b.z }
-      : { type: 'previewSnap', x: b.x, y: b.z },
+      ? c
+        ? { type: 'previewCurve', id, ax: a.x, ay: a.z, cx: c.x, cy: c.z, bx: b.x, by: b.z }
+        : { type: 'previewRoad', id, ax: a.x, ay: a.z, bx: b.x, by: b.z }
+      : { type: 'previewSnap', id, x: b.x, y: b.z },
   );
 }
-function setRoadTool(on: boolean) {
-  roadTool = on;
+function setRoadTool(tool: typeof roadTool) {
+  roadTool = tool;
   roadStart = null;
-  previewEnd = null;
-  renderer.setPreview(null, null, null);
-  roadButton.classList.toggle('active', on);
+  roadControl = null;
+  pendingBuild = null;
+  refused = false;
+  invalidatePreview();
+  for (const [button, mode] of [
+    [roadButton, 'straight'],
+    [curveButton, 'curve'],
+  ] as const) {
+    button.classList.toggle('active', tool === mode);
+    button.setAttribute('aria-pressed', String(tool === mode));
+  }
+  updateRoadHelp();
 }
-roadButton.onclick = () => setRoadTool(!roadTool);
+roadButton.onclick = () => setRoadTool(roadTool === 'straight' ? null : 'straight');
+curveButton.onclick = () => setRoadTool(roadTool === 'curve' ? null : 'curve');
 
 const canvas = renderer.renderer.domElement;
 let downX = 0;
@@ -96,18 +157,33 @@ canvas.addEventListener('pointerdown', (e) => {
 });
 canvas.addEventListener('pointerup', (e) => {
   if (!roadTool) return;
-  if (e.button === 2) return setRoadTool(false);
+  if (e.button === 2) return setRoadTool(null);
+  if (pendingBuild) return;
   // Treat it as a click only if the pointer barely moved, so panning still works.
   if (e.button !== 0 || Math.hypot(e.clientX - downX, e.clientY - downY) > 4) return;
   const p = renderer.pick(e.clientX, e.clientY);
   if (!p) return;
-  if (roadStart) send({ type: 'buildRoad', ax: roadStart.x, ay: roadStart.z, bx: p.x, by: p.z });
-  roadStart = p;
-  previewEnd = null;
-  renderer.setPreview(null, null, null);
+  if (!roadStart) roadStart = p;
+  else if (roadTool === 'curve' && !roadControl) roadControl = p;
+  else {
+    const id = ++nextBuildId;
+    pendingBuild = { id, end: p };
+    const a = roadStart;
+    const c = roadControl;
+    send(
+      c
+        ? { type: 'buildCurve', id, ax: a.x, ay: a.z, cx: c.x, cy: c.z, bx: p.x, by: p.z }
+        : { type: 'buildRoad', id, ax: a.x, ay: a.z, bx: p.x, by: p.z },
+    );
+  }
+  refused = false;
+  invalidatePreview();
+  updateRoadHelp();
 });
 canvas.addEventListener('pointermove', (e) => {
-  if (!roadTool) return;
+  if (!roadTool || pendingBuild) return;
+  // Keep the latest completed preview visible during movement. Only a change of tool or
+  // construction stage invalidates an in-flight response; cursor updates queue the next one.
   previewEnd = renderer.pick(e.clientX, e.clientY);
   previewWanted = true;
   sendPreview();
@@ -115,8 +191,9 @@ canvas.addEventListener('pointermove', (e) => {
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
 addEventListener('keydown', (e) => {
-  if (e.key === 'r' || e.key === 'R') setRoadTool(!roadTool);
-  else if (e.key === 'Escape') setRoadTool(false);
+  if (e.key === 'r' || e.key === 'R') setRoadTool(roadTool === 'straight' ? null : 'straight');
+  else if (e.key === 'c' || e.key === 'C') setRoadTool(roadTool === 'curve' ? null : 'curve');
+  else if (e.key === 'Escape') setRoadTool(null);
   else if (e.key === ' ') setSpeed(speed === 0 ? 1 : 0);
   else if (e.key === '1') setSpeed(1);
   else if (e.key === '2') setSpeed(3);
@@ -148,8 +225,7 @@ function frame() {
       `driving    ${fmt(stats.driving)}   parked ${fmt(stats.parked)}\n` +
       `trips      ${fmt(stats.tripsCompleted)}\n` +
       `stuck      ${fmt(stats.despawnedStuck)}   no path ${fmt(stats.pathsFailed)}\n` +
-      `road edits ${fmt(stats.despawnedByEdit)} cars removed\n` +
-      (roadTool ? `\nROAD TOOL: click to place, Esc to stop` : '');
+      `road edits ${fmt(stats.despawnedByEdit)} cars removed\n`;
   }
   requestAnimationFrame(frame);
 }

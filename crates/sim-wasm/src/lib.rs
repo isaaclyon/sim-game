@@ -58,6 +58,31 @@ impl Sim {
         self.world.apply(Command::BuildRoad { ax, ay, bx, by })
     }
 
+    pub fn build_curve(&mut self, ax: f32, ay: f32, cx: f32, cy: f32, bx: f32, by: f32) -> bool {
+        self.world.apply(Command::BuildCurve {
+            ax,
+            ay,
+            cx,
+            cy,
+            bx,
+            by,
+        })
+    }
+
+    pub fn curve_preview(
+        &mut self,
+        ax: f32,
+        ay: f32,
+        cx: f32,
+        cy: f32,
+        bx: f32,
+        by: f32,
+    ) -> Vec<f32> {
+        self.world
+            .write_curve_preview(ax, ay, cx, cy, bx, by, &mut self.buf);
+        self.buf.clone()
+    }
+
     /// `[x, y, join]` per stop of the road `build_road` would build; see
     /// `World::write_road_preview`. Empty if it would be refused.
     pub fn road_preview(&mut self, ax: f32, ay: f32, bx: f32, by: f32) -> Vec<f32> {
@@ -88,7 +113,7 @@ impl Sim {
         self.buf.clone()
     }
 
-    /// `[ax, ay, bx, by, speed_limit]` per road.
+    /// `[ax, ay, bx, by, speed_limit]` per rendered segment; curves have multiple segments.
     pub fn road_segments(&mut self) -> Vec<f32> {
         self.world.write_road_segments(&mut self.buf);
         self.buf.clone()

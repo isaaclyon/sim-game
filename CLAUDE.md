@@ -16,12 +16,14 @@ What to build next and why lives in `docs/ROADMAP.md`. Work on the current miles
 
 ## Snapshot formats
 - Agents: `[x, y, heading, speed_ratio]` per agent (`SNAPSHOT_STRIDE`), speed_ratio < 0 = hidden.
-- Roads: `[ax, ay, bx, by, speed_limit]` per road.
+- Roads: `[ax, ay, bx, by, speed_limit]` per rendered segment; curved roads emit multiple segments.
 - Signals: `[x, y, heading, state]` per signalised approach (`SIGNAL_STRIDE`), state 0 = red,
   1 = green, 2 = protected-left green.
-- Road preview: `[x, y, join]` per stop of the road `BuildRoad` would build, join 0 = new end,
-  1 = existing node, 2 = splits a road; empty = refused. Answers `previewRoad`, or `previewSnap`
-  with one stop (where a road would start). Changes nothing.
+- Road preview: `[x, y, join]` per sample of the road `BuildRoad` / `BuildCurve` would build,
+  join -1 = interior curve sample (no marker), 0 = new end, 1 = existing node, 2 = splits a road;
+  empty = refused. Answers `previewRoad` / `previewCurve`, or `previewSnap` with one stop
+  (where a road would start). Echoes the request id so outdated previews can be discarded.
+  Changes nothing.
 Change both sides (Rust writer, `protocol.ts` doc, `renderer.ts` reader) together.
 
 ## Checks before finishing a change

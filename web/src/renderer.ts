@@ -8,7 +8,7 @@
 // - Vehicle matrices are written on the CPU each frame. If that becomes the bottleneck, move
 //   interpolation and orientation into a vertex shader fed by the raw snapshot.
 // - Picking is a ray against the ground plane. Add three-mesh-bvh once we pick against meshes.
-// - Road meshes will likely want BatchedMesh, bezierjs for curves and earcut for polygons.
+// - Road meshes may want BatchedMesh and earcut. Curve sampling belongs to the sim.
 
 import CameraControls from 'camera-controls';
 import * as THREE from 'three';
@@ -101,7 +101,7 @@ export class Renderer {
     });
   }
 
-  /** `segments` is `[ax, ay, bx, by, speedLimit]` per road. */
+  /** `segments` is `[ax, ay, bx, by, speedLimit]` per rendered segment (many per curve). */
   setRoads(segments: Float32Array, bounds: [number, number, number, number], fitCamera: boolean) {
     const n = segments.length / 5;
     const positions = new Float32Array(n * 6);
@@ -258,8 +258,9 @@ export class Renderer {
   /**
    * Draws the road the sim would build from `a` to `b`. `stops` is `[x, y, join]` per stop
    * (see `roadPreview` in protocol.ts): the line follows the stops, with a marker where it joins
-   * the network. Empty `stops` means refused: a red straight line. A single stop is where a
-   * road would start, drawn as a marker even for a new end. `null` hides the preview.
+   * the network. Join -1 marks interior curve samples without a marker. Empty `stops` means
+   * refused: a red straight line. A single stop is where a road would start, drawn as a marker
+   * even for a new end. `null` hides the preview.
    */
   setPreview(stops: Float32Array | null, a: THREE.Vector3 | null, b: THREE.Vector3 | null) {
     const line: THREE.Vector3[] = [];
