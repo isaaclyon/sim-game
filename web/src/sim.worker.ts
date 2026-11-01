@@ -110,8 +110,8 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
     case 'buildCurve': {
       const success = sim
         ? msg.type === 'buildCurve'
-          ? sim.build_curve(msg.ax, msg.ay, msg.cx, msg.cy, msg.bx, msg.by)
-          : sim.build_road(msg.ax, msg.ay, msg.bx, msg.by)
+          ? sim.build_curve(msg.ax, msg.ay, msg.cx, msg.cy, msg.bx, msg.by, msg.class)
+          : sim.build_road(msg.ax, msg.ay, msg.bx, msg.by, msg.class)
         : false;
       if (success && sim) sendRoadsIfChanged(sim);
       post({ type: 'buildResult', id: msg.id, success });

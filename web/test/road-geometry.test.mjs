@@ -87,11 +87,11 @@ test('sampled roads preserve exact shared endpoints for asphalt pads', () => {
     const sim = new Sim(1, 0, 0);
     assert.ok(
       curved
-        ? sim.build_curve(-100, -100, -50, -20, 0.1, 0.1)
-        : sim.build_road(-100, -100, 0.1, 0.1),
+        ? sim.build_curve(-100, -100, -50, -20, 0.1, 0.1, 0)
+        : sim.build_road(-100, -100, 0.1, 0.1, 0),
     );
     const first = sim.road_segments();
-    assert.ok(sim.build_road(0.1, 0.1, 100, -100));
+    assert.ok(sim.build_road(0.1, 0.1, 100, -100, 0));
     const segments = sim.road_segments();
     assert.deepEqual(
       [...segments.slice(first.length - 3, first.length - 1)],
@@ -106,10 +106,28 @@ test('sampled roads preserve exact shared endpoints for asphalt pads', () => {
   }
 });
 
-test('speed limits do not change asphalt geometry', () => {
-  const street = geometry([[0, 0, 100, 0, 10]]);
-  const avenue = geometry([[0, 0, 100, 0, 25]]);
-  assert.deepEqual(street.getAttribute('position').array, avenue.getAttribute('position').array);
+test('main roads are wider, and junction pads fit the widest road', () => {
+  const main = geometry([[0, 0, 100, 0, 1]]);
+  assert.ok(covers(main, 50, 5.9));
+  assert.ok(!covers(main, 50, 6.1));
+  const street = geometry([[0, 0, 100, 0, 0]]);
+  assert.ok(!covers(street, 50, 4.1));
+  const junction = geometry([
+    [0, 0, 100, 0, 1],
+    [0, 0, 0, 100, 0],
+  ]);
+  for (let i = 0; i < 360; i++) {
+    const angle = (i * Math.PI) / 180;
+    assert.ok(covers(junction, 5.99 * Math.cos(angle), 5.99 * Math.sin(angle)));
+  }
+});
+
+test('the sim rejects unknown road classes', () => {
+  const sim = new Sim(1, 0, 0);
+  assert.equal(sim.build_road(0, 0, 100, 0, 2), false);
+  assert.ok(sim.build_road(0, 0, 100, 0, 1));
+  assert.equal(sim.road_segments()[4], 1, 'snapshot carries the class');
+  sim.free();
 });
 
 test('empty and zero-length roads produce no invalid triangles', () => {

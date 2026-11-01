@@ -118,7 +118,7 @@ export class Renderer {
     });
   }
 
-  /** `segments` is `[ax, ay, bx, by, speedLimit]` per active rendered segment (many per curve), not per road ID. */
+  /** `segments` is `[ax, ay, bx, by, class]` per active rendered segment (many per curve), not per road ID. */
   setRoads(segments: Float32Array, bounds: [number, number, number, number], fitCamera: boolean) {
     const geom = buildRoadGeometry(segments);
     if (this.roads) {

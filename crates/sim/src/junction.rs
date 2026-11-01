@@ -11,7 +11,7 @@
 use std::f32::consts::{FRAC_PI_4, PI, TAU};
 
 use crate::agents::{AgentId, Agents};
-use crate::road::{LaneId, NodeId, RoadNetwork, STREET_SPEED};
+use crate::road::{LaneId, NodeId, RoadClass, RoadNetwork};
 use crate::traffic::{ACCEL, SPACING, Traffic};
 
 /// Distance from the node centre to the stop line, metres. Clamped on short lanes.
@@ -157,9 +157,7 @@ impl Junctions {
         self.control = (0..nodes as NodeId)
             .map(|n| {
                 let out = net.out_lanes(n);
-                let avenue = out
-                    .iter()
-                    .any(|&l| net.lane_speed[l as usize] > STREET_SPEED);
+                let avenue = out.iter().any(|&l| net.lane_class(l) == RoadClass::Main);
                 match out.len() {
                     0..=2 => Control::None,
                     3 => Control::Priority,
@@ -303,9 +301,9 @@ impl Junctions {
         match self.control[node as usize] {
             Control::None => false,
             Control::Priority => {
-                let (sa, sb) = (net.lane_speed[a as usize], net.lane_speed[b as usize]);
-                if sa != sb {
-                    return sb > sa; // The bigger road has right of way.
+                let (ca, cb) = (net.lane_class(a), net.lane_class(b));
+                if ca != cb {
+                    return cb == RoadClass::Main; // The main road has right of way.
                 }
                 // Counter-clockwise from your own road is your right (y up, right-hand traffic).
                 let from_right = rel > 0.0 && rel < 5.0 * PI / 6.0;
@@ -605,19 +603,17 @@ pub fn next_lane(agents: &Agents, agent: AgentId) -> Option<LaneId> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::road::AVENUE_SPEED;
-
     /// A junction at the origin with arms 100 m away, east, north, west, south in that order,
-    /// skipping any arm whose speed is `None`. Arm `k` owns lane `2k` (out of the junction)
+    /// skipping any arm whose class is `None`. Arm `k` owns lane `2k` (out of the junction)
     /// and `2k + 1` (into it).
-    fn junction(arms: [Option<f32>; 4]) -> (RoadNetwork, Junctions) {
+    fn junction(arms: [Option<RoadClass>; 4]) -> (RoadNetwork, Junctions) {
         let mut net = RoadNetwork::default();
         let centre = net.add_node(0.0, 0.0);
-        for (k, speed) in arms.iter().enumerate() {
-            let Some(speed) = *speed else { continue };
+        for (k, class) in arms.iter().enumerate() {
+            let Some(class) = *class else { continue };
             let angle = k as f32 * PI / 2.0;
             let arm = net.add_node(100.0 * angle.cos(), 100.0 * angle.sin());
-            net.add_road(centre, arm, speed);
+            net.add_road(centre, arm, class);
         }
         net.rebuild_adjacency();
         let mut j = Junctions::default();
@@ -625,8 +621,8 @@ mod tests {
         (net, j)
     }
 
-    const S: Option<f32> = Some(STREET_SPEED);
-    const A: Option<f32> = Some(AVENUE_SPEED);
+    const S: Option<RoadClass> = Some(RoadClass::Street);
+    const A: Option<RoadClass> = Some(RoadClass::Main);
     // Lanes of the four-way junction.
     const IN_E: LaneId = 1;
     const IN_N: LaneId = 3;
@@ -643,8 +639,8 @@ mod tests {
         let a = net.add_node(0.0, 0.0);
         let b = net.add_node(200.0, 0.0);
         let c = net.add_node(300.0, 0.0);
-        net.add_curve(a, b, (100.0, 100.0), STREET_SPEED);
-        net.add_road(b, c, STREET_SPEED);
+        net.add_curve(a, b, (100.0, 100.0), RoadClass::Street);
+        net.add_road(b, c, RoadClass::Street);
         net.rebuild_adjacency();
         let mut j = Junctions::default();
         j.sync(&net);
