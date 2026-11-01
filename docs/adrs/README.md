@@ -22,6 +22,7 @@ rewriting history; mark the old one `Superseded by NNNN`.
 | [0014](0014-zone-grid.md) | Zones live on a fixed grid, independent of blocks | Accepted |
 | [0015](0015-curved-road-snapshots.md) | Curved roads use simulation-sampled segment snapshots | Accepted |
 | [0016](0016-blocks-lots-and-alleys.md) | Blocks are derived road faces; lots are zone-cell sets; the sim adds alleys | Accepted |
+| [0017](0017-lots-cut-along-roads.md) | Lots are shapes cut along roads; buildings take their shape from lots | Proposed |
 
 ADRs are only for decisions that are hard to reverse. See [AGENTS.md](AGENTS.md) for when to
 write one and how.
