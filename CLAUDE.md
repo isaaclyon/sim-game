@@ -13,6 +13,10 @@ What to build next and why lives in `docs/ROADMAP.md`. Work on the current miles
 - Storage is struct-of-arrays (`Vec` per field). Keep it that way for anything with 10k+ entries.
 - Ids (`NodeId`, `LaneId`, `AgentId`) are indices and append-only.
 - `crates/sim-wasm` only converts types. Logic goes in `sim`.
+- Hand-written code files, tests and scripts included, stay at or under 500 physical lines.
+  Split a growing file by responsibility into a module folder (`foo/mod.rs` plus private child
+  modules; integration tests as `tests/foo/main.rs`), not into numbered chunks.
+  `scripts/line-limit.mjs` enforces it and skips generated WASM bindings, dependencies and docs.
 
 ## Snapshot formats
 - Agents: `[x, y, heading, speed_ratio]` per agent (`SNAPSHOT_STRIDE`), speed_ratio < 0 = hidden.
@@ -38,7 +42,7 @@ What to build next and why lives in `docs/ROADMAP.md`. Work on the current miles
 Change both sides (Rust writer, `protocol.ts` doc, `renderer.ts` reader) together.
 
 ## Checks before finishing a change
-- `scripts/check.sh` (same as CI): gitleaks over full history, rustfmt, clippy `-D warnings` (host + wasm32), `cargo test -p sim`,
+- `scripts/check.sh` (same as CI): gitleaks over full history, the 500-line file limit, rustfmt, clippy `-D warnings` (host + wasm32), `cargo test -p sim`,
   WASM worker and frontend geometry tests (Node 24+), Biome lint/format, `tsc`.
   `scripts/check.sh --fix` applies formatting and safe fixes first.
 - The repo is public. `.githooks/pre-commit` runs gitleaks on staged changes; enable it per clone

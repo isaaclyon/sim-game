@@ -56,6 +56,7 @@ frontend tests, use `cd web && npm test`.
 - `crates/sim` – the simulation. No I/O, no clock, no randomness except the seeded `Rng`.
 - `crates/sim-wasm` – wasm-bindgen wrapper around `sim`.
 - `web/` – Vite app. `sim.worker.ts` owns the sim; `main.ts` draws snapshots.
+- `scripts/` – `check.sh` runs every CI check, including the 500-line limit on code files.
 
 Architecture decisions: [docs/adrs](docs/adrs/README.md). Plan: [docs/ROADMAP.md](docs/ROADMAP.md).
 
