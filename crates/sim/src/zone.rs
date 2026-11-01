@@ -82,33 +82,34 @@ impl ZoneGrid {
     }
 
     /// Sets every cell whose centre lies inside the rectangle with corners `(ax, ay)` and
-    /// `(bx, by)`, clipped to the grid. Returns whether any cell changed.
-    pub fn paint(&mut self, ax: f32, ay: f32, bx: f32, by: f32, zone: Zone) -> bool {
+    /// `(bx, by)`, clipped to the grid. Returns the cells that changed, ascending.
+    pub fn paint(&mut self, ax: f32, ay: f32, bx: f32, by: f32, zone: Zone) -> Vec<u32> {
         if ![ax, ay, bx, by].iter().all(|v| v.is_finite()) {
-            return false;
+            return Vec::new();
         }
         let rect = [ax.min(bx), ay.min(by), ax.max(bx), ay.max(by)];
         let cells: Vec<u32> = self.cells_in(rect).collect();
         self.set(&cells, zone)
     }
 
-    /// Sets the given cells (row-major indices) to `zone`. Returns whether any cell changed.
-    pub fn set(&mut self, cells: &[u32], zone: Zone) -> bool {
-        let mut changed = false;
+    /// Sets the given cells (row-major indices) to `zone`. Returns the ones that changed, in
+    /// the given order.
+    pub fn set(&mut self, cells: &[u32], zone: Zone) -> Vec<u32> {
+        let mut changed = Vec::new();
         for &i in cells {
             let cell = &mut self.cells[i as usize];
             if *cell == zone as u8 {
                 continue;
             }
+            changed.push(i);
             if *cell == Zone::None as u8 {
                 self.zoned += 1;
             } else if zone == Zone::None {
                 self.zoned -= 1;
             }
             *cell = zone as u8;
-            changed = true;
         }
-        if changed {
+        if !changed.is_empty() {
             self.version = self.version.wrapping_add(1);
         }
         changed
@@ -192,7 +193,10 @@ mod tests {
     fn paints_cells_whose_centres_are_inside_either_corner_order() {
         let mut g = grid();
         // Cells with centres 4, 12, 20 (x) and 4 (y) are inside; 28 is not.
-        assert!(g.paint(24.0, 6.0, 0.0, 0.0, Zone::CommercialHigh));
+        assert!(
+            !g.paint(24.0, 6.0, 0.0, 0.0, Zone::CommercialHigh)
+                .is_empty()
+        );
         assert_eq!(g.zone_at(1.0, 1.0), Some(Zone::CommercialHigh));
         assert_eq!(g.zone_at(23.0, 7.0), Some(Zone::CommercialHigh));
         assert_eq!(g.zone_at(25.0, 1.0), Some(Zone::None));
@@ -203,26 +207,44 @@ mod tests {
     #[test]
     fn repainting_the_same_zone_changes_nothing_and_unzone_clears() {
         let mut g = grid();
-        assert!(g.paint(0.0, 0.0, 40.0, 40.0, Zone::ResidentialLow));
-        assert!(!g.paint(0.0, 0.0, 40.0, 40.0, Zone::ResidentialLow));
+        assert!(
+            !g.paint(0.0, 0.0, 40.0, 40.0, Zone::ResidentialLow)
+                .is_empty()
+        );
+        assert!(
+            g.paint(0.0, 0.0, 40.0, 40.0, Zone::ResidentialLow)
+                .is_empty()
+        );
         assert_eq!(g.version, 1);
-        assert!(g.paint(0.0, 0.0, 40.0, 40.0, Zone::ResidentialHigh));
+        assert!(
+            !g.paint(0.0, 0.0, 40.0, 40.0, Zone::ResidentialHigh)
+                .is_empty()
+        );
         assert_eq!(g.zone_at(10.0, 10.0), Some(Zone::ResidentialHigh));
-        assert!(g.paint(0.0, 0.0, 40.0, 40.0, Zone::None));
+        assert!(!g.paint(0.0, 0.0, 40.0, 40.0, Zone::None).is_empty());
         assert_eq!(g.zone_at(10.0, 10.0), Some(Zone::None));
     }
 
     #[test]
     fn clips_to_the_grid_and_ignores_bad_input() {
         let mut g = grid();
-        assert!(g.paint(-1e6, -1e6, 1e6, 1e6, Zone::IndustrialLow));
+        assert!(
+            !g.paint(-1e6, -1e6, 1e6, 1e6, Zone::IndustrialLow)
+                .is_empty()
+        );
         assert!(g.cells.iter().all(|&c| c == Zone::IndustrialLow as u8));
         let mut g = grid();
-        assert!(!g.paint(1e6, 1e6, 2e6, 2e6, Zone::IndustrialLow));
-        assert!(!g.paint(f32::NAN, 0.0, 10.0, 10.0, Zone::IndustrialLow));
-        assert!(!g.paint(0.0, 0.0, f32::INFINITY, 10.0, Zone::IndustrialLow));
+        assert!(g.paint(1e6, 1e6, 2e6, 2e6, Zone::IndustrialLow).is_empty());
+        assert!(
+            g.paint(f32::NAN, 0.0, 10.0, 10.0, Zone::IndustrialLow)
+                .is_empty()
+        );
+        assert!(
+            g.paint(0.0, 0.0, f32::INFINITY, 10.0, Zone::IndustrialLow)
+                .is_empty()
+        );
         // A rectangle smaller than a cell that misses every centre paints nothing.
-        assert!(!g.paint(0.5, 0.5, 1.5, 1.5, Zone::IndustrialLow));
+        assert!(g.paint(0.5, 0.5, 1.5, 1.5, Zone::IndustrialLow).is_empty());
         assert_eq!(g.version, 0);
     }
 }

@@ -411,3 +411,80 @@ fn zoning_the_generated_town_is_deterministic() {
     };
     assert_eq!(run(), run());
 }
+
+#[test]
+fn merging_then_opening_a_block_retires_all_its_lots() {
+    let mut w = empty();
+    rect(&mut w, 0.0, 0.0, 100.0, 100.0);
+    road(&mut w, 100.0, 0.0, 200.0, 0.0);
+    road(&mut w, 200.0, 0.0, 200.0, 100.0);
+    road(&mut w, 200.0, 100.0, 100.0, 100.0);
+    assert!(fill(&mut w, 50.0, 50.0, Zone::ResidentialLow));
+    assert!(fill(&mut w, 150.0, 50.0, Zone::ResidentialLow));
+    assert!(w.apply(Command::DeleteRoad { x: 100.0, y: 50.0 }));
+    assert!(
+        w.lots.active_lots().next().is_some(),
+        "the merged block keeps lots"
+    );
+    // Lots kept through the merge must know their block grew, so opening it finds them.
+    assert!(w.apply(Command::DeleteRoad { x: 200.0, y: 50.0 }));
+    assert_eq!(w.lots.active_lots().count(), 0, "no closed block, no lots");
+    let mut outlines = Vec::new();
+    w.write_lot_outlines(&mut outlines);
+    assert!(outlines.is_empty());
+}
+
+#[test]
+fn an_alley_keeps_the_lots_across_the_street() {
+    let mut w = empty();
+    rect(&mut w, -100.0, 0.0, 0.0, 200.0);
+    road(&mut w, 0.0, 0.0, 400.0, 0.0);
+    road(&mut w, 400.0, 0.0, 400.0, 200.0);
+    road(&mut w, 400.0, 200.0, 0.0, 200.0);
+    assert!(fill(&mut w, -50.0, 100.0, Zone::ResidentialLow));
+    let west: BTreeSet<LotId> = w.lots.active_lots().collect();
+    assert!(!west.is_empty());
+    let roads = w.roads.road_count();
+    assert!(fill(&mut w, 200.0, 100.0, Zone::ResidentialLow));
+    assert!(w.roads.road_count() > roads, "the deep block got an alley");
+    let after: BTreeSet<LotId> = w.lots.active_lots().collect();
+    assert!(
+        west.is_subset(&after),
+        "zoning next door retires no lots here"
+    );
+    let active: BTreeSet<u32> = w.roads.active_roads().collect();
+    for &l in &west {
+        let l = l as usize;
+        let r = w.lots.road[l];
+        assert!(active.contains(&r));
+        // The frontage road still passes through the lot's front point.
+        let (a, b) = w.roads.road_ends(r);
+        let (ax, ay) = (w.roads.node_x[a as usize], w.roads.node_y[a as usize]);
+        let (bx, by) = (w.roads.node_x[b as usize], w.roads.node_y[b as usize]);
+        let (fx, fy) = (w.lots.front_x[l], w.lots.front_y[l]);
+        let inside = |v: f32, p: f32, q: f32| v >= p.min(q) - 0.01 && v <= p.max(q) + 0.01;
+        assert!(
+            inside(fx, ax, bx) && inside(fy, ay, by),
+            "lot {l} fronts road {r}"
+        );
+    }
+    check_lots(&w);
+}
+
+#[test]
+fn repainting_without_changing_the_interior_does_not_bring_an_alley_back() {
+    let mut w = empty();
+    rect(&mut w, 0.0, 0.0, 400.0, 200.0);
+    assert!(fill(&mut w, 200.0, 100.0, Zone::ResidentialLow));
+    assert!(w.apply(Command::DeleteRoad { x: 200.0, y: 100.0 }));
+    let roads = w.roads.road_count();
+    // Same zone; only cells under and beyond the roads change.
+    assert!(w.apply(Command::PaintZone {
+        ax: -16.0,
+        ay: -16.0,
+        bx: 416.0,
+        by: 216.0,
+        zone: Zone::ResidentialLow,
+    }));
+    assert_eq!(w.roads.road_count(), roads, "a bulldozed alley stays gone");
+}

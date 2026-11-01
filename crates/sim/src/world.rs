@@ -36,6 +36,23 @@ const RETRY_AFTER_S: f32 = 10.0;
 /// Rounds of alley cuts one zoning command may make; each round can halve a deep block.
 const ALLEY_ROUNDS: u32 = 6;
 
+/// Which blocks a lot update looks at, by bounding box.
+enum Scope<'a> {
+    /// Blocks meeting this area: after a player's edit.
+    Near(Rect),
+    /// Blocks inside one of these blocks' bounds: the pieces of blocks just divided by alleys.
+    Inside(&'a [Rect]),
+}
+
+impl Scope<'_> {
+    fn has(&self, block: Rect) -> bool {
+        match self {
+            Scope::Near(area) => block::intersects(block, *area),
+            Scope::Inside(blocks) => blocks.iter().any(|&b| block::contains_rect(b, block, 0.5)),
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Config {
     pub seed: u64,
@@ -216,12 +233,11 @@ impl World {
                 zone,
             } => {
                 let changed = self.zones.paint(ax, ay, bx, by, zone);
-                if changed {
+                if !changed.is_empty() {
                     let rect = [ax.min(bx), ay.min(by), ax.max(bx), ay.max(by)];
-                    let painted = self.zones.cells_in(rect).collect();
-                    self.after_zoning(rect, painted);
+                    self.after_zoning(rect, &changed);
                 }
-                changed
+                !changed.is_empty()
             }
             Command::FillBlock { x, y, zone } => self.fill_block(x, y, zone),
         }
@@ -467,7 +483,7 @@ impl World {
         };
         self.sync_roads();
         self.remove_cars_using(&split);
-        self.update_lots(rect, true);
+        self.update_lots(Scope::Near(rect), true);
         true
     }
 
@@ -507,7 +523,7 @@ impl World {
         self.roads.remove_road(road);
         self.remove_cars_using(&[road]);
         self.sync_roads();
-        self.update_lots(block::shape_rect(self.roads.shape(road)), true);
+        self.update_lots(Scope::Near(block::shape_rect(self.roads.shape(road))), true);
         true
     }
 
@@ -526,27 +542,42 @@ impl World {
             .iter()
             .map(|c| c.index)
             .collect();
-        if !self.zones.set(&cells, zone) {
+        let changed = self.zones.set(&cells, zone);
+        if changed.is_empty() {
             return false;
         }
-        self.after_zoning(self.blocks.rect(b), cells);
+        self.after_zoning(self.blocks.rect(b), &changed);
         true
     }
 
     /// After a zoning command changed cells: alleys for deep blocks, then lots for newly zoned
-    /// blocks. `painted` holds the cells the command set, ascending; `rect` bounds them.
-    fn after_zoning(&mut self, rect: Rect, painted: Vec<u32>) {
-        if let Some(alleys) = self.add_alleys(rect, &painted) {
-            self.update_lots(alleys, true);
+    /// blocks. `changed` holds the cells whose zone changed, ascending; `rect` bounds them.
+    fn after_zoning(&mut self, rect: Rect, changed: &[u32]) {
+        let (divided, split) = self.add_alleys(rect, changed);
+        if !divided.is_empty() {
+            // Lots across the street from an alley keep their ids; the road they front was
+            // only split, so they move to the piece in front of them.
+            self.refresh_blocks();
+            for lot in self.lots.active_lots().collect::<Vec<_>>() {
+                let l = lot as usize;
+                if split.contains(&self.lots.road[l])
+                    && let Some(road) = self
+                        .blocks
+                        .road_at((self.lots.front_x[l], self.lots.front_y[l]))
+                {
+                    self.lots.road[l] = road;
+                }
+            }
+            self.update_lots(Scope::Inside(&divided), true);
         }
-        self.update_lots(rect, false);
+        self.update_lots(Scope::Near(rect), false);
     }
 
     /// Cuts blocks near `rect` that have enough zoned cells out of a road's reach, some of them
-    /// just painted, with alleys or connector streets; then the pieces, for a few rounds.
-    /// Returns the area it changed.
-    fn add_alleys(&mut self, rect: Rect, painted: &[u32]) -> Option<Rect> {
-        let mut edited: Option<Rect> = None;
+    /// just changed, with alleys or connector streets; then the pieces, for a few rounds.
+    /// Returns the bounds of the blocks it divided and the roads it split.
+    fn add_alleys(&mut self, rect: Rect, changed: &[u32]) -> (Vec<Rect>, Vec<RoadId>) {
+        let mut divided = Vec::new();
         let mut split = Vec::new();
         let mut cut: Vec<Rect> = Vec::new();
         for round in 0..ALLEY_ROUNDS {
@@ -569,7 +600,7 @@ impl World {
                     .map(|c| c.index)
                     .collect();
                 if deep.len() < MIN_DEEP_CELLS
-                    || (round == 0 && !deep.iter().any(|c| painted.binary_search(c).is_ok()))
+                    || (round == 0 && !deep.iter().any(|c| changed.binary_search(c).is_ok()))
                 {
                     continue;
                 }
@@ -579,8 +610,10 @@ impl World {
             for (br, options) in plans {
                 for (shape, alley) in options {
                     let speed = if alley { ALLEY_SPEED } else { STREET_SPEED };
-                    if let Some(r) = self.add_road(shape, speed, &mut split) {
-                        edited = Some(edited.map_or(r, |e| block::union(e, r)));
+                    if self.add_road(shape, speed, &mut split).is_some() {
+                        if round == 0 {
+                            divided.push(br);
+                        }
                         cut.push(br);
                         break;
                     }
@@ -590,23 +623,23 @@ impl World {
                 break;
             }
         }
-        if edited.is_some() {
+        if !divided.is_empty() {
             self.sync_roads();
             self.remove_cars_using(&split);
         }
-        edited
+        (divided, split)
     }
 
-    /// Recuts lots in blocks whose bounding box meets `area` (ADR 0016). With `retire`, after a
-    /// road edit: lots there that no longer match are retired. Without, after zoning: only
-    /// zoned blocks with no lots yet are cut.
-    fn update_lots(&mut self, area: Rect, retire: bool) {
+    /// Recuts lots in the blocks of `scope` (ADR 0016). With `retire`, after a road edit: lots
+    /// there that no longer match are retired. Without, after zoning: only zoned blocks with no
+    /// lots yet are cut.
+    fn update_lots(&mut self, scope: Scope, retire: bool) {
         if self.lots.active_lots().next().is_none() && !self.zones.any_zoned() {
             return;
         }
         self.refresh_blocks();
         let old = if retire {
-            self.lots.active_in(area)
+            self.lots.active_in(|r| scope.has(r))
         } else {
             Vec::new()
         };
@@ -614,7 +647,7 @@ impl World {
         let mut plans = Vec::new();
         for b in 0..self.blocks.len() {
             let br = self.blocks.rect(b);
-            if !block::intersects(br, area) {
+            if !scope.has(br) {
                 continue;
             }
             let cells = self.blocks.cells(b, &self.zones);
@@ -626,6 +659,8 @@ impl World {
             for plan in self.blocks.cut(&cells, self.zones.cols) {
                 match self.lots.matching(&plan) {
                     Some(lot) => {
+                        // Its block may have grown or shrunk around it.
+                        self.lots.set_block(lot, br);
                         kept.insert(lot);
                     }
                     None => plans.push((plan, br)),

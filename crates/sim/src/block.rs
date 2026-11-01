@@ -300,6 +300,16 @@ impl Blocks {
         cells
     }
 
+    /// The road whose centreline passes nearest `p`, among roads whose bounds are within a
+    /// metre of it.
+    pub(crate) fn road_at(&self, p: Point) -> Option<RoadId> {
+        let near = [p.0 - 1.0, p.1 - 1.0, p.0 + 1.0, p.1 + 1.0];
+        let roads: Vec<RoadId> = (0..self.road_rect.len() as RoadId)
+            .filter(|&r| intersects(self.road_rect[r as usize], near))
+            .collect();
+        self.nearest(&roads, 0, p).map(|c| c.road)
+    }
+
     fn nearest(&self, roads: &[RoadId], index: u32, at: Point) -> Option<Cell> {
         let mut best: Option<Cell> = None;
         for &r in roads {

@@ -52,21 +52,25 @@ allocated when the first lot is cut, maps each zone cell to at most one active l
 **When lots change:**
 
 - A zoning command (`PaintZone`, `FillBlock`) that changes cells cuts lots in every block it
-  touched that contains a zoned cell and has no lots yet. Zoning never removes or recuts lots,
-  so repainting or unzoning keeps lot ids (and, later, their buildings; see #17).
+  touched that contains a zoned cell and has no lots yet. Zoning removes or recuts lots only in
+  a block an alley divides (below), so repainting or unzoning keeps lot ids (and, later, their
+  buildings; see #17).
 - A road edit (build, split, bulldoze) recuts the blocks near the edit. A recut lot with the
-  same cells, frontage road and front point as an existing lot keeps that lot's id; other old
-  lots there are retired and new ones appended. Touched blocks with no zoned cells lose their
-  lots.
+  same cells, frontage road and front point as an existing lot keeps that lot's id (and takes
+  its block's new bounds); other old lots there are retired and new ones appended. Touched
+  blocks with no zoned cells lose their lots.
 
 **Alleys.** After a zoning command, a block that has at least six zoned interior cells, among
-them a cell this command changed, is cut by a straight road through its middle, ending on
+them a cell whose zone this command changed, is cut by a straight road through its middle, ending on
 the roads around it. If the block is more than twice as long as it is wide, the cut is an
 alley along its length at 30 km/h; otherwise it is a connector street across it at street
 speed. The pieces are checked again, up to six rounds per command. Cuts go through the normal
 construction planner (`BuildRoad` rules), so they snap, split and refuse exactly like player
 roads, and the player can bulldoze them. Road edits never add alleys, so a bulldozed alley
-stays gone until the player zones that block's interior again.
+stays gone until the player changes the zone of that block's interior again. Only the divided
+block is recut, by the road edit rule: its lots that no longer match are retired, since the
+alley may run through them. Lots across the street keep their ids; where an alley splits the
+road they face, they switch to the piece their front point lies on.
 
 **Buildings (#16)** will live in their own struct-of-arrays, each on one lot id, at most one per
 lot. Retiring a lot (a road edit) removes its building; zoning changes never retire lots.

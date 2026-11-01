@@ -3,7 +3,7 @@
 //! A lot is a set of zone cells facing one road. Ids are append-only; a retired lot keeps its
 //! slot and record, like a deleted road (ADR 0013).
 
-use crate::block::{LotPlan, Rect, intersects};
+use crate::block::{LotPlan, Rect};
 use crate::road::RoadId;
 use crate::zone::{Zone, ZoneGrid};
 
@@ -73,11 +73,15 @@ impl Lots {
         Zone::from_u8(best as u8).unwrap_or(Zone::None)
     }
 
-    /// Active lots cut from blocks whose bounding box meets `rect`.
-    pub(crate) fn active_in(&self, rect: Rect) -> Vec<LotId> {
+    /// Active lots whose block bounds pass `hit`.
+    pub(crate) fn active_in(&self, hit: impl Fn(Rect) -> bool) -> Vec<LotId> {
         self.active_lots()
-            .filter(|&l| intersects(self.block[l as usize], rect))
+            .filter(|&l| hit(self.block[l as usize]))
             .collect()
+    }
+
+    pub(crate) fn set_block(&mut self, lot: LotId, block: Rect) {
+        self.block[lot as usize] = block;
     }
 
     /// The active lot identical to `plan`, if any.
