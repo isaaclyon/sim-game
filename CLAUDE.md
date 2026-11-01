@@ -29,7 +29,8 @@ Change both sides (Rust writer, `protocol.ts` doc, `renderer.ts` reader) togethe
 - `clippy.toml` bans `HashMap`/`HashSet` and `Instant::now`/`SystemTime::now` to protect
   determinism. Use `BTreeMap`/`BTreeSet` or `Vec` storage; only `#[allow]` with a comment where
   state is unaffected (benches).
-- For perf-sensitive sim changes, rerun `traffic_bench` and compare ms/tick.
+- For perf-sensitive sim changes, rerun `traffic_bench` and compare ms/tick, at the default size
+  (ADR 0011) and with `--scale la` (ADR 0012).
 
 ## Licensing
 Only MIT / Apache-2.0 / BSD / ISC dependencies. GPL/AGPL projects (Egregoria, Citybound, movsim)
