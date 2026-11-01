@@ -31,7 +31,9 @@ is too deep to reach from its edges; these are ordinary roads you can bulldoze.
 Buildings start appearing after a few simulation seconds and fill suitable zoned lots within
 about a minute at normal speed. Low-density homes have yards; apartments and shops follow lot
 shapes and share side walls; industry grows as sheds with space around them. Density changes
-building height. Very small or awkward lots can stay open. Growth pauses with the simulation.
+building height. Very small or awkward lots can stay open. A partly painted lot also stays
+empty if unzoned cells outnumber or tie its most common zone; click to fill the whole block
+to zone those gaps. Growth pauses with the simulation.
 This is quick visual growth for testing zoning, not demand-driven development yet.
 Repainting or unzoning keeps existing buildings and their original use, while unzoning stops
 new construction. A road edit that removes a lot removes its building immediately. Citizens,

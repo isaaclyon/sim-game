@@ -104,6 +104,8 @@ impl Buildings {
                 continue;
             };
             let mut rng = Rng::new(seed.wrapping_add(lot as u64));
+            // The first draw sets growth time; use the next so height is independent.
+            rng.next_u64();
             let height = match zone {
                 Zone::ResidentialLow => 3.0 * (1 + rng.below(2)) as f32,
                 Zone::ResidentialHigh => 3.0 * (4 + rng.below(5)) as f32,

@@ -149,6 +149,16 @@ fn growth_and_pending_work_are_deterministic_and_snapshots_are_read_only() {
 }
 
 #[test]
+fn growth_does_not_always_build_shortest_first() {
+    let mut w = town(Zone::ResidentialHigh);
+    advance(&mut w, 61);
+    assert!(
+        w.buildings.height.windows(2).any(|h| h[0] > h[1]),
+        "short and tall buildings should mix during growth"
+    );
+}
+
+#[test]
 fn opening_a_block_clears_its_buildings_immediately() {
     let mut w = town(Zone::CommercialHigh);
     advance(&mut w, 61);
