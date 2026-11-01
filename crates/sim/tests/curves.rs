@@ -31,7 +31,11 @@ fn bulldoze_highlights_and_removes_the_whole_curve_not_its_chord() {
     let mut segments = Vec::new();
     w.write_road_segments(&mut segments);
     assert_eq!(preview.len() / 2, segments.len() / 5 + 1);
-    for (p, s) in preview.windows(4).step_by(2).zip(segments.chunks_exact(5)) {
+    for (p, s) in preview
+        .windows(4)
+        .step_by(2)
+        .zip(segments.as_chunks::<5>().0.iter())
+    {
         assert_eq!(p, &s[..4]);
     }
     assert_eq!(w.state_hash(), hash, "hover does not change the world");
@@ -65,7 +69,13 @@ fn curves_after_deleted_slots_still_render_snap_and_split() {
     let mut segments = Vec::new();
     w.write_road_segments(&mut segments);
     assert!(segments.len() > 5);
-    assert!(segments.chunks_exact(5).all(|s| s[0] >= 0.0 && s[1] >= 0.0));
+    assert!(
+        segments
+            .as_chunks::<5>()
+            .0
+            .iter()
+            .all(|s| s[0] >= 0.0 && s[1] >= 0.0)
+    );
     let mut preview = Vec::new();
     w.write_snap_preview(100.0, 50.0, &mut preview);
     assert_eq!(preview, [100.0, 50.0, 2.0]);
@@ -101,8 +111,8 @@ fn extending_a_rebuilt_road_follows_the_active_curve() {
     let mut preview = Vec::new();
     w.write_road_preview(0.0, 0.0, 300.0, 0.0, &mut preview);
     assert!(!preview.is_empty());
-    assert!(preview.chunks_exact(3).all(|p| p[1] <= 0.0));
-    assert!(preview.chunks_exact(3).any(|p| p[1] < -40.0));
+    assert!(preview.as_chunks::<3>().0.iter().all(|p| p[1] <= 0.0));
+    assert!(preview.as_chunks::<3>().0.iter().any(|p| p[1] < -40.0));
     assert!(w.apply(Command::BuildRoad {
         ax: 0.0,
         ay: 0.0,
@@ -170,7 +180,12 @@ fn preview_matches_built_curve_without_mutating_world() {
     let mut segments = Vec::new();
     w.write_road_segments(&mut segments);
     assert_eq!(segments.len() / 5, preview.len() / 3 - 1);
-    for (s, p) in segments.chunks_exact(5).zip(preview.windows(6).step_by(3)) {
+    for (s, p) in segments
+        .as_chunks::<5>()
+        .0
+        .iter()
+        .zip(preview.windows(6).step_by(3))
+    {
         close((s[0], s[1]), (p[0], p[1]));
         close((s[2], s[3]), (p[3], p[4]));
     }
@@ -217,7 +232,15 @@ fn curves_cross_each_other_and_preview_marks_only_real_junctions() {
     let mut preview = Vec::new();
     w.write_curve_preview(100.0, -100.0, 200.0, 0.0, 100.0, 100.0, &mut preview);
     assert!(!preview.is_empty());
-    assert_eq!(preview.chunks_exact(3).filter(|s| s[2] == 2.0).count(), 1);
+    assert_eq!(
+        preview
+            .as_chunks::<3>()
+            .0
+            .iter()
+            .filter(|s| s[2] == 2.0)
+            .count(),
+        1
+    );
     assert!(w.apply(Command::BuildCurve {
         ax: 100.0,
         ay: -100.0,
@@ -227,7 +250,12 @@ fn curves_cross_each_other_and_preview_marks_only_real_junctions() {
         by: 100.0
     }));
     assert_eq!(w.roads.road_count(), 4);
-    let split = preview.chunks_exact(3).find(|s| s[2] == 2.0).unwrap();
+    let split = preview
+        .as_chunks::<3>()
+        .0
+        .iter()
+        .find(|s| s[2] == 2.0)
+        .unwrap();
     let n = w.roads.nearest_node(split[0], split[1], 0.02).unwrap();
     assert_eq!(w.roads.out_lanes(n).len(), 4);
 }
@@ -259,9 +287,11 @@ fn curve_traffic_replays_and_survives_a_split() {
         }
         let mut snapshot = Vec::new();
         w.write_agent_snapshot(&mut snapshot);
-        assert!(snapshot.chunks_exact(4).any(|s| s[3] >= 0.0));
+        assert!(snapshot.as_chunks::<4>().0.iter().any(|s| s[3] >= 0.0));
         for (i, s) in snapshot
-            .chunks_exact(4)
+            .as_chunks::<4>()
+            .0
+            .iter()
             .enumerate()
             .filter(|(_, s)| s[3] >= 0.0)
         {
