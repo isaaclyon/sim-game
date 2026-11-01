@@ -37,6 +37,22 @@ fn consistent(w: &World) {
         }
     }
     assert!(w.vacancies_hold());
+    // The inspector (ADR 0022) sees every reference of a resident, and none after departure.
+    for c in 0..w.citizens.active.len() as u32 {
+        let info = w.citizen_info(c).unwrap();
+        let i = c as usize;
+        assert_eq!(info.resident, w.citizens.active[i]);
+        if info.resident {
+            assert!(info.home.is_some() && info.location.is_some());
+            assert_eq!(info.job.map(|p| p.building), w.citizens.job[i]);
+            assert_eq!(
+                info.destination.map(|p| p.building),
+                w.citizens.destination[i]
+            );
+        } else {
+            assert!(info.home.is_none() && info.job.is_none() && info.location.is_none());
+        }
+    }
     for hh in 0..w.households.active.len() {
         let members = &w.households.members[hh];
         let together = members

@@ -1,6 +1,7 @@
 //! The world: owns all sim state and advances it one fixed step at a time.
 
 mod closure;
+mod inspect;
 mod residents;
 mod roads;
 mod snapshot;
@@ -21,6 +22,8 @@ use crate::rng::Rng;
 use crate::road::{LaneId, RoadClass, RoadNetwork};
 use crate::traffic::Traffic;
 use crate::zone::{Zone, ZoneGrid};
+
+pub use inspect::{CitizenInfo, Place};
 
 /// Floats per agent in `write_agent_snapshot`.
 pub const SNAPSHOT_STRIDE: usize = 4;

@@ -46,6 +46,10 @@ What to build next and why lives in `docs/ROADMAP.md`. Work on the current miles
   including growth, closure removals (ADR 0023)
   and removals from paused road edits. Growth snapshots are capped at four
   per real second; start, edits and pause flush immediately.
+- Citizen inspection: `inspect` names a car by its agent snapshot index; the worker maps it once
+  to a citizen and answers `citizen` for that one citizen only, at once and after every frame
+  and edit while selected (ADR 0022). Read-only, not hashed; names are derived from the seed and
+  IDs, never stored or drawn from a gameplay RNG. Places are absent once their building is gone.
 Change both sides (Rust writer, `protocol.ts` doc, `renderer.ts` reader) together.
 
 ## Checks before finishing a change

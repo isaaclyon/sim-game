@@ -32,6 +32,26 @@ pub struct SimStats {
     pub despawned_by_edit: f64,
 }
 
+/// One citizen's details for the inspector (ADR 0022); see `World::citizen_info`. Places are
+/// building IDs with their original use as a zone byte; `None` when absent or removed.
+/// `activity` is 0 = home, 1 = work, 2 = shop.
+#[wasm_bindgen(getter_with_clone)]
+pub struct CitizenView {
+    pub name: String,
+    pub resident: bool,
+    pub home: Option<u32>,
+    pub home_zone: Option<u8>,
+    pub job: Option<u32>,
+    pub job_zone: Option<u8>,
+    pub activity: u8,
+    pub location: Option<u32>,
+    pub location_zone: Option<u8>,
+    pub destination: Option<u32>,
+    pub destination_zone: Option<u8>,
+    pub agent: Option<u32>,
+    pub driving: bool,
+}
+
 #[wasm_bindgen]
 impl Sim {
     #[wasm_bindgen(constructor)]
@@ -204,6 +224,36 @@ impl Sim {
 
     pub fn roads_version(&self) -> u32 {
         self.world.roads.version
+    }
+
+    /// The resident who owns vehicle slot `agent`; `None` for synthetic or unknown slots.
+    pub fn citizen_of_agent(&self, agent: u32) -> Option<u32> {
+        self.world.citizen_of_agent(agent)
+    }
+
+    /// Read-only details of citizen `id`, or `None` for an unknown ID.
+    pub fn citizen_info(&self, id: u32) -> Option<CitizenView> {
+        let c = self.world.citizen_info(id)?;
+        let split = |p: Option<sim::world::Place>| (p.map(|p| p.building), p.map(|p| p.zone as u8));
+        let (home, home_zone) = split(c.home);
+        let (job, job_zone) = split(c.job);
+        let (location, location_zone) = split(c.location);
+        let (destination, destination_zone) = split(c.destination);
+        Some(CitizenView {
+            name: c.name,
+            resident: c.resident,
+            home,
+            home_zone,
+            job,
+            job_zone,
+            activity: c.activity as u8,
+            location,
+            location_zone,
+            destination,
+            destination_zone,
+            agent: c.agent,
+            driving: c.driving,
+        })
     }
 
     /// `[x, y, heading, speed_ratio]` per agent; see `World::write_agent_snapshot`.

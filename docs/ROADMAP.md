@@ -73,7 +73,8 @@ despawns, and the road tool feels good with snapping, curves and bulldozing.
     don't all pick the same "best" route and traffic spreads out. It replaces or tunes the
     per-queued-car delay from ADR 0009's work.
 - Citizen inspector: click a car to see the citizen's name, home, job and destination; a follow
-  camera rides along.
+  camera rides along. Implemented as a read-only query for the selected citizen
+  ([ADR 0022](adrs/0022-citizen-inspection-query.md)).
 - Demand: a simple R/C/I balance decides what gets built next.
 - Day clock and an on-screen time and speed indicator.
 - Minimal UI: tool bar (road, zone, bulldoze), population counter.

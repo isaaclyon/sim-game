@@ -1,4 +1,5 @@
 import type * as THREE from 'three';
+import { Inspector } from './inspector';
 import { type FromWorker, RoadClass, type Stats, type ToWorker, Zone } from './protocol';
 import { Renderer } from './renderer';
 
@@ -12,6 +13,25 @@ const renderer = new Renderer(document.body);
 const hud = byId('hud');
 const worker = new Worker(new URL('./sim.worker.ts', import.meta.url), { type: 'module' });
 const send = (msg: ToWorker) => worker.postMessage(msg);
+// Pan keys held when follow starts are ignored until released, so they cannot fight it.
+const ignoredCameraKeys = new Set<string>();
+const inspector = new Inspector(
+  send,
+  {
+    follow: (agent, seconds) => renderer.follow(agent, seconds),
+    setFollowing(on) {
+      renderer.setFollowing(on);
+      if (!on) return;
+      renderer.keyCamera.stopPan();
+      for (const key of 'wasd') if (heldCameraKeys.delete(key)) ignoredCameraKeys.add(key);
+    },
+  },
+  byId('inspector'),
+  byId('inspector-text'),
+  byId('follow') as HTMLButtonElement,
+  byId('inspector-close') as HTMLButtonElement,
+);
+renderer.onUserPan = () => inspector.setFollow(false);
 
 // Two most recent snapshots, and when they arrived, for interpolation.
 let prev: Float32Array | undefined;
@@ -65,6 +85,8 @@ worker.onmessage = (e: MessageEvent<FromWorker>) => {
     renderer.setLots(msg.rings);
   } else if (msg.type === 'buildings') {
     renderer.setBuildings(msg.data);
+  } else if (msg.type === 'citizen') {
+    inspector.receive(msg.selection, msg.citizen);
   } else if (msg.type === 'blockPreview') {
     blockInFlight = false;
     if (msg.revision === blockRevision && zone !== null && !zoneStart && blockHover)
@@ -276,11 +298,15 @@ canvas.addEventListener('pointerup', (e) => {
     blockWanted = true;
     return;
   }
-  if (!roadTool && !bulldozeTool) return;
+  // Treat it as a click only if the pointer barely moved, so panning still works.
+  const still = Math.hypot(e.clientX - downX, e.clientY - downY) <= 4;
+  if (!roadTool && !bulldozeTool) {
+    if (e.button === 0 && still) inspector.select(renderer.carAt(e.clientX, e.clientY));
+    return;
+  }
   if (e.button === 2) return setTool(null);
   if (pendingBuild) return;
-  // Treat it as a click only if the pointer barely moved, so panning still works.
-  if (e.button !== 0 || Math.hypot(e.clientX - downX, e.clientY - downY) > 4) return;
+  if (e.button !== 0 || !still) return;
   const p = renderer.pick(e.clientX, e.clientY);
   if (!p) return;
   if (bulldozeTool) send({ type: 'deleteRoad', x: p.x, y: p.z });
@@ -358,6 +384,8 @@ const heldCameraKeys = new Set<string>();
 function moveWithKeys(seconds: number) {
   const input = [0, 0, 0];
   for (const key of heldCameraKeys) for (let i = 0; i < 3; i++) input[i] += CAMERA_KEYS[key][i];
+  // Panning takes the camera back from follow; turning orbits the followed car.
+  if (input[0] !== 0 || input[1] !== 0) inspector.setFollow(false);
   if (renderer.keyCamera.update(input[0], input[1], input[2], seconds) && zoneStart)
     zoneKeyPanned = true;
 }
@@ -366,7 +394,10 @@ function stopKeyCamera() {
   renderer.keyCamera.stop();
 }
 // Keyup can go missing when the page loses focus or a modifier is down, so stop on those.
-addEventListener('keyup', (e) => heldCameraKeys.delete(e.key.toLowerCase()));
+addEventListener('keyup', (e) => {
+  heldCameraKeys.delete(e.key.toLowerCase());
+  ignoredCameraKeys.delete(e.key.toLowerCase());
+});
 addEventListener('blur', stopKeyCamera);
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') stopKeyCamera();
@@ -386,7 +417,7 @@ addEventListener('keydown', (e) => {
   if (target?.closest(TEXT_ENTRY)) return;
   const cameraKey = e.key.toLowerCase();
   if (Object.hasOwn(CAMERA_KEYS, cameraKey)) {
-    heldCameraKeys.add(cameraKey);
+    if (!ignoredCameraKeys.has(cameraKey)) heldCameraKeys.add(cameraKey);
     return;
   }
   if (e.repeat) return;
@@ -400,7 +431,10 @@ addEventListener('keydown', (e) => {
   else if (e.key === 'x' || e.key === 'X') zoneKey(Zone.CommercialLow, Zone.CommercialHigh);
   else if (e.key === 'c' || e.key === 'C') zoneKey(Zone.IndustrialLow, Zone.IndustrialHigh);
   else if (e.key === 'u' || e.key === 'U') setZone(Zone.None);
-  else if (e.key === 'Escape') setTool(null);
+  else if (e.key === 'f' || e.key === 'F') inspector.toggleFollow();
+  // Esc cancels a tool first, then closes the inspector.
+  else if (e.key === 'Escape')
+    roadTool || bulldozeTool || zone !== null ? setTool(null) : inspector.select(null);
   else if (e.key === ' ') setSpeed(speed === 0 ? 1 : 0);
   else if (e.key === '1') setSpeed(1);
   else if (e.key === '2') setSpeed(3);
@@ -416,12 +450,14 @@ let lastFrame = performance.now();
 function frame() {
   const now = performance.now();
   fps = fps * 0.95 + (1000 / Math.max(now - lastFrame, 1)) * 0.05;
-  moveWithKeys((now - lastFrame) / 1000);
+  const seconds = (now - lastFrame) / 1000;
+  moveWithKeys(seconds);
   lastFrame = now;
   if (curr) {
     const t = speed === 0 ? 1 : Math.min((now - currAt) / frameGap, 1);
-    renderer.drawAgents(prev, curr, t);
+    renderer.drawAgents(prev, curr, t, inspector.selected);
   }
+  inspector.update(seconds);
   // A camera move slides the ground under a still cursor; ask again what the cursor is over.
   if (renderer.render() && pointer) hover(pointer);
   if (stats) {
@@ -436,6 +472,7 @@ function frame() {
       `stuck      ${fmt(stats.despawnedStuck)}   no path ${fmt(stats.pathsFailed)}\n` +
       `road edits ${fmt(stats.despawnedByEdit)} cars removed\n` +
       `camera     WASD or drag pans, Q/E turns, right-drag orbits, wheel zooms\n` +
+      `inspect    click a car; F follows it, Esc closes\n` +
       (zone !== null
         ? `\nZONE: ${ZONE_NAMES[zone]}. Click a block to fill it, drag a rectangle to paint, Esc to stop` +
           `\n(Z/X/C pick a zone, press again for the other density; U unzones)`

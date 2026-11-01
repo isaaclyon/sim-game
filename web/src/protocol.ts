@@ -50,7 +50,14 @@ export type ToWorker =
       by: number;
     }
   /** Asks where a road started here would start. Answered with a one-stop `roadPreview`. */
-  | { type: 'previewSnap'; revision: number; x: number; y: number };
+  | { type: 'previewSnap'; revision: number; x: number; y: number }
+  /**
+   * Selects the resident who owns car `agent` (an index into the `frame` agents snapshot) for
+   * the citizen inspector, or clears the selection with null (ADR 0022). The worker keeps the
+   * citizen, not the car slot. Answered with `citizen` at once, paused or not, then after every
+   * frame and edit while selected. `selection` is echoed so replies to an older one are dropped.
+   */
+  | { type: 'inspect'; agent: number | null; selection: number };
 
 /** Road classes, matching the sim's `RoadClass` (ADR 0017). Main roads carry long
  * trips; the sim lays alleys to reach deep lots. */
@@ -72,6 +79,43 @@ export const Zone = {
   IndustrialHigh: 6,
 } as const;
 export type Zone = (typeof Zone)[keyof typeof Zone];
+
+/** What a citizen is doing or travelling to do, matching the sim's `Activity`. */
+export const Activity = {
+  Home: 0,
+  Work: 1,
+  Shop: 2,
+} as const;
+export type Activity = (typeof Activity)[keyof typeof Activity];
+
+/** A building, named by its ID and original use. */
+export interface Place {
+  building: number;
+  zone: Zone;
+}
+
+/**
+ * Sim-owned details of one citizen. Places are null when absent, or when their building was
+ * removed; all are null once the citizen has left town (`resident` false).
+ */
+export interface Citizen {
+  id: number;
+  /** Derived from the world seed and IDs; a shared surname means a shared home, not kinship. */
+  name: string;
+  resident: boolean;
+  home: Place | null;
+  job: Place | null;
+  /** The current activity, or the one the current trip is for. */
+  activity: Activity;
+  /** Where the citizen is, or where the current trip started. */
+  location: Place | null;
+  /** Where the current trip goes; null while staying put. */
+  destination: Place | null;
+  /** The citizen's own car: an index into `frame` agents; never reassigned to anyone else. */
+  agent: number | null;
+  /** On a road now, so the car is drawn. */
+  driving: boolean;
+}
 
 export interface Stats {
   tick: number;
@@ -142,6 +186,8 @@ export type FromWorker =
    * `signals` is `[x, y, heading, state]` per signalised approach, at its stop line; state is
    * 0 = red, 1 = green, 2 = protected-left green.
    */
+  /** The inspected citizen, or null if the selected car has no resident. Answers `inspect`. */
+  | { type: 'citizen'; selection: number; citizen: Citizen | null }
   | {
       type: 'frame';
       agents: Float32Array;

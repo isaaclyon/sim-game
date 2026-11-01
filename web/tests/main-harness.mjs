@@ -9,6 +9,8 @@ export async function tools() {
   function element() {
     return {
       textContent: '',
+      hidden: false,
+      disabled: false,
       style: {},
       events: {},
       attributes: {},
@@ -23,7 +25,18 @@ export async function tools() {
     };
   }
   const elements = Object.fromEntries(
-    ['hud', 'road', 'curve', 'main-road', 'bulldoze', 'road-help'].map((id) => [id, element()]),
+    [
+      'hud',
+      'road',
+      'curve',
+      'main-road',
+      'bulldoze',
+      'road-help',
+      'inspector',
+      'inspector-text',
+      'follow',
+      'inspector-close',
+    ].map((id) => [id, element()]),
   );
   const zoneButtons = Object.values(Zone).map((zone) => ({
     ...element(),
@@ -38,6 +51,9 @@ export async function tools() {
   const documentEvents = {};
   const pans = [];
   const clock = { now: 0, cameraMoved: false };
+  // Inspector: the car under the next click, and what the renderer was asked to do.
+  const cars = { at: null, visible: true, drawnSelected: [], follows: [], following: [] };
+  let renderer;
   let worker;
   let frame;
   class Worker {
@@ -49,6 +65,21 @@ export async function tools() {
     }
   }
   class Renderer {
+    onUserPan = null;
+    constructor() {
+      renderer = this;
+    }
+    carAt(x, y) {
+      cars.clicked = [x, y];
+      return cars.at;
+    }
+    follow(agent, seconds) {
+      cars.follows.push([agent, seconds]);
+      return cars.visible;
+    }
+    setFollowing(on) {
+      cars.following.push(on);
+    }
     render() {
       return clock.cameraMoved;
     }
@@ -60,8 +91,14 @@ export async function tools() {
       stop() {
         pans.push('stop');
       },
+      stopPan() {
+        pans.push('stopPan');
+      },
     };
-    drawAgents() {}
+    drawAgents(...args) {
+      const selected = args[3];
+      cars.drawnSelected.push(selected);
+    }
     drawSignals() {}
     renderer = { domElement: canvas };
     pick(x, z) {
@@ -119,23 +156,29 @@ export async function tools() {
       },
     },
   );
+  const inspector = new SourceTextModule(
+    stripTypeScriptTypes(readFileSync(new URL('../src/inspector.ts', import.meta.url), 'utf8')),
+    { context },
+  );
   await module.link((specifier) =>
-    specifier === './protocol'
-      ? new SyntheticModule(
-          ['RoadClass', 'Zone'],
-          function () {
-            this.setExport('RoadClass', RoadClass);
-            this.setExport('Zone', Zone);
-          },
-          { context },
-        )
-      : new SyntheticModule(
-          ['Renderer'],
-          function () {
-            this.setExport('Renderer', Renderer);
-          },
-          { context },
-        ),
+    specifier === './inspector'
+      ? inspector
+      : specifier === './protocol'
+        ? new SyntheticModule(
+            ['RoadClass', 'Zone'],
+            function () {
+              this.setExport('RoadClass', RoadClass);
+              this.setExport('Zone', Zone);
+            },
+            { context },
+          )
+        : new SyntheticModule(
+            ['Renderer'],
+            function () {
+              this.setExport('Renderer', Renderer);
+            },
+            { context },
+          ),
   );
   await module.evaluate();
   const move = (x, y) => canvas.events.pointermove({ clientX: x, clientY: y });
@@ -155,6 +198,8 @@ export async function tools() {
     canvas,
     clock,
     zoneDrags,
+    cars,
+    userPan: () => renderer.onUserPan?.(),
     down: (x, y) => canvas.events.pointerdown({ clientX: x, clientY: y, button: 0 }),
     up: (x, y) => canvas.events.pointerup({ clientX: x, clientY: y, button: 0 }),
     move,
