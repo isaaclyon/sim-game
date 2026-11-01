@@ -43,6 +43,8 @@ pub struct ZoneGrid {
     pub cells: Vec<u8>,
     /// Bumped on every change so the frontend knows when to redraw.
     pub version: u32,
+    /// Cells with a zone other than `Zone::None`.
+    zoned: u32,
 }
 
 impl ZoneGrid {
@@ -65,6 +67,7 @@ impl ZoneGrid {
             rows,
             cells: vec![Zone::None as u8; cols as usize * rows as usize],
             version: 0,
+            zoned: 0,
         }
     }
 
@@ -84,29 +87,69 @@ impl ZoneGrid {
         if ![ax, ay, bx, by].iter().all(|v| v.is_finite()) {
             return false;
         }
+        let rect = [ax.min(bx), ay.min(by), ax.max(bx), ay.max(by)];
+        let cells: Vec<u32> = self.cells_in(rect).collect();
+        self.set(&cells, zone)
+    }
+
+    /// Sets the given cells (row-major indices) to `zone`. Returns whether any cell changed.
+    pub fn set(&mut self, cells: &[u32], zone: Zone) -> bool {
+        let mut changed = false;
+        for &i in cells {
+            let cell = &mut self.cells[i as usize];
+            if *cell == zone as u8 {
+                continue;
+            }
+            if *cell == Zone::None as u8 {
+                self.zoned += 1;
+            } else if zone == Zone::None {
+                self.zoned -= 1;
+            }
+            *cell = zone as u8;
+            changed = true;
+        }
+        if changed {
+            self.version = self.version.wrapping_add(1);
+        }
+        changed
+    }
+
+    /// Whether any cell has a zone.
+    pub fn any_zoned(&self) -> bool {
+        self.zoned > 0
+    }
+
+    /// Indices of the cells whose centre lies inside `[min_x, min_y, max_x, max_y]`, row-major.
+    pub fn cells_in(&self, rect: [f32; 4]) -> impl Iterator<Item = u32> + use<> {
         // Cell c's centre is x0 + (c + 0.5) * ZONE_CELL; keep the ones in [lo, hi].
         let span = |lo: f32, hi: f32, origin: f32, n: u32| {
             let first = ((lo - origin) / ZONE_CELL - 0.5).ceil().max(0.0);
             let last = ((hi - origin) / ZONE_CELL - 0.5)
                 .floor()
                 .min(n as f32 - 1.0);
-            (first as usize, last as i64)
-        };
-        let (c0, c1) = span(ax.min(bx), ax.max(bx), self.x0, self.cols);
-        let (r0, r1) = span(ay.min(by), ay.max(by), self.y0, self.rows);
-        let mut changed = false;
-        for r in r0 as i64..=r1 {
-            let row = r as usize * self.cols as usize;
-            for c in c0 as i64..=c1 {
-                let cell = &mut self.cells[row + c as usize];
-                changed |= *cell != zone as u8;
-                *cell = zone as u8;
+            if first.is_nan() || last.is_nan() || first > last {
+                return 0..0;
             }
-        }
-        if changed {
-            self.version = self.version.wrapping_add(1);
-        }
-        changed
+            first as u32..last as u32 + 1
+        };
+        let cols = span(rect[0], rect[2], self.x0, self.cols);
+        let rows = span(rect[1], rect[3], self.y0, self.rows);
+        let width = self.cols;
+        rows.flat_map(move |r| cols.clone().map(move |c| r * width + c))
+    }
+
+    /// Centre of cell `index`.
+    pub fn centre(&self, index: u32) -> (f32, f32) {
+        let (c, r) = (index % self.cols, index / self.cols);
+        (
+            self.x0 + (c as f32 + 0.5) * ZONE_CELL,
+            self.y0 + (r as f32 + 0.5) * ZONE_CELL,
+        )
+    }
+
+    /// The zone of cell `index`.
+    pub fn zone(&self, index: u32) -> Zone {
+        Zone::from_u8(self.cells[index as usize]).unwrap_or(Zone::None)
     }
 
     /// `[origin_x, origin_y, cell_size, cols, rows]`.

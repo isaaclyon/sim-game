@@ -31,6 +31,9 @@ What to build next and why lives in `docs/ROADMAP.md`. Work on the current miles
 - Zones: one byte per zone cell, row-major, plus layout `[origin_x, origin_y, cell_size, cols,
   rows]`; byte 0 = none, 1/2 = residential low/high, 3/4 commercial, 5/6 industrial (ADR 0014).
   Sent whole when the zone grid's version changes.
+- Lots: `[ax, ay, bx, by]` per lot outline segment along zone cell edges, sent whole when the
+  lots version changes (ADR 0016). Block preview: `[x, y]` per outline sample of the block
+  under the cursor, closed; empty = no block. Read-only.
 Change both sides (Rust writer, `protocol.ts` doc, `renderer.ts` reader) together.
 
 ## Checks before finishing a change

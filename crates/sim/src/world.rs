@@ -1,14 +1,16 @@
 //! The world: owns all sim state and advances it one fixed step at a time.
 
 use std::cmp::Reverse;
-use std::collections::{BinaryHeap, VecDeque};
+use std::collections::{BTreeSet, BinaryHeap, VecDeque};
 
 use crate::agents::{AgentId, AgentState, Agents};
+use crate::block::{self, Blocks, LOT_REACH, MIN_DEEP_CELLS, Rect};
 use crate::geometry::Shape;
 use crate::junction::{Junctions, Verdict};
+use crate::lot::Lots;
 use crate::path::Pathfinder;
 use crate::rng::Rng;
-use crate::road::{LaneId, NodeId, RoadId, RoadNetwork, STREET_SPEED};
+use crate::road::{ALLEY_SPEED, LaneId, NodeId, RoadId, RoadNetwork, STREET_SPEED};
 use crate::snap::{self, Join};
 use crate::traffic::Traffic;
 use crate::zone::{Zone, ZoneGrid};
@@ -31,6 +33,8 @@ const DETOUR_EVERY_S: f32 = 5.0;
 const DETOUR_MAX_NODES: u32 = 256;
 /// Wait before retrying after a failed path or a stuck despawn, seconds.
 const RETRY_AFTER_S: f32 = 10.0;
+/// Rounds of alley cuts one zoning command may make; each round can halve a deep block.
+const ALLEY_ROUNDS: u32 = 6;
 
 #[derive(Clone, Debug)]
 pub struct Config {
@@ -95,6 +99,13 @@ pub enum Command {
         by: f32,
         zone: Zone,
     },
+    /// Sets every cell of the block containing `(x, y)`; outside every block it changes nothing.
+    /// See ADR 0016.
+    FillBlock {
+        x: f32,
+        y: f32,
+        zone: Zone,
+    },
 }
 
 #[derive(Clone, Copy, Default, Debug)]
@@ -119,6 +130,10 @@ pub struct World {
     pub cfg: Config,
     pub roads: RoadNetwork,
     pub zones: ZoneGrid,
+    pub lots: Lots,
+    /// Faces of the road network, traced again when `blocks_version` falls behind the roads.
+    blocks: Blocks,
+    blocks_version: Option<u32>,
     pub agents: Agents,
     traffic: Traffic,
     pub junctions: Junctions,
@@ -141,6 +156,9 @@ impl World {
             cfg,
             zones: ZoneGrid::covering(roads.bounds()),
             roads,
+            lots: Lots::default(),
+            blocks: Blocks::default(),
+            blocks_version: None,
             agents: Agents::default(),
             traffic: Traffic::default(),
             junctions: Junctions::default(),
@@ -196,7 +214,16 @@ impl World {
                 bx,
                 by,
                 zone,
-            } => self.zones.paint(ax, ay, bx, by, zone),
+            } => {
+                let changed = self.zones.paint(ax, ay, bx, by, zone);
+                if changed {
+                    let rect = [ax.min(bx), ay.min(by), ax.max(bx), ay.max(by)];
+                    let painted = self.zones.cells_in(rect).collect();
+                    self.after_zoning(rect, painted);
+                }
+                changed
+            }
+            Command::FillBlock { x, y, zone } => self.fill_block(x, y, zone),
         }
     }
 
@@ -354,6 +381,24 @@ impl World {
         }
     }
 
+    /// Writes `[x, y]` per outline sample of the block containing `(x, y)`, or nothing outside
+    /// every block. Changes no world state; it only refreshes the cached block outlines.
+    pub fn write_block_preview(&mut self, x: f32, y: f32, out: &mut Vec<f32>) {
+        out.clear();
+        if !x.is_finite() || !y.is_finite() {
+            return;
+        }
+        self.refresh_blocks();
+        if let Some(b) = self.blocks.at((x, y)) {
+            out.extend(self.blocks.outline(b).iter().flat_map(|p| [p.0, p.1]));
+        }
+    }
+
+    /// Writes `[ax, ay, bx, by]` per lot outline segment, along zone cell edges.
+    pub fn write_lot_outlines(&self, out: &mut Vec<f32>) {
+        self.lots.write_outlines(&self.zones, out);
+    }
+
     /// Writes `[x, y, heading, state]` per signalised approach, at its stop line. State is
     /// 0 = red, 1 = green, 2 = protected-left green; heading is the approach's travel direction.
     pub fn write_signal_snapshot(&self, out: &mut Vec<f32>) {
@@ -388,6 +433,10 @@ impl World {
             word[..chunk.len()].copy_from_slice(chunk);
             mix(u64::from_le_bytes(word));
         }
+        mix(self.lots.len() as u64);
+        for lot in self.lots.active_lots() {
+            mix(lot as u64);
+        }
         h
     }
 
@@ -412,10 +461,20 @@ impl World {
     /// Builds a street along `snap::plan_road`: joining nodes near its ends, and splitting the
     /// roads it crosses or ends beside so they meet at a junction.
     fn build_road(&mut self, shape: Shape) -> bool {
-        let Some(plan) = snap::plan(&self.roads, shape) else {
+        let mut split = Vec::new();
+        let Some(rect) = self.add_road(shape, STREET_SPEED, &mut split) else {
             return false;
         };
-        let mut split = Vec::new();
+        self.sync_roads();
+        self.remove_cars_using(&split);
+        self.update_lots(rect, true);
+        true
+    }
+
+    /// Adds the roads `snap::plan` makes of `shape`, pushing the roads it splits onto `split`.
+    /// Returns the area it changed. The caller syncs the network and removes affected cars.
+    fn add_road(&mut self, shape: Shape, speed: f32, split: &mut Vec<RoadId>) -> Option<Rect> {
+        let plan = snap::plan(&self.roads, shape)?;
         let nodes: Vec<NodeId> = plan
             .stops
             .iter()
@@ -432,14 +491,13 @@ impl World {
                 }
             })
             .collect();
+        let mut rect = block::shape_rect(plan.legs[0]);
         for (leg, shape) in nodes.windows(2).zip(plan.legs) {
+            rect = block::union(rect, block::shape_rect(shape));
             // False where the plan follows an existing road, which is kept as it is.
-            self.roads
-                .add_shape(leg[0], leg[1], shape.control, STREET_SPEED);
+            self.roads.add_shape(leg[0], leg[1], shape.control, speed);
         }
-        self.sync_roads();
-        self.remove_cars_using(&split);
-        true
+        Some(rect)
     }
 
     fn delete_road(&mut self, x: f32, y: f32) -> bool {
@@ -449,7 +507,154 @@ impl World {
         self.roads.remove_road(road);
         self.remove_cars_using(&[road]);
         self.sync_roads();
+        self.update_lots(block::shape_rect(self.roads.shape(road)), true);
         true
+    }
+
+    /// Sets the cells of the block containing `(x, y)`. See ADR 0016.
+    fn fill_block(&mut self, x: f32, y: f32, zone: Zone) -> bool {
+        if !x.is_finite() || !y.is_finite() {
+            return false;
+        }
+        self.refresh_blocks();
+        let Some(b) = self.blocks.at((x, y)) else {
+            return false;
+        };
+        let cells: Vec<u32> = self
+            .blocks
+            .cells(b, &self.zones)
+            .iter()
+            .map(|c| c.index)
+            .collect();
+        if !self.zones.set(&cells, zone) {
+            return false;
+        }
+        self.after_zoning(self.blocks.rect(b), cells);
+        true
+    }
+
+    /// After a zoning command changed cells: alleys for deep blocks, then lots for newly zoned
+    /// blocks. `painted` holds the cells the command set, ascending; `rect` bounds them.
+    fn after_zoning(&mut self, rect: Rect, painted: Vec<u32>) {
+        if let Some(alleys) = self.add_alleys(rect, &painted) {
+            self.update_lots(alleys, true);
+        }
+        self.update_lots(rect, false);
+    }
+
+    /// Cuts blocks near `rect` that have enough zoned cells out of a road's reach, some of them
+    /// just painted, with alleys or connector streets; then the pieces, for a few rounds.
+    /// Returns the area it changed.
+    fn add_alleys(&mut self, rect: Rect, painted: &[u32]) -> Option<Rect> {
+        let mut edited: Option<Rect> = None;
+        let mut split = Vec::new();
+        let mut cut: Vec<Rect> = Vec::new();
+        for round in 0..ALLEY_ROUNDS {
+            self.refresh_blocks();
+            let mut plans = Vec::new();
+            for b in 0..self.blocks.len() {
+                let br = self.blocks.rect(b);
+                let eligible = if round == 0 {
+                    block::intersects(br, rect)
+                } else {
+                    cut.iter().any(|&r| block::contains_rect(r, br, 0.5))
+                };
+                if !eligible {
+                    continue;
+                }
+                let cells = self.blocks.cells(b, &self.zones);
+                let deep: Vec<u32> = cells
+                    .iter()
+                    .filter(|c| c.dist > LOT_REACH && self.zones.zone(c.index) != Zone::None)
+                    .map(|c| c.index)
+                    .collect();
+                if deep.len() < MIN_DEEP_CELLS
+                    || (round == 0 && !deep.iter().any(|c| painted.binary_search(c).is_ok()))
+                {
+                    continue;
+                }
+                plans.push((br, self.blocks.cuts(b, &cells, &self.zones)));
+            }
+            cut.clear();
+            for (br, options) in plans {
+                for (shape, alley) in options {
+                    let speed = if alley { ALLEY_SPEED } else { STREET_SPEED };
+                    if let Some(r) = self.add_road(shape, speed, &mut split) {
+                        edited = Some(edited.map_or(r, |e| block::union(e, r)));
+                        cut.push(br);
+                        break;
+                    }
+                }
+            }
+            if cut.is_empty() {
+                break;
+            }
+        }
+        if edited.is_some() {
+            self.sync_roads();
+            self.remove_cars_using(&split);
+        }
+        edited
+    }
+
+    /// Recuts lots in blocks whose bounding box meets `area` (ADR 0016). With `retire`, after a
+    /// road edit: lots there that no longer match are retired. Without, after zoning: only
+    /// zoned blocks with no lots yet are cut.
+    fn update_lots(&mut self, area: Rect, retire: bool) {
+        if self.lots.active_lots().next().is_none() && !self.zones.any_zoned() {
+            return;
+        }
+        self.refresh_blocks();
+        let old = if retire {
+            self.lots.active_in(area)
+        } else {
+            Vec::new()
+        };
+        let mut kept = BTreeSet::new();
+        let mut plans = Vec::new();
+        for b in 0..self.blocks.len() {
+            let br = self.blocks.rect(b);
+            if !block::intersects(br, area) {
+                continue;
+            }
+            let cells = self.blocks.cells(b, &self.zones);
+            if cells.iter().all(|c| self.zones.zone(c.index) == Zone::None)
+                || (!retire && cells.iter().any(|c| self.lots.owner(c.index).is_some()))
+            {
+                continue;
+            }
+            for plan in self.blocks.cut(&cells, self.zones.cols) {
+                match self.lots.matching(&plan) {
+                    Some(lot) => {
+                        kept.insert(lot);
+                    }
+                    None => plans.push((plan, br)),
+                }
+            }
+        }
+        let mut changed = false;
+        for lot in old {
+            if !kept.contains(&lot) {
+                self.lots.retire(lot);
+                changed = true;
+            }
+        }
+        for (plan, br) in plans {
+            changed |= self.lots.push(plan, br, self.zones.cells.len());
+        }
+        if changed {
+            self.lots.version = self.lots.version.wrapping_add(1);
+        }
+    }
+
+    /// Traces the road network's blocks again if roads changed since the last time.
+    fn refresh_blocks(&mut self) {
+        if self.blocks_version == Some(self.roads.version) {
+            return;
+        }
+        self.roads.rebuild_adjacency();
+        self.blocks = Blocks::find(&self.roads);
+        self.blocks_version = Some(self.roads.version);
     }
 
     /// Removes cars whose remaining route uses a lane of `roads`, just split or deleted.

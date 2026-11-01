@@ -66,6 +66,12 @@ async function tools() {
     setBulldozePreview(segment) {
       previews.push({ type: 'bulldoze', segment });
     }
+    setBlockOutline(outline, zone) {
+      previews.push({ type: 'block', outline, zone });
+    }
+    setLots(segments) {
+      previews.push({ type: 'lots', segments });
+    }
   }
   const context = createContext({
     document: {
@@ -166,6 +172,8 @@ test('zoning shortcuts and drags stay exclusive with curved roads and bulldozing
   assert.equal(t.previews.at(-1).stops, null, 'late curve previews cannot cover the zone brush');
   t.key('u');
   t.click(10, 20);
+  assert.equal(t.messages.at(-1).type, 'fillBlock', 'a click fills the block under it');
+  assert.deepEqual([t.messages.at(-1).x, t.messages.at(-1).y], [10, 20]);
   assert.equal(t.messages.at(-1).zone, Zone.None);
   t.down(10, 20);
   t.key('v');
@@ -189,6 +197,40 @@ test('zoning shortcuts and drags stay exclusive with curved roads and bulldozing
     cells,
     'zone snapshots remain separate from traffic frames',
   );
+});
+
+test('the zone brush outlines the block under the cursor, one question at a time', async () => {
+  const t = await tools();
+  t.move(5, 5);
+  assert.equal(t.messages.length, 1, 'only init: no brush, no block question');
+  t.key('z');
+  t.move(10, 10);
+  const asked = t.messages.at(-1);
+  assert.equal(asked.type, 'previewBlock');
+  assert.deepEqual([asked.x, asked.y], [10, 10]);
+  t.move(20, 20);
+  t.move(30, 30);
+  assert.equal(t.messages.at(-1), asked, 'waits for the reply in flight');
+  const outline = new Float32Array([0, 0, 100, 0, 100, 100, 0, 100]);
+  t.reply({ type: 'blockPreview', outline, revision: asked.revision });
+  assert.deepEqual(t.previews.at(-1), { type: 'block', outline, zone: Zone.ResidentialLow });
+  const latest = t.messages.at(-1);
+  assert.deepEqual([latest.type, latest.x, latest.y], ['previewBlock', 30, 30], 'latest only');
+  const shown = t.previews.length;
+  t.down(30, 30);
+  t.reply({ type: 'blockPreview', outline, revision: latest.revision });
+  assert.equal(t.previews.length, shown, 'a reply from before the click is not drawn');
+  t.up(30, 30);
+  assert.equal(t.messages.at(-1).type, 'fillBlock');
+  t.move(40, 40);
+  const again = t.messages.at(-1);
+  assert.equal(again.type, 'previewBlock', 'hovering resumes after the click');
+  t.key('Escape');
+  t.reply({ type: 'blockPreview', outline, revision: again.revision });
+  assert.notEqual(t.previews.at(-1).type, 'block', 'nor once the brush is off');
+  const segments = new Float32Array([0, 0, 8, 0]);
+  t.reply({ type: 'lots', segments });
+  assert.deepEqual(t.previews.at(-1), { type: 'lots', segments });
 });
 
 test('switching from curve to bulldoze discards a delayed preview and resets construction', async () => {

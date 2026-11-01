@@ -102,6 +102,31 @@ impl Sim {
         })
     }
 
+    /// Sets every cell of the block containing `(x, y)` (ADR 0016). Same `zone` bytes as
+    /// `paint_zone`.
+    pub fn fill_block(&mut self, x: f32, y: f32, zone: u8) -> bool {
+        let Some(zone) = Zone::from_u8(zone) else {
+            return false;
+        };
+        self.world.apply(Command::FillBlock { x, y, zone })
+    }
+
+    /// `[x, y]` per outline sample of the block containing `(x, y)`, or empty outside every block.
+    pub fn block_preview(&mut self, x: f32, y: f32) -> Vec<f32> {
+        self.world.write_block_preview(x, y, &mut self.buf);
+        self.buf.clone()
+    }
+
+    pub fn lots_version(&self) -> u32 {
+        self.world.lots.version
+    }
+
+    /// `[ax, ay, bx, by]` per lot outline segment, along zone cell edges.
+    pub fn lot_outlines(&mut self) -> Vec<f32> {
+        self.world.write_lot_outlines(&mut self.buf);
+        self.buf.clone()
+    }
+
     pub fn zones_version(&self) -> u32 {
         self.world.zones.version
     }
