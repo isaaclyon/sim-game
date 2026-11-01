@@ -159,7 +159,7 @@ impl Sim {
         self.world.buildings.version
     }
 
-    /// `[zone, height, n, x0, y0, …]` per active building; footprint points are counter-clockwise.
+    /// `[zone, height, roof, n, x0, y0, …]` per active building; footprint points are counter-clockwise.
     pub fn building_snapshot(&mut self) -> Vec<f32> {
         self.world.buildings.write_snapshot(&mut self.buf);
         self.buf.clone()
