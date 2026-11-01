@@ -26,6 +26,10 @@ pub const MAX_GAP_AREA: f32 = 1000.0;
 /// square metres are spikes: hair-thin strips where two lots' back lines nearly agree.
 const SPIKE_COS: f32 = 0.985;
 const SPIKE_AREA: f32 = 2.0;
+/// Cosine of the largest turn, 30°, between pieces of one straight block side.
+const STRAIGHT_COS: f32 = 0.866;
+/// Cosine of the largest turn away from 90°, 30°, at a corner of a rectangle-like block.
+const RIGHT_COS: f32 = 0.5;
 /// Spacing, metres, of the points along a road side that trace the back of its lots.
 const BACK_STEP: f32 = 2.0;
 /// Corners turning back sharper than this (`1 + cos` of the turn) end lots square instead of
@@ -224,7 +228,8 @@ pub(crate) struct LotPlan {
 struct Piece {
     road: RoadId,
     left: bool,
-    k: u32,
+    /// The stretch of road the lot fronts, metres from the road's start.
+    span: (f32, f32),
     ring: Ring,
     rect: Rect,
 }
@@ -506,14 +511,31 @@ impl Blocks {
         }
         lanes.sort_unstable();
         lanes.dedup();
+        let flanks = self.flanks(i);
+        // Lots facing the fronts reach back to the facing front, past the flank roads and
+        // roads beyond the block's corners.
+        let rivals: Vec<RoadId> = if flanks.is_empty() {
+            roads.clone()
+        } else {
+            let mut r: Vec<RoadId> = lanes
+                .iter()
+                .filter(|l| !flanks.contains(l))
+                .map(|l| l / 2)
+                .collect();
+            r.dedup();
+            r
+        };
         let mut lots: Vec<Piece> = Vec::new();
         let mut slivers: Vec<Piece> = Vec::new();
         for &lane in &lanes {
+            if flanks.contains(&lane) {
+                continue;
+            }
             let road = lane / 2;
-            let (n, _) = self.stretches(road);
-            let offsets = self.offsets(lane, &roads);
-            for k in 0..n {
-                let ribbon = self.ribbon(lane, k, &offsets);
+            let edges = self.edges(lane, &flanks);
+            let offsets = self.offsets(lane, &rivals, &edges, &flanks);
+            for k in 0..edges.len() - 1 {
+                let ribbon = self.ribbon(lane, &edges, k, &offsets, &flanks);
                 let rr = poly::bounds(&ribbon);
                 let mut pieces = poly::intersect(&[ribbon], &land);
                 let near: Vec<Ring> = lots
@@ -534,7 +556,7 @@ impl Blocks {
                     let piece = Piece {
                         road,
                         left: lane.is_multiple_of(2),
-                        k,
+                        span: (edges[k], edges[k + 1]),
                         ring,
                         rect,
                     };
@@ -577,14 +599,7 @@ impl Blocks {
                     .filter(|&c| poly::contains(&outline, grid.centre(c)) && claimed.insert(c))
                     .collect();
                 cells.sort_unstable();
-                let (n, w) = self.stretches(p.road);
-                let len = self.road_len(p.road);
-                let s1 = if p.k + 1 == n {
-                    len
-                } else {
-                    (p.k + 1) as f32 * w
-                };
-                let s0 = p.k as f32 * w;
+                let (s0, s1) = p.span;
                 let (front, dir) = self.point_at(p.road, (s0 + s1) / 2.0);
                 // Facing the road: right of travel for lots on its left, and vice versa.
                 let facing = if p.left {
@@ -642,10 +657,15 @@ impl Blocks {
     /// (so lots from facing roads meet on one line), at most `LOT_REACH` from its road, and
     /// stops where it first crosses another offset of the same side, so lots on curves come
     /// to a point instead of folding over each other.
-    fn offsets(&self, lane: LaneId, roads: &[RoadId]) -> Vec<(f32, Point, Point, f32)> {
+    fn offsets(
+        &self,
+        lane: LaneId,
+        roads: &[RoadId],
+        edges: &[f32],
+        flanks: &[LaneId],
+    ) -> Vec<(f32, Point, Point, f32)> {
         let road = lane / 2;
         let left = lane.is_multiple_of(2);
-        let (n, w) = self.stretches(road);
         let len = self.road_len(road);
         let start = self.road_start[road as usize] as usize;
         let pts = self.road_points(road);
@@ -665,7 +685,7 @@ impl Blocks {
             .collect();
         // Where offsets start: the road's points, its stretch ends and every `BACK_STEP`.
         let mut at: Vec<f32> = arc.to_vec();
-        at.extend((1..n).map(|k| k as f32 * w));
+        at.extend_from_slice(&edges[1..edges.len() - 1]);
         at.sort_by(f32::total_cmp);
         at.dedup_by(|b, a| *b - *a <= 1e-3);
         let mut dense = Vec::with_capacity(at.len() * 4);
@@ -680,7 +700,11 @@ impl Blocks {
         let dense = dense.into_iter().enumerate().map(|(i, s)| {
             if i == 0 || i == last {
                 let s = if i == 0 { 0.0 } else { len };
-                return (s, self.point_at(road, s).0, self.offset_at(lane, s, true));
+                return (
+                    s,
+                    self.point_at(road, s).0,
+                    self.offset_at(lane, s, Some(flanks)),
+                );
             }
             let j = arc.partition_point(|&v| v <= s).clamp(1, arc.len() - 1);
             let f = ((s - arc[j - 1]) / (arc[j] - arc[j - 1]).max(1e-6)).clamp(0.0, 1.0);
@@ -717,17 +741,26 @@ impl Blocks {
         out
     }
 
-    /// The land stretch `k` of `lane`'s side of its road could cover, from `offsets`: from the
-    /// centreline back along each offset, within the bisectors of the corners at the road's
-    /// ends.
-    fn ribbon(&self, lane: LaneId, k: u32, offsets: &[(f32, Point, Point, f32)]) -> Ring {
+    /// The land stretch `k` (between `edges[k]` and `edges[k + 1]`) of `lane`'s side of its
+    /// road could cover, from `offsets`: from the centreline back along each offset, within
+    /// the bisectors of the corners at the road's ends, or along the flank roads there.
+    fn ribbon(
+        &self,
+        lane: LaneId,
+        edges: &[f32],
+        k: usize,
+        offsets: &[(f32, Point, Point, f32)],
+        flanks: &[LaneId],
+    ) -> Ring {
         let road = lane / 2;
-        let (n, w) = self.stretches(road);
         let len = self.road_len(road);
-        let (s0, s1) = (
-            k as f32 * w,
-            if k + 1 == n { len } else { (k + 1) as f32 * w },
-        );
+        // The end stretches run to the road's ends, past any margin along a flank.
+        let s0 = if k == 0 { 0.0 } else { edges[k] };
+        let s1 = if k + 2 == edges.len() {
+            len
+        } else {
+            edges[k + 1]
+        };
         let span: Vec<_> = offsets
             .iter()
             .filter(|o| o.0 >= s0 - 1e-3 && o.0 <= s1 + 1e-3)
@@ -740,8 +773,8 @@ impl Blocks {
         // Land past either corner's bisector belongs to the road side around that corner.
         for at in [0.0, len] {
             let (p, d) = self.point_at(road, at);
-            let m = self.offset_at(lane, at, true);
-            if m != self.offset_at(lane, at, false) {
+            let m = self.offset_at(lane, at, Some(flanks));
+            if m != self.offset_at(lane, at, None) {
                 let keep = if at == 0.0 { d } else { (-d.0, -d.1) };
                 pts = clip_half_plane(&pts, p, m, keep);
             }
@@ -749,47 +782,153 @@ impl Blocks {
         poly::ring(pts)
     }
 
-    /// The offset direction of `lane`'s side of its road `s` metres along it: along the corner
-    /// bisector with the next lane around the block at a road end (`at_end`), else square to
-    /// the road.
-    fn offset_at(&self, lane: LaneId, s: f32, at_end: bool) -> Point {
+    /// The offset direction of `lane`'s side of its road `s` metres along it, scaled so it
+    /// moves one metre away from the road per unit: at a road end (`flanks` given), along
+    /// the flank road there if the lane around the corner is one of `flanks`, else along the
+    /// corner bisector; elsewhere square to the road.
+    fn offset_at(&self, lane: LaneId, s: f32, flanks: Option<&[LaneId]>) -> Point {
         let road = lane / 2;
         let left = lane.is_multiple_of(2);
         let (_, d) = self.point_at(road, s);
         let n1 = if left { left_of(d) } else { (d.1, -d.0) };
-        if !at_end {
+        let Some(flanks) = flanks else {
             return n1;
+        };
+        let Some((other, along, n2)) = self.around(lane, s <= 0.0) else {
+            return n1;
+        };
+        if flanks.contains(&other) {
+            let c = along.0 * n1.0 + along.1 * n1.1;
+            if c > MIN_MITRE {
+                return (along.0 / c, along.1 / c);
+            }
         }
+        mitre(n1, n2)
+    }
+
+    /// The lane around the block from `lane` at its road's start (`at_start`) or end, the unit
+    /// direction along it away from that corner, and its unit inward normal there. `None` at
+    /// a dead end.
+    fn around(&self, lane: LaneId, at_start: bool) -> Option<(LaneId, Point, Point)> {
         // Lane `lane` travels a→b on the left side and b→a on the right; the road start is
         // where the left side's lane starts and the right side's lane ends.
-        let at_start = s <= 0.0;
-        let ends_here = at_start != left;
-        let n2 = if ends_here {
+        if at_start != lane.is_multiple_of(2) {
             let m = self.next[lane as usize];
-            if m == LaneId::MAX {
-                return n1;
-            }
-            left_of(unit(self.leaving(m)))
+            (m != LaneId::MAX).then(|| {
+                let d = unit(self.leaving(m));
+                (m, d, left_of(d))
+            })
         } else {
             let p = self.prev[lane as usize];
-            if p == LaneId::MAX {
-                return n1;
+            (p != LaneId::MAX).then(|| {
+                let d = unit(self.leaving(p ^ 1));
+                (p, d, left_of((-d.0, -d.1)))
+            })
+        }
+    }
+
+    /// Where `lane`'s stretches start and end, metres along its road from the road's start:
+    /// about `LOT_WIDTH` apart along the road, or along the kerb where the road meets one of
+    /// `flanks`, so lots there are as wide as the rest.
+    fn edges(&self, lane: LaneId, flanks: &[LaneId]) -> Vec<f32> {
+        let len = self.road_len(lane / 2);
+        let margin = |at_start: bool| {
+            let s = if at_start { 0.0 } else { len };
+            match self.around(lane, at_start) {
+                Some((other, along, _)) if flanks.contains(&other) => {
+                    let (_, d) = self.point_at(lane / 2, s);
+                    let sin = cross(d, along).abs().max(0.5);
+                    ROAD_HALF_WIDTH / sin
+                }
+                _ => 0.0,
             }
-            let d = unit(self.leaving(p ^ 1));
-            left_of((-d.0, -d.1))
         };
-        mitre(n1, n2)
+        let (m0, m1) = (margin(true), margin(false));
+        let usable = (len - m0 - m1).max(1.0);
+        let n = ((usable / LOT_WIDTH).round() as u32).max(1);
+        let w = usable / n as f32;
+        let mut edges = vec![0.0];
+        edges.extend((1..n).map(|k| m0 + k as f32 * w));
+        edges.push(len);
+        edges
+    }
+
+    /// Lanes around block `i` that get no lots: in a four-sided block with corners between 60°
+    /// and 120° and straight sides, the shorter pair of opposite sides (the more north-south
+    /// pair if they are about equal), so lots face the other pair and reach back to the middle
+    /// as rectangles. Empty for other blocks, or when lots couldn't reach across.
+    fn flanks(&self, i: usize) -> Vec<LaneId> {
+        let ring = &self.lanes[self.lane_start[i] as usize..self.lane_start[i + 1] as usize];
+        let ends: Vec<(Point, Point, Point, Point)> = ring
+            .iter()
+            .map(|&l| {
+                let p = self.lane_points(l);
+                let n = p.len();
+                (
+                    p[0],
+                    unit(sub(p[1], p[0])),
+                    p[n - 1],
+                    unit(sub(p[n - 1], p[n - 2])),
+                )
+            })
+            .collect();
+        let dot = |a: Point, b: Point| a.0 * b.0 + a.1 * b.1;
+        let n = ring.len();
+        // A corner is where the next lane turns more than 30° from the one before it.
+        let corners: Vec<usize> = (0..n)
+            .filter(|&j| dot(ends[(j + n - 1) % n].3, ends[j].1) < STRAIGHT_COS)
+            .collect();
+        if corners.len() != 4
+            || corners
+                .iter()
+                .any(|&j| dot(ends[(j + n - 1) % n].3, ends[j].1).abs() > RIGHT_COS)
+        {
+            return Vec::new();
+        }
+        let mut sides = Vec::with_capacity(4);
+        for c in 0..4 {
+            let (from, to) = (corners[c], corners[(c + 1) % 4]);
+            let lanes: Vec<usize> = (0..n)
+                .map(|k| (from + k) % n)
+                .take((to + n - from) % n)
+                .collect();
+            let (first, last) = (lanes[0], lanes[lanes.len() - 1]);
+            // A side that bends, along a curve or at a junction, isn't straight.
+            if lanes
+                .iter()
+                .any(|&j| dot(ends[j].1, ends[j].3) < STRAIGHT_COS)
+                || dot(ends[first].1, ends[last].3) < STRAIGHT_COS
+            {
+                return Vec::new();
+            }
+            let len: f32 = lanes.iter().map(|&j| self.road_len(ring[j] / 2)).sum();
+            sides.push((lanes, len, sub(ends[last].2, ends[first].0)));
+        }
+        let (a, b) = (sides[0].1 + sides[2].1, sides[1].1 + sides[3].1);
+        let chord = sides[0].2;
+        let flank = if a > b * 1.05 {
+            1
+        } else if b > a * 1.05 || chord.1.abs() > chord.0.abs() {
+            0
+        } else {
+            1
+        };
+        let reach = 2.0 * (LOT_REACH + ROAD_HALF_WIDTH);
+        if sides[flank].1 > reach || sides[flank + 2].1 > reach {
+            return Vec::new();
+        }
+        let mut out: Vec<LaneId> = sides[flank]
+            .0
+            .iter()
+            .chain(&sides[flank + 2].0)
+            .map(|&j| ring[j])
+            .collect();
+        out.sort_unstable();
+        out
     }
 
     fn road_len(&self, r: RoadId) -> f32 {
         self.arc[self.road_start[r as usize + 1] as usize - 1]
-    }
-
-    /// How many stretches road `r`'s sides are cut into, and how long each is.
-    fn stretches(&self, r: RoadId) -> (u32, f32) {
-        let len = self.road_len(r);
-        let n = ((len / LOT_WIDTH).round() as u32).max(1);
-        (n, len / n as f32)
     }
 
     /// The point `s` metres along road `r` and the unit direction of travel there.

@@ -58,6 +58,21 @@ unchanged. The grid says what land is for; lots say how it is divided.
    along it. Corners sharper than about 10° that enclose under 2 m² are removed from the final
    outline, so lots have no spikes; the land lost is negligible.
 
+**Rectangle-like blocks** are cut as on a city grid. A block qualifies when it has exactly four
+straight sides (each turning less than 30° along its length) and four corners between 60° and
+120°, and its shorter pair of opposite sides is at most twice `LOT_REACH` plus a road width
+long (136 m), so lots can reach across. Lots face only the longer pair of sides (if the pairs
+are within 5%, the more east-west pair). The other two sides are flanks and get no lots:
+
+- Front lots reach back to the line halfway to the facing front; flank roads and roads beyond
+  the block's corners don't count in that.
+- The end lots of a front run along the flank instead of along a corner bisector.
+- A front's stretches are measured along its kerb, between the flanks' kerbs, so the end lots
+  are as wide as the rest (a 120 m grid gives seven 16 m lots per side).
+
+A perfect grid of square blocks therefore cuts into identical rectangles, about 16 m by 56 m,
+seven along each of two sides of every block. Other blocks keep the rules above.
+
 Land deeper than the lot depth stays the block's interior and drives alleys and connector
 streets exactly as in ADR 0016.
 

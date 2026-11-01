@@ -649,7 +649,8 @@ fn lots_from_facing_roads_meet_on_one_line_without_slivers() {
     assert_eq!(unlotted(&w), 0, "every zoned cell has a lot");
 }
 
-/// A perfect lattice zoned whole: every block is cut the same way, with no alleys.
+/// A perfect lattice zoned whole: every block is cut the same way, into rectangles facing
+/// two of its sides, with no alleys.
 #[test]
 fn a_perfect_grid_cuts_every_block_the_same_way() {
     let cfg = Config::default();
@@ -681,6 +682,11 @@ fn a_perfect_grid_cuts_every_block_the_same_way() {
     let mut blocks: Vec<Vec<Vec<(i32, i32)>>> = vec![Vec::new(); ((n - 1) * (n - 1)) as usize];
     for &l in &lots {
         let o = w.lots.outline(l);
+        let b = bounds(o);
+        assert!(
+            o.len() == 4 && ((b[2] - b[0]) * (b[3] - b[1]) - area(o)).abs() < 1.0,
+            "lot {l} is not a rectangle: {o:?}"
+        );
         let (cx, cy) = centroid(o);
         let (bx, by) = ((cx / spacing).floor(), (cy / spacing).floor());
         let mut shape: Vec<(i32, i32)> = o
@@ -699,7 +705,7 @@ fn a_perfect_grid_cuts_every_block_the_same_way() {
     for b in &mut blocks {
         b.sort();
     }
-    assert!(blocks[0].len() >= 16, "{} lots in a block", blocks[0].len());
+    assert_eq!(blocks[0].len(), 14, "7 lots on each of two sides");
     for (i, b) in blocks.iter().enumerate() {
         assert_eq!(b, &blocks[0], "block {i} is cut differently from block 0");
     }
