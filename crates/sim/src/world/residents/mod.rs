@@ -9,7 +9,7 @@ mod tests;
 use crate::citizen::{CitizenId, HomeId};
 use crate::rng::Rng;
 use std::cmp::Reverse;
-use std::collections::BinaryHeap;
+use std::collections::{BTreeSet, BinaryHeap};
 
 pub(super) struct Residents {
     pub rng: Rng,
@@ -24,6 +24,9 @@ pub(super) struct Residents {
     pub arrivals: BinaryHeap<Reverse<(u64, HomeId)>>,
     pub activities: BinaryHeap<Reverse<(u64, CitizenId)>>,
     pub searches: BinaryHeap<Reverse<(u64, CitizenId)>>,
+    /// Derived index for relocation: exactly the vacant homes of active buildings that are not
+    /// closing. Not hashed, since it follows from hashed state; `vacancies_hold` checks that.
+    pub vacant: BTreeSet<HomeId>,
 }
 impl Residents {
     pub fn new(seed: u64) -> Self {
@@ -39,6 +42,7 @@ impl Residents {
             arrivals: BinaryHeap::new(),
             activities: BinaryHeap::new(),
             searches: BinaryHeap::new(),
+            vacant: BTreeSet::new(),
         }
     }
 }

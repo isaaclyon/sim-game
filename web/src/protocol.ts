@@ -171,7 +171,8 @@ export type FromWorker =
    * indexed by ID. Height is metres; n is the footprint point count, counter-clockwise,
    * without a repeated closing point. Zone is the original use, not the repainted zone.
    * Roof is a stable palette index (0–3 for industry; 0 for other uses).
-   * Growth is coalesced to at most four snapshots per real second. Start, edits and pause
+   * Closing buildings stay until they empty out (ADR 0023).
+   * Growth and closure are coalesced to at most four snapshots per real second. Start, edits and pause
    * flush immediately, so paused road edits never leave displaced buildings visible.
    */
   | { type: 'buildings'; data: Float32Array }

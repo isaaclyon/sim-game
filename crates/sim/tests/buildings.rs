@@ -1,4 +1,4 @@
-//! Buildings grow on lots, retain their use when rezoned, and leave with retired lots.
+//! Buildings grow on lots, close gradually when rezoned, and leave with retired lots.
 use sim::road::RoadClass;
 use sim::{Command, Config, World, Zone};
 
@@ -76,18 +76,33 @@ fn all_six_uses_grow_with_their_own_height_and_footprint() {
 }
 
 #[test]
-fn repaint_and_unzone_preserve_existing_buildings_and_stop_new_growth() {
+fn repaint_and_unzone_close_buildings_gradually_then_replace_them() {
     let mut w = town(Zone::ResidentialLow);
     advance(&mut w, 10);
     let original = snapshot(&w);
+    let old: Vec<_> = w.buildings.active_buildings().collect();
     assert!(!original.is_empty());
+    let version = w.buildings.version;
     assert!(w.apply(Command::FillBlock {
         x: 50.0,
         y: 50.0,
         zone: Zone::None
     }));
-    advance(&mut w, 61);
+    assert_eq!(
+        w.buildings.version, version,
+        "a paused repaint keeps geometry"
+    );
+    assert!(old.iter().all(|&b| w.building_closing(b)));
+    // Closure steps are 3–12 sim seconds apart (ADR 0023); a house needs at most two.
+    for _ in 0..29 {
+        w.tick();
+    }
     assert_eq!(snapshot(&w), original);
+    advance(&mut w, 22);
+    assert!(snapshot(&w).is_empty());
+    assert!(w.buildings.version > version);
+    advance(&mut w, 61);
+    assert!(snapshot(&w).is_empty(), "unzoned lots stay vacant");
     assert!(w.apply(Command::FillBlock {
         x: 50.0,
         y: 50.0,
@@ -99,8 +114,25 @@ fn repaint_and_unzone_preserve_existing_buildings_and_stop_new_growth() {
         .active_buildings()
         .map(|b| w.buildings.zone[b as usize])
         .collect();
-    assert!(zones.contains(&Zone::ResidentialLow));
-    assert!(zones.contains(&Zone::CommercialHigh));
+    assert!(!zones.is_empty());
+    assert!(zones.iter().all(|&z| z == Zone::CommercialHigh));
+}
+
+#[test]
+fn restoring_the_original_zone_keeps_closing_buildings() {
+    let mut w = town(Zone::ResidentialLow);
+    advance(&mut w, 10);
+    let old: Vec<_> = w.buildings.active_buildings().collect();
+    for zone in [Zone::ResidentialHigh, Zone::ResidentialLow] {
+        assert!(w.apply(Command::FillBlock {
+            x: 50.0,
+            y: 50.0,
+            zone
+        }));
+    }
+    assert!(old.iter().all(|&b| !w.building_closing(b)));
+    advance(&mut w, 61);
+    assert!(old.iter().all(|&b| w.buildings.active[b as usize]));
 }
 
 #[test]

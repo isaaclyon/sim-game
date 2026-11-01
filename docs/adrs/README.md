@@ -26,8 +26,9 @@ rewriting history; mark the old one `Superseded by NNNN`.
 | [0018](0018-lots-cut-along-roads.md) | Lots are shapes cut along roads; buildings take their shape from lots | Industrial frontage and buildings superseded by 0019; otherwise accepted |
 | [0019](0019-industrial-lot-variety.md) | Industrial lots combine neighbouring frontage strips | Industrial footprint fallback superseded by 0020; otherwise accepted |
 | [0020](0020-rectangular-industrial-halls.md) | Industrial halls stay rectangular | Accepted |
-| [0021](0021-citizens-households-and-trips.md) | Citizens, households, homes, jobs and trips | Accepted |
+| [0021](0021-citizens-households-and-trips.md) | Citizens, households, homes, jobs and trips | Accepted; residents of repainted buildings superseded by 0023 |
 | [0022](0022-citizen-inspection-query.md) | Citizen inspection is a read-only query for one selected citizen | Accepted |
+| [0023](0023-gradual-closure-of-rezoned-buildings.md) | Gradual closure of rezoned buildings | Accepted |
 
 ADRs are only for decisions that are hard to reverse. See [AGENTS.md](AGENTS.md) for when to
 write one and how.

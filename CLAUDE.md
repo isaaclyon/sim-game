@@ -43,7 +43,8 @@ What to build next and why lives in `docs/ROADMAP.md`. Work on the current miles
   Height is metres; n is the counter-clockwise footprint point count, with no repeated closing
   point. Roof is a stable palette index (0–3 for industry, 0 otherwise; ADR 0019).
   Zone is the building's original use. Sent whole when the buildings version changes,
-  including growth and removals from paused road edits. Growth snapshots are capped at four
+  including growth, closure removals (ADR 0023)
+  and removals from paused road edits. Growth snapshots are capped at four
   per real second; start, edits and pause flush immediately.
 - Citizen inspection: `inspect` names a car by its agent snapshot index; the worker maps it once
   to a citizen and answers `citizen` for that one citizen only, at once and after every frame

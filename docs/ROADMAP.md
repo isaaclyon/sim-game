@@ -60,7 +60,7 @@ despawns, and the road tool feels good with snapping, curves and bulldozing.
   wedges on curves ([ADR 0018](adrs/0018-lots-cut-along-roads.md)).
 - Buildings appear on zoned lots over time, as procedural low-poly boxes by zone and density.
 - Repainting or unzoning occupied land doesn't bulldoze it: the old buildings empty out over
-  time and the new zone replaces them.
+  time and the new zone replaces them. Implemented ([ADR 0023](adrs/0023-gradual-closure-of-rezoned-buildings.md)).
 - Citizens get a home and a workplace. Trips run home → work → shop → home on a daily
   schedule, replacing random node-to-node trips ([ADR 0021](adrs/0021-citizens-households-and-trips.md)).
   Households, homes, limited jobs, the resident population counter and unemployment

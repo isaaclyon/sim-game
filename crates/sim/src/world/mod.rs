@@ -1,5 +1,6 @@
 //! The world: owns all sim state and advances it one fixed step at a time.
 
+mod closure;
 mod inspect;
 mod residents;
 mod roads;
@@ -145,6 +146,7 @@ pub struct World {
     pub households: crate::citizen::Households,
     pub homes: crate::citizen::Homes,
     residents: residents::Residents,
+    closures: closure::Closures,
     /// Faces of the road network, traced again when `blocks_version` falls behind the roads.
     blocks: Blocks,
     blocks_version: Option<u32>,
@@ -168,6 +170,7 @@ impl World {
     pub fn new(cfg: Config, roads: RoadNetwork, rng: Rng) -> Self {
         let mut world = Self {
             residents: residents::Residents::new(cfg.seed),
+            closures: Default::default(),
             citizens: Default::default(),
             households: Default::default(),
             homes: Default::default(),
@@ -265,8 +268,7 @@ impl World {
                 self.cfg.dt,
                 self.cfg.seed,
             );
-        }
-        if versions != (self.lots.version, self.zones.version) {
+            self.reconcile_closures();
             self.reconcile_residents();
         }
         changed
@@ -274,6 +276,7 @@ impl World {
 
     pub fn tick(&mut self) {
         self.sync_roads();
+        self.tick_closures();
         self.tick_residents();
         self.wake_parked();
         self.lane_delay.clear();

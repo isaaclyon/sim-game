@@ -25,13 +25,16 @@ test('WASM sends sim-owned building footprints, heights and original zones', () 
   assert.equal(i, data.length);
   const version = s.buildings_version();
   assert.ok(s.fill_block(50, 50, 0));
-  s.tick(610);
-  assert.deepEqual(s.building_snapshot(), data);
+  s.tick(20);
+  assert.deepEqual(s.building_snapshot(), data, 'unzoned buildings close gradually');
   assert.equal(s.buildings_version(), version);
+  s.tick(20000);
+  assert.equal(s.building_snapshot().length, 0, 'closed buildings leave unzoned land vacant');
+  assert.notEqual(s.buildings_version(), version);
   s.free();
 });
 
-test('industrial snapshots carry varied roofs and halls and preserve them after repainting', () => {
+test('industrial snapshots carry varied roofs and halls until repainting replaces them', () => {
   const s = new Sim(1, 3, 3);
   assert.ok(s.fill_block(50, 50, 6));
   s.tick(610);
@@ -51,10 +54,16 @@ test('industrial snapshots carry varied roofs and halls and preserve them after 
   assert.ok(roofs.size > 1);
   assert.ok(heights.size > 1);
   s.fill_block(50, 50, 1);
-  assert.deepEqual(s.building_snapshot(), data);
-  s.tick(610);
-  // Vacant corner lots may now fit houses; existing halls must remain unchanged.
-  assert.deepEqual(s.building_snapshot().subarray(0, data.length), data);
+  assert.deepEqual(s.building_snapshot(), data, 'repainting keeps halls until they close');
+  // Empty workplaces close at their first step, 3–12 sim seconds; houses grow within a minute.
+  s.tick(730);
+  const zones = new Set();
+  const after = s.building_snapshot();
+  for (let j = 0; j < after.length; ) {
+    zones.add(after[j]);
+    j += 4 + 2 * after[j + 3];
+  }
+  assert.deepEqual([...zones], [1]);
   s.free();
 });
 
@@ -125,6 +134,17 @@ test('worker publishes growing buildings and paused road edits, but no unchanged
     grown.data,
     'paused construction removes displaced buildings immediately',
   );
+});
+
+test('worker publishes buildings removed by closure while running', async () => {
+  const { send, buildings, advance } = await worker();
+  await send({ type: 'fillBlock', x: 50, y: 50, zone: 6 });
+  for (let i = 0; i < 61; i++) advance(1000);
+  assert.ok(buildings().at(-1).data.length > 0);
+  await send({ type: 'fillBlock', x: 50, y: 50, zone: 0 });
+  assert.ok(buildings().at(-1).data.length > 0, 'repainting keeps buildings at first');
+  for (let i = 0; i < 13; i++) advance(1000);
+  assert.equal(buildings().at(-1).data.length, 0);
 });
 
 test('fast growth limits full geometry updates and pausing flushes the latest buildings', async () => {

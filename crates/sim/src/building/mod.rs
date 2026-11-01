@@ -1,5 +1,6 @@
 //! Buildings on lots (ADR 0016/0018). Growth is a timed visual placeholder for demand.
-//! Lot geometry is read only at construction; rezoning never changes an existing building.
+//! Lot geometry is read only at construction; rezoning never changes an existing building,
+//! it only starts the building's gradual closure (ADR 0023).
 mod footprint;
 
 use std::cmp::Reverse;
@@ -73,11 +74,7 @@ impl Buildings {
             if zone == Zone::None {
                 self.due[l] = None;
             } else if self.due[l].is_none_or(|(_, old)| old != zone) {
-                // Per-lot RNG keeps construction independent of traffic RNG and edit order.
-                let mut rng = Rng::new(seed.wrapping_add(l as u64));
-                let seconds = 2.0 + rng.below(580) as f32 / 10.0;
-                let delay = (seconds / dt).ceil().max(1.0) as u64;
-                self.due[l] = Some((tick.saturating_add(delay), zone));
+                self.schedule(l, zone, tick, dt, seed);
             }
         }
         self.pending = self
@@ -91,6 +88,43 @@ impl Buildings {
         }
     }
 
+    fn schedule(&mut self, l: usize, zone: Zone, tick: u64, dt: f32, seed: u64) {
+        // Per-lot RNG keeps construction independent of traffic RNG and edit order.
+        let mut rng = Rng::new(seed.wrapping_add(l as u64));
+        let seconds = 2.0 + rng.below(580) as f32 / 10.0;
+        let delay = (seconds / dt).ceil().max(1.0) as u64;
+        let at = tick.saturating_add(delay);
+        self.due[l] = Some((at, zone));
+        self.pending.push(Reverse((at, l as LotId)));
+    }
+
+    /// Removes a closed building and schedules its lot for the lot's current zone. Only the
+    /// lot's active owner can be removed, so a stale id never frees a replacement's lot.
+    /// Occupancy cleanup is the caller's job.
+    pub(crate) fn remove(
+        &mut self,
+        building: BuildingId,
+        lots: &Lots,
+        zones: &ZoneGrid,
+        tick: u64,
+        dt: f32,
+        seed: u64,
+    ) -> bool {
+        let b = building as usize;
+        let l = self.lot[b] as usize;
+        if !self.active[b] || self.owner[l] != Some(building) {
+            return false;
+        }
+        self.active[b] = false;
+        self.owner[l] = None;
+        self.version = self.version.wrapping_add(1);
+        let zone = lots.zone(l as LotId, zones);
+        if lots.active[l] && zone != Zone::None {
+            self.schedule(l, zone, tick, dt, seed);
+        }
+        true
+    }
+
     pub(crate) fn grow(&mut self, tick: u64, lots: &Lots, roads: &RoadNetwork, seed: u64) {
         let mut changed = false;
         while let Some(&Reverse((at, lot))) = self.pending.peek() {
@@ -99,7 +133,8 @@ impl Buildings {
             }
             self.pending.pop();
             let l = lot as usize;
-            let Some((_, zone)) = self.due[l].take() else {
+            // Entries whose deadline was replaced are stale.
+            let Some((_, zone)) = self.due[l].take_if(|&mut (due, _)| due == at) else {
                 continue;
             };
             let mut rng = Rng::new(seed.wrapping_add(lot as u64));

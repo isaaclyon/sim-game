@@ -35,21 +35,21 @@ impl World {
         }
         let old = self.households.home[hh] as usize;
         let size = self.households.members[hh].len();
-        let replacement = (0..self.homes.building.len()).find(|&h| {
-            h != old
-                && self.homes.household[h].is_none()
-                && self.homes.capacity[h] as usize >= size
-                && self.building_accepts_assignments(self.homes.building[h])
-        });
+        let replacement = self.vacant_home(old, size);
         self.homes.household[old] = None;
-        if self.buildings.active[self.homes.building[old] as usize] {
+        let b = self.homes.building[old];
+        if self.buildings.active[b as usize] {
             self.residents.arrivals.push(Reverse((
                 self.totals.tick + self.secs_to_ticks(30.0),
                 old as u32,
             )));
+            if !self.building_closing(b) {
+                self.residents.vacant.insert(old as u32);
+            }
         }
         if let Some(h) = replacement {
             self.homes.household[h] = Some(household);
+            self.residents.vacant.remove(&(h as u32));
             self.households.home[hh] = h as u32;
         } else {
             self.households.active[hh] = false;
@@ -68,6 +68,32 @@ impl World {
                 self.residents.population -= 1;
             }
         }
+    }
+
+    /// Lowest-id vacant home other than `old` that fits `size` and accepts assignments. The
+    /// index only narrows the candidates; the full eligibility test still decides.
+    pub(in crate::world) fn vacant_home(&self, old: usize, size: usize) -> Option<usize> {
+        self.residents
+            .vacant
+            .iter()
+            .map(|&h| h as usize)
+            .find(|&h| {
+                h != old
+                    && self.homes.household[h].is_none()
+                    && self.homes.capacity[h] as usize >= size
+                    && self.building_accepts_assignments(self.homes.building[h])
+            })
+    }
+
+    /// The vacancy index lists exactly the vacant homes of active buildings that are not closing.
+    #[cfg(test)]
+    pub(in crate::world) fn vacancies_hold(&self) -> bool {
+        (0..self.homes.building.len()).all(|h| {
+            let b = self.homes.building[h];
+            let open = self.buildings.active[b as usize] && !self.building_closing(b);
+            let expected = open && self.homes.household[h].is_none();
+            self.residents.vacant.contains(&(h as u32)) == expected
+        })
     }
 
     pub(in crate::world) fn release_job(&mut self, c: CitizenId) {

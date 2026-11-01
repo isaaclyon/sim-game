@@ -41,9 +41,12 @@ building height. Very small or awkward lots can stay open. A partly painted lot 
 empty if unzoned cells outnumber or tie its most common zone; click to fill the whole block
 to zone those gaps. Growth pauses with the simulation.
 This is quick visual growth for testing zoning, not demand-driven development yet.
-Repainting or unzoning keeps existing buildings and their original use, while unzoning stops
-new construction. A road edit that removes a lot removes its building immediately.
-Demand and gradual redevelopment come in later issues.
+Repainting or unzoning doesn't bulldoze. Existing buildings keep their original use while
+they empty out: workers lose their jobs at once, and households move to a free home elsewhere
+or leave town, one every few seconds. An empty building then disappears and the new zone grows
+in its place; unzoned land stays vacant. Painting the original zone back before that stops
+the closure. A road edit that removes a lot removes its building immediately
+([ADR 0023](docs/adrs/0023-gradual-closure-of-rezoned-buildings.md)). Demand comes in a later issue.
 
 ## Citizens
 
