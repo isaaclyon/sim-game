@@ -30,11 +30,17 @@ test('WASM sends sim-owned building footprints, heights and original zones', () 
   s.free();
 });
 
-test('worker publishes growing buildings and paused road edits, but no unchanged geometry', async () => {
+async function worker() {
   let now = 0;
   let step;
   const messages = [];
-  const self = { postMessage: (msg) => messages.push(msg) };
+  const publishedAt = [];
+  const self = {
+    postMessage: (msg) => {
+      messages.push(msg);
+      if (msg.type === 'buildings') publishedAt.push(now);
+    },
+  };
   const context = createContext({
     self,
     performance: { now: () => now },
@@ -59,18 +65,30 @@ test('worker publishes growing buildings and paused road edits, but no unchanged
   const send = (data) => self.onmessage({ data });
   await send({ type: 'init', seed: 1, cols: 3, rows: 3, agents: 0 });
   const buildings = () => messages.filter((m) => m.type === 'buildings');
+  return {
+    send,
+    messages,
+    buildings,
+    publishedAt,
+    advance(ms) {
+      now += ms;
+      step();
+    },
+  };
+}
+
+test('worker publishes growing buildings and paused road edits, but no unchanged geometry', async () => {
+  const { send, buildings, advance } = await worker();
   assert.equal(buildings().length, 1);
   assert.equal(buildings()[0].data.length, 0);
   await send({ type: 'fillBlock', x: 50, y: 50, zone: 2 });
   for (let i = 0; i < 61; i++) {
-    now += 1000;
-    step();
+    advance(1000);
   }
   const grown = buildings().at(-1);
   assert.ok(grown.data.length > 0);
   const count = buildings().length;
-  now += 1000;
-  step();
+  advance(1000);
   assert.equal(buildings().length, count);
   await send({ type: 'setSpeed', speed: 0 });
   await send({ type: 'buildRoad', ax: 0, ay: 60, bx: 120, by: 60, class: 0, id: 1 });
@@ -79,4 +97,29 @@ test('worker publishes growing buildings and paused road edits, but no unchanged
     grown.data,
     'paused construction removes displaced buildings immediately',
   );
+});
+
+test('fast growth limits full geometry updates and pausing flushes the latest buildings', async () => {
+  const w = await worker();
+  await w.send({ type: 'fillBlock', x: 50, y: 50, zone: 2 });
+  await w.send({ type: 'setSpeed', speed: 10 });
+  for (let i = 0; i < 100; i++) w.advance(10);
+  for (let i = 1; i < w.publishedAt.length; i++) {
+    assert.ok(
+      w.publishedAt[i] - w.publishedAt[i - 1] >= 250,
+      'whole-city mesh rebuilds are capped at four per real second',
+    );
+  }
+  const mirror = new Sim(1, 3, 3);
+  mirror.fill_block(50, 50, 2);
+  mirror.tick(w.messages.findLast((m) => m.type === 'frame').stats.tick);
+  const expected = mirror.building_snapshot();
+  assert.ok(expected.length > 0);
+  await w.send({ type: 'setSpeed', speed: 0 });
+  assert.deepEqual(
+    w.buildings().at(-1).data,
+    expected,
+    'pause must not leave a throttled snapshot hidden indefinitely',
+  );
+  mirror.free();
 });

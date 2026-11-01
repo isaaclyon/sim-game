@@ -38,7 +38,8 @@ What to build next and why lives in `docs/ROADMAP.md`. Work on the current miles
 - Buildings: `[zone, height, n, x0, y0, …]` per active building in ID order, not indexed by ID.
   Height is metres; n is the counter-clockwise footprint point count, with no repeated closing
   point. Zone is the building's original use. Sent whole when the buildings version changes,
-  including growth and removals from paused road edits.
+  including growth and removals from paused road edits. Growth snapshots are capped at four
+  per real second; start, edits and pause flush immediately.
 Change both sides (Rust writer, `protocol.ts` doc, `renderer.ts` reader) together.
 
 ## Checks before finishing a change
