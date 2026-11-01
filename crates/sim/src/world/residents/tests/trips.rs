@@ -27,7 +27,7 @@ fn route_failure_waits_and_retries_without_arrival_or_losing_job() {
     isolate(&mut w);
     let home = w.home_building(0);
     let target = distant(&w, 0);
-    w.citizens.job[0] = Some(target);
+    assign_job(&mut w, 0, target);
     let from = w.building_node(home).unwrap();
     let roads: Vec<_> = w.roads.out_lanes(from).iter().map(|l| l / 2).collect();
     for r in roads {

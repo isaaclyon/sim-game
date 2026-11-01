@@ -61,7 +61,7 @@ test('normal worker frames report residents separately from cars', async () => {
 });
 
 for (const type of ['buildRoad', 'buildCurve', 'deleteRoad']) {
-  test(`${type} publishes reduced population immediately when occupied homes are cut while paused`, async () => {
+  test(`${type} publishes reduced population and unemployment immediately when occupied homes are cut while paused`, async () => {
     const w = await worker(0);
     w.ready();
     await w.init;
@@ -91,6 +91,14 @@ for (const type of ['buildRoad', 'buildCurve', 'deleteRoad']) {
     assert.notEqual(after, before, 'paused construction must publish new statistics');
     assert.equal(after.stats.tick, before.stats.tick);
     assert.ok(after.stats.population < before.stats.population);
+    assert.ok(after.stats.unemployed <= after.stats.population);
+    assert.notEqual(after.stats.unemployed, before.stats.unemployed);
+    assert.equal(
+      after.stats.unemploymentPercent,
+      after.stats.population === 0
+        ? 0
+        : Math.fround((after.stats.unemployed * 100) / after.stats.population),
+    );
   });
 }
 

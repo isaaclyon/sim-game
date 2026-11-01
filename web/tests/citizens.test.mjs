@@ -10,11 +10,16 @@ test('population counts residents through WASM, independently of travelling cars
   const initial = sim.stats();
   assert.equal(initial.population, 0);
   assert.equal(initial.agents, 0);
+  assert.equal(initial.unemployed, 0);
+  assert.equal(initial.unemployment_percent, 0);
   initial.free();
   sim.fill_block(50, 50, 1);
   sim.tick(1200);
   const residents = sim.stats();
   assert.ok(residents.population > 0);
+  // Nobody has a job yet: all residents are unemployed, and the sim reports the rate.
+  assert.equal(residents.unemployed, residents.population);
+  assert.equal(residents.unemployment_percent, 100);
   assert.equal(residents.driving, 0);
   residents.free();
   sim.free();

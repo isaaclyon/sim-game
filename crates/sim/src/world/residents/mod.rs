@@ -17,6 +17,8 @@ pub(super) struct Residents {
     pub jobs: Vec<u32>,
     pub workers: Vec<u32>,
     pub population: u32,
+    /// Active residents with an assigned job; changes only where `Citizens::job` does.
+    pub employed: u32,
     pub connectivity_version: Option<u32>,
     pub component: Vec<u32>,
     pub arrivals: BinaryHeap<Reverse<(u64, HomeId)>>,
@@ -31,6 +33,7 @@ impl Residents {
             jobs: Vec::new(),
             workers: Vec::new(),
             population: 0,
+            employed: 0,
             connectivity_version: None,
             component: Vec::new(),
             arrivals: BinaryHeap::new(),
