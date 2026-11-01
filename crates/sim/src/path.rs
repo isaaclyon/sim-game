@@ -1,6 +1,6 @@
 //! A* over the lane graph. Cost is free-flow travel time plus a per-lane congestion delay, so
 //! routes prefer fast main roads until they back up. Long trips search only main roads in
-//! their middle (ADR 0016).
+//! their middle (ADR 0017).
 
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
@@ -11,7 +11,7 @@ use crate::road::{LaneId, MAIN_SPEED, NodeId, RoadClass, RoadNetwork};
 const HEURISTIC_WEIGHT: f32 = 1.5;
 /// Straight-line distance from a trip's start or end within which it may use local streets.
 /// Farther from both, the search follows main roads only, the way a driver heads for the
-/// nearest main road, rides it, and leaves it near the destination (ADR 0016).
+/// nearest main road, rides it, and leaves it near the destination (ADR 0017).
 pub const MAIN_ROAD_REACH: f32 = 500.0;
 
 /// Reusable search state. Buffers persist between searches and a generation stamp marks

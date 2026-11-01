@@ -56,7 +56,7 @@ despawns, and the road tool feels good with snapping, curves and bulldozing.
   between roads, including odd shapes left by curves. Where a block is too deep to reach from
   its edges, the sim adds alleys and small connector streets to reach interior lots. These
   are ordinary roads in the road graph, so cars use them and the player can bulldoze them.
-  **ADR** for the building and lot data model, block detection and subdivision.
+  ([ADR 0016](adrs/0016-blocks-lots-and-alleys.md)).
 - Buildings appear on zoned lots over time, as procedural low-poly boxes by zone and density.
 - Repainting or unzoning occupied land doesn't bulldoze it: the old buildings empty out over
   time and the new zone replaces them.

@@ -1,4 +1,4 @@
-# 0016. Road classes and main-road routing
+# 0017. Road classes and main-road routing
 
 - Status: Accepted
 - Date: 2026-11-02
@@ -17,9 +17,10 @@ long trips. Multi-lane roads and highways are a separate, later issue (#52).
 
 ## Decision
 
-- **Road class is per road and explicit.** `RoadClass` is `Street` (0) or `Main` (1). It sets
+- **Road class is per road and explicit.** `RoadClass` is `Street` (0), `Main` (1) or
+  `Alley` (2, laid by the sim to reach deep lots, ADR 0016). It sets
   the speed limit (13.9 and 20 m/s), right of way at priority junctions, and which 4+-way
-  junctions get signals. Both still have one lane each way; lane counts can later hang off
+  junctions get signals. All still have one lane each way; lane counts can later hang off
   the class or the road without changing this.
 - **Commands carry the class.** `BuildRoad` and `BuildCurve` take a `class`. Where a build
   follows an existing road, that road keeps its class; a split road's two halves keep theirs.

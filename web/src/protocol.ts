@@ -31,6 +31,10 @@ export type ToWorker =
    * `zone` is a `Zone` value; `Zone.None` unzones.
    */
   | { type: 'paintZone'; ax: number; ay: number; bx: number; by: number; zone: Zone }
+  /** Zones every cell of the block (land enclosed by roads) containing the point (ADR 0016). */
+  | { type: 'fillBlock'; x: number; y: number; zone: Zone }
+  /** Asks for the outline of the block containing the point. Answered with `blockPreview`. */
+  | { type: 'previewBlock'; x: number; y: number; revision: number }
   | { type: 'previewBulldoze'; x: number; y: number; revision: number }
   /** Asks where a road would snap. Changes nothing; answered with `roadPreview`. */
   | { type: 'previewRoad'; revision: number; ax: number; ay: number; bx: number; by: number }
@@ -47,10 +51,12 @@ export type ToWorker =
   /** Asks where a road started here would start. Answered with a one-stop `roadPreview`. */
   | { type: 'previewSnap'; revision: number; x: number; y: number };
 
-/** Road classes, matching the sim's `RoadClass` (ADR 0016). Main roads carry long trips. */
+/** Road classes, matching the sim's `RoadClass` (ADR 0017). Main roads carry long
+ * trips; the sim lays alleys to reach deep lots. */
 export const RoadClass = {
   Street: 0,
   Main: 1,
+  Alley: 2,
 } as const;
 export type RoadClass = (typeof RoadClass)[keyof typeof RoadClass];
 
@@ -99,6 +105,13 @@ export type FromWorker =
    * Sent at start and whenever a paint changes a cell.
    */
   | { type: 'zones'; cells: Uint8Array; layout: [number, number, number, number, number] }
+  /**
+   * `segments` is `[ax, ay, bx, by]` per lot outline segment, along zone cell edges (ADR 0016).
+   * Sent at start and whenever lots change.
+   */
+  | { type: 'lots'; segments: Float32Array }
+  /** `[x, y]` per outline sample of the block under the cursor, closed; empty outside blocks. */
+  | { type: 'blockPreview'; outline: Float32Array; revision: number }
   | { type: 'buildResult'; id: number; success: boolean }
   /** Selected road's `[x, y]` centreline samples, or empty on a miss. Sim-owned hit testing. */
   | { type: 'bulldozePreview'; segment: Float32Array; revision: number }

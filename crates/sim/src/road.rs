@@ -21,13 +21,15 @@ pub const STREET_SPEED: f32 = 13.9;
 pub const MAIN_SPEED: f32 = 20.0;
 
 /// What a road is for. Local streets reach places; main roads carry the middle of long trips,
-/// are faster, and win right of way and signals at junctions (ADR 0016).
+/// are faster, and win right of way and signals at junctions (ADR 0017).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[repr(u8)]
 pub enum RoadClass {
     #[default]
     Street = 0,
     Main = 1,
+    /// Laid by the sim to reach deep lots (ADR 0017).
+    Alley = 2,
 }
 
 impl RoadClass {
@@ -35,6 +37,7 @@ impl RoadClass {
         match v {
             0 => Some(Self::Street),
             1 => Some(Self::Main),
+            2 => Some(Self::Alley),
             _ => None,
         }
     }
@@ -43,9 +46,12 @@ impl RoadClass {
         match self {
             Self::Street => STREET_SPEED,
             Self::Main => MAIN_SPEED,
+            Self::Alley => ALLEY_SPEED,
         }
     }
 }
+/// Alley speed limit, m/s (30 km/h). The sim lays alleys to reach deep lots (ADR 0016).
+pub const ALLEY_SPEED: f32 = 8.3;
 
 #[derive(Default, Clone)]
 pub struct RoadNetwork {

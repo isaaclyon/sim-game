@@ -301,9 +301,9 @@ impl Junctions {
         match self.control[node as usize] {
             Control::None => false,
             Control::Priority => {
-                let (ca, cb) = (net.lane_class(a), net.lane_class(b));
-                if ca != cb {
-                    return cb == RoadClass::Main; // The main road has right of way.
+                let (sa, sb) = (net.lane_class(a).speed(), net.lane_class(b).speed());
+                if sa != sb {
+                    return sb > sa; // The bigger road has right of way.
                 }
                 // Counter-clockwise from your own road is your right (y up, right-hand traffic).
                 let from_right = rel > 0.0 && rel < 5.0 * PI / 6.0;

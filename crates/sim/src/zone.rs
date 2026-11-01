@@ -43,6 +43,8 @@ pub struct ZoneGrid {
     pub cells: Vec<u8>,
     /// Bumped on every change so the frontend knows when to redraw.
     pub version: u32,
+    /// Cells with a zone other than `Zone::None`.
+    zoned: u32,
 }
 
 impl ZoneGrid {
@@ -65,6 +67,7 @@ impl ZoneGrid {
             rows,
             cells: vec![Zone::None as u8; cols as usize * rows as usize],
             version: 0,
+            zoned: 0,
         }
     }
 
@@ -79,34 +82,75 @@ impl ZoneGrid {
     }
 
     /// Sets every cell whose centre lies inside the rectangle with corners `(ax, ay)` and
-    /// `(bx, by)`, clipped to the grid. Returns whether any cell changed.
-    pub fn paint(&mut self, ax: f32, ay: f32, bx: f32, by: f32, zone: Zone) -> bool {
+    /// `(bx, by)`, clipped to the grid. Returns the cells that changed, ascending.
+    pub fn paint(&mut self, ax: f32, ay: f32, bx: f32, by: f32, zone: Zone) -> Vec<u32> {
         if ![ax, ay, bx, by].iter().all(|v| v.is_finite()) {
-            return false;
+            return Vec::new();
         }
+        let rect = [ax.min(bx), ay.min(by), ax.max(bx), ay.max(by)];
+        let cells: Vec<u32> = self.cells_in(rect).collect();
+        self.set(&cells, zone)
+    }
+
+    /// Sets the given cells (row-major indices) to `zone`. Returns the ones that changed, in
+    /// the given order.
+    pub fn set(&mut self, cells: &[u32], zone: Zone) -> Vec<u32> {
+        let mut changed = Vec::new();
+        for &i in cells {
+            let cell = &mut self.cells[i as usize];
+            if *cell == zone as u8 {
+                continue;
+            }
+            changed.push(i);
+            if *cell == Zone::None as u8 {
+                self.zoned += 1;
+            } else if zone == Zone::None {
+                self.zoned -= 1;
+            }
+            *cell = zone as u8;
+        }
+        if !changed.is_empty() {
+            self.version = self.version.wrapping_add(1);
+        }
+        changed
+    }
+
+    /// Whether any cell has a zone.
+    pub fn any_zoned(&self) -> bool {
+        self.zoned > 0
+    }
+
+    /// Indices of the cells whose centre lies inside `[min_x, min_y, max_x, max_y]`, row-major.
+    pub fn cells_in(&self, rect: [f32; 4]) -> impl Iterator<Item = u32> + use<> {
         // Cell c's centre is x0 + (c + 0.5) * ZONE_CELL; keep the ones in [lo, hi].
         let span = |lo: f32, hi: f32, origin: f32, n: u32| {
             let first = ((lo - origin) / ZONE_CELL - 0.5).ceil().max(0.0);
             let last = ((hi - origin) / ZONE_CELL - 0.5)
                 .floor()
                 .min(n as f32 - 1.0);
-            (first as usize, last as i64)
-        };
-        let (c0, c1) = span(ax.min(bx), ax.max(bx), self.x0, self.cols);
-        let (r0, r1) = span(ay.min(by), ay.max(by), self.y0, self.rows);
-        let mut changed = false;
-        for r in r0 as i64..=r1 {
-            let row = r as usize * self.cols as usize;
-            for c in c0 as i64..=c1 {
-                let cell = &mut self.cells[row + c as usize];
-                changed |= *cell != zone as u8;
-                *cell = zone as u8;
+            if first.is_nan() || last.is_nan() || first > last {
+                return 0..0;
             }
-        }
-        if changed {
-            self.version = self.version.wrapping_add(1);
-        }
-        changed
+            first as u32..last as u32 + 1
+        };
+        let cols = span(rect[0], rect[2], self.x0, self.cols);
+        let rows = span(rect[1], rect[3], self.y0, self.rows);
+        let width = self.cols;
+        rows.flat_map(move |r| cols.clone().map(move |c| r * width + c))
+    }
+
+    /// Centre of cell `index`.
+    pub fn centre(&self, index: u32) -> (f32, f32) {
+        let (c, r) = (index % self.cols, index / self.cols);
+        (
+            self.x0 + (c as f32 + 0.5) * ZONE_CELL,
+            self.y0 + (r as f32 + 0.5) * ZONE_CELL,
+        )
+    }
+
+    /// The zone of cell `index`.
+    pub fn zone(&self, index: u32) -> Zone {
+        Zone::from_u8(self.cells[index as usize]).unwrap_or(Zone::None)
     }
 
     /// `[origin_x, origin_y, cell_size, cols, rows]`.
@@ -149,7 +193,10 @@ mod tests {
     fn paints_cells_whose_centres_are_inside_either_corner_order() {
         let mut g = grid();
         // Cells with centres 4, 12, 20 (x) and 4 (y) are inside; 28 is not.
-        assert!(g.paint(24.0, 6.0, 0.0, 0.0, Zone::CommercialHigh));
+        assert!(
+            !g.paint(24.0, 6.0, 0.0, 0.0, Zone::CommercialHigh)
+                .is_empty()
+        );
         assert_eq!(g.zone_at(1.0, 1.0), Some(Zone::CommercialHigh));
         assert_eq!(g.zone_at(23.0, 7.0), Some(Zone::CommercialHigh));
         assert_eq!(g.zone_at(25.0, 1.0), Some(Zone::None));
@@ -160,26 +207,44 @@ mod tests {
     #[test]
     fn repainting_the_same_zone_changes_nothing_and_unzone_clears() {
         let mut g = grid();
-        assert!(g.paint(0.0, 0.0, 40.0, 40.0, Zone::ResidentialLow));
-        assert!(!g.paint(0.0, 0.0, 40.0, 40.0, Zone::ResidentialLow));
+        assert!(
+            !g.paint(0.0, 0.0, 40.0, 40.0, Zone::ResidentialLow)
+                .is_empty()
+        );
+        assert!(
+            g.paint(0.0, 0.0, 40.0, 40.0, Zone::ResidentialLow)
+                .is_empty()
+        );
         assert_eq!(g.version, 1);
-        assert!(g.paint(0.0, 0.0, 40.0, 40.0, Zone::ResidentialHigh));
+        assert!(
+            !g.paint(0.0, 0.0, 40.0, 40.0, Zone::ResidentialHigh)
+                .is_empty()
+        );
         assert_eq!(g.zone_at(10.0, 10.0), Some(Zone::ResidentialHigh));
-        assert!(g.paint(0.0, 0.0, 40.0, 40.0, Zone::None));
+        assert!(!g.paint(0.0, 0.0, 40.0, 40.0, Zone::None).is_empty());
         assert_eq!(g.zone_at(10.0, 10.0), Some(Zone::None));
     }
 
     #[test]
     fn clips_to_the_grid_and_ignores_bad_input() {
         let mut g = grid();
-        assert!(g.paint(-1e6, -1e6, 1e6, 1e6, Zone::IndustrialLow));
+        assert!(
+            !g.paint(-1e6, -1e6, 1e6, 1e6, Zone::IndustrialLow)
+                .is_empty()
+        );
         assert!(g.cells.iter().all(|&c| c == Zone::IndustrialLow as u8));
         let mut g = grid();
-        assert!(!g.paint(1e6, 1e6, 2e6, 2e6, Zone::IndustrialLow));
-        assert!(!g.paint(f32::NAN, 0.0, 10.0, 10.0, Zone::IndustrialLow));
-        assert!(!g.paint(0.0, 0.0, f32::INFINITY, 10.0, Zone::IndustrialLow));
+        assert!(g.paint(1e6, 1e6, 2e6, 2e6, Zone::IndustrialLow).is_empty());
+        assert!(
+            g.paint(f32::NAN, 0.0, 10.0, 10.0, Zone::IndustrialLow)
+                .is_empty()
+        );
+        assert!(
+            g.paint(0.0, 0.0, f32::INFINITY, 10.0, Zone::IndustrialLow)
+                .is_empty()
+        );
         // A rectangle smaller than a cell that misses every centre paints nothing.
-        assert!(!g.paint(0.5, 0.5, 1.5, 1.5, Zone::IndustrialLow));
+        assert!(g.paint(0.5, 0.5, 1.5, 1.5, Zone::IndustrialLow).is_empty());
         assert_eq!(g.version, 0);
     }
 }

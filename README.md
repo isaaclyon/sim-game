@@ -19,8 +19,11 @@ highlight a whole road between junctions, then click to remove both directions. 
 while paused. Esc or right-click cancels. Space pauses, 1/2/3 set speed.
 Cars whose remaining route uses a deleted road park and retry; other traffic continues.
 The zone brush paints residential (`Z`), commercial (`X`) or industrial (`C`); press the key
-again to switch between low and high density, or use the tool bar. `U` unzones. Drag a
-rectangle to paint it (left-drag paints instead of panning while the brush is on).
+again to switch between low and high density, or use the tool bar. `U` unzones. Click inside a
+block (land enclosed by roads, outlined on hover) to zone all of it, or drag a rectangle to
+paint just that (left-drag paints instead of panning while the brush is on). The sim cuts
+zoned blocks into lots facing their roads, and adds alleys or connector streets where a block
+is too deep to reach from its edges; these are ordinary roads you can bulldoze.
 
 ## Roads
 
@@ -42,7 +45,7 @@ samples use join code -1 between actual junctions.
 
 Roads render as asphalt ribbons with simple pads at shared endpoints: streets are eight metres
 wide, main roads twelve. Press M (or the main road button) to build main roads with either road
-tool. Main roads are faster, and long trips ride them in the middle (ADR 0016).
+tool. Main roads are faster, and long trips ride them in the middle (ADR 0017).
 The view preserves the simulation's right-hand traffic.
 
 Run `scripts/check.sh` for the full checks, including road geometry tests. To run just those

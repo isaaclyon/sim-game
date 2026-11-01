@@ -47,6 +47,7 @@ const MARKER_PX = 10;
 const ZONE_COLORS = [null, 0x7bd88f, 0x2e9e4f, 0x6fb3ff, 0x2f6fd0, 0xf2c94c, 0xd9822b].map((c) =>
   c === null ? null : new THREE.Color(BG).lerp(new THREE.Color(c), 0.45),
 );
+const LOT_COLOR = 0x9aa7b4;
 /** Bright versions for the drag outline, which must stand out. */
 const ZONE_OUTLINE = [0xe5484d, 0x7bd88f, 0x2e9e4f, 0x6fb3ff, 0x2f6fd0, 0xf2c94c, 0xd9822b];
 
@@ -63,6 +64,7 @@ export class Renderer {
   private readonly markers: THREE.Points;
   private zones?: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
   private readonly zoneDrag: THREE.LineLoop;
+  private lots?: THREE.LineSegments;
   private readonly matrix = new THREE.Matrix4();
   private readonly quat = new THREE.Quaternion();
   private readonly pos = new THREE.Vector3();
@@ -354,6 +356,43 @@ export class Renderer {
     this.zoneDrag.geometry.dispose();
     this.zoneDrag.geometry = new THREE.BufferGeometry().setFromPoints(points);
     (this.zoneDrag.material as THREE.LineBasicMaterial).color.set(ZONE_OUTLINE[zone] ?? 0xffffff);
+  }
+
+  /** Outlines the block the zone brush would fill: `[x, y]` per sample, closed; empty hides it. */
+  setBlockOutline(outline: Float32Array, zone: number) {
+    const points = [];
+    for (let i = 0; i < outline.length; i += 2)
+      points.push(new THREE.Vector3(outline[i], 0.5, outline[i + 1]));
+    this.zoneDrag.visible = points.length > 2;
+    this.zoneDrag.geometry.dispose();
+    this.zoneDrag.geometry = new THREE.BufferGeometry().setFromPoints(points);
+    (this.zoneDrag.material as THREE.LineBasicMaterial).color.set(ZONE_OUTLINE[zone] ?? 0xffffff);
+  }
+
+  /** Draws lot edges over the zones: `[ax, ay, bx, by]` per segment (see `lots` in protocol.ts). */
+  setLots(segments: Float32Array) {
+    const pos = new Float32Array((segments.length / 4) * 6);
+    for (let i = 0, j = 0; i < segments.length; i += 4, j += 6) {
+      pos.set([segments[i], 0.1, segments[i + 1], segments[i + 2], 0.1, segments[i + 3]], j);
+    }
+    const geom = new THREE.BufferGeometry();
+    geom.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    if (!this.lots) {
+      // Drawn just after the zones and before the roads, which cover lot edges under them.
+      const material = new THREE.LineBasicMaterial({
+        color: LOT_COLOR,
+        transparent: true,
+        opacity: 0.35,
+        depthWrite: false,
+      });
+      this.lots = new THREE.LineSegments(geom, material);
+      this.lots.renderOrder = -1;
+      this.lots.frustumCulled = false;
+      this.scene.add(this.lots);
+    } else {
+      this.lots.geometry.dispose();
+      this.lots.geometry = geom;
+    }
   }
 
   /** Draw the full centreline selected by the sim, in the destructive-action color. */

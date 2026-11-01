@@ -124,7 +124,7 @@ test('main roads are wider, and junction pads fit the widest road', () => {
 
 test('the sim rejects unknown road classes', () => {
   const sim = new Sim(1, 0, 0);
-  assert.equal(sim.build_road(0, 0, 100, 0, 2), false);
+  assert.equal(sim.build_road(0, 0, 100, 0, 3), false);
   assert.ok(sim.build_road(0, 0, 100, 0, 1));
   assert.equal(sim.road_segments()[4], 1, 'snapshot carries the class');
   sim.free();

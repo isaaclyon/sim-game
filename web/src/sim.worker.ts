@@ -13,6 +13,7 @@ let backlogMs = 0;
 let last = performance.now();
 let roadsVersion = -1;
 let zonesVersion = -1;
+let lotsVersion = -1;
 
 function post(msg: FromWorker, transfer: Transferable[] = []) {
   self.postMessage(msg, { transfer });
@@ -34,6 +35,22 @@ function sendZonesIfChanged(s: Sim) {
   const cells = s.zone_cells();
   const [x0, y0, cell, cols, rows] = s.zone_layout();
   post({ type: 'zones', cells, layout: [x0, y0, cell, cols, rows] }, [cells.buffer]);
+}
+
+function sendLotsIfChanged(s: Sim) {
+  const version = s.lots_version();
+  if (version === lotsVersion) return;
+  lotsVersion = version;
+  const segments = s.lot_outlines();
+  post({ type: 'lots', segments }, [segments.buffer]);
+}
+
+/** After an edit: zoning can add alleys, and road edits can recut lots (ADR 0016). */
+function sendEdits(s: Sim) {
+  sendRoadsIfChanged(s);
+  sendZonesIfChanged(s);
+  sendLotsIfChanged(s);
+  sendFrame(s); // Cars and signals also change while paused.
 }
 
 function readStats(s: Sim): Stats {
@@ -97,6 +114,7 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
       sim.spawn_agents(msg.agents);
       sendRoadsIfChanged(sim);
       sendZonesIfChanged(sim);
+      sendLotsIfChanged(sim);
       last = performance.now();
       step();
       break;
@@ -113,19 +131,27 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
           ? sim.build_curve(msg.ax, msg.ay, msg.cx, msg.cy, msg.bx, msg.by, msg.class)
           : sim.build_road(msg.ax, msg.ay, msg.bx, msg.by, msg.class)
         : false;
-      if (success && sim) sendRoadsIfChanged(sim);
+      if (success && sim) {
+        sendRoadsIfChanged(sim);
+        sendLotsIfChanged(sim);
+      }
       post({ type: 'buildResult', id: msg.id, success });
       break;
     }
     case 'deleteRoad':
-      if (sim?.delete_road(msg.x, msg.y)) {
-        sendRoadsIfChanged(sim);
-        sendFrame(sim); // Cars and signals also change while paused.
-      }
+      if (sim?.delete_road(msg.x, msg.y)) sendEdits(sim);
       break;
     case 'paintZone':
-      if (sim?.paint_zone(msg.ax, msg.ay, msg.bx, msg.by, msg.zone)) sendZonesIfChanged(sim);
+      if (sim?.paint_zone(msg.ax, msg.ay, msg.bx, msg.by, msg.zone)) sendEdits(sim);
       break;
+    case 'fillBlock':
+      if (sim?.fill_block(msg.x, msg.y, msg.zone)) sendEdits(sim);
+      break;
+    case 'previewBlock': {
+      const outline = sim?.block_preview(msg.x, msg.y) ?? new Float32Array();
+      post({ type: 'blockPreview', outline, revision: msg.revision }, [outline.buffer]);
+      break;
+    }
     case 'previewBulldoze': {
       const segment = sim?.bulldoze_preview(msg.x, msg.y) ?? new Float32Array();
       post({ type: 'bulldozePreview', segment, revision: msg.revision }, [segment.buffer]);
