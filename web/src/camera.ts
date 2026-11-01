@@ -47,6 +47,19 @@ export function turnAroundTarget(controls: CameraControls, angle: number) {
   if (spherical.theta !== now) controls.rotateTo(spherical.theta + angle, spherical.phi, true);
 }
 
+/** Seconds for a followed car's camera to cover about two thirds of the gap to it. */
+export const FOLLOW_EASE = 0.15;
+
+/**
+ * Eases the camera's target toward `point` over `seconds`, keeping zoom and angle. It moves the
+ * target directly, like `panAlongGround`, so following every frame starts no transitions.
+ */
+export function followPoint(controls: CameraControls, point: THREE.Vector3, seconds: number) {
+  controls.getTarget(now, false);
+  now.lerp(point, 1 - Math.exp(-Math.max(seconds, 0) / FOLLOW_EASE));
+  controls.moveTo(now.x, now.y, now.z, false);
+}
+
 /** Top keyboard pan speed in camera distances per second, so it looks the same at any zoom. */
 export const KEY_PAN_SPEED = 1;
 /** Top keyboard turn speed in radians per second: a quarter turn. */
@@ -110,6 +123,12 @@ export class KeyCamera {
       any ||= moved.some((m) => m !== 0);
     }
     return any;
+  }
+
+  /** Stops panning at once and keeps any turn, for a camera that starts following a car. */
+  stopPan() {
+    this.speed[0] = 0;
+    this.speed[1] = 0;
   }
 
   /** Stops at once, for focus loss and hidden tabs. */

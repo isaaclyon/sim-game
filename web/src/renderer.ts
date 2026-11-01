@@ -14,7 +14,8 @@
 import CameraControls from 'camera-controls';
 import * as THREE from 'three';
 import { buildBuildingGeometry } from './building-geometry';
-import { KeyCamera } from './camera';
+import { followPoint, KeyCamera } from './camera';
+import { carPosition, nearestCar } from './car-pick';
 import { buildRoadGeometry } from './road-geometry';
 import { createSimScene } from './scene';
 
@@ -35,6 +36,7 @@ const ASPHALT_COLOR = 0x3a4654;
 const CAR_LENGTH = 4.5;
 const CAR_WIDTH = 2;
 const CAR_HEIGHT = 1.5;
+const SELECTED_CAR_COLOR = new THREE.Color(0xffffff);
 const PREVIEW_COLOR = new THREE.Color(0x4a8bd0);
 const PREVIEW_REFUSED_COLOR = new THREE.Color(0xe5484d);
 /** Snap markers, indexed by join: new end (not drawn), existing node, split road. */
@@ -76,6 +78,11 @@ export class Renderer {
   private readonly scale = new THREE.Vector3(1, 1, 1);
   private readonly up = new THREE.Vector3(0, 1, 0);
   private readonly color = new THREE.Color();
+  /** `[x, y]` per agent id as last drawn, NaN when hidden; reused for picking and follow. */
+  private drawn = new Float32Array();
+  private readonly look = new THREE.Vector3();
+  /** Called when a mouse or touch drag pans the camera, so follow can let go. */
+  onUserPan: (() => void) | null = null;
 
   constructor(container: HTMLElement) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -95,6 +102,16 @@ export class Renderer {
     this.controls.maxPolarAngle = THREE.MathUtils.degToRad(70);
     this.controls.minDistance = 30;
     this.keyCamera = new KeyCamera(this.controls);
+    const pans =
+      CameraControls.ACTION.TRUCK |
+      CameraControls.ACTION.SCREEN_PAN |
+      CameraControls.ACTION.TOUCH_TRUCK |
+      CameraControls.ACTION.TOUCH_SCREEN_PAN |
+      CameraControls.ACTION.TOUCH_DOLLY_TRUCK |
+      CameraControls.ACTION.TOUCH_ZOOM_TRUCK;
+    this.controls.addEventListener('control', () => {
+      if (this.controls.currentAction & pans) this.onUserPan?.();
+    });
 
     this.scene.add(new THREE.HemisphereLight(0xdde6ef, 0x20262d, 2.5));
     const sun = new THREE.DirectionalLight(0xffffff, 1.2);
@@ -233,11 +250,19 @@ export class Renderer {
 
   /**
    * Draws vehicles interpolated between two snapshots. `t` in [0, 1] blends prev → curr.
-   * Agents hidden in either snapshot snap to the visible one so spawns don't streak.
+   * Agents hidden in either snapshot snap to the visible one so spawns don't streak. Car
+   * `selected`, an agent id, is drawn white.
    */
-  drawAgents(prev: Float32Array | undefined, curr: Float32Array, t: number) {
+  drawAgents(
+    prev: Float32Array | undefined,
+    curr: Float32Array,
+    t: number,
+    selected: number | null = null,
+  ) {
     const count = curr.length / STRIDE;
     const cars = this.ensureCars(count);
+    if (this.drawn.length < count * 2) this.drawn = new Float32Array(count * 3);
+    this.drawn.fill(Number.NaN);
     let drawn = 0;
     for (let i = 0; i < count; i++) {
       const o = i * STRIDE;
@@ -263,8 +288,11 @@ export class Renderer {
       this.quat.setFromAxisAngle(this.up, -h);
       this.matrix.compose(this.pos, this.quat, this.scale);
       cars.setMatrixAt(drawn, this.matrix);
+      this.drawn[i * 2] = x;
+      this.drawn[i * 2 + 1] = y;
       // red (stopped) → yellow → green (at the limit)
-      this.color.setHSL(Math.min(ratio, 1) * 0.33, 0.85, 0.55);
+      if (i === selected) this.color.copy(SELECTED_CAR_COLOR);
+      else this.color.setHSL(Math.min(ratio, 1) * 0.33, 0.85, 0.55);
       cars.setColorAt(drawn, this.color);
       drawn++;
     }
@@ -278,6 +306,31 @@ export class Renderer {
     this.controls.mouseButtons.left = pans
       ? CameraControls.ACTION.TRUCK
       : CameraControls.ACTION.NONE;
+  }
+
+  /** The agent id of the drawn car nearest a screen point, within a few pixels, or null. */
+  carAt(clientX: number, clientY: number): number | null {
+    return nearestCar(
+      this.drawn,
+      this.scene,
+      this.camera,
+      clientX,
+      clientY,
+      innerWidth,
+      innerHeight,
+    );
+  }
+
+  /** Eases the camera toward car `agent`; holds still and returns false while it is hidden. */
+  follow(agent: number, seconds: number): boolean {
+    if (!carPosition(this.drawn, this.scene, agent, this.look)) return false;
+    followPoint(this.controls, this.look, seconds);
+    return true;
+  }
+
+  /** While following, the wheel zooms toward the followed car instead of the cursor. */
+  setFollowing(on: boolean) {
+    this.controls.dollyToCursor = !on;
   }
 
   /** Ground-plane point in scene-local (sim x, y as x, z), or null if the ray misses. */

@@ -3,6 +3,8 @@ import test from 'node:test';
 import CameraControls from 'camera-controls';
 import * as THREE from 'three';
 import {
+  FOLLOW_EASE,
+  followPoint,
   KEY_EASE,
   KEY_PAN_SPEED,
   KEY_TURN_SPEED,
@@ -207,4 +209,45 @@ test('Q and E keep an unfinished mouse orbit easing instead of jumping', () => {
   const after = c.getSpherical(new THREE.Spherical(), true);
   assert.ok(Math.abs(after.theta - end.theta - 0.01) < 1e-9, 'the orbit still eases in');
   assert.ok(Math.abs(after.phi - end.phi) < 1e-9, 'and so does its tilt');
+});
+
+test('stopping the pan for follow keeps a turn gliding', () => {
+  const { c } = controls(0.4, 0.8);
+  const keys = new KeyCamera(c);
+  hold(c, [1, 1, 1], keys, 30, 1 / 60);
+  keys.stopPan();
+  const [start, azimuth] = [target(c), c.azimuthAngle];
+  hold(c, [0, 0, 0], keys, 1, 1 / 60);
+  assert.ok(target(c).distanceTo(start) < 1e-9, 'no leftover pan fights the follow camera');
+  assert.ok(c.azimuthAngle !== azimuth, 'the turn eases out as before');
+});
+
+test('following eases onto the car without transitions, keeping zoom and angle', () => {
+  const { c } = controls(0.4, 0.8);
+  let waiting = 0;
+  const add = c.addEventListener.bind(c);
+  c.addEventListener = (type, listener) => {
+    if (type === 'rest') waiting++;
+    add(type, listener);
+  };
+  const [azimuth, polar, distance] = [c.azimuthAngle, c.polarAngle, c.distance];
+  const car = new THREE.Vector3(400, 0, 100);
+  const gap = target(c).distanceTo(car);
+  followPoint(c, car, FOLLOW_EASE);
+  c.update(1 / 60);
+  const left = target(c).distanceTo(car);
+  assert.ok(
+    Math.abs(left - gap * Math.exp(-1)) < 1e-3 * gap,
+    'two thirds of the way per ease time',
+  );
+  for (let frame = 0; frame < 600; frame++) {
+    car.x += 0.2;
+    followPoint(c, car, 1 / 60);
+    c.update(1 / 60);
+  }
+  // At 12 m/s the ease trails by about speed times ease time, 1.8 m.
+  assert.ok(target(c).distanceTo(car) < 2, 'rides along with a moving car');
+  assert.equal(waiting, 0, 'no camera transitions pile up');
+  assert.ok(Math.abs(c.azimuthAngle - azimuth) < 1e-9 && Math.abs(c.polarAngle - polar) < 1e-9);
+  assert.ok(Math.abs(c.distance - distance) < 1e-6);
 });
