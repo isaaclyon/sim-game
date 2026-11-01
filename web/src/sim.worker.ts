@@ -14,6 +14,7 @@ let last = performance.now();
 let roadsVersion = -1;
 let zonesVersion = -1;
 let lotsVersion = -1;
+let buildingsVersion = -1;
 
 function post(msg: FromWorker, transfer: Transferable[] = []) {
   self.postMessage(msg, { transfer });
@@ -45,11 +46,20 @@ function sendLotsIfChanged(s: Sim) {
   post({ type: 'lots', rings }, [rings.buffer]);
 }
 
+function sendBuildingsIfChanged(s: Sim) {
+  const version = s.buildings_version();
+  if (version === buildingsVersion) return;
+  buildingsVersion = version;
+  const data = s.building_snapshot();
+  post({ type: 'buildings', data }, [data.buffer]);
+}
+
 /** After an edit: zoning can add alleys, and road edits can recut lots (ADR 0016). */
 function sendEdits(s: Sim) {
   sendRoadsIfChanged(s);
   sendZonesIfChanged(s);
   sendLotsIfChanged(s);
+  sendBuildingsIfChanged(s);
   sendFrame(s); // Cars and signals also change while paused.
 }
 
@@ -98,6 +108,7 @@ function step() {
       sim.tick(n);
       const perTick = (performance.now() - t0) / n;
       sendRoadsIfChanged(sim);
+      sendBuildingsIfChanged(sim);
       sendFrame(sim, perTick);
     }
   }
@@ -115,6 +126,7 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
       sendRoadsIfChanged(sim);
       sendZonesIfChanged(sim);
       sendLotsIfChanged(sim);
+      sendBuildingsIfChanged(sim);
       last = performance.now();
       step();
       break;
@@ -134,6 +146,7 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
       if (success && sim) {
         sendRoadsIfChanged(sim);
         sendLotsIfChanged(sim);
+        sendBuildingsIfChanged(sim);
       }
       post({ type: 'buildResult', id: msg.id, success });
       break;

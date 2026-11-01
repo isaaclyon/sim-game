@@ -5,6 +5,7 @@ use std::collections::{BTreeSet, BinaryHeap, VecDeque};
 
 use crate::agents::{AgentId, AgentState, Agents};
 use crate::block::{self, Blocks, LOT_REACH, MIN_DEEP_CELLS, Rect};
+use crate::building::Buildings;
 use crate::geometry::Shape;
 use crate::junction::{Junctions, Verdict};
 use crate::lot::Lots;
@@ -153,6 +154,7 @@ pub struct World {
     pub roads: RoadNetwork,
     pub zones: ZoneGrid,
     pub lots: Lots,
+    pub buildings: Buildings,
     /// Faces of the road network, traced again when `blocks_version` falls behind the roads.
     blocks: Blocks,
     blocks_version: Option<u32>,
@@ -179,6 +181,7 @@ impl World {
             zones: ZoneGrid::covering(roads.bounds()),
             roads,
             lots: Lots::default(),
+            buildings: Buildings::default(),
             blocks: Blocks::default(),
             blocks_version: None,
             agents: Agents::default(),
@@ -210,7 +213,8 @@ impl World {
     }
 
     pub fn apply(&mut self, cmd: Command) -> bool {
-        match cmd {
+        let versions = (self.lots.version, self.zones.version);
+        let changed = match cmd {
             Command::SpawnAgents { count } => self.spawn_agents(count),
             Command::BuildRoad {
                 ax,
@@ -258,7 +262,17 @@ impl World {
                 !changed.is_empty()
             }
             Command::FillBlock { x, y, zone } => self.fill_block(x, y, zone),
+        };
+        if versions != (self.lots.version, self.zones.version) {
+            self.buildings.reconcile(
+                &self.lots,
+                &self.zones,
+                self.totals.tick,
+                self.cfg.dt,
+                self.cfg.seed,
+            );
         }
+        changed
     }
 
     pub fn tick(&mut self) {
@@ -284,6 +298,8 @@ impl World {
         self.resolve_exits(&exits);
         self.traffic.recycle_exits(exits);
         self.totals.tick += 1;
+        self.buildings
+            .grow(self.totals.tick, &self.lots, &self.roads, self.cfg.seed);
     }
 
     pub fn stats(&self) -> Stats {
@@ -462,6 +478,7 @@ impl World {
             mix(a.cleared[i] as u64);
         }
         self.junctions.hash_into(&mut mix);
+        self.buildings.hash_into(&mut mix);
         for chunk in self.zones.cells.chunks(8) {
             let mut word = [0u8; 8];
             word[..chunk.len()].copy_from_slice(chunk);

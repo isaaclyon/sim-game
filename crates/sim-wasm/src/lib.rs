@@ -152,6 +152,16 @@ impl Sim {
         self.buf.clone()
     }
 
+    pub fn buildings_version(&self) -> u32 {
+        self.world.buildings.version
+    }
+
+    /// `[zone, height, n, x0, y0, …]` per active building; footprint points are counter-clockwise.
+    pub fn building_snapshot(&mut self) -> Vec<f32> {
+        self.world.buildings.write_snapshot(&mut self.buf);
+        self.buf.clone()
+    }
+
     pub fn zones_version(&self) -> u32 {
         self.world.zones.version
     }
