@@ -42,6 +42,9 @@ impl World {
             mix(c.job_due[i]);
             mix(c.departure[i] as u64);
             mix(c.work_duration[i] as u64);
+            mix(c.owns_car[i] as u64 | (c.car_out[i] as u64) << 1);
+            mix(c.walk_limit[i].to_bits() as u64);
+            mix(c.walk_speed[i].to_bits() as u64);
         }
         for (&jobs, &workers) in self.residents.jobs.iter().zip(&self.residents.workers) {
             mix(jobs as u64);

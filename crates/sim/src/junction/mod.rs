@@ -89,6 +89,8 @@ pub struct Junctions {
     protected: Vec<bool>,
     elapsed: Vec<u32>,
     crossings: Vec<Vec<Crossing>>,
+    /// Signal groups that walkers are waiting to cross with, one bit per group (ADR 0026).
+    walk_call: Vec<u32>,
     /// Signalised nodes in id order.
     signals: Vec<NodeId>,
 }
@@ -191,6 +193,7 @@ impl Junctions {
         self.protected.resize(nodes, false);
         self.elapsed.resize(nodes, 0);
         self.crossings.resize_with(nodes, Vec::new);
+        self.walk_call.resize(nodes, 0);
         for n in 0..nodes {
             let kept = old_control.get(n) == Some(&Control::Signal)
                 && self.control[n] == Control::Signal
@@ -199,6 +202,7 @@ impl Junctions {
                 self.phase[n] = 0;
                 self.protected[n] = false;
                 self.elapsed[n] = 0;
+                self.walk_call[n] = 0;
             }
         }
     }

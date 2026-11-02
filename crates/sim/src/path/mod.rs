@@ -1,6 +1,7 @@
 //! A* over the lane graph. Cost is free-flow travel time, raised by a small per-driver
 //! amount (ADR 0024), plus a per-lane congestion delay, so routes prefer fast main roads until
-//! they back up. Long trips search only main roads in their middle (ADR 0017).
+//! they back up. Long trips search only main roads in their middle (ADR 0017). Walks search
+//! plain distance over every road (ADR 0026).
 
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
@@ -25,12 +26,18 @@ struct Costs<'a> {
     net: &'a RoadNetwork,
     delay: &'a [f32],
     driver: Option<u64>,
+    /// Costs are metres on foot: no speeds, taste or congestion.
+    walk: bool,
 }
 
 impl Costs<'_> {
     /// Seconds to drive `lane`: free-flow time scaled by the driver's taste, plus congestion.
+    /// Metres for walks.
     fn lane(&self, lane: LaneId) -> f32 {
         let l = lane as usize;
+        if self.walk {
+            return self.net.lane_len[l];
+        }
         let mut time = self.net.lane_len[l] / self.net.lane_speed[l];
         if let Some(driver) = self.driver {
             // Top 24 bits as a uniform [0, 1), as `Rng::unit` does.
@@ -102,9 +109,33 @@ impl Pathfinder {
         out: &mut Vec<LaneId>,
     ) -> bool {
         self.last_expanded = 0;
-        let costs = Costs { net, delay, driver };
+        let costs = Costs {
+            net,
+            delay,
+            driver,
+            walk: false,
+        };
         (net.has_main_roads() && self.search(&costs, from, to, MAIN_ROAD_REACH, out))
             || self.search(&costs, from, to, f32::INFINITY, out)
+    }
+
+    /// Writes the shortest walk by distance from `from` to `to` into `out`, over every road in
+    /// either direction (sidewalks run both ways). Returns false if `to` is unreachable.
+    pub fn find_walk(
+        &mut self,
+        net: &RoadNetwork,
+        from: NodeId,
+        to: NodeId,
+        out: &mut Vec<LaneId>,
+    ) -> bool {
+        self.last_expanded = 0;
+        let costs = Costs {
+            net,
+            delay: &[],
+            driver: None,
+            walk: true,
+        };
+        self.search(&costs, from, to, f32::INFINITY, out)
     }
 
     /// A* from `from` to `to` that leaves nodes farther than `reach` from both ends only by
@@ -127,9 +158,15 @@ impl Pathfinder {
         // route noise never lower a cost). Inflating it trades up to HEURISTIC_WEIGHT× route
         // cost for far fewer expansions, which matters once congestion delays make the plain
         // bound loose.
+        // Walks are short and must look direct, so their search is exact.
+        let scale = if costs.walk {
+            1.0
+        } else {
+            HEURISTIC_WEIGHT / MAIN_SPEED
+        };
         let h = |node: NodeId| {
             let i = node as usize;
-            (net.node_x[i] - tx).hypot(net.node_y[i] - ty) / MAIN_SPEED * HEURISTIC_WEIGHT
+            (net.node_x[i] - tx).hypot(net.node_y[i] - ty) * scale
         };
         let reach2 = reach * reach;
         let local = |node: NodeId| {

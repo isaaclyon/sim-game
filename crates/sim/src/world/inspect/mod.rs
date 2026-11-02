@@ -30,14 +30,16 @@ pub struct CitizenInfo {
     pub location: Option<Place>,
     /// Where the current trip goes; `None` while staying put.
     pub destination: Option<Place>,
-    /// The citizen's own vehicle slot, once allocated; never another citizen's.
+    /// The citizen's own travel slot, once allocated; never another citizen's.
     pub agent: Option<AgentId>,
     /// On a road now, so the car is visible.
     pub driving: bool,
+    /// The current trip is on foot (ADR 0026); the walker is drawn once it sets off.
+    pub on_foot: bool,
 }
 
 impl World {
-    /// The resident who owns vehicle slot `agent`, or `None` for synthetic or unknown slots.
+    /// The resident who owns travel slot `agent`, or `None` for synthetic or unknown slots.
     pub fn citizen_of_agent(&self, agent: AgentId) -> Option<CitizenId> {
         self.agents.citizen.get(agent as usize).copied().flatten()
     }
@@ -65,6 +67,9 @@ impl World {
             destination: self.citizens.destination[i].and_then(place),
             agent,
             driving: agent.is_some_and(|a| self.agents.state[a as usize] == AgentState::Driving),
+            on_foot: resident
+                && self.citizens.destination[i].is_some()
+                && !self.citizens.car_out[i],
         })
     }
 }

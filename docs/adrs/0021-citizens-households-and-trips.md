@@ -1,6 +1,6 @@
 # 0021. Citizens, households, homes, jobs and trips
 
-- Status: Accepted; residents of repainted buildings superseded by [0023](0023-gradual-closure-of-rezoned-buildings.md)
+- Status: Accepted; residents of repainted buildings superseded by [0023](0023-gradual-closure-of-rezoned-buildings.md); walking and vehicle-only travel slots by [0026](0026-walking-trips-and-household-cars.md)
 - Date: 2026-11-01
 
 ## Context

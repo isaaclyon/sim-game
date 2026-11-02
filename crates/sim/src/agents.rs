@@ -1,7 +1,8 @@
 //! Vehicle agents, stored struct-of-arrays and indexed by `AgentId`.
 //!
 //! Synthetic agents cycle between random trips and parking. Citizens lazily reserve a stable
-//! vehicle slot, dormant between trips and never reassigned to another citizen (ADR 0021).
+//! travel slot, dormant between trips and never reassigned to another citizen (ADR 0021). The
+//! slot carries the citizen's car or the citizen on foot (ADR 0026).
 //! Population comes from the separate resident table, not these allocated slots.
 
 use crate::road::{LaneId, NodeId};
@@ -21,6 +22,8 @@ pub enum AgentState {
     Entering,
     /// On `lane`, `pos` metres from its start.
     Driving,
+    /// On foot along the sidewalk of `lane`, `pos` metres from its start; outside lane queues.
+    Walking,
 }
 
 #[derive(Default)]
@@ -40,6 +43,8 @@ pub struct Agents {
     pub stuck_ticks: Vec<u16>,
     /// Allowed through the junction at the end of the current lane.
     pub cleared: Vec<bool>,
+    /// Walkers only: where on the last lane of `path` the walk ends, metres.
+    pub walk_end: Vec<f32>,
 }
 
 impl Agents {
@@ -63,6 +68,7 @@ impl Agents {
         self.path_idx.push(0);
         self.stuck_ticks.push(0);
         self.cleared.push(false);
+        self.walk_end.push(0.0);
         (self.state.len() - 1) as AgentId
     }
 }

@@ -7,6 +7,7 @@ mod residents;
 mod roads;
 mod snapshot;
 mod trips;
+mod walking;
 mod zoning;
 
 use std::cmp::Reverse;
@@ -28,7 +29,7 @@ pub use demand::Demand;
 pub use inspect::{CitizenInfo, Place};
 
 /// Floats per agent in `write_agent_snapshot`.
-pub const SNAPSHOT_STRIDE: usize = 4;
+pub const SNAPSHOT_STRIDE: usize = 5;
 /// Floats per signalised approach in `write_signal_snapshot`.
 pub const SIGNAL_STRIDE: usize = 4;
 /// Expected delay each queued car adds to a lane, seconds. Feeds route choice so traffic
@@ -117,7 +118,7 @@ pub enum Command {
 #[derive(Clone, Copy, Default, Debug)]
 pub struct Stats {
     pub tick: u64,
-    /// Allocated vehicle slots, including dormant citizen reservations and departed tombstones.
+    /// Allocated travel slots, including dormant citizen reservations and departed tombstones.
     pub agents: u32,
     /// Resident individuals, including those not travelling.
     pub population: u32,
@@ -132,7 +133,12 @@ pub struct Stats {
     pub awaiting_path: u32,
     pub entering: u32,
     pub driving: u32,
+    /// Citizens on foot now (ADR 0026).
+    pub walking: u32,
+    /// Includes walks.
     pub trips_completed: u64,
+    /// Trips finished on foot.
+    pub walks_completed: u64,
     pub paths_found: u64,
     pub paths_failed: u64,
     /// Nodes expanded by trip route searches (not detours), a measure of routing cost.
@@ -169,6 +175,8 @@ pub struct World {
     /// Scratch for `resolve_exits`: front cars that stay put this tick.
     held: Vec<(AgentId, LaneId, bool)>,
     entering: Vec<AgentId>,
+    /// Citizens on foot, in the order their walks started.
+    walking: Vec<AgentId>,
     /// Parked agents keyed by wake-up tick. Ties pop in agent-id order, so it stays deterministic.
     wake: BinaryHeap<Reverse<(u64, AgentId)>>,
     rng: Rng,
@@ -200,6 +208,7 @@ impl World {
             detour: Vec::new(),
             held: Vec::new(),
             entering: Vec::new(),
+            walking: Vec::new(),
             wake: BinaryHeap::new(),
             rng,
             totals: Stats::default(),
@@ -300,6 +309,7 @@ impl World {
         self.enter_lanes();
         self.junctions
             .update_signals(&self.roads, &self.traffic, &self.agents, self.cfg.dt);
+        self.advance_walkers();
         let exits = self.traffic.advance(
             &self.roads,
             &mut self.agents,
@@ -328,6 +338,7 @@ impl World {
                 AgentState::AwaitingPath => s.awaiting_path += 1,
                 AgentState::Entering => s.entering += 1,
                 AgentState::Driving => s.driving += 1,
+                AgentState::Walking => s.walking += 1,
             }
         }
         s

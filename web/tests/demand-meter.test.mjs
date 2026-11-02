@@ -19,6 +19,8 @@ test('the HUD meter raises bars for demand and drops them for a surplus', async 
       demand: { residential: 60, commercial: 0, industrial: -60 },
       driving: 0,
       parked: 0,
+      walking: 0,
+      walksCompleted: 0,
       tripsCompleted: 0,
       despawnedStuck: 0,
       pathsFailed: 0,

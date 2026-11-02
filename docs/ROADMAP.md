@@ -65,6 +65,11 @@ despawns, and the road tool feels good with snapping, curves and bulldozing.
   schedule, replacing random node-to-node trips ([ADR 0021](adrs/0021-citizens-households-and-trips.md)).
   Households, homes, limited jobs, the resident population counter and unemployment
   statistics are implemented.
+- Walking trips: most adults own a car, some don't. Short trips are walked, and adults
+  without a car only take jobs and shops within walking reach. Walkers show as small figures
+  on the sidewalks, wait at red lights and can be clicked in the citizen inspector. The HUD
+  shows the share of trips made on foot
+  ([ADR 0026](adrs/0026-walking-trips-and-household-cars.md)).
 - Route choice that feels human:
   - Road classes: trips use local streets to reach a main road, ride it, then leave it near the
     destination. Routing searches the main-road layer for the middle of long trips, which is
@@ -92,8 +97,8 @@ The point where the toy starts to look like a place.
 - Low-poly art pass: building variety by zone and density, trees, terrain color, water. Build
   the building kit so it can carry an era style (village cottages vs. town blocks) later.
 - Lighting and shadows, and a day/night cycle that follows the sim clock (lit windows, headlights).
-- Varied vehicles (cars, vans, trucks) and pedestrians as small instanced figures. Pedestrians
-  are clickable in the citizen inspector too.
+- Varied vehicles (cars, vans, trucks), and detailed pedestrian figures in place of the M2
+  placeholders.
 - Ambient sound that changes with the camera (traffic hum, birds, city noise).
 - Juice: buildings rising on construction, zone paint feedback, smooth tool previews.
 

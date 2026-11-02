@@ -7,31 +7,43 @@ use crate::snap::{self, Join};
 
 /// Distance from the road centreline to the middle of each lane, metres.
 const LANE_OFFSET: f32 = 2.0;
+/// Walkers keep this far right of the centreline, just off the asphalt; wider on main roads.
+const SIDEWALK_OFFSET: f32 = 5.0;
+const MAIN_SIDEWALK_OFFSET: f32 = 7.0;
 /// Signal heads stand this far right of the road centreline, metres.
 const SIGNAL_OFFSET: f32 = 6.0;
 
 impl World {
-    /// Writes `[x, y, heading, speed_ratio]` per agent, indexed by agent id so the renderer can
-    /// interpolate between snapshots. Heading is radians from +x. Agents not on a road get
+    /// Writes `[x, y, heading, speed_ratio, kind]` per agent, indexed by agent id so the
+    /// renderer can interpolate between snapshots. Heading is radians from +x. Kind is 0 = car,
+    /// 1 = walker on the sidewalk (ADR 0026). Agents not on a road or sidewalk get
     /// `speed_ratio = -1`.
     pub fn write_agent_snapshot(&self, out: &mut Vec<f32>) {
         let a = &self.agents;
         out.clear();
         out.reserve(a.len() * SNAPSHOT_STRIDE);
         for i in 0..a.len() {
-            if a.state[i] == AgentState::Driving {
-                let lane = a.lane[i];
-                let (x, y) = self.roads.lane_point(lane, a.pos[i], LANE_OFFSET);
-                let heading = self.roads.lane_heading(lane, a.pos[i]);
-                out.extend([
-                    x,
-                    y,
-                    heading,
-                    a.speed[i] / self.roads.lane_speed[lane as usize],
-                ]);
-            } else {
-                out.extend([0.0, 0.0, 0.0, -1.0]);
-            }
+            let lane = a.lane[i];
+            let (side, limit, kind) = match a.state[i] {
+                AgentState::Driving => (LANE_OFFSET, self.roads.lane_speed[lane as usize], 0.0),
+                AgentState::Walking => {
+                    let main = self.roads.lane_class(lane) == crate::road::RoadClass::Main;
+                    let side = if main {
+                        MAIN_SIDEWALK_OFFSET
+                    } else {
+                        SIDEWALK_OFFSET
+                    };
+                    let c = a.citizen[i].expect("walkers are citizens") as usize;
+                    (side, self.citizens.walk_speed[c], 1.0)
+                }
+                _ => {
+                    out.extend([0.0, 0.0, 0.0, -1.0, 0.0]);
+                    continue;
+                }
+            };
+            let (x, y) = self.roads.lane_point(lane, a.pos[i], side);
+            let heading = self.roads.lane_heading(lane, a.pos[i]);
+            out.extend([x, y, heading, a.speed[i] / limit, kind]);
         }
     }
 
@@ -180,6 +192,7 @@ impl World {
             mix(a.pos[i].to_bits() as u64);
             mix(a.dest[i] as u64);
             mix(a.cleared[i] as u64);
+            mix(a.walk_end[i].to_bits() as u64);
         }
         self.hash_residents(&mut mix);
         self.hash_closures(&mut mix);
@@ -192,6 +205,10 @@ impl World {
             mix(a as u64);
         }
         for &a in &self.entering {
+            mix(a as u64);
+        }
+        mix(self.walking.len() as u64);
+        for &a in &self.walking {
             mix(a as u64);
         }
         self.junctions.hash_into(&mut mix);

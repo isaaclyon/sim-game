@@ -19,7 +19,8 @@ What to build next and why lives in `docs/ROADMAP.md`. Work on the current miles
   `scripts/line-limit.mjs` enforces it and skips generated WASM bindings, dependencies and docs.
 
 ## Snapshot formats
-- Agents: `[x, y, heading, speed_ratio]` per agent (`SNAPSHOT_STRIDE`), speed_ratio < 0 = hidden.
+- Agents: `[x, y, heading, speed_ratio, kind]` per agent (`SNAPSHOT_STRIDE`, `AGENT_STRIDE`),
+  speed_ratio < 0 = hidden, kind 0 = car, 1 = walker on the sidewalk (ADR 0026).
 - Roads: `[ax, ay, bx, by, class]` per active rendered segment, class 0 = street, 1 = main road,
   2 = alley; curves emit multiple segments. Packed in road ID order, not indexed by road ID
   (ADR 0015, 0017).
@@ -46,7 +47,7 @@ What to build next and why lives in `docs/ROADMAP.md`. Work on the current miles
   including growth, closure removals (ADR 0023)
   and removals from paused road edits. Growth snapshots are capped at four
   per real second; start, edits and pause flush immediately.
-- Citizen inspection: `inspect` names a car by its agent snapshot index; the worker maps it once
+- Citizen inspection: `inspect` names a car or walker by its agent snapshot index; the worker maps it once
   to a citizen and answers `citizen` for that one citizen only, at once and after every frame
   and edit while selected (ADR 0022). Read-only, not hashed; names are derived from the seed and
   IDs, never stored or drawn from a gameplay RNG. Places are absent once their building is gone.

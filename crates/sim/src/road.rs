@@ -347,6 +347,20 @@ impl RoadNetwork {
         }
     }
 
+    /// Distance along `road`'s lane `2k` to the centreline point nearest `p`, metres. On lane
+    /// `2k + 1` the same point is `lane_len - offset` along.
+    pub(crate) fn road_offset(&self, road: RoadId, p: Point) -> f32 {
+        let r = road as usize;
+        let t = self.shape(road).nearest(p);
+        let table = &self.lengths[r];
+        if table.is_empty() {
+            return t * self.lane_len[r * 2];
+        }
+        let x = t * (table.len() - 1) as f32;
+        let i = (x.floor() as usize).min(table.len() - 2);
+        table[i] + (table[i + 1] - table[i]) * (x - i as f32)
+    }
+
     fn parameter(&self, lane: LaneId, dist: f32) -> f32 {
         let len = self.lane_len[lane as usize];
         let d = dist.clamp(0.0, len);

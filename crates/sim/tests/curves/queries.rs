@@ -75,9 +75,15 @@ fn curve_traffic_replays_and_survives_a_split() {
         }
         let mut snapshot = Vec::new();
         w.write_agent_snapshot(&mut snapshot);
-        assert!(snapshot.as_chunks::<4>().0.iter().any(|s| s[3] >= 0.0));
+        assert!(
+            snapshot
+                .as_chunks::<{ sim::world::SNAPSHOT_STRIDE }>()
+                .0
+                .iter()
+                .any(|s| s[3] >= 0.0)
+        );
         for (i, s) in snapshot
-            .as_chunks::<4>()
+            .as_chunks::<{ sim::world::SNAPSHOT_STRIDE }>()
             .0
             .iter()
             .enumerate()

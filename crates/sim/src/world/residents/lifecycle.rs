@@ -18,6 +18,7 @@ impl World {
                 self.traffic.queues[self.agents.lane[a as usize] as usize].retain(|&v| v != a);
             }
             self.entering.retain(|&v| v != a);
+            self.walking.retain(|&v| v != a);
             self.path_queue.retain(|&v| v != a);
             self.agents.state[a as usize] = AgentState::Dormant;
             self.agents.cleared[a as usize] = false;
@@ -59,6 +60,7 @@ impl World {
             self.cancel_citizen_trip(c);
             if let Some(h) = replacement {
                 self.citizens.location[i] = self.homes.building[h];
+                self.citizens.car_out[i] = false;
                 self.citizens.activity[i] = Activity::Home;
                 self.schedule_activity(c, 30.0);
             } else {
@@ -130,7 +132,9 @@ impl World {
                 let home = self.home_building(c);
                 self.citizens.activity[i] = Activity::Home;
                 if removed_location {
+                    // A car out at a removed building comes home with its owner.
                     self.citizens.location[i] = home;
+                    self.citizens.car_out[i] = false;
                 } else if self.citizens.location[i] != home {
                     self.citizens.destination[i] = Some(home);
                 }

@@ -448,6 +448,9 @@ addEventListener('keydown', (e) => {
 function fmt(n: number) {
   return n.toLocaleString('en-US');
 }
+/** Share of finished trips made on foot (ADR 0026). */
+const walkShare = (s: Stats) =>
+  `${s.tripsCompleted ? ((100 * s.walksCompleted) / s.tripsCompleted).toFixed(0) : 0}%`;
 let fps = 60;
 let lastFrame = performance.now();
 function frame() {
@@ -471,12 +474,12 @@ function frame() {
       `Day ${stats.day}   ${hh}:${mm}   ${speed === 0 ? 'paused' : `${speed}×`}\n` +
       `fps        ${fps.toFixed(0)}   tick ${tickMs.toFixed(2)} ms\n` +
       `population ${fmt(stats.population)}   unemployed ${fmt(stats.unemployed)} (${stats.unemploymentPercent.toFixed(1)}%)\n` +
-      `driving    ${fmt(stats.driving)}   parked ${fmt(stats.parked)}\n` +
-      `trips      ${fmt(stats.tripsCompleted)}\n` +
+      `driving    ${fmt(stats.driving)}   walking ${fmt(stats.walking)}   parked ${fmt(stats.parked)}\n` +
+      `trips      ${fmt(stats.tripsCompleted)}   on foot ${walkShare(stats)}\n` +
       `stuck      ${fmt(stats.despawnedStuck)}   no path ${fmt(stats.pathsFailed)}\n` +
       `road edits ${fmt(stats.despawnedByEdit)} cars removed\n` +
       `camera     WASD or drag pans, Q/E turns, right-drag orbits, wheel zooms\n` +
-      `inspect    click a car; F follows it, Esc closes\n` +
+      `inspect    click a car or walker; F follows, Esc closes\n` +
       (zone !== null
         ? `\nZONE: ${ZONE_NAMES[zone]}. Click a block to fill it, drag a rectangle to paint, Esc to stop` +
           `\n(Z/X/C pick a zone, press again for the other density; U unzones)`
