@@ -14,6 +14,7 @@
 import CameraControls from 'camera-controls';
 import * as THREE from 'three';
 import { AgentLayer } from './agent-layer';
+import type { Listener } from './ambience';
 import { buildBuildingGeometry } from './building-geometry';
 import { followPoint, KeyCamera } from './camera';
 import { carPosition, nearestCar } from './car-pick';
@@ -246,6 +247,12 @@ export class Renderer {
   /** While following, the wheel zooms toward the followed car instead of the cursor. */
   setFollowing(on: boolean) {
     this.controls.dollyToCursor = !on;
+  }
+
+  /** Where ambient sound is heard: the sim point the camera looks at, and its distance. */
+  listener(): Listener {
+    this.scene.worldToLocal(this.controls.getTarget(this.look, false));
+    return { x: this.look.x, y: this.look.z, distance: this.controls.distance };
   }
 
   /** Ground-plane point in scene-local (sim x, y as x, z), or null if the ray misses. */

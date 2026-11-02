@@ -40,6 +40,7 @@ export async function tools() {
       'inspector-text',
       'follow',
       'inspector-close',
+      'sound',
     ].map((id) => [id, element()]),
   );
   const zoneButtons = Object.values(Zone).map((zone) => ({
@@ -57,6 +58,19 @@ export async function tools() {
   const clock = { now: 0, cameraMoved: false };
   // Inspector: the car under the next click, and what the renderer was asked to do.
   const cars = { at: null, visible: true, drawnSelected: [], follows: [], following: [] };
+  // Ambient sound: what main.ts asked of it.
+  const sound = { toggles: 0, buildings: [], updates: [] };
+  class AmbientSound {
+    toggle() {
+      sound.toggles++;
+    }
+    setBuildings(data) {
+      sound.buildings.push(data);
+    }
+    update(...args) {
+      sound.updates.push(args);
+    }
+  }
   let renderer;
   let worker;
   let frame;
@@ -104,6 +118,10 @@ export async function tools() {
       cars.drawnSelected.push(selected);
     }
     drawSignals() {}
+    setBuildings() {}
+    listener() {
+      return { x: 1, y: 2, distance: 300 };
+    }
     renderer = { domElement: canvas };
     pick(x, z) {
       return { x, z };
@@ -171,24 +189,32 @@ export async function tools() {
   await module.link((specifier) =>
     specifier === './inspector'
       ? inspector
-      : specifier === './demand-meter'
-        ? demandMeter
-        : specifier === './protocol'
-          ? new SyntheticModule(
-              ['RoadClass', 'Zone'],
-              function () {
-                this.setExport('RoadClass', RoadClass);
-                this.setExport('Zone', Zone);
-              },
-              { context },
-            )
-          : new SyntheticModule(
-              ['Renderer'],
-              function () {
-                this.setExport('Renderer', Renderer);
-              },
-              { context },
-            ),
+      : specifier === './ambient-sound'
+        ? new SyntheticModule(
+            ['AmbientSound'],
+            function () {
+              this.setExport('AmbientSound', AmbientSound);
+            },
+            { context },
+          )
+        : specifier === './demand-meter'
+          ? demandMeter
+          : specifier === './protocol'
+            ? new SyntheticModule(
+                ['RoadClass', 'Zone'],
+                function () {
+                  this.setExport('RoadClass', RoadClass);
+                  this.setExport('Zone', Zone);
+                },
+                { context },
+              )
+            : new SyntheticModule(
+                ['Renderer'],
+                function () {
+                  this.setExport('Renderer', Renderer);
+                },
+                { context },
+              ),
   );
   await module.evaluate();
   const move = (x, y) => canvas.events.pointermove({ clientX: x, clientY: y });
@@ -209,6 +235,7 @@ export async function tools() {
     clock,
     zoneDrags,
     cars,
+    sound,
     userPan: () => renderer.onUserPan?.(),
     down: (x, y) => canvas.events.pointerdown({ clientX: x, clientY: y, button: 0 }),
     up: (x, y) => canvas.events.pointerup({ clientX: x, clientY: y, button: 0 }),
