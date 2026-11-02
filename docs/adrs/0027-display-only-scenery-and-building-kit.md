@@ -1,4 +1,4 @@
-# 0027. Display-only scenery and a building kit driven by sim footprints
+# 0027. Display-only scenery, building kit and agent looks
 
 - Status: Accepted
 - Date: 2026-11-04
@@ -24,6 +24,12 @@ affect play yet, and later eras (village, town) need to restyle buildings withou
   RNG. Colours and proportions live in a `Style`; one present-day style ships, and an era
   switch later picks another `Style` without sim changes.
 - Building meshes are built per 256 m tile and rebuilt only when that tile's records change.
+- Vehicle models (car, hatchback, SUV, van, pickup, box van), paint and walker clothes are
+  chosen in the frontend from a hash of the stable agent id (issue #29), so a citizen keeps the
+  same car and look. Every model is at most 6 m long to fit the sim's 7 m queue spacing. Cars
+  show paint by default; a traffic view (T) tints them by speed instead. Walkers swing their
+  legs by distance moved, so they stand still while waiting or paused. Freight trucks that are
+  longer or slower would be sim-owned and need their own ADR.
 
 ## Consequences
 

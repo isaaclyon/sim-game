@@ -26,14 +26,15 @@ export interface Listener {
 export function buildingCentres(data: Float32Array): Float32Array {
   const out: number[] = [];
   for (let i = 0; i < data.length; ) {
-    const [height, n] = [data[i + 1], data[i + 3]];
+    // `[zone, height, roof, front, n, x0, y0, …]` per building (see protocol.ts).
+    const [height, n] = [data[i + 1], data[i + 4]];
     let [x, y] = [0, 0];
     for (let k = 0; k < n; k++) {
-      x += data[i + 4 + 2 * k];
-      y += data[i + 5 + 2 * k];
+      x += data[i + 5 + 2 * k];
+      y += data[i + 6 + 2 * k];
     }
     if (n > 0) out.push(x / n, y / n, height);
-    i += 4 + 2 * n;
+    i += 5 + 2 * n;
   }
   return new Float32Array(out);
 }

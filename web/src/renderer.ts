@@ -238,6 +238,12 @@ export class Renderer {
     this.agents.draw(prev, curr, t, selected);
   }
 
+  /** Switches cars between paint and speed colours; returns whether traffic view is on. */
+  toggleTrafficView(): boolean {
+    this.agents.trafficView = !this.agents.trafficView;
+    return this.agents.trafficView;
+  }
+
   /** Left drag pans the camera, unless a tool needs the drag (the zone brush). */
   setLeftDragPans(pans: boolean) {
     this.controls.mouseButtons.left = pans

@@ -32,7 +32,7 @@ rewriting history; mark the old one `Superseded by NNNN`.
 | [0024](0024-per-driver-route-noise.md) | Per-driver route noise | Accepted |
 | [0025](0025-rci-demand-gates-growth.md) | R/C/I demand gates growth | Accepted |
 | [0026](0026-walking-trips-and-household-cars.md) | Walking trips and household cars | Accepted |
-| [0027](0027-display-only-scenery-and-building-kit.md) | Display-only scenery and a building kit driven by sim footprints | Accepted |
+| [0027](0027-display-only-scenery-and-building-kit.md) | Display-only scenery, building kit and agent looks | Accepted |
 
 ADRs are only for decisions that are hard to reverse. See [AGENTS.md](AGENTS.md) for when to
 write one and how.

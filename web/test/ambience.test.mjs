@@ -16,6 +16,7 @@ const square = (x, y, height) => [
   1,
   height,
   0,
+  2,
   4,
   x - 5,
   y - 5,
