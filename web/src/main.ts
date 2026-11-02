@@ -1,4 +1,5 @@
 import type * as THREE from 'three';
+import { AmbientSound } from './ambient-sound';
 import { drawDemand } from './demand-meter';
 import { Inspector } from './inspector';
 import { type FromWorker, RoadClass, type Stats, type ToWorker, Zone } from './protocol';
@@ -11,6 +12,7 @@ const byId = (id: string): HTMLElement => {
 };
 
 const renderer = new Renderer(document.body);
+const sound = new AmbientSound(byId('sound') as HTMLButtonElement);
 const hud = byId('hud');
 const demand = byId('demand');
 const demandFills = ['residential', 'commercial', 'industrial'].map((u) => byId(`demand-${u}`));
@@ -88,6 +90,7 @@ worker.onmessage = (e: MessageEvent<FromWorker>) => {
     renderer.setLots(msg.rings);
   } else if (msg.type === 'buildings') {
     renderer.setBuildings(msg.data);
+    sound.setBuildings(msg.data);
   } else if (msg.type === 'citizen') {
     inspector.receive(msg.selection, msg.citizen);
   } else if (msg.type === 'blockPreview') {
@@ -435,6 +438,7 @@ addEventListener('keydown', (e) => {
   else if (e.key === 'c' || e.key === 'C') zoneKey(Zone.IndustrialLow, Zone.IndustrialHigh);
   else if (e.key === 'u' || e.key === 'U') setZone(Zone.None);
   else if (e.key === 'f' || e.key === 'F') inspector.toggleFollow();
+  else if (e.key === 'n' || e.key === 'N') sound.toggle();
   // Esc cancels a tool first, then closes the inspector.
   else if (e.key === 'Escape')
     roadTool || bulldozeTool || zone !== null ? setTool(null) : inspector.select(null);
@@ -466,6 +470,7 @@ function frame() {
   inspector.update(seconds);
   // A camera move slides the ground under a still cursor; ask again what the cursor is over.
   if (renderer.render() && pointer) hover(pointer);
+  sound.update(now / 1000, curr, stats?.secondOfDay ?? 43200, renderer.listener());
   if (stats) {
     drawDemand(demand, demandFills, stats.demand);
     const hh = String(Math.floor(stats.secondOfDay / 3600)).padStart(2, '0');
@@ -479,7 +484,7 @@ function frame() {
       `stuck      ${fmt(stats.despawnedStuck)}   no path ${fmt(stats.pathsFailed)}\n` +
       `road edits ${fmt(stats.despawnedByEdit)} cars removed\n` +
       `camera     WASD or drag pans, Q/E turns, right-drag orbits, wheel zooms\n` +
-      `inspect    click a car or walker; F follows, Esc closes\n` +
+      `inspect    click a car or walker; F follows, Esc closes   N sound\n` +
       (zone !== null
         ? `\nZONE: ${ZONE_NAMES[zone]}. Click a block to fill it, drag a rectangle to paint, Esc to stop` +
           `\n(Z/X/C pick a zone, press again for the other density; U unzones)`
@@ -489,4 +494,4 @@ function frame() {
 }
 requestAnimationFrame(frame);
 
-if (import.meta.env.DEV) Object.assign(window, { renderer });
+if (import.meta.env.DEV) Object.assign(window, { renderer, sound });

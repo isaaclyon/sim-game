@@ -19,6 +19,9 @@ The bend control pulls the curve toward it; it is not a point the road passes th
 Both construction tools continue from the last successful end. `B` toggles bulldoze: hover to
 highlight a whole road between junctions, then click to remove both directions. All tools work
 while paused. Esc or right-click cancels. Space pauses, 1/2/3 set speed.
+Ambient sound follows the camera: traffic hum over busy roads, city noise among buildings and
+walkers, and birds over open land by day. It starts on the first click or key press; `N` or the
+sound button turns it on and off, and the choice is remembered.
 The HUD shows the sim's day clock and speed (`Day 1   06:00   1×`). The game starts on Day 1 at
 06:00, and each sim second advances the clock six seconds, so a day lasts 4 real hours at 1× and 24
 minutes at 10×. Speed changes how many sim seconds pass per real second; pausing stops the clock.
