@@ -24,7 +24,7 @@ rewriting history; mark the old one `Superseded by NNNN`.
 | [0016](0016-blocks-lots-and-alleys.md) | Blocks are derived road faces; lots are zone-cell sets; the sim adds alleys | Accepted; lots superseded by 0018 |
 | [0017](0017-road-classes-and-main-road-routing.md) | Road classes and main-road routing | Accepted |
 | [0018](0018-lots-cut-along-roads.md) | Lots are shapes cut along roads; buildings take their shape from lots | Industrial frontage and buildings superseded by 0019; otherwise accepted |
-| [0019](0019-industrial-lot-variety.md) | Industrial lots combine neighbouring frontage strips | Industrial footprint fallback superseded by 0020; otherwise accepted |
+| [0019](0019-industrial-lot-variety.md) | Industrial lots combine neighbouring frontage strips | Industrial footprint fallback superseded by 0020; snapshot extended with `front` by 0027; otherwise accepted |
 | [0020](0020-rectangular-industrial-halls.md) | Industrial halls stay rectangular | Accepted |
 | [0021](0021-citizens-households-and-trips.md) | Citizens, households, homes, jobs and trips | Accepted; residents of repainted buildings superseded by 0023; walking and travel slots by 0026 |
 | [0022](0022-citizen-inspection-query.md) | Citizen inspection is a read-only query for one selected citizen | Accepted; pedestrian picking superseded by 0026 |
@@ -32,6 +32,7 @@ rewriting history; mark the old one `Superseded by NNNN`.
 | [0024](0024-per-driver-route-noise.md) | Per-driver route noise | Accepted |
 | [0025](0025-rci-demand-gates-growth.md) | R/C/I demand gates growth | Accepted |
 | [0026](0026-walking-trips-and-household-cars.md) | Walking trips and household cars | Accepted |
+| [0027](0027-display-only-scenery-and-building-kit.md) | Display-only scenery and a building kit driven by sim footprints | Accepted |
 
 ADRs are only for decisions that are hard to reverse. See [AGENTS.md](AGENTS.md) for when to
 write one and how.

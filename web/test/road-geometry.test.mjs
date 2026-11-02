@@ -145,3 +145,16 @@ test('replacement snapshots do not retain old pads', () => {
   assert.ok(covers(junction, -2, -2));
   assert.ok(!covers(replacement, -2, -2));
 });
+
+test('sidewalk width and class colours', async () => {
+  const { Color } = await import('three');
+  const colors = [new Color(1, 0, 0), new Color(0, 1, 0), new Color(0, 0, 1)];
+  const mesh = buildRoadGeometry(new Float32Array([0, 0, 100, 0, 1, 0, 0, 0, 100, 2]), 2, colors);
+  const p = mesh.getAttribute('position');
+  const c = mesh.getAttribute('color');
+  assert.equal(c.count, p.count);
+  assert.equal(Math.max(...Array.from({ length: 6 }, (_, i) => Math.abs(p.getZ(i)))), 8);
+  assert.equal(c.getY(0), 1, 'main road colour');
+  // The junction pad takes the wider main road's colour.
+  assert.equal(c.getY(p.count - 1), 1);
+});

@@ -215,16 +215,21 @@ impl Buildings {
         true
     }
 
-    /// `[zone, height, roof, n, x0, y0, …]` per active building in id order, not indexed by id.
-    pub fn write_snapshot(&self, out: &mut Vec<f32>) {
+    /// `[zone, height, roof, front, n, x0, y0, …]` per active building in id order, not indexed
+    /// by id. `front` is the footprint edge (from point `front` to the next) facing the lot's
+    /// road; it is derived here for drawing and is not stored or hashed.
+    pub fn write_snapshot(&self, lots: &Lots, out: &mut Vec<f32>) {
         out.clear();
         for b in self.active_buildings() {
             let i = b as usize;
             let ring = self.footprint(b);
+            let lot = self.lot[i] as usize;
+            let facing = (lots.facing_x[lot], lots.facing_y[lot]);
             out.extend([
                 self.zone[i] as u8 as f32,
                 self.height[i],
                 self.roof[i] as f32,
+                front_edge(ring, facing) as f32,
                 ring.len() as f32,
             ]);
             out.extend(ring.iter().flat_map(|p| [p.0, p.1]));
@@ -257,4 +262,22 @@ impl Buildings {
             }
         }
     }
+}
+
+/// The counter-clockwise ring edge whose outward normal best matches `facing`. Edges shorter
+/// than 2 m are skipped unless nothing else is left, so corner slivers never become fronts.
+fn front_edge(ring: &[Point], facing: Point) -> usize {
+    let score = |k: usize, min: f32| {
+        let (a, b) = (ring[k], ring[(k + 1) % ring.len()]);
+        let len = (b.0 - a.0).hypot(b.1 - a.1);
+        if len < min {
+            return f32::NEG_INFINITY;
+        }
+        ((b.1 - a.1) * facing.0 - (b.0 - a.0) * facing.1) / len
+    };
+    let best = |min| (0..ring.len()).max_by(|&j, &k| score(j, min).total_cmp(&score(k, min)));
+    best(2.0)
+        .filter(|&k| score(k, 2.0).is_finite())
+        .or_else(|| best(0.0))
+        .unwrap_or(0)
 }

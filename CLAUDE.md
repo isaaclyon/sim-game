@@ -40,9 +40,11 @@ What to build next and why lives in `docs/ROADMAP.md`. Work on the current miles
 - Lots: `[n, x0, y0, …]` per lot, its outline's point count then its points, sent whole when
   the lots version changes (ADR 0018). Block preview: `[x, y]` per outline sample of the block
   under the cursor, closed; empty = no block. Read-only.
-- Buildings: `[zone, height, roof, n, x0, y0, …]` per active building in ID order, not indexed by ID.
-  Height is metres; n is the counter-clockwise footprint point count, with no repeated closing
-  point. Roof is a stable palette index (0–3 for industry, 0 otherwise; ADR 0019).
+- Buildings: `[zone, height, roof, front, n, x0, y0, …]` per active building in ID order, not
+  indexed by ID. Height is metres; n is the counter-clockwise footprint point count, with no
+  repeated closing point. Roof is a stable palette index (0–3 for industry, 0 otherwise; ADR 0019).
+  Front is the footprint edge (point `front` to the next) facing the lot's road, derived on
+  write, not stored or hashed (ADR 0027).
   Zone is the building's original use. Sent whole when the buildings version changes,
   including growth, closure removals (ADR 0023)
   and removals from paused road edits. Growth snapshots are capped at four
