@@ -14,6 +14,8 @@ export interface VehicleModel {
   length: number;
   body: () => THREE.BufferGeometry;
   trim: () => THREE.BufferGeometry;
+  /** A painted two-box stand-in for cars far from the camera. */
+  far: () => THREE.BufferGeometry;
 }
 
 const WHITE = new THREE.Color(0xffffff);
@@ -148,6 +150,22 @@ function pane(mb: MeshBuilder, a: Pt, b: Pt, hw: number) {
   mb.extrude([a, b, [b[0] + n[0], b[1] + n[1]], [a[0] + n[0], a[1] + n[1]]], hw, 0, GLASS);
 }
 
+/** Darkens the paint on the far model's upper box, so it still reads as glass and roof. */
+const FAR_CABIN = new THREE.Color(0x5a5a5a);
+
+/**
+ * The far model: a body `length` by `width` up to `top`, and a darker box over `x = [x0, x1]` up
+ * to `roof`. Painted like the body, about 24 triangles.
+ */
+function far(length: number, width: number, top: number, roof: number, [x0, x1]: number[]) {
+  return () => {
+    const mb = new MeshBuilder();
+    mb.box([0, 0], 0.15, length, top - 0.15, width, 0, WHITE);
+    mb.box([(x0 + x1) / 2, 0], top, x1 - x0, roof - top, width - 0.2, 0, FAR_CABIN);
+    return mb.geometry();
+  };
+}
+
 /**
  * A passenger car `length` by `width`: a body `bodyH` tall above the road, then a glasshouse over
  * `cabin = [centre, length]` whose windscreen and rear window lean by `rake = [front, rear]`.
@@ -176,6 +194,7 @@ function car(
       lights(mb, length + 0.02, width, top - 0.32);
       return mb.geometry();
     },
+    far: far(length, width, top, top + 0.56, x),
   };
 }
 
@@ -211,6 +230,7 @@ export const VEHICLES: VehicleModel[] = [
       lights(mb, 5.22, 1.95, 0.85);
       return mb.geometry();
     },
+    far: far(5.2, 1.95, 1.22, 2.27, [-2.6, 1.65]),
   },
   {
     name: 'pickup',
@@ -232,6 +252,7 @@ export const VEHICLES: VehicleModel[] = [
       lights(mb, 5.42, 1.9, 0.76);
       return mb.geometry();
     },
+    far: far(5.4, 1.9, 1.08, 1.7, [-0.45, 1.55]),
   },
   {
     name: 'box van',
@@ -264,6 +285,8 @@ export const VEHICLES: VehicleModel[] = [
       lights(mb, 6.02, 2, 0.8);
       return mb.geometry();
     },
+    // The cargo box stands in for the cabin, so it is drawn as tall as the real one.
+    far: far(6, 2, 1.35, 3, [-3, 1.4]),
   },
 ];
 

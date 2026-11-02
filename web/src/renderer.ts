@@ -17,6 +17,7 @@
 import CameraControls from 'camera-controls';
 import * as THREE from 'three';
 import { AgentLayer } from './agent-layer';
+import { pixelsPerMetre } from './agent-lod.ts';
 import type { Listener } from './ambience';
 import { BuildingLayer } from './building-kit/layer.ts';
 import { followPoint, KeyCamera } from './camera';
@@ -209,7 +210,14 @@ export class Renderer {
     t: number,
     selected: number | null = null,
   ) {
-    this.agents.draw(prev, curr, t, selected);
+    this.agents.draw(
+      prev,
+      curr,
+      t,
+      selected,
+      this.camera,
+      pixelsPerMetre(this.camera, innerHeight),
+    );
   }
 
   /** Switches cars between paint and speed colours; returns whether traffic view is on. */

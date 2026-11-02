@@ -17,6 +17,7 @@ const SWING = 0.5;
 
 const WHITE = new THREE.Color(0xffffff);
 const SHOE = new THREE.Color(0x3a3a3a);
+const LEGS = new THREE.Color(0x555555);
 
 /** A cap over the crown and the back of the head. */
 function shortHair(mb: MeshBuilder) {
@@ -84,6 +85,15 @@ export const FIGURE = {
   }),
   arm: part((mb) => mb.box([0, 0], -0.6, 0.11, 0.6, 0.11, 0, WHITE)),
 };
+
+/**
+ * A walker far from the camera: one block, tinted by the shirt, with darker legs. About 24
+ * triangles instead of about 100.
+ */
+export const FAR_WALKER = part((mb) => {
+  mb.box([0, 0], 0, 0.22, HIP, 0.3, 0, LEGS);
+  mb.box([0, 0], HIP, 0.24, SHOULDER - HIP + 0.32, 0.42, 0, WHITE);
+});
 
 /** Where each limb pivots, across the body (z); legs at the hip, arms at the shoulder. */
 export const LIMBS = {

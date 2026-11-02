@@ -1,5 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import {
+  CAR_DETAIL_PX,
+  Detail,
+  detail,
+  pixelsPerMetre,
+  WALKER_DETAIL_PX,
+  WALKER_HIDE_PX,
+} from '../src/agent-lod.ts';
 import { VEHICLES, vehicleModel, vehiclePaint } from '../src/vehicle-models.ts';
 import { FIGURE, hairStyle, sizeOf, swing } from '../src/walker-figure.ts';
 
@@ -64,4 +72,19 @@ test('walkers vary in hair and size, and keep it for life', () => {
   const hair = bounds(FIGURE.hair());
   const head = bounds(FIGURE.head());
   assert.ok(hair.max.y > head.max.y, 'hair sits on top of the head');
+});
+
+test('far cars and walkers draw simpler, and the farthest walkers not at all', () => {
+  const scale = pixelsPerMetre({ fov: 45 }, 1000);
+  assert.equal(detail(4.6, 100, scale, CAR_DETAIL_PX), Detail.Full);
+  assert.equal(detail(4.6, 1000, scale, CAR_DETAIL_PX), Detail.Simple);
+  assert.equal(detail(4.6, 1e6, scale, CAR_DETAIL_PX), Detail.Simple, 'cars never vanish');
+  const walker = (d) => detail(1.75, d, scale, WALKER_DETAIL_PX, WALKER_HIDE_PX);
+  assert.deepEqual([walker(50), walker(300), walker(2000)], [2, 1, 0]);
+  for (const v of VEHICLES) {
+    const far = v.far().getAttribute('position').count / 3;
+    const near =
+      (v.body().getAttribute('position').count + v.trim().getAttribute('position').count) / 3;
+    assert.ok(far <= near / 5, `${v.name} far model is ${far} triangles`);
+  }
 });
