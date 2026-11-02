@@ -11,17 +11,31 @@ const MAIN: RoadClass = 1;
 
 /** Flat asphalt ribbons and shared-endpoint pads from `[ax, ay, bx, by, class]`.
  * This is display geometry only; the sim remains responsible for joining roads.
+ * `extra` widens every road on both sides (sidewalks); `colors`, indexed by class, adds a
+ * vertex colour attribute. Pads take the colour of their widest road.
  */
-export function buildRoadGeometry(segments: Float32Array): THREE.BufferGeometry {
+export function buildRoadGeometry(
+  segments: Float32Array,
+  extra = 0,
+  colors?: THREE.Color[],
+): THREE.BufferGeometry {
   const positions: number[] = [];
-  const endpoints = new Map<string, { x: number; z: number; count: number; half: number }>();
-  function endpoint(x: number, z: number, half: number) {
+  const rgb: number[] = [];
+  const paint = (cls: number, vertices: number) => {
+    const c = colors?.[cls] ?? colors?.[0];
+    if (c) for (let i = 0; i < vertices; i++) rgb.push(c.r, c.g, c.b);
+  };
+  const endpoints = new Map<
+    string,
+    { x: number; z: number; count: number; half: number; cls: number }
+  >();
+  function endpoint(x: number, z: number, half: number, cls: number) {
     const key = `${x},${z}`;
     const point = endpoints.get(key);
     if (point) {
       point.count++;
-      point.half = Math.max(point.half, half);
-    } else endpoints.set(key, { x, z, count: 1, half });
+      if (half > point.half) Object.assign(point, { half, cls });
+    } else endpoints.set(key, { x, z, count: 1, half, cls });
   }
 
   for (let i = 0; i < segments.length; i += 5) {
@@ -30,7 +44,7 @@ export function buildRoadGeometry(segments: Float32Array): THREE.BufferGeometry 
     const dz = bz - az;
     const length = Math.hypot(dx, dz);
     if (length === 0) continue;
-    const half = cls === MAIN ? MAIN_HALF_WIDTH : HALF_WIDTH;
+    const half = (cls === MAIN ? MAIN_HALF_WIDTH : HALF_WIDTH) + extra;
     const nx = (-dz / length) * half;
     const nz = (dx / length) * half;
     // Counterclockwise from above: front faces point toward world +y.
@@ -54,14 +68,16 @@ export function buildRoadGeometry(segments: Float32Array): THREE.BufferGeometry 
       0,
       bz - nz,
     );
-    endpoint(ax, az, half);
-    endpoint(bx, bz, half);
+    paint(cls, 6);
+    endpoint(ax, az, half, cls);
+    endpoint(bx, bz, half, cls);
   }
 
   // Circumscribe the widest road's half-width so even oblique joins have no wedge-shaped gaps.
   // Pads and ribbons share one unlit material and plane; overlaps have identical color.
-  for (const { x, z, count, half } of endpoints.values()) {
+  for (const { x, z, count, half, cls } of endpoints.values()) {
     if (count < 2) continue;
+    paint(cls, PAD_SIDES * 3);
     const radius = half / Math.cos(Math.PI / PAD_SIDES);
     for (let i = 0; i < PAD_SIDES; i++) {
       const a = (i / PAD_SIDES) * Math.PI * 2;
@@ -82,5 +98,6 @@ export function buildRoadGeometry(segments: Float32Array): THREE.BufferGeometry 
 
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  if (colors) geometry.setAttribute('color', new THREE.Float32BufferAttribute(rgb, 3));
   return geometry;
 }

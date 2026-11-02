@@ -37,6 +37,10 @@ const inspector = new Inspector(
   byId('inspector-close') as HTMLButtonElement,
 );
 renderer.onUserPan = () => inspector.setFollow(false);
+const trafficButton = byId('traffic');
+const toggleTraffic = () =>
+  trafficButton.setAttribute('aria-pressed', String(renderer.toggleTrafficView()));
+trafficButton.onclick = toggleTraffic;
 
 // Two most recent snapshots, and when they arrived, for interpolation.
 let prev: Float32Array | undefined;
@@ -439,6 +443,7 @@ addEventListener('keydown', (e) => {
   else if (e.key === 'u' || e.key === 'U') setZone(Zone.None);
   else if (e.key === 'f' || e.key === 'F') inspector.toggleFollow();
   else if (e.key === 'n' || e.key === 'N') sound.toggle();
+  else if (e.key === 't' || e.key === 'T') toggleTraffic();
   // Esc cancels a tool first, then closes the inspector.
   else if (e.key === 'Escape')
     roadTool || bulldozeTool || zone !== null ? setTool(null) : inspector.select(null);
@@ -449,9 +454,7 @@ addEventListener('keydown', (e) => {
 });
 
 // --- frame loop ---
-function fmt(n: number) {
-  return n.toLocaleString('en-US');
-}
+const fmt = (n: number) => n.toLocaleString('en-US');
 /** Share of finished trips made on foot (ADR 0026). */
 const walkShare = (s: Stats) =>
   `${s.tripsCompleted ? ((100 * s.walksCompleted) / s.tripsCompleted).toFixed(0) : 0}%`;
@@ -484,7 +487,7 @@ function frame() {
       `stuck      ${fmt(stats.despawnedStuck)}   no path ${fmt(stats.pathsFailed)}\n` +
       `road edits ${fmt(stats.despawnedByEdit)} cars removed\n` +
       `camera     WASD or drag pans, Q/E turns, right-drag orbits, wheel zooms\n` +
-      `inspect    click a car or walker; F follows, Esc closes   N sound\n` +
+      `inspect    click a car or walker; F follows, Esc closes   N sound   T traffic\n` +
       (zone !== null
         ? `\nZONE: ${ZONE_NAMES[zone]}. Click a block to fill it, drag a rectangle to paint, Esc to stop` +
           `\n(Z/X/C pick a zone, press again for the other density; U unzones)`

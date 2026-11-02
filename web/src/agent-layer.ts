@@ -1,66 +1,93 @@
-// Cars as instanced boxes and walkers as instanced cylinders (ADR 0026), interpolated between
-// two agent snapshots. Keeps where each agent was drawn for picking and follow.
+// Cars as instanced low-poly vehicles and walkers as instanced figures (ADR 0026, issue #29),
+// interpolated between two agent snapshots. Keeps where each agent was drawn for picking and
+// follow. Models, paint and clothes are display only, chosen from each stable agent id.
 
 import * as THREE from 'three';
-import { ensureInstances, standingBox } from './instances';
+import { ensureInstances } from './instances';
 import { AGENT_STRIDE, AgentKind } from './protocol';
+import { VEHICLES, vehicleModel, vehiclePaint } from './vehicle-models.ts';
+import { FIGURE, LIMBS, shirtOf, skinOf, swing, trousersOf } from './walker-figure.ts';
 
-const CAR_LENGTH = 4.5;
-const CAR_WIDTH = 2;
-const CAR_HEIGHT = 1.5;
-const WALKER_RADIUS = 0.4;
-const WALKER_HEIGHT = 1.8;
-const WALKER_COLOR = new THREE.Color(0xd9b3ff);
-const SELECTED_COLOR = new THREE.Color(0xffffff);
+const SELECTED_COLOR = new THREE.Color(0x3fd0ff);
+const WHITE = new THREE.Color(0xffffff);
+const Z = new THREE.Vector3(0, 0, 1);
 
-function walkerGeometry(): THREE.BufferGeometry {
-  const geom = new THREE.CylinderGeometry(WALKER_RADIUS, WALKER_RADIUS, WALKER_HEIGHT, 8);
-  geom.translate(0, WALKER_HEIGHT / 2, 0);
-  return geom;
-}
+type Part = 'torso' | 'head' | 'leg' | 'arm';
+const PARTS: Part[] = ['torso', 'head', 'leg', 'arm'];
 
 export class AgentLayer {
-  private cars?: THREE.InstancedMesh;
-  private walkers?: THREE.InstancedMesh;
-  private readonly carMaterial = new THREE.MeshLambertMaterial();
-  private readonly walkerMaterial = new THREE.MeshLambertMaterial();
+  /** Per vehicle model: painted body, then trim. */
+  private readonly bodies: (THREE.InstancedMesh | undefined)[] = [];
+  private readonly trims: (THREE.InstancedMesh | undefined)[] = [];
+  private readonly figure: Partial<Record<Part, THREE.InstancedMesh>> = {};
+  private readonly material = new THREE.MeshLambertMaterial({
+    vertexColors: true,
+    flatShading: true,
+  });
   private readonly matrix = new THREE.Matrix4();
+  private readonly limb = new THREE.Matrix4();
   private readonly quat = new THREE.Quaternion();
   private readonly pos = new THREE.Vector3();
   private readonly scale = new THREE.Vector3(1, 1, 1);
   private readonly up = new THREE.Vector3(0, 1, 0);
   private readonly color = new THREE.Color();
+  private readonly scene: THREE.Object3D;
   /** `[x, y]` per agent id as last drawn, NaN when hidden; reused for picking and follow. */
   drawn = new Float32Array();
+  /** Model index per agent id, cached because the hash runs for every car every frame. */
+  private models = new Uint8Array();
+  /** Colours cars by speed instead of paint: red stopped, yellow slow, green at the limit. */
+  trafficView = false;
 
-  constructor(private readonly scene: THREE.Object3D) {}
+  constructor(scene: THREE.Object3D) {
+    this.scene = scene;
+  }
 
   /**
    * Draws agents interpolated between two snapshots. `t` in [0, 1] blends prev → curr.
    * Agents hidden in either snapshot snap to the visible one so spawns don't streak. Agent
-   * `selected`, an agent id, is drawn white.
+   * `selected`, an agent id, is drawn in the highlight colour.
    */
   draw(prev: Float32Array | undefined, curr: Float32Array, t: number, selected: number | null) {
     const count = curr.length / AGENT_STRIDE;
-    this.cars = ensureInstances(
-      this.scene,
-      this.cars,
-      count,
-      () => standingBox([CAR_LENGTH, CAR_HEIGHT, CAR_WIDTH]),
-      this.carMaterial,
-    );
-    this.walkers = ensureInstances(
-      this.scene,
-      this.walkers,
-      count,
-      walkerGeometry,
-      this.walkerMaterial,
-    );
-    const { cars, walkers } = this;
+    if (this.models.length < count) {
+      const models = new Uint8Array(Math.ceil(count * 1.5));
+      for (let i = 0; i < models.length; i++) models[i] = vehicleModel(i);
+      this.models = models;
+    }
+    const perModel = VEHICLES.map(() => 0);
+    let walkers = 0;
+    for (let i = 0; i < count; i++) {
+      const o = i * AGENT_STRIDE;
+      if (curr[o + 3] < 0) continue;
+      if (curr[o + 4] === AgentKind.Walker) walkers++;
+      else perModel[this.models[i]]++;
+    }
+    VEHICLES.forEach((v, m) => {
+      this.bodies[m] = ensureInstances(
+        this.scene,
+        this.bodies[m],
+        perModel[m],
+        v.body,
+        this.material,
+      );
+      this.trims[m] = ensureInstances(
+        this.scene,
+        this.trims[m],
+        perModel[m],
+        v.trim,
+        this.material,
+      );
+    });
+    for (const p of PARTS) {
+      const n = p === 'leg' || p === 'arm' ? walkers * 2 : walkers;
+      this.figure[p] = ensureInstances(this.scene, this.figure[p], n, FIGURE[p], this.material);
+    }
+
     if (this.drawn.length < count * 2) this.drawn = new Float32Array(count * 3);
     this.drawn.fill(Number.NaN);
-    let carCount = 0;
-    let walkerCount = 0;
+    const used = VEHICLES.map(() => 0);
+    let w = 0;
     for (let i = 0; i < count; i++) {
       const o = i * AGENT_STRIDE;
       const ratio = curr[o + 3];
@@ -88,25 +115,54 @@ export class AgentLayer {
       this.drawn[i * 2] = x;
       this.drawn[i * 2 + 1] = y;
       if (kind === AgentKind.Walker) {
-        walkers.setMatrixAt(walkerCount, this.matrix);
-        walkers.setColorAt(walkerCount, i === selected ? SELECTED_COLOR : WALKER_COLOR);
-        walkerCount++;
+        this.drawWalker(w++, i, x * Math.cos(h) + y * Math.sin(h), ratio, i === selected);
         continue;
       }
-      // red (stopped) → yellow → green (at the limit)
+      const m = this.models[i];
+      const body = this.bodies[m] as THREE.InstancedMesh;
+      const trim = this.trims[m] as THREE.InstancedMesh;
       if (i === selected) this.color.copy(SELECTED_COLOR);
-      else this.color.setHSL(Math.min(ratio, 1) * 0.33, 0.85, 0.55);
-      cars.setMatrixAt(carCount, this.matrix);
-      cars.setColorAt(carCount, this.color);
-      carCount++;
+      else if (this.trafficView) this.color.setHSL(Math.min(ratio, 1) * 0.33, 0.85, 0.55);
+      else this.color.copy(vehiclePaint(i));
+      body.setMatrixAt(used[m], this.matrix);
+      body.setColorAt(used[m], this.color);
+      trim.setMatrixAt(used[m], this.matrix);
+      trim.setColorAt(used[m], WHITE);
+      used[m]++;
     }
-    for (const [mesh, n] of [
-      [cars, carCount],
-      [walkers, walkerCount],
-    ] as const) {
-      mesh.count = n;
-      mesh.instanceMatrix.needsUpdate = true;
-      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    VEHICLES.forEach((_, m) => {
+      finish(this.bodies[m], used[m]);
+      finish(this.trims[m], used[m]);
+    });
+    for (const p of PARTS) finish(this.figure[p], p === 'leg' || p === 'arm' ? w * 2 : w);
+  }
+
+  /** Walker `w` of this frame, agent `agent`, posed from `walked` metres along its heading. */
+  private drawWalker(w: number, agent: number, walked: number, ratio: number, selected: boolean) {
+    const f = this.figure as Record<Part, THREE.InstancedMesh>;
+    const shirt = selected ? SELECTED_COLOR : shirtOf(agent);
+    f.torso.setMatrixAt(w, this.matrix);
+    f.torso.setColorAt(w, shirt);
+    f.head.setMatrixAt(w, this.matrix);
+    f.head.setColorAt(w, skinOf(agent));
+    const angles = swing(walked, ratio, agent);
+    for (const [k, p] of (['leg', 'arm'] as const).entries()) {
+      const { y, z } = LIMBS[p];
+      for (const [side, sign] of [
+        [0, 1],
+        [1, -1],
+      ]) {
+        this.limb.makeRotationAxis(Z, angles[k] * sign).setPosition(0, y, z[side]);
+        f[p].setMatrixAt(w * 2 + side, this.limb.premultiply(this.matrix));
+        f[p].setColorAt(w * 2 + side, p === 'leg' ? trousersOf(agent) : shirt);
+      }
     }
   }
+}
+
+function finish(mesh: THREE.InstancedMesh | undefined, count: number) {
+  if (!mesh) return;
+  mesh.count = count;
+  mesh.instanceMatrix.needsUpdate = true;
+  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
 }

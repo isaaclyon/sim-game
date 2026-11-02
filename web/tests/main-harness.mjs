@@ -41,6 +41,7 @@ export async function tools() {
       'follow',
       'inspector-close',
       'sound',
+      'traffic',
     ].map((id) => [id, element()]),
   );
   const zoneButtons = Object.values(Zone).map((zone) => ({
@@ -118,6 +119,11 @@ export async function tools() {
       cars.drawnSelected.push(selected);
     }
     drawSignals() {}
+    trafficView = false;
+    toggleTrafficView() {
+      this.trafficView = !this.trafficView;
+      return this.trafficView;
+    }
     setBuildings() {}
     listener() {
       return { x: 1, y: 2, distance: 300 };

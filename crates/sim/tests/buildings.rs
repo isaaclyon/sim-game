@@ -28,7 +28,7 @@ fn advance(w: &mut World, seconds: u32) {
 
 fn snapshot(w: &World) -> Vec<f32> {
     let mut out = Vec::new();
-    w.buildings.write_snapshot(&mut out);
+    w.buildings.write_snapshot(&w.lots, &mut out);
     out
 }
 
@@ -80,6 +80,38 @@ fn all_six_uses_grow_with_their_own_height_and_footprint() {
             assert!(ring.len() >= 4);
             assert!(ring.iter().all(|p| p.0.is_finite() && p.1.is_finite()));
         }
+    }
+}
+
+#[test]
+fn snapshot_front_edge_faces_the_lot_road() {
+    for zone in [
+        Zone::ResidentialLow,
+        Zone::CommercialHigh,
+        Zone::IndustrialLow,
+    ] {
+        let mut w = town(zone);
+        advance(&mut w, 61);
+        let data = snapshot(&w);
+        let mut i = 0;
+        for id in w.buildings.active_buildings() {
+            let (front, n) = (data[i + 3] as usize, data[i + 4] as usize);
+            assert_eq!(n, w.buildings.footprint(id).len());
+            assert!(front < n);
+            let at = |k: usize| (data[i + 5 + 2 * (k % n)], data[i + 6 + 2 * (k % n)]);
+            let ((ax, ay), (bx, by)) = (at(front), at(front + 1));
+            let len = (bx - ax).hypot(by - ay);
+            // Counter-clockwise rings: the outward normal is the edge turned clockwise.
+            let normal = ((by - ay) / len, -(bx - ax) / len);
+            let lot = w.buildings.lot[id as usize] as usize;
+            let facing = (w.lots.facing_x[lot], w.lots.facing_y[lot]);
+            assert!(
+                normal.0 * facing.0 + normal.1 * facing.1 > 0.7,
+                "{zone:?} front edge faces its road"
+            );
+            i += 5 + 2 * n;
+        }
+        assert_eq!(i, data.len());
     }
 }
 

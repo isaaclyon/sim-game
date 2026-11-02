@@ -21,3 +21,13 @@ test('N turns ambient sound on and off', async () => {
   t.key('n', { repeat: true });
   assert.equal(t.sound.toggles, 2, 'holding N does not flicker the sound');
 });
+
+test('T switches cars between paint and traffic colours', async () => {
+  const t = await tools();
+  t.key('t');
+  assert.equal(t.elements.traffic.attributes['aria-pressed'], 'true');
+  t.key('T');
+  assert.equal(t.elements.traffic.attributes['aria-pressed'], 'false');
+  t.elements.traffic.onclick();
+  assert.equal(t.elements.traffic.attributes['aria-pressed'], 'true', 'the button does the same');
+});

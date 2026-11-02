@@ -189,9 +189,12 @@ impl Sim {
         self.world.buildings.version
     }
 
-    /// `[zone, height, roof, n, x0, y0, …]` per active building; footprint points are counter-clockwise.
+    /// `[zone, height, roof, front, n, x0, y0, …]` per active building; footprint points are
+    /// counter-clockwise and `front` is the edge facing the lot's road.
     pub fn building_snapshot(&mut self) -> Vec<f32> {
-        self.world.buildings.write_snapshot(&mut self.buf);
+        self.world
+            .buildings
+            .write_snapshot(&self.world.lots, &mut self.buf);
         self.buf.clone()
     }
 

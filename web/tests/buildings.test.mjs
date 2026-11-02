@@ -7,7 +7,7 @@ import { initSync, Sim } from '../src/pkg/sim_wasm.js';
 
 initSync({ module: readFileSync(new URL('../src/pkg/sim_wasm_bg.wasm', import.meta.url)) });
 
-test('WASM sends sim-owned building footprints, heights and original zones', () => {
+test('WASM sends sim-owned building footprints, fronts, heights and original zones', () => {
   const s = new Sim(1, 3, 3);
   assert.equal(s.building_snapshot().length, 0);
   assert.ok(s.fill_block(50, 50, 2));
@@ -19,8 +19,9 @@ test('WASM sends sim-owned building footprints, heights and original zones', () 
     assert.equal(data[i], 2);
     assert.ok(data[i + 1] >= 12);
     assert.equal(data[i + 2], 0, 'non-industrial roofs keep their original palette');
-    assert.ok(data[i + 3] >= 3);
-    i += 4 + 2 * data[i + 3];
+    assert.ok(data[i + 3] < data[i + 4], 'the front is one of the footprint edges');
+    assert.ok(data[i + 4] >= 3);
+    i += 5 + 2 * data[i + 4];
   }
   assert.equal(i, data.length);
   const version = s.buildings_version();
@@ -47,8 +48,8 @@ test('industrial snapshots carry varied roofs and halls until repainting replace
     assert.ok(data[i + 2] >= 0 && data[i + 2] <= 3);
     roofs.add(data[i + 2]);
     heights.add(data[i + 1]);
-    assert.equal(data[i + 3], 4, 'industrial halls stay rectangular');
-    i += 4 + 2 * data[i + 3];
+    assert.equal(data[i + 4], 4, 'industrial halls stay rectangular');
+    i += 5 + 2 * data[i + 4];
   }
   assert.equal(i, data.length);
   assert.ok(roofs.size > 1);
@@ -61,7 +62,7 @@ test('industrial snapshots carry varied roofs and halls until repainting replace
   const after = s.building_snapshot();
   for (let j = 0; j < after.length; ) {
     zones.add(after[j]);
-    j += 4 + 2 * after[j + 3];
+    j += 5 + 2 * after[j + 4];
   }
   assert.deepEqual([...zones], [1]);
   s.free();
