@@ -117,6 +117,12 @@ export interface Citizen {
   driving: boolean;
 }
 
+export interface Demand {
+  residential: number;
+  commercial: number;
+  industrial: number;
+}
+
 export interface Stats {
   tick: number;
   /** Day clock from the sim (`sim::clock`): 1-based day and seconds since midnight. */
@@ -128,6 +134,9 @@ export interface Stats {
   unemployed: number;
   /** Sim-computed `unemployed` as a percentage of `population`; 0 with no residents. */
   unemploymentPercent: number;
+  /** R/C/I demand from the sim, in people (ADR 0024). A zoned lot builds only while its use
+   *  is positive; negative is a surplus. */
+  demand: Demand;
   /** Allocated vehicle slots, including dormant reservations and departed citizens' slots. */
   agents: number;
   /** Synthetic vehicles waiting between trips; not residents at home or dormant slots. */

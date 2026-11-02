@@ -81,6 +81,11 @@ function readStats(s: Sim): Stats {
     population: st.population,
     unemployed: st.unemployed,
     unemploymentPercent: st.unemployment_percent,
+    demand: {
+      residential: st.demand_residential,
+      commercial: st.demand_commercial,
+      industrial: st.demand_industrial,
+    },
     parked: st.parked,
     awaitingPath: st.awaiting_path,
     entering: st.entering,

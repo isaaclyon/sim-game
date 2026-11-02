@@ -27,6 +27,10 @@ export async function tools() {
   const elements = Object.fromEntries(
     [
       'hud',
+      'demand',
+      'demand-residential',
+      'demand-commercial',
+      'demand-industrial',
       'road',
       'curve',
       'main-road',
@@ -160,25 +164,31 @@ export async function tools() {
     stripTypeScriptTypes(readFileSync(new URL('../src/inspector.ts', import.meta.url), 'utf8')),
     { context },
   );
+  const demandMeter = new SourceTextModule(
+    stripTypeScriptTypes(readFileSync(new URL('../src/demand-meter.ts', import.meta.url), 'utf8')),
+    { context },
+  );
   await module.link((specifier) =>
     specifier === './inspector'
       ? inspector
-      : specifier === './protocol'
-        ? new SyntheticModule(
-            ['RoadClass', 'Zone'],
-            function () {
-              this.setExport('RoadClass', RoadClass);
-              this.setExport('Zone', Zone);
-            },
-            { context },
-          )
-        : new SyntheticModule(
-            ['Renderer'],
-            function () {
-              this.setExport('Renderer', Renderer);
-            },
-            { context },
-          ),
+      : specifier === './demand-meter'
+        ? demandMeter
+        : specifier === './protocol'
+          ? new SyntheticModule(
+              ['RoadClass', 'Zone'],
+              function () {
+                this.setExport('RoadClass', RoadClass);
+                this.setExport('Zone', Zone);
+              },
+              { context },
+            )
+          : new SyntheticModule(
+              ['Renderer'],
+              function () {
+                this.setExport('Renderer', Renderer);
+              },
+              { context },
+            ),
   );
   await module.evaluate();
   const move = (x, y) => canvas.events.pointermove({ clientX: x, clientY: y });

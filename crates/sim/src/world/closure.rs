@@ -69,6 +69,9 @@ impl World {
                 self.list_vacancies(b as BuildingId, true);
             }
         }
+        for b in 0..self.buildings.active.len() {
+            self.count_supply(b as BuildingId);
+        }
         if started {
             self.release_closing_jobs();
         }
@@ -146,6 +149,7 @@ impl World {
                     self.cfg.dt,
                     self.cfg.seed,
                 );
+                self.count_supply(b);
             }
         }
         if removed {

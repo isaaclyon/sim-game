@@ -78,7 +78,11 @@ impl World {
                 }
             }
         }
+        let first = self.residents.registered;
         self.residents.registered = self.buildings.active.len();
+        for b in first..self.residents.registered {
+            self.count_supply(b as BuildingId);
+        }
     }
 
     pub(in crate::world) fn admit_households(&mut self) {

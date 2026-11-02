@@ -28,7 +28,8 @@ rewriting history; mark the old one `Superseded by NNNN`.
 | [0020](0020-rectangular-industrial-halls.md) | Industrial halls stay rectangular | Accepted |
 | [0021](0021-citizens-households-and-trips.md) | Citizens, households, homes, jobs and trips | Accepted; residents of repainted buildings superseded by 0023 |
 | [0022](0022-citizen-inspection-query.md) | Citizen inspection is a read-only query for one selected citizen | Accepted |
-| [0023](0023-gradual-closure-of-rezoned-buildings.md) | Gradual closure of rezoned buildings | Accepted |
+| [0023](0023-gradual-closure-of-rezoned-buildings.md) | Gradual closure of rezoned buildings | Accepted; replacement growth gated by demand in 0024 |
+| [0024](0024-rci-demand-gates-growth.md) | R/C/I demand gates growth | Accepted |
 
 ADRs are only for decisions that are hard to reverse. See [AGENTS.md](AGENTS.md) for when to
 write one and how.
