@@ -27,10 +27,3 @@ export function ensureInstances(
   scene.add(instances);
   return instances;
 }
-
-/** A box `size` long (x), tall (y) and wide (z), standing on the ground. */
-export function standingBox(size: [number, number, number]): THREE.BufferGeometry {
-  const geom = new THREE.BoxGeometry(...size);
-  geom.translate(0, size[1] / 2, 0);
-  return geom;
-}

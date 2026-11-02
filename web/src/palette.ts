@@ -42,6 +42,8 @@ export const TREES = {
 /** Indexed by `RoadClass`: street, main road, alley. */
 export const ROADS = [0x8c8f95, 0x73777e, 0xaba597];
 export const SIDEWALK = 0xdad5ca;
+/** Lane paint: centre lines and road edge lines, slightly weathered. */
+export const MARKINGS = { centre: 0xe2b443, edge: 0xebe8df };
 
 /** Car tint by speed ratio: stuck → slow → free. */
 export const TRAFFIC = { stuck: 0xe5383b, slow: 0xf2c14e, free: 0x38b26b };

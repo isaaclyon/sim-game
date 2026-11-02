@@ -11,7 +11,7 @@
 // - Roads share one static mesh, rebuilt only when the road snapshot changes.
 // - Ground, water, fields and trees are decoration from `scenery/`, never sim state.
 // - Flat layers share y = 0 without depth writes. Ground draws first; the zone overlay, lots,
-//   sidewalks and roads draw in the transparent pass, after buildings and cars, in that order.
+//   sidewalks, roads and lane paint draw in the transparent pass, after buildings and cars, in that order.
 // - Curve sampling belongs to the sim.
 
 import CameraControls from 'camera-controls';
@@ -21,24 +21,16 @@ import type { Listener } from './ambience';
 import { BuildingLayer } from './building-kit/layer.ts';
 import { followPoint, KeyCamera } from './camera';
 import { carPosition, nearestCar } from './car-pick';
-import { ensureInstances, standingBox } from './instances';
 import { LIGHT, ROADS, SIDEWALK, SKY } from './palette';
 import { buildRoadGeometry } from './road-geometry';
+import { buildRoadMarkings } from './road-markings.ts';
 import { createSimScene } from './scene';
 import { Scenery } from './scenery/index.ts';
+import { SignalLayer } from './signal-layer.ts';
 import { ZoneOverlay } from './zone-overlay';
 
 CameraControls.install({ THREE });
 
-const SIGNAL_STRIDE = 4;
-/** Indexed by signal state: red, green, protected-left green. */
-const SIGNAL_COLORS = [
-  new THREE.Color(0xe5484d),
-  new THREE.Color(0x46c46e),
-  new THREE.Color(0x3fb8e8),
-];
-const SIGNAL_SIZE = 1.5;
-const SIGNAL_HEIGHT = 4;
 const ROAD_COLORS = ROADS.map((c) => new THREE.Color(c));
 const SIDEWALK_WIDTH = 2;
 const PREVIEW_COLOR = new THREE.Color(0x4a8bd0);
@@ -61,20 +53,17 @@ export class Renderer {
   private readonly clock = new THREE.Clock();
   private roads?: THREE.Mesh;
   private sidewalks?: THREE.Mesh;
+  private markings?: THREE.Mesh;
   private readonly buildings = new BuildingLayer(
     new THREE.MeshLambertMaterial({ vertexColors: true }),
   );
   private readonly scenery = new Scenery();
   private readonly overlay = new ZoneOverlay();
   private readonly agents = new AgentLayer(this.scene);
-  private signals?: THREE.InstancedMesh;
+  private readonly signals = new SignalLayer(this.scene);
   private readonly preview: THREE.Line;
   private readonly markers: THREE.Points;
   private readonly zoneDrag: THREE.LineLoop;
-  private readonly matrix = new THREE.Matrix4();
-  private readonly quat = new THREE.Quaternion();
-  private readonly pos = new THREE.Vector3();
-  private readonly scale = new THREE.Vector3(1, 1, 1);
   private readonly up = new THREE.Vector3(0, 1, 0);
   private readonly look = new THREE.Vector3();
   /** Called when a mouse or touch drag pans the camera, so follow can let go. */
@@ -154,6 +143,12 @@ export class Renderer {
       new THREE.MeshBasicMaterial({ vertexColors: true }),
       4,
     );
+    this.markings = this.flatLayer(
+      this.markings,
+      buildRoadMarkings(segments),
+      new THREE.MeshBasicMaterial({ vertexColors: true }),
+      5,
+    );
     this.scenery.setRoads(segments);
 
     if (fitCamera) {
@@ -202,30 +197,9 @@ export class Renderer {
     this.buildings.update(data);
   }
 
-  /** `signals` is `[x, y, heading, state]` per signalised approach, at its stop line. */
+  /** `signals` is `[x, y, heading, state]` per signalised approach; see `SignalLayer`. */
   drawSignals(signals: Float32Array) {
-    const count = signals.length / SIGNAL_STRIDE;
-    const material = this.signals
-      ? (this.signals.material as THREE.Material)
-      : new THREE.MeshBasicMaterial();
-    this.signals = ensureInstances(
-      this.scene,
-      this.signals,
-      count,
-      () => standingBox([SIGNAL_SIZE, SIGNAL_HEIGHT, SIGNAL_SIZE]),
-      material,
-    );
-    this.quat.identity();
-    for (let i = 0; i < count; i++) {
-      const o = i * SIGNAL_STRIDE;
-      this.pos.set(signals[o], 0, signals[o + 1]);
-      this.matrix.compose(this.pos, this.quat, this.scale);
-      this.signals.setMatrixAt(i, this.matrix);
-      this.signals.setColorAt(i, SIGNAL_COLORS[signals[o + 3]] ?? SIGNAL_COLORS[0]);
-    }
-    this.signals.count = count;
-    this.signals.instanceMatrix.needsUpdate = true;
-    if (this.signals.instanceColor) this.signals.instanceColor.needsUpdate = true;
+    this.signals.draw(signals);
   }
 
   /** Draws cars and walkers between two snapshots; see `AgentLayer.draw`. */

@@ -30,6 +30,10 @@ affect play yet, and later eras (village, town) need to restyle buildings withou
   show paint by default; a traffic view (T) tints them by speed instead. Walkers swing their
   legs by distance moved, so they stand still while waiting or paused. Freight trucks that are
   longer or slower would be sim-owned and need their own ADR.
+- Lane paint follows road class from the roads snapshot: main roads get a double solid yellow
+  centre line and white edge lines, streets a dashed yellow centre line, alleys none. Paint
+  stops at junctions where three or more segments meet. Traffic signals draw as mast arms
+  from the signals snapshot, with the lamps its state calls for lit. Both are display only.
 
 ## Consequences
 

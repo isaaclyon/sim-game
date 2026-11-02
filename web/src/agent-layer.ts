@@ -20,7 +20,10 @@ export class AgentLayer {
   private readonly bodies: (THREE.InstancedMesh | undefined)[] = [];
   private readonly trims: (THREE.InstancedMesh | undefined)[] = [];
   private readonly figure: Partial<Record<Part, THREE.InstancedMesh>> = {};
-  private readonly material = new THREE.MeshLambertMaterial({ flatShading: true });
+  private readonly material = new THREE.MeshLambertMaterial({
+    vertexColors: true,
+    flatShading: true,
+  });
   private readonly matrix = new THREE.Matrix4();
   private readonly limb = new THREE.Matrix4();
   private readonly quat = new THREE.Quaternion();
