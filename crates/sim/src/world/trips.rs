@@ -37,9 +37,9 @@ impl World {
         true
     }
 
-    /// Removes cars whose remaining route uses a lane of `roads`, just split or deleted.
-    /// They wait and start a new trip, like a stuck despawn. Junction reservations are left
-    /// to expire; both splits and tombstones keep the headings those reservations use.
+    /// Removes cars and walkers whose remaining route uses a lane of `roads`, just split or
+    /// deleted. They wait and start a new trip, like a stuck despawn. Junction reservations
+    /// are left to expire; both splits and tombstones keep the headings those reservations use.
     pub(super) fn remove_cars_using(&mut self, roads: &[RoadId]) {
         if roads.is_empty() {
             return;
@@ -49,8 +49,10 @@ impl World {
             let a = agent as usize;
             let state = self.agents.state[a];
             // Only cars with a current route; a parked car's old route is stale.
-            if !matches!(state, AgentState::Driving | AgentState::Entering)
-                || !uses(&self.agents.path[a][self.agents.path_idx[a] as usize..])
+            if !matches!(
+                state,
+                AgentState::Driving | AgentState::Entering | AgentState::Walking
+            ) || !uses(&self.agents.path[a][self.agents.path_idx[a] as usize..])
             {
                 continue;
             }
@@ -60,12 +62,16 @@ impl World {
                 self.agents.node[a] = self.roads.lane_to[lane];
                 self.agents.cleared[a] = false;
             }
-            self.totals.despawned_by_edit += 1;
+            if state != AgentState::Walking {
+                self.totals.despawned_by_edit += 1;
+            }
             self.park(agent, RETRY_AFTER_S);
         }
         let state = &self.agents.state;
         self.entering
             .retain(|&agent| state[agent as usize] == AgentState::Entering);
+        self.walking
+            .retain(|&agent| state[agent as usize] == AgentState::Walking);
     }
 
     pub(super) fn secs_to_ticks(&self, secs: f32) -> u64 {
@@ -110,6 +116,16 @@ impl World {
             // rather than routing from stale junctions retained in the vehicle slot.
             if let Some(c) = self.agents.citizen[a] {
                 let i = c as usize;
+                if !self.citizens.car_out[i] {
+                    if self.plan_walk(agent, c) {
+                        self.totals.paths_found += 1;
+                        self.walking.push(agent);
+                    } else {
+                        self.totals.paths_failed += 1;
+                        self.retry_citizen_trip(c);
+                    }
+                    continue;
+                }
                 let from = self.building_node(self.citizens.location[i]);
                 let to = self.citizens.destination[i].and_then(|b| self.building_node(b));
                 let (Some(from), Some(to)) = (from, to) else {

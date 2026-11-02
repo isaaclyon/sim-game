@@ -20,7 +20,7 @@ export function describe(c: Citizen): string {
   ];
   const now = !c.destination
     ? stay[c.activity]
-    : `${c.driving ? 'driving' : 'waiting to drive'} ${trip[c.activity]}`;
+    : `${c.onFoot ? 'walking' : c.driving ? 'driving' : 'waiting to drive'} ${trip[c.activity]}`;
   return [
     c.name,
     `home   ${c.home ? label(c.home) : 'none'}`,

@@ -25,6 +25,7 @@ fn same_junction_arrives_without_allocating_car_or_failing_path() {
 fn route_failure_waits_and_retries_without_arrival_or_losing_job() {
     let mut w = town();
     isolate(&mut w);
+    driver(&mut w, 0);
     let home = w.home_building(0);
     let target = distant(&w, 0);
     assign_job(&mut w, 0, target);
@@ -48,6 +49,7 @@ fn route_failure_waits_and_retries_without_arrival_or_losing_job() {
 fn road_invalidation_recovers_last_activity_and_reuses_same_identity() {
     let mut w = town();
     isolate(&mut w);
+    driver(&mut w, 0);
     let home = w.home_building(0);
     let target = distant(&w, 0);
     journey(&mut w, 0, target, Activity::Work);
@@ -79,6 +81,7 @@ fn road_invalidation_recovers_last_activity_and_reuses_same_identity() {
 fn deferred_path_request_uses_current_access_and_does_not_fake_arrival() {
     let mut w = town();
     isolate(&mut w);
+    driver(&mut w, 0);
     let target = distant(&w, 0);
     journey(&mut w, 0, target, Activity::Work);
     let a = w.citizens.agent[0].unwrap() as usize;
@@ -96,6 +99,7 @@ fn deferred_path_request_uses_current_access_and_does_not_fake_arrival() {
 fn stuck_safety_valve_recovers_without_arrival() {
     let mut w = town();
     isolate(&mut w);
+    driver(&mut w, 0);
     let home = w.home_building(0);
     let target = w
         .buildings
@@ -127,6 +131,7 @@ fn stuck_safety_valve_recovers_without_arrival() {
 fn arrival_starts_duration_and_only_then_changes_location() {
     let mut w = town();
     isolate(&mut w);
+    driver(&mut w, 0);
     let home = w.home_building(0);
     let target = distant(&w, 0);
     journey(&mut w, 0, target, Activity::Work);

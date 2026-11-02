@@ -15,6 +15,7 @@ const resident = {
   destination: { building: 40, zone: Zone.IndustrialLow },
   agent: 3,
   driving: true,
+  onFoot: false,
 };
 const inspects = (t) => t.messages.filter((m) => m.type === 'inspect');
 /** Clicks car `agent` in idle mode and answers as the worker would. */
@@ -41,6 +42,8 @@ const showCars = (t) =>
       demand: { residential: 0, commercial: 0, industrial: 0 },
       driving: 0,
       parked: 0,
+      walking: 0,
+      walksCompleted: 0,
       tripsCompleted: 0,
       despawnedStuck: 0,
       pathsFailed: 0,
@@ -75,6 +78,7 @@ test('the panel tells the truth about each state', async () => {
     return panel(t);
   };
   assert.match(show({ job: null }), /job +unemployed/);
+  assert.match(show({ driving: false, onFoot: true }), /now +walking to work at factory #40/);
   assert.match(
     show({ driving: false }),
     /now +waiting to drive to work at factory #40/,

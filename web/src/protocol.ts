@@ -52,7 +52,8 @@ export type ToWorker =
   /** Asks where a road started here would start. Answered with a one-stop `roadPreview`. */
   | { type: 'previewSnap'; revision: number; x: number; y: number }
   /**
-   * Selects the resident who owns car `agent` (an index into the `frame` agents snapshot) for
+   * Selects the resident who owns agent `agent` (a car or walker, an index into the `frame`
+   * agents snapshot) for
    * the citizen inspector, or clears the selection with null (ADR 0022). The worker keeps the
    * citizen, not the car slot. Answered with `citizen` at once, paused or not, then after every
    * frame and edit while selected. `selection` is echoed so replies to an older one are dropped.
@@ -88,6 +89,15 @@ export const Activity = {
 } as const;
 export type Activity = (typeof Activity)[keyof typeof Activity];
 
+/** Floats per agent in the `frame` agents snapshot. */
+export const AGENT_STRIDE = 5;
+/** The `kind` field of an agent snapshot entry (ADR 0026). */
+export const AgentKind = {
+  Car: 0,
+  Walker: 1,
+} as const;
+export type AgentKind = (typeof AgentKind)[keyof typeof AgentKind];
+
 /** A building, named by its ID and original use. */
 export interface Place {
   building: number;
@@ -111,10 +121,12 @@ export interface Citizen {
   location: Place | null;
   /** Where the current trip goes; null while staying put. */
   destination: Place | null;
-  /** The citizen's own car: an index into `frame` agents; never reassigned to anyone else. */
+  /** The citizen's own travel slot: an index into `frame` agents; never reassigned. */
   agent: number | null;
   /** On a road now, so the car is drawn. */
   driving: boolean;
+  /** The current trip is on foot (ADR 0026); the walker is drawn once it sets off. */
+  onFoot: boolean;
 }
 
 export interface Demand {
@@ -137,14 +149,19 @@ export interface Stats {
   /** R/C/I demand from the sim, in people (ADR 0025). A zoned lot builds only while its use
    *  is positive; negative is a surplus. */
   demand: Demand;
-  /** Allocated vehicle slots, including dormant reservations and departed citizens' slots. */
+  /** Allocated travel slots, including dormant reservations and departed citizens' slots. */
   agents: number;
   /** Synthetic vehicles waiting between trips; not residents at home or dormant slots. */
   parked: number;
   awaitingPath: number;
   entering: number;
   driving: number;
+  /** Citizens on foot now. */
+  walking: number;
+  /** Includes walks. */
   tripsCompleted: number;
+  /** Trips made on foot (ADR 0026). */
+  walksCompleted: number;
   pathsFailed: number;
   despawnedStuck: number;
   /** Cars removed because a road on their remaining route was split or deleted. */
@@ -190,13 +207,14 @@ export type FromWorker =
   | { type: 'buildResult'; id: number; success: boolean }
   /** Selected road's `[x, y]` centreline samples, or empty on a miss. Sim-owned hit testing. */
   | { type: 'bulldozePreview'; segment: Float32Array; revision: number }
+  /** The inspected citizen, or null if the selected agent has no resident. Answers `inspect`. */
+  | { type: 'citizen'; selection: number; citizen: Citizen | null }
   /**
-   * `agents` is `[x, y, heading, speedRatio]` per agent id; speedRatio < 0 means hidden.
+   * `agents` is `[x, y, heading, speedRatio, kind]` per agent id (`AGENT_STRIDE`); speedRatio
+   * < 0 means hidden; kind is an `AgentKind` (ADR 0026).
    * `signals` is `[x, y, heading, state]` per signalised approach, at its stop line; state is
    * 0 = red, 1 = green, 2 = protected-left green.
    */
-  /** The inspected citizen, or null if the selected car has no resident. Answers `inspect`. */
-  | { type: 'citizen'; selection: number; citizen: Citizen | null }
   | {
       type: 'frame';
       agents: Float32Array;

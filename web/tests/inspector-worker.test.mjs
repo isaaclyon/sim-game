@@ -1,16 +1,18 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { AgentKind, AGENT_STRIDE as STRIDE } from '../src/protocol.ts';
 import { worker } from './worker-harness.mjs';
 
-const STRIDE = 4;
 const frame = (w) => w.messages.findLast((msg) => msg.type === 'frame');
 const replies = (w) => w.messages.filter((msg) => msg.type === 'citizen');
-/** Index of a car drawn in the latest frame, which is its agent id. */
-function visibleCar(w) {
+/** Index of an agent of `kind` drawn in the latest frame, which is its agent id. */
+function visible(w, kind) {
   const { agents } = frame(w);
-  for (let i = 0; i < agents.length / STRIDE; i++) if (agents[i * STRIDE + 3] >= 0) return i;
+  for (let i = 0; i < agents.length / STRIDE; i++)
+    if (agents[i * STRIDE + 3] >= 0 && agents[i * STRIDE + 4] === kind) return i;
   return -1;
 }
+const visibleCar = (w) => visible(w, AgentKind.Car);
 
 /** Homes, shops and industry in every block, run until a resident's car is on the road. */
 async function town() {
@@ -57,6 +59,21 @@ test('selecting a car answers at once with its resident, and keeps answering whi
   const count = replies(w).length;
   for (let i = 0; i < 50; i++) w.advance(101);
   assert.equal(replies(w).length, count, 'nothing is streamed without a selection');
+});
+
+test('selecting a walker shows a resident on foot (ADR 0026)', async () => {
+  const w = await town();
+  for (let i = 0; i < 20000 && visible(w, AgentKind.Walker) < 0; i++) w.advance(101);
+  const agent = visible(w, AgentKind.Walker);
+  assert.ok(agent >= 0, 'a resident walks');
+  await w.send({ type: 'inspect', agent, selection: 4 });
+  const c = w.messages.at(-1).citizen;
+  assert.equal(c.agent, agent);
+  assert.equal(c.onFoot, true);
+  assert.equal(c.driving, false, 'walkers are not cars');
+  assert.ok(c.destination, 'walking somewhere');
+  const { stats } = frame(w);
+  assert.ok(stats.walking > 0);
 });
 
 test('a paused sim still answers selections and edits', async () => {

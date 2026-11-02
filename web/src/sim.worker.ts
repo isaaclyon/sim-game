@@ -90,7 +90,9 @@ function readStats(s: Sim): Stats {
     awaitingPath: st.awaiting_path,
     entering: st.entering,
     driving: st.driving,
+    walking: st.walking,
     tripsCompleted: st.trips_completed,
+    walksCompleted: st.walks_completed,
     pathsFailed: st.paths_failed,
     despawnedStuck: st.despawned_stuck,
     despawnedByEdit: st.despawned_by_edit,
@@ -130,6 +132,7 @@ function sendCitizen(s: Sim) {
       destination: place(v.destination, v.destination_zone),
       agent: v.agent ?? null,
       driving: v.driving,
+      onFoot: v.on_foot,
     };
     v.free();
   }

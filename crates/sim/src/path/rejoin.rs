@@ -37,6 +37,7 @@ impl Pathfinder {
             net,
             delay,
             driver: None,
+            walk: false,
         };
         self.begin(net.node_count());
         if self.route_stamp.len() < net.node_count() {

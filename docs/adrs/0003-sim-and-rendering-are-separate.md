@@ -1,6 +1,6 @@
 # 0003. Sim and rendering are separate: commands in, snapshots out
 
-- Status: Superseded by [0015](0015-curved-road-snapshots.md) for road snapshot cardinality and by [0017](0017-road-classes-and-main-road-routing.md) for the road speed field; all other decisions remain accepted
+- Status: Superseded by [0015](0015-curved-road-snapshots.md) for road snapshot cardinality and by [0017](0017-road-classes-and-main-road-routing.md) for the road speed field, and by [0026](0026-walking-trips-and-household-cars.md) for the agent format; all other decisions remain accepted
 - Date: 2026-10-30
 
 ## Context

@@ -7,6 +7,15 @@ pub type CitizenId = u32;
 pub type HouseholdId = u32;
 pub type HomeId = u32;
 
+/// Chance, in percent, that an adult brings a car of their own when moving in (ADR 0026).
+pub const CAR_OWNERSHIP_PERCENT: u32 = 85;
+/// Straight-line walking limits, metres: car owners walk below theirs, and adults without a
+/// car reach no further than theirs. Drawn per person.
+const OWNER_WALK_M: (f32, f32) = (100.0, 400.0);
+const CARLESS_WALK_M: (f32, f32) = (500.0, 1500.0);
+/// Walking speeds, m/s, drawn per person.
+const WALK_SPEED: (f32, f32) = (1.2, 1.6);
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Activity {
     Home,
@@ -31,6 +40,15 @@ pub struct Citizens {
     pub departure: Vec<u32>,
     /// Sim seconds, counted from arrival.
     pub work_duration: Vec<u32>,
+    /// Owns one car, used by nobody else (ADR 0026).
+    pub owns_car: Vec<bool>,
+    /// The car is out with its owner on this round trip; otherwise it is parked at home.
+    /// Trips drive while it is out and walk otherwise.
+    pub car_out: Vec<bool>,
+    /// Straight-line walking limit, metres.
+    pub walk_limit: Vec<f32>,
+    /// Metres per second on foot.
+    pub walk_speed: Vec<f32>,
 }
 impl Citizens {
     pub(crate) fn push(
@@ -52,6 +70,16 @@ impl Citizens {
         self.departure.push(7 * 3600 + rng.below(2 * 3600));
         self.work_duration
             .push((6 * 3600 + rng.below(3 * 3600)) / 6);
+        let owns_car = rng.below(100) < CAR_OWNERSHIP_PERCENT;
+        let (lo, hi) = if owns_car {
+            OWNER_WALK_M
+        } else {
+            CARLESS_WALK_M
+        };
+        self.owns_car.push(owns_car);
+        self.car_out.push(false);
+        self.walk_limit.push(rng.range(lo, hi));
+        self.walk_speed.push(rng.range(WALK_SPEED.0, WALK_SPEED.1));
         id
     }
 }

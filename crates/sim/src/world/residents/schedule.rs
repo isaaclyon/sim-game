@@ -112,6 +112,17 @@ impl World {
         let Some(destination) = self.citizens.destination[i] else {
             return;
         };
+        if destination == self.citizens.location[i] {
+            self.totals.trips_completed += 1;
+            self.citizen_arrived(c);
+            return;
+        }
+        // The mode is chosen leaving home and kept until home again, so the car comes back.
+        let home = self.home_building(c);
+        if self.citizens.location[i] == home {
+            self.citizens.car_out[i] = self.citizens.owns_car[i]
+                && self.front_distance(home, destination) > self.citizens.walk_limit[i];
+        }
         let (Some(from), Some(to)) = (
             self.building_node(self.citizens.location[i]),
             self.building_node(destination),
@@ -119,7 +130,7 @@ impl World {
             self.schedule_activity(c, 30.0);
             return;
         };
-        if from == to {
+        if from == to && self.citizens.car_out[i] {
             self.totals.trips_completed += 1;
             self.citizen_arrived(c);
             return;
@@ -150,7 +161,10 @@ impl World {
             self.agents.state[a as usize] = AgentState::Dormant;
         }
         match self.citizens.activity[i] {
-            Activity::Home => self.schedule_day(c),
+            Activity::Home => {
+                self.citizens.car_out[i] = false;
+                self.schedule_day(c);
+            }
             Activity::Work => self.schedule_activity(c, self.citizens.work_duration[i] as f32),
             Activity::Shop => {
                 let seconds = 60 + self.residents.rng.below(241);

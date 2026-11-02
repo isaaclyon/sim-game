@@ -8,7 +8,7 @@ rewriting history; mark the old one `Superseded by NNNN`.
 |---|---|---|
 | [0001](0001-record-architecture-decisions.md) | Record architecture decisions | Accepted |
 | [0002](0002-rust-sim-with-browser-frontend.md) | Rust sim compiled to WASM, browser frontend | Accepted |
-| [0003](0003-sim-and-rendering-are-separate.md) | Sim and rendering are separate: commands in, snapshots out | Road snapshot cardinality superseded by 0015, its speed field by 0017; otherwise accepted |
+| [0003](0003-sim-and-rendering-are-separate.md) | Sim and rendering are separate: commands in, snapshots out | Road snapshot cardinality superseded by 0015, its speed field by 0017; agent format by 0026; otherwise accepted |
 | [0004](0004-deterministic-fixed-timestep-sim.md) | Deterministic fixed-timestep sim | Accepted |
 | [0005](0005-data-oriented-storage.md) | Data-oriented storage with append-only ids | Accepted; agent removal completed by 0021 |
 | [0006](0006-agents-pathfinding-and-traffic-model.md) | Agents, pathfinding and traffic model | Accepted; pathfinding superseded by 0010; citizen lifecycle and recovery by 0021 |
@@ -26,11 +26,12 @@ rewriting history; mark the old one `Superseded by NNNN`.
 | [0018](0018-lots-cut-along-roads.md) | Lots are shapes cut along roads; buildings take their shape from lots | Industrial frontage and buildings superseded by 0019; otherwise accepted |
 | [0019](0019-industrial-lot-variety.md) | Industrial lots combine neighbouring frontage strips | Industrial footprint fallback superseded by 0020; otherwise accepted |
 | [0020](0020-rectangular-industrial-halls.md) | Industrial halls stay rectangular | Accepted |
-| [0021](0021-citizens-households-and-trips.md) | Citizens, households, homes, jobs and trips | Accepted; residents of repainted buildings superseded by 0023 |
-| [0022](0022-citizen-inspection-query.md) | Citizen inspection is a read-only query for one selected citizen | Accepted |
+| [0021](0021-citizens-households-and-trips.md) | Citizens, households, homes, jobs and trips | Accepted; residents of repainted buildings superseded by 0023; walking and travel slots by 0026 |
+| [0022](0022-citizen-inspection-query.md) | Citizen inspection is a read-only query for one selected citizen | Accepted; pedestrian picking superseded by 0026 |
 | [0023](0023-gradual-closure-of-rezoned-buildings.md) | Gradual closure of rezoned buildings | Accepted; replacement growth gated by demand in 0025 |
 | [0024](0024-per-driver-route-noise.md) | Per-driver route noise | Accepted |
 | [0025](0025-rci-demand-gates-growth.md) | R/C/I demand gates growth | Accepted |
+| [0026](0026-walking-trips-and-household-cars.md) | Walking trips and household cars | Accepted |
 
 ADRs are only for decisions that are hard to reverse. See [AGENTS.md](AGENTS.md) for when to
 write one and how.

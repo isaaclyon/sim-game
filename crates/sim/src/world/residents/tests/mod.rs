@@ -8,6 +8,7 @@ mod employment;
 mod occupancy;
 mod schedules;
 mod trips;
+mod walking;
 
 fn advance(w: &mut World, seconds: u32) {
     for _ in 0..seconds * 10 {
@@ -50,6 +51,16 @@ fn assign_job(w: &mut World, c: u32, b: u32) {
     w.residents.employed += 1;
     let assigned = w.citizens.job.iter().filter(|j| j.is_some()).count() as u32;
     assert_eq!(w.residents.employed, assigned);
+}
+/// Makes citizen `c` an owner who drives every trip that starts from home.
+fn driver(w: &mut World, c: u32) {
+    w.citizens.owns_car[c as usize] = true;
+    w.citizens.walk_limit[c as usize] = 0.0;
+}
+/// Makes citizen `c` walk every trip, with no car and no practical limit.
+fn walker(w: &mut World, c: u32) {
+    w.citizens.owns_car[c as usize] = false;
+    w.citizens.walk_limit[c as usize] = 1e6;
 }
 fn journey(w: &mut World, c: u32, b: u32, activity: Activity) {
     w.citizens.destination[c as usize] = Some(b);

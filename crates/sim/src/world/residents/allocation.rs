@@ -152,6 +152,7 @@ impl World {
     }
 
     /// Seeded distance preference among reachable options. No route searches for assignments.
+    /// Without a car at hand, only options within walking reach count (ADR 0026).
     pub(in crate::world) fn choose_destination(
         &mut self,
         c: CitizenId,
@@ -163,6 +164,7 @@ impl World {
             self.citizens.location[c as usize]
         };
         let from = self.building_node(origin)?;
+        let reach = self.walk_reach(c, job);
         self.refresh_resident_connectivity();
         let mut best: Option<(f32, BuildingId)> = None;
         for b in 0..self.residents.registered {
@@ -174,7 +176,10 @@ impl World {
                     Zone::CommercialLow | Zone::CommercialHigh
                 )
             };
-            if !eligible || !self.building_accepts_assignments(b as u32) {
+            if !eligible
+                || !self.building_accepts_assignments(b as u32)
+                || reach.is_some_and(|r| self.front_distance(origin, b as u32) > r)
+            {
                 continue;
             }
             let to = self.building_node(b as u32).unwrap();

@@ -30,7 +30,9 @@ pub struct SimStats {
     pub awaiting_path: u32,
     pub entering: u32,
     pub driving: u32,
+    pub walking: u32,
     pub trips_completed: f64,
+    pub walks_completed: f64,
     pub paths_failed: f64,
     pub despawned_stuck: f64,
     pub despawned_by_edit: f64,
@@ -54,6 +56,7 @@ pub struct CitizenView {
     pub destination_zone: Option<u8>,
     pub agent: Option<u32>,
     pub driving: bool,
+    pub on_foot: bool,
 }
 
 #[wasm_bindgen]
@@ -257,10 +260,11 @@ impl Sim {
             destination_zone,
             agent: c.agent,
             driving: c.driving,
+            on_foot: c.on_foot,
         })
     }
 
-    /// `[x, y, heading, speed_ratio]` per agent; see `World::write_agent_snapshot`.
+    /// `[x, y, heading, speed_ratio, kind]` per agent; see `World::write_agent_snapshot`.
     pub fn agent_snapshot(&mut self) -> Vec<f32> {
         self.world.write_agent_snapshot(&mut self.buf);
         self.buf.clone()
@@ -303,7 +307,9 @@ impl Sim {
             awaiting_path: s.awaiting_path,
             entering: s.entering,
             driving: s.driving,
+            walking: s.walking,
             trips_completed: s.trips_completed as f64,
+            walks_completed: s.walks_completed as f64,
             paths_failed: s.paths_failed as f64,
             despawned_stuck: s.despawned_stuck as f64,
             despawned_by_edit: s.despawned_by_edit as f64,

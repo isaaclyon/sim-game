@@ -1,6 +1,6 @@
 # 0022. Citizen inspection is a read-only query for one selected citizen
 
-- Status: Accepted
+- Status: Accepted; pedestrian picking superseded by [0026](0026-walking-trips-and-household-cars.md)
 - Date: 2026-11-01
 
 ## Context

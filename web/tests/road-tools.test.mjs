@@ -18,6 +18,8 @@ test('normal startup has no synthetic traffic and HUD displays authoritative pop
     agents: 9,
     parked: 0,
     driving: 2,
+    walking: 0,
+    walksCompleted: 0,
     tripsCompleted: 0,
     despawnedStuck: 0,
     pathsFailed: 0,

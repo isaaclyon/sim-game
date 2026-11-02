@@ -67,6 +67,24 @@ impl Junctions {
         self.phase[n] = phase;
         self.protected[n] = protected;
         self.elapsed[n] = 0;
+        if !protected {
+            self.walk_call[n] &= !group_bit(phase);
+        }
+    }
+
+    /// Whether a walker on the sidewalk of `lane` may cross at the node it leads to. Walkers
+    /// cross with parallel traffic: at a signal only while `lane`'s own group has a plain
+    /// green. Other junctions never hold walkers, and cars do not yield to them (ADR 0026).
+    pub fn walk_allowed(&self, net: &RoadNetwork, lane: LaneId) -> bool {
+        let n = net.lane_to[lane as usize] as usize;
+        self.control[n] != super::Control::Signal
+            || (self.group[lane as usize] == self.phase[n] && !self.protected[n])
+    }
+
+    /// A walker waits to cross from `lane`: its group calls for a green like a waiting car.
+    pub fn call_walk(&mut self, net: &RoadNetwork, lane: LaneId) {
+        let n = net.lane_to[lane as usize] as usize;
+        self.walk_call[n] |= group_bit(self.group[lane as usize]);
     }
 
     /// Arriving lanes of signal group `group` at `node`.
@@ -93,6 +111,9 @@ impl Junctions {
         group: u8,
         horizon: f32,
     ) -> bool {
+        if self.walk_call[node as usize] & group_bit(group) != 0 {
+            return true;
+        }
         self.group_lanes(net, node, group).any(|lane| {
             traffic.waiting(lane, agents).is_some_and(|b| {
                 (self.stop[lane as usize] - agents.pos[b as usize])
@@ -155,6 +176,12 @@ impl Junctions {
             let n = node as usize;
             mix(self.phase[n] as u64 | (self.protected[n] as u64) << 8);
             mix(self.elapsed[n] as u64);
+            mix(self.walk_call[n] as u64);
         }
     }
+}
+
+/// A signal group's bit in `walk_call`. Nodes with more than 32 approaches share the top bit.
+fn group_bit(group: u8) -> u32 {
+    1 << group.min(31)
 }

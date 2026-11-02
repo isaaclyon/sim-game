@@ -1,11 +1,11 @@
-// Three.js scene: roads as asphalt ribbons and pads, vehicles as one instanced box mesh. Sim (x, y) maps
+// Three.js scene: roads as asphalt ribbons and pads, agents drawn by `AgentLayer`. Sim (x, y) maps
 // to scene-local (x, z), then world (x, -z) with y up (see scene.ts).
 //
 // Current choices, all cheap to change:
 // - WebGLRenderer. WebGPURenderer is still experimental; write new shaders in TSL so switching
 //   later is easy.
 // - camera-controls for the camera (MapControls was cruder at damping, bounds, zoom-to-cursor).
-// - Vehicle matrices are written on the CPU each frame. If that becomes the bottleneck, move
+// - Agent matrices are written on the CPU each frame. If that becomes the bottleneck, move
 //   interpolation and orientation into a vertex shader fed by the raw snapshot.
 // - Picking is a ray against the ground plane. Add three-mesh-bvh once we pick against meshes.
 // - Roads share one static mesh, rebuilt only when the road snapshot changes.
@@ -13,15 +13,16 @@
 
 import CameraControls from 'camera-controls';
 import * as THREE from 'three';
+import { AgentLayer } from './agent-layer';
 import { buildBuildingGeometry } from './building-geometry';
 import { followPoint, KeyCamera } from './camera';
 import { carPosition, nearestCar } from './car-pick';
+import { ensureInstances, standingBox } from './instances';
 import { buildRoadGeometry } from './road-geometry';
 import { createSimScene } from './scene';
 
 CameraControls.install({ THREE });
 
-const STRIDE = 4;
 const SIGNAL_STRIDE = 4;
 /** Indexed by signal state: red, green, protected-left green. */
 const SIGNAL_COLORS = [
@@ -33,10 +34,6 @@ const SIGNAL_SIZE = 1.5;
 const SIGNAL_HEIGHT = 4;
 const BG = 0x0f1419;
 const ASPHALT_COLOR = 0x3a4654;
-const CAR_LENGTH = 4.5;
-const CAR_WIDTH = 2;
-const CAR_HEIGHT = 1.5;
-const SELECTED_CAR_COLOR = new THREE.Color(0xffffff);
 const PREVIEW_COLOR = new THREE.Color(0x4a8bd0);
 const PREVIEW_REFUSED_COLOR = new THREE.Color(0xe5484d);
 /** Snap markers, indexed by join: new end (not drawn), existing node, split road. */
@@ -65,7 +62,7 @@ export class Renderer {
   private readonly clock = new THREE.Clock();
   private roads?: THREE.Mesh;
   private buildings?: THREE.Mesh;
-  private cars?: THREE.InstancedMesh;
+  private readonly agents = new AgentLayer(this.scene);
   private signals?: THREE.InstancedMesh;
   private readonly preview: THREE.Line;
   private readonly markers: THREE.Points;
@@ -77,9 +74,6 @@ export class Renderer {
   private readonly pos = new THREE.Vector3();
   private readonly scale = new THREE.Vector3(1, 1, 1);
   private readonly up = new THREE.Vector3(0, 1, 0);
-  private readonly color = new THREE.Color();
-  /** `[x, y]` per agent id as last drawn, NaN when hidden; reused for picking and follow. */
-  private drawn = new Float32Array();
   private readonly look = new THREE.Vector3();
   /** Called when a mouse or touch drag pans the camera, so follow can let go. */
   onUserPan: (() => void) | null = null;
@@ -186,53 +180,17 @@ export class Renderer {
     }
   }
 
-  /**
-   * Returns `mesh` if it can hold `count` instances, else a bigger replacement box mesh that
-   * reuses `material`. `mesh.count` is how many instances were drawn last frame;
-   * `instanceMatrix.count` is capacity.
-   */
-  private ensureBoxes(
-    mesh: THREE.InstancedMesh | undefined,
-    count: number,
-    size: [number, number, number],
-    material: THREE.Material,
-  ): THREE.InstancedMesh {
-    if (mesh && mesh.instanceMatrix.count >= count) return mesh;
-    if (mesh) {
-      this.scene.remove(mesh);
-      mesh.dispose();
-      mesh.geometry.dispose();
-    }
-    const geom = new THREE.BoxGeometry(...size);
-    geom.translate(0, size[1] / 2, 0);
-    const capacity = Math.ceil(Math.max(count, 1024) * 1.5);
-    const boxes = new THREE.InstancedMesh(geom, material, capacity);
-    boxes.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-    boxes.frustumCulled = false;
-    this.scene.add(boxes);
-    return boxes;
-  }
-
-  private ensureCars(count: number): THREE.InstancedMesh {
-    this.cars = this.ensureBoxes(
-      this.cars,
-      count,
-      [CAR_LENGTH, CAR_HEIGHT, CAR_WIDTH],
-      this.cars ? (this.cars.material as THREE.Material) : new THREE.MeshLambertMaterial(),
-    );
-    return this.cars;
-  }
-
   /** `signals` is `[x, y, heading, state]` per signalised approach, at its stop line. */
   drawSignals(signals: Float32Array) {
     const count = signals.length / SIGNAL_STRIDE;
     const material = this.signals
       ? (this.signals.material as THREE.Material)
       : new THREE.MeshBasicMaterial();
-    this.signals = this.ensureBoxes(
+    this.signals = ensureInstances(
+      this.scene,
       this.signals,
       count,
-      [SIGNAL_SIZE, SIGNAL_HEIGHT, SIGNAL_SIZE],
+      () => standingBox([SIGNAL_SIZE, SIGNAL_HEIGHT, SIGNAL_SIZE]),
       material,
     );
     this.quat.identity();
@@ -248,57 +206,14 @@ export class Renderer {
     if (this.signals.instanceColor) this.signals.instanceColor.needsUpdate = true;
   }
 
-  /**
-   * Draws vehicles interpolated between two snapshots. `t` in [0, 1] blends prev → curr.
-   * Agents hidden in either snapshot snap to the visible one so spawns don't streak. Car
-   * `selected`, an agent id, is drawn white.
-   */
+  /** Draws cars and walkers between two snapshots; see `AgentLayer.draw`. */
   drawAgents(
     prev: Float32Array | undefined,
     curr: Float32Array,
     t: number,
     selected: number | null = null,
   ) {
-    const count = curr.length / STRIDE;
-    const cars = this.ensureCars(count);
-    if (this.drawn.length < count * 2) this.drawn = new Float32Array(count * 3);
-    this.drawn.fill(Number.NaN);
-    let drawn = 0;
-    for (let i = 0; i < count; i++) {
-      const o = i * STRIDE;
-      const ratio = curr[o + 3];
-      if (ratio < 0) continue;
-      let x = curr[o];
-      let y = curr[o + 1];
-      let h = curr[o + 2];
-      if (prev && o + 3 < prev.length && prev[o + 3] >= 0) {
-        const px = prev[o];
-        const py = prev[o + 1];
-        // A big jump means a new trip, not motion; don't slide across the map.
-        if ((x - px) ** 2 + (y - py) ** 2 < 2500) {
-          x = px + (x - px) * t;
-          y = py + (y - py) * t;
-          let dh = h - prev[o + 2];
-          dh = Math.atan2(Math.sin(dh), Math.cos(dh));
-          h = prev[o + 2] + dh * t;
-        }
-      }
-      this.pos.set(x, 0, y);
-      // Local +z holds sim +y, so negate here; the scene reflects all positions and headings.
-      this.quat.setFromAxisAngle(this.up, -h);
-      this.matrix.compose(this.pos, this.quat, this.scale);
-      cars.setMatrixAt(drawn, this.matrix);
-      this.drawn[i * 2] = x;
-      this.drawn[i * 2 + 1] = y;
-      // red (stopped) → yellow → green (at the limit)
-      if (i === selected) this.color.copy(SELECTED_CAR_COLOR);
-      else this.color.setHSL(Math.min(ratio, 1) * 0.33, 0.85, 0.55);
-      cars.setColorAt(drawn, this.color);
-      drawn++;
-    }
-    cars.count = drawn;
-    cars.instanceMatrix.needsUpdate = true;
-    if (cars.instanceColor) cars.instanceColor.needsUpdate = true;
+    this.agents.draw(prev, curr, t, selected);
   }
 
   /** Left drag pans the camera, unless a tool needs the drag (the zone brush). */
@@ -308,10 +223,10 @@ export class Renderer {
       : CameraControls.ACTION.NONE;
   }
 
-  /** The agent id of the drawn car nearest a screen point, within a few pixels, or null. */
+  /** The agent id of the drawn car or walker nearest a screen point, within a few pixels, or null. */
   carAt(clientX: number, clientY: number): number | null {
     return nearestCar(
-      this.drawn,
+      this.agents.drawn,
       this.scene,
       this.camera,
       clientX,
@@ -321,9 +236,9 @@ export class Renderer {
     );
   }
 
-  /** Eases the camera toward car `agent`; holds still and returns false while it is hidden. */
+  /** Eases the camera toward agent `agent`; holds still and returns false while it is hidden. */
   follow(agent: number, seconds: number): boolean {
-    if (!carPosition(this.drawn, this.scene, agent, this.look)) return false;
+    if (!carPosition(this.agents.drawn, this.scene, agent, this.look)) return false;
     followPoint(this.controls, this.look, seconds);
     return true;
   }
