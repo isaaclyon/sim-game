@@ -16,6 +16,14 @@ const STRIDE = 1.5;
 const SWING = 0.5;
 
 const WHITE = new THREE.Color(0xffffff);
+const SHOE = new THREE.Color(0x3a3a3a);
+const LEGS = new THREE.Color(0x555555);
+
+/** A cap over the crown and the back of the head. */
+function shortHair(mb: MeshBuilder) {
+  mb.cylinder([0, 0], SHOULDER + 0.28, 0.13, 0.1, 6, WHITE, 0.09);
+  mb.box([-0.1, 0], SHOULDER + 0.16, 0.08, 0.14, 0.23, 0, WHITE);
+}
 
 export const SHIRTS = [
   0x3f6fb5, 0xc8423b, 0xe3b23c, 0x4f8f5b, 0xeeeeea, 0x2f3338, 0x8a5aa8, 0xd97a9a, 0x5aa3a8,
@@ -30,7 +38,23 @@ export const SKIN = [0xf1d0b5, 0xe0b48f, 0xc68e64, 0x8d5a3b, 0x5e3a26].map(
 const pick = (list: THREE.Color[], agent: number, salt: number) =>
   list[Math.floor(agentHash(agent, salt) * list.length)];
 
+export const HAIR = [0x1d1a17, 0x1d1a17, 0x3b2a1e, 0x6b4a2e, 0xc9a35e, 0x9a9a96, 0x8e3f22].map(
+  (c) => new THREE.Color(c),
+);
+
 export const shirtOf = (agent: number) => pick(SHIRTS, agent, 3);
+export const hairOf = (agent: number) => pick(HAIR, agent, 7);
+
+/** Hair style: 0 none, 1 short, 2 long. About one walker in nine is bald. */
+export function hairStyle(agent: number): 0 | 1 | 2 {
+  const r = agentHash(agent, 8);
+  return r < 0.11 ? 0 : r < 0.6 ? 1 : 2;
+}
+
+/** `[height, build]` scales: heights within about +/-8%, builds within about +/-10%. */
+export function sizeOf(agent: number): [number, number] {
+  return [0.92 + agentHash(agent, 9) * 0.16, 0.9 + agentHash(agent, 10) * 0.2];
+}
 export const trousersOf = (agent: number) => pick(TROUSERS, agent, 4);
 export const skinOf = (agent: number) => pick(SKIN, agent, 5);
 
@@ -47,11 +71,29 @@ export const FIGURE = {
   torso: part((mb) => mb.box([0, 0], HIP, 0.24, SHOULDER - HIP + 0.06, 0.42, 0, WHITE)),
   head: part((mb) => {
     mb.box([0, 0], SHOULDER + 0.06, 0.08, 0.08, 0.08, 0, WHITE);
-    mb.box([0, 0], SHOULDER + 0.12, 0.22, 0.24, 0.2, 0, WHITE);
+    mb.cylinder([0, 0], SHOULDER + 0.12, 0.12, 0.24, 6, WHITE, 0.105);
   }),
-  leg: part((mb) => mb.box([0, 0], -HIP, 0.16, HIP, 0.15, 0, WHITE)),
+  hair: part(shortHair),
+  longHair: part((mb) => {
+    shortHair(mb);
+    mb.box([-0.11, 0], SHOULDER - 0.04, 0.09, 0.32, 0.25, 0, WHITE);
+  }),
+  // The shoe is tinted dark, so the trouser colour multiplies down to near black.
+  leg: part((mb) => {
+    mb.box([0, 0], -HIP + 0.08, 0.16, HIP - 0.08, 0.15, 0, WHITE);
+    mb.box([0.04, 0], -HIP, 0.25, 0.08, 0.15, 0, SHOE);
+  }),
   arm: part((mb) => mb.box([0, 0], -0.6, 0.11, 0.6, 0.11, 0, WHITE)),
 };
+
+/**
+ * A walker far from the camera: one block, tinted by the shirt, with darker legs. About 24
+ * triangles instead of about 100.
+ */
+export const FAR_WALKER = part((mb) => {
+  mb.box([0, 0], 0, 0.22, HIP, 0.3, 0, LEGS);
+  mb.box([0, 0], HIP, 0.24, SHOULDER - HIP + 0.32, 0.42, 0, WHITE);
+});
 
 /** Where each limb pivots, across the body (z); legs at the hip, arms at the shoulder. */
 export const LIMBS = {

@@ -30,6 +30,9 @@ affect play yet, and later eras (village, town) need to restyle buildings withou
   show paint by default; a traffic view (T) tints them by speed instead. Walkers swing their
   legs by distance moved, so they stand still while waiting or paused. Freight trucks that are
   longer or slower would be sim-owned and need their own ADR.
+- Cars and walkers outside the camera's view are not drawn. Far ones draw simpler, chosen by
+  on-screen size (`agent-lod.ts`): a two-box car, a one-block walker, and no walker at all
+  below a few pixels. Picking and follow use every agent's position regardless.
 - Lane paint follows road class from the roads snapshot: main roads get a double solid yellow
   centre line and white edge lines, streets a dashed yellow centre line, alleys none. Paint
   stops at junctions where three or more segments meet. Traffic signals draw as mast arms

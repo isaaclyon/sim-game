@@ -123,6 +123,30 @@ export class MeshBuilder {
     if (cap) this.poly(ring, y1, col);
   }
 
+  /**
+   * A convex `shape` drawn in the x–y plane, given depth along z: `halfWidth(y)` either side of
+   * `zc`. A width that shrinks with height bevels the top edges.
+   */
+  extrude(shape: Pt[], halfWidth: number | ((y: number) => number), zc: number, col: THREE.Color) {
+    const hw = typeof halfWidth === 'number' ? () => halfWidth : halfWidth;
+    const v = (p: Pt, s: number): V3 => [p[0], p[1], zc + s * hw(p[1])];
+    // triangulateShape may reverse its input, so read points back from the array it indexed.
+    const pts = shape.map((p) => new THREE.Vector2(p[0], p[1]));
+    const tris = THREE.ShapeUtils.triangulateShape(pts, []);
+    for (const s of [1, -1])
+      for (const [a, b, c] of tris) {
+        const [pa, pb, pc] = [a, b, c].map((i): Pt => [pts[i].x, pts[i].y]);
+        this.tri(v(pa, s), v(pb, s), v(pc, s), col, [0, 0, s]);
+      }
+    const cx = shape.reduce((sum, p) => sum + p[0], 0) / shape.length;
+    const cy = shape.reduce((sum, p) => sum + p[1], 0) / shape.length;
+    for (let i = 0; i < shape.length; i++) {
+      const [p, q] = [shape[i], shape[(i + 1) % shape.length]];
+      const out: V3 = [(p[0] + q[0]) / 2 - cx, (p[1] + q[1]) / 2 - cy, 0];
+      this.quad(v(p, 1), v(q, 1), v(q, -1), v(p, -1), col, out);
+    }
+  }
+
   geometry(): THREE.BufferGeometry {
     const buffer = new THREE.InterleavedBuffer(this.data.slice(0, this.size), 9);
     const g = new THREE.BufferGeometry();
