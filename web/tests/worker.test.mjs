@@ -9,10 +9,14 @@ test('normal worker frames report residents separately from cars', async () => {
   const frame = () => w.messages.findLast((msg) => msg.type === 'frame');
   assert.equal(frame().stats.population, 0);
   assert.equal(frame().stats.agents, 0);
+  // An empty town wants a little of everything (ADR 0025).
+  const { residential, commercial, industrial } = frame().stats.demand;
+  assert.ok(residential > 0 && commercial > 0 && industrial > 0);
   await w.send({ type: 'fillBlock', x: 50, y: 50, zone: 1 });
   for (let i = 0; i < 1200; i++) w.advance(101);
   assert.ok(frame().stats.population > 0);
   assert.equal(frame().stats.driving, 0);
+  assert.ok(frame().stats.demand.residential < residential, 'residents fill housing demand');
 });
 
 for (const type of ['buildRoad', 'buildCurve', 'deleteRoad']) {

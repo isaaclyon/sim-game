@@ -20,6 +20,19 @@
       }
       #inspector[hidden] { display: none; }
       #inspector-text { white-space: pre; }
+      #demand {
+        position: fixed; top: 12px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px;
+        padding: 8px 12px; border-radius: 8px; background: rgba(15, 20, 25, 0.85); color: #c9d4df;
+        font: 12px/1 ui-monospace, SFMono-Regular, Menlo, monospace; pointer-events: auto;
+      }
+      #demand .use { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+      #demand .track { position: relative; width: 14px; height: 48px; background: #1c2530; border-radius: 3px; }
+      #demand .track::after { content: ''; position: absolute; left: -2px; right: -2px; top: 50%; border-top: 1px solid #6b7b8f; }
+      #demand .fill { position: absolute; left: 0; right: 0; bottom: 50%; height: 0; border-radius: 2px; }
+      #demand-residential { background: #7bd88f; }
+      #demand-commercial { background: #6fb3ff; }
+      #demand-industrial { background: #f2c94c; }
+      #demand .fill.surplus { background: #e5484d; }
       #inspector-text::first-line { color: white; font-weight: 600; }
       #inspector .actions { display: flex; gap: 6px; margin-top: 8px; }
       #controls { position: fixed; bottom: 12px; left: 12px; right: 12px; display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none; }
@@ -39,6 +52,11 @@
   </head>
   <body>
     <div id="hud">loading…</div>
+    <div id="demand" role="img" aria-label="demand">
+      <div class="use"><div class="track"><div class="fill" id="demand-residential"></div></div>R</div>
+      <div class="use"><div class="track"><div class="fill" id="demand-commercial"></div></div>C</div>
+      <div class="use"><div class="track"><div class="fill" id="demand-industrial"></div></div>I</div>
+    </div>
     <section id="inspector" aria-label="citizen" hidden>
       <div id="inspector-text" aria-live="polite"></div>
       <div class="actions">

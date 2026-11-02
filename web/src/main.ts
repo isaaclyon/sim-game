@@ -1,4 +1,5 @@
 import type * as THREE from 'three';
+import { drawDemand } from './demand-meter';
 import { Inspector } from './inspector';
 import { type FromWorker, RoadClass, type Stats, type ToWorker, Zone } from './protocol';
 import { Renderer } from './renderer';
@@ -11,6 +12,8 @@ const byId = (id: string): HTMLElement => {
 
 const renderer = new Renderer(document.body);
 const hud = byId('hud');
+const demand = byId('demand');
+const demandFills = ['residential', 'commercial', 'industrial'].map((u) => byId(`demand-${u}`));
 const worker = new Worker(new URL('./sim.worker.ts', import.meta.url), { type: 'module' });
 const send = (msg: ToWorker) => worker.postMessage(msg);
 // Pan keys held when follow starts are ignored until released, so they cannot fight it.
@@ -461,6 +464,7 @@ function frame() {
   // A camera move slides the ground under a still cursor; ask again what the cursor is over.
   if (renderer.render() && pointer) hover(pointer);
   if (stats) {
+    drawDemand(demand, demandFills, stats.demand);
     const hh = String(Math.floor(stats.secondOfDay / 3600)).padStart(2, '0');
     const mm = String(Math.floor((stats.secondOfDay % 3600) / 60)).padStart(2, '0');
     hud.textContent =

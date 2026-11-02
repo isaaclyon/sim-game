@@ -37,6 +37,7 @@ fn consistent(w: &World) {
         }
     }
     assert!(w.vacancies_hold());
+    assert!(w.supply_holds());
     // The inspector (ADR 0022) sees every reference of a resident, and none after departure.
     for c in 0..w.citizens.active.len() as u32 {
         let info = w.citizen_info(c).unwrap();
@@ -65,7 +66,10 @@ fn consistent(w: &World) {
 /// Apartments next to shops, so closures involve several households and many workers.
 fn dense() -> World {
     let mut w = World::new(
-        Config::default(),
+        Config {
+            ignore_demand: true,
+            ..Config::default()
+        },
         crate::road::RoadNetwork::generate_lattice(4, 3, 120.0),
         crate::rng::Rng::new(1),
     );
@@ -436,7 +440,7 @@ fn vacancy_index_matches_a_linear_scan_through_every_lifecycle_path() {
 }
 
 #[test]
-fn a_building_repainted_before_registration_closes_and_admits_nobody() {
+fn a_building_repainted_on_the_tick_it_grows_closes_and_admits_nobody() {
     let mut w = dense();
     paint(&mut w, 290.0, Zone::ResidentialHigh);
     let before = w.buildings.active.len();
@@ -444,13 +448,16 @@ fn a_building_repainted_before_registration_closes_and_admits_nobody() {
         (before..w.buildings.active.len())
             .find(|&b| w.lots.front_x[w.buildings.lot[b] as usize] > 240.0)
     };
-    while grown(&w).is_none() {
+    for _ in 0..1200 {
+        if grown(&w).is_some() {
+            break;
+        }
         w.tick();
     }
-    let fresh = grown(&w).unwrap() as u32;
+    let fresh = grown(&w).expect("the painted block grows") as u32;
     assert!(
-        w.residents.registered <= fresh as usize,
-        "growth registers on the next tick"
+        w.residents.registered > fresh as usize,
+        "growth registers its homes and jobs at once (ADR 0025)"
     );
     paint(&mut w, 290.0, Zone::CommercialLow);
     assert!(w.building_closing(fresh));

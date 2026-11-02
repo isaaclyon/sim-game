@@ -2,8 +2,16 @@
 use sim::road::RoadClass;
 use sim::{Command, Config, World, Zone};
 
+/// Geometry and closure tests fill whole single-use blocks, so they grow without demand.
+fn full() -> Config {
+    Config {
+        ignore_demand: true,
+        ..Config::default()
+    }
+}
+
 fn town(zone: Zone) -> World {
-    let mut w = World::generate(Config::default(), 3, 3);
+    let mut w = World::generate(full(), 3, 3);
     assert!(w.apply(Command::FillBlock {
         x: 50.0,
         y: 50.0,
@@ -201,7 +209,7 @@ fn opening_a_block_clears_its_buildings_immediately() {
 
 #[test]
 fn curved_street_buildings_follow_lots_without_replacing_them_with_boxes() {
-    let mut w = World::generate(Config::default(), 0, 0);
+    let mut w = World::generate(full(), 0, 0);
     for (ax, ay, bx, by) in [
         (0.0, 0.0, 120.0, 0.0),
         (120.0, 0.0, 120.0, 120.0),
@@ -288,7 +296,7 @@ fn industrial_buildings_vary_in_height_and_survive_repainting_and_nearby_road_ed
 #[test]
 fn industrial_halls_never_take_the_pointed_shape_of_corner_lots() {
     for zone in [Zone::IndustrialLow, Zone::IndustrialHigh] {
-        let mut w = World::generate(Config::default(), 6, 6);
+        let mut w = World::generate(full(), 6, 6);
         assert!(w.apply(Command::PaintZone {
             ax: -100.0,
             ay: -100.0,

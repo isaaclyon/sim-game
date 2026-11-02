@@ -38,6 +38,7 @@ const showCars = (t) =>
       population: 0,
       unemployed: 0,
       unemploymentPercent: 0,
+      demand: { residential: 0, commercial: 0, industrial: 0 },
       driving: 0,
       parked: 0,
       tripsCompleted: 0,

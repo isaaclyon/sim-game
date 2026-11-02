@@ -68,3 +68,10 @@ unzoned. Its workers lose their jobs, its households move or leave one at a time
 empty building is then removed so the lot's current zone can grow. Painting the original
 zone back cancels it (ADR 0023).
 _Avoid_: demolition (road edits remove buildings at once), eviction
+
+**Demand**:
+How many more people the town wants housed (residential), or wants as shop or industry jobs
+(commercial, industrial). People move in where there are jobs, and businesses open where
+there are people. A zoned lot builds only while its use has positive demand; otherwise it
+waits (ADR 0025).
+_Avoid_: need, desirability

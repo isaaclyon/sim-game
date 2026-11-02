@@ -1,6 +1,7 @@
 //! The world: owns all sim state and advances it one fixed step at a time.
 
 mod closure;
+mod demand;
 mod inspect;
 mod residents;
 mod roads;
@@ -23,6 +24,7 @@ use crate::road::{LaneId, RoadClass, RoadNetwork};
 use crate::traffic::Traffic;
 use crate::zone::{Zone, ZoneGrid};
 
+pub use demand::Demand;
 pub use inspect::{CitizenInfo, Place};
 
 /// Floats per agent in `write_agent_snapshot`.
@@ -46,6 +48,9 @@ pub struct Config {
     /// most city builders.
     pub stuck_limit_s: f32,
     pub grid_spacing: f32,
+    /// Builds every due lot whatever the demand (ADR 0025). For tests and benchmarks that need
+    /// full blocks; the game leaves it off.
+    pub ignore_demand: bool,
 }
 
 impl Default for Config {
@@ -58,6 +63,7 @@ impl Default for Config {
             dwell_max_s: 240.0,
             stuck_limit_s: 60.0,
             grid_spacing: 120.0,
+            ignore_demand: false,
         }
     }
 }
@@ -119,6 +125,8 @@ pub struct Stats {
     pub unemployed: u32,
     /// `unemployed` as a percentage of `population`; 0 when nobody lives in town.
     pub unemployment_percent: f32,
+    /// What the town wants built next (ADR 0025).
+    pub demand: Demand,
     /// Synthetic vehicles waiting between random trips; dormant citizen slots are excluded.
     pub parked: u32,
     pub awaiting_path: u32,
@@ -147,6 +155,7 @@ pub struct World {
     pub homes: crate::citizen::Homes,
     residents: residents::Residents,
     closures: closure::Closures,
+    supply: demand::Supply,
     /// Faces of the road network, traced again when `blocks_version` falls behind the roads.
     blocks: Blocks,
     blocks_version: Option<u32>,
@@ -171,6 +180,7 @@ impl World {
         let mut world = Self {
             residents: residents::Residents::new(cfg.seed),
             closures: Default::default(),
+            supply: Default::default(),
             citizens: Default::default(),
             households: Default::default(),
             homes: Default::default(),
@@ -299,8 +309,7 @@ impl World {
         self.resolve_exits(&exits);
         self.traffic.recycle_exits(exits);
         self.totals.tick += 1;
-        self.buildings
-            .grow(self.totals.tick, &self.lots, &self.roads, self.cfg.seed);
+        self.grow_buildings();
     }
 
     pub fn stats(&self) -> Stats {
@@ -308,6 +317,7 @@ impl World {
         s.agents = self.agents.len() as u32;
         s.population = self.residents.population;
         s.unemployed = self.residents.population - self.residents.employed;
+        s.demand = self.demand();
         if s.population > 0 {
             s.unemployment_percent = s.unemployed as f32 * 100.0 / s.population as f32;
         }

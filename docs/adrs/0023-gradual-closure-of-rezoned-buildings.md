@@ -1,6 +1,6 @@
 # 0023. Gradual closure of rezoned buildings
 
-- Status: Accepted
+- Status: Accepted; replacement growth gated by demand in [0025](0025-rci-demand-gates-growth.md)
 - Date: 2026-11-02
 
 ## Context

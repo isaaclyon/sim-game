@@ -16,7 +16,10 @@ fn advance(w: &mut World, seconds: u32) {
 }
 fn town() -> World {
     let mut w = World::new(
-        Config::default(),
+        Config {
+            ignore_demand: true,
+            ..Config::default()
+        },
         crate::road::RoadNetwork::generate_lattice(4, 3, 120.0),
         crate::rng::Rng::new(1),
     );
