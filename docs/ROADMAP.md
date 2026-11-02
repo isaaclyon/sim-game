@@ -70,14 +70,14 @@ despawns, and the road tool feels good with snapping, curves and bulldozing.
     destination. Routing searches the main-road layer for the middle of long trips, which is
     also faster.
   - Some randomness: each driver adds a small seeded random change to route costs, so cars
-    don't all pick the same "best" route and traffic spreads out. It replaces or tunes the
-    per-queued-car delay from ADR 0009's work.
+    don't all pick the same "best" route and traffic spreads out. Implemented; the
+    per-queued-car delay stays as it was ([ADR 0024](adrs/0024-per-driver-route-noise.md)).
 - Citizen inspector: click a car to see the citizen's name, home, job and destination; a follow
   camera rides along. Implemented as a read-only query for the selected citizen
   ([ADR 0022](adrs/0022-citizen-inspection-query.md)).
 - Demand: a simple R/C/I balance decides what gets built next. Implemented: zoned lots build
   only while their use has demand, shown as R/C/I bars in the HUD
-  ([ADR 0024](adrs/0024-rci-demand-gates-growth.md)).
+  ([ADR 0025](adrs/0025-rci-demand-gates-growth.md)).
 - Day clock and an on-screen time and speed indicator.
 - Minimal UI: tool bar (road, zone, bulldoze), population counter.
 - Hosted build (e.g. GitHub Pages) so the city is a link.

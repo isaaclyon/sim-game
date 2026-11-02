@@ -73,5 +73,5 @@ _Avoid_: demolition (road edits remove buildings at once), eviction
 How many more people the town wants housed (residential), or wants as shop or industry jobs
 (commercial, industrial). People move in where there are jobs, and businesses open where
 there are people. A zoned lot builds only while its use has positive demand; otherwise it
-waits (ADR 0024).
+waits (ADR 0025).
 _Avoid_: need, desirability

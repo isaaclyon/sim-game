@@ -7,7 +7,7 @@ export function demandFill(people: number): number {
   return people / (Math.abs(people) + 60);
 }
 
-/** Draws R/C/I demand (ADR 0024): a bar rises above the midline for demand, drops below it
+/** Draws R/C/I demand (ADR 0025): a bar rises above the midline for demand, drops below it
  *  for a surplus. `fills` are the residential, commercial and industrial bars in that order. */
 export function drawDemand(root: HTMLElement, fills: HTMLElement[], demand: Demand) {
   const parts = USES.map((use, i) => {

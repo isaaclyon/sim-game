@@ -48,7 +48,7 @@ pub struct Config {
     /// most city builders.
     pub stuck_limit_s: f32,
     pub grid_spacing: f32,
-    /// Builds every due lot whatever the demand (ADR 0024). For tests and benchmarks that need
+    /// Builds every due lot whatever the demand (ADR 0025). For tests and benchmarks that need
     /// full blocks; the game leaves it off.
     pub ignore_demand: bool,
 }
@@ -125,7 +125,7 @@ pub struct Stats {
     pub unemployed: u32,
     /// `unemployed` as a percentage of `population`; 0 when nobody lives in town.
     pub unemployment_percent: f32,
-    /// What the town wants built next (ADR 0024).
+    /// What the town wants built next (ADR 0025).
     pub demand: Demand,
     /// Synthetic vehicles waiting between random trips; dormant citizen slots are excluded.
     pub parked: u32,

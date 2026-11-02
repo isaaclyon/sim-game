@@ -15,7 +15,7 @@ rewriting history; mark the old one `Superseded by NNNN`.
 | [0007](0007-three-js-rendering-approach.md) | Three.js rendering approach | Deprecated |
 | [0008](0008-permissive-licenses-only.md) | Permissive-license dependencies only | Accepted |
 | [0009](0009-intersection-rules.md) | Intersection rules | Accepted; ms/tick target superseded by 0011 |
-| [0010](0010-congestion-aware-routing-and-detours.md) | Congestion-aware routing and detours | Accepted; long-trip search narrowed by 0017 |
+| [0010](0010-congestion-aware-routing-and-detours.md) | Congestion-aware routing and detours | Accepted; long-trip search narrowed by 0017; cost superseded by 0024 |
 | [0011](0011-absolute-tick-budget.md) | Absolute tick budget for traffic | Accepted |
 | [0012](0012-la-scale-target.md) | Scale target: Los Angeles at rush hour, 10x speed | Accepted |
 | [0013](0013-road-deletion-tombstones.md) | Road deletion uses tombstones | Bulldoze preview shape superseded by 0015; citizen recovery by 0021; otherwise accepted |
@@ -28,8 +28,9 @@ rewriting history; mark the old one `Superseded by NNNN`.
 | [0020](0020-rectangular-industrial-halls.md) | Industrial halls stay rectangular | Accepted |
 | [0021](0021-citizens-households-and-trips.md) | Citizens, households, homes, jobs and trips | Accepted; residents of repainted buildings superseded by 0023 |
 | [0022](0022-citizen-inspection-query.md) | Citizen inspection is a read-only query for one selected citizen | Accepted |
-| [0023](0023-gradual-closure-of-rezoned-buildings.md) | Gradual closure of rezoned buildings | Accepted; replacement growth gated by demand in 0024 |
-| [0024](0024-rci-demand-gates-growth.md) | R/C/I demand gates growth | Accepted |
+| [0023](0023-gradual-closure-of-rezoned-buildings.md) | Gradual closure of rezoned buildings | Accepted; replacement growth gated by demand in 0025 |
+| [0024](0024-per-driver-route-noise.md) | Per-driver route noise | Accepted |
+| [0025](0025-rci-demand-gates-growth.md) | R/C/I demand gates growth | Accepted |
 
 ADRs are only for decisions that are hard to reverse. See [AGENTS.md](AGENTS.md) for when to
 write one and how.

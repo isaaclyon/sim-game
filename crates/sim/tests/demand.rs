@@ -1,4 +1,4 @@
-//! R/C/I demand decides what grows next (ADR 0024).
+//! R/C/I demand decides what grows next (ADR 0025).
 use sim::{Command, Config, World, Zone};
 
 fn advance(w: &mut World, seconds: u32) {

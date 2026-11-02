@@ -457,7 +457,7 @@ fn a_building_repainted_on_the_tick_it_grows_closes_and_admits_nobody() {
     let fresh = grown(&w).expect("the painted block grows") as u32;
     assert!(
         w.residents.registered > fresh as usize,
-        "growth registers its homes and jobs at once (ADR 0024)"
+        "growth registers its homes and jobs at once (ADR 0025)"
     );
     paint(&mut w, 290.0, Zone::CommercialLow);
     assert!(w.building_closing(fresh));

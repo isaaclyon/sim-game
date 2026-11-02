@@ -22,7 +22,7 @@ pub struct SimStats {
     pub population: u32,
     pub unemployed: u32,
     pub unemployment_percent: f32,
-    /// R/C/I demand in people (ADR 0024): positive wants more buildings, negative is a surplus.
+    /// R/C/I demand in people (ADR 0025): positive wants more buildings, negative is a surplus.
     pub demand_residential: i32,
     pub demand_commercial: i32,
     pub demand_industrial: i32,

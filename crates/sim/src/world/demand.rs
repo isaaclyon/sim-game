@@ -1,4 +1,4 @@
-//! R/C/I demand: what the town wants built next (ADR 0024).
+//! R/C/I demand: what the town wants built next (ADR 0025).
 //!
 //! People move in where there are jobs, and businesses open where there are people. Residential
 //! demand is open jobs plus a small base, minus residents and the room left in empty homes, so

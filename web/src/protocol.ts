@@ -134,7 +134,7 @@ export interface Stats {
   unemployed: number;
   /** Sim-computed `unemployed` as a percentage of `population`; 0 with no residents. */
   unemploymentPercent: number;
-  /** R/C/I demand from the sim, in people (ADR 0024). A zoned lot builds only while its use
+  /** R/C/I demand from the sim, in people (ADR 0025). A zoned lot builds only while its use
    *  is positive; negative is a surplus. */
   demand: Demand;
   /** Allocated vehicle slots, including dormant reservations and departed citizens' slots. */

@@ -1,5 +1,5 @@
 //! Buildings on lots (ADR 0016/0018). A zoned lot builds after a seeded delay, and only
-//! while its use has demand; otherwise it waits and checks again (ADR 0024).
+//! while its use has demand; otherwise it waits and checks again (ADR 0025).
 //! Lot geometry is read only at construction; rezoning never changes an existing building,
 //! it only starts the building's gradual closure (ADR 0023).
 mod footprint;
@@ -145,7 +145,7 @@ impl Buildings {
         None
     }
 
-    /// Puts a due lot back to wait for demand (ADR 0024). The retry delay is drawn from the
+    /// Puts a due lot back to wait for demand (ADR 0025). The retry delay is drawn from the
     /// lot and tick, so it stays independent of traffic RNG and edit order.
     pub(crate) fn defer(&mut self, lot: LotId, zone: Zone, tick: u64, dt: f32, seed: u64) {
         let mut rng = Rng::new(seed ^ (u64::from(lot) << 32) ^ tick.wrapping_mul(0x9E37_79B9));

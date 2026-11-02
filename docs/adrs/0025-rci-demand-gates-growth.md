@@ -1,4 +1,4 @@
-# 0024. R/C/I demand gates growth
+# 0025. R/C/I demand gates growth
 
 - Status: Accepted
 - Date: 2026-11-03
