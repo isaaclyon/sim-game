@@ -15,6 +15,10 @@ export interface Style {
   rooftop: number;
   chimney: number;
   door: number;
+  /** The band along the ground and the door steps. */
+  plinth: number;
+  /** Window and door surrounds: light on darker walls, dark on light ones. */
+  trim: { light: number; dark: number };
 }
 
 export const PRESENT_DAY: Style = {
@@ -39,4 +43,6 @@ export const PRESENT_DAY: Style = {
   rooftop: 0xc9ced2,
   chimney: 0x8e7f73,
   door: 0x7a5f4e,
+  plinth: 0x8c877f,
+  trim: { light: 0xf7f4ee, dark: 0x4d4a47 },
 };

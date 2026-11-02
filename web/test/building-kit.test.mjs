@@ -59,7 +59,8 @@ test('flat roofs on concave lots do not bridge the gap', () => {
     if (n.getY(i) < 0.9 || p.getY(i) !== 16) continue;
     const x = (p.getX(i) + p.getX(i + 1) + p.getX(i + 2)) / 3;
     const z = (p.getZ(i) + p.getZ(i + 1) + p.getZ(i + 2)) / 3;
-    assert.ok(x <= 8 || z <= 8, 'no roof across the concavity');
+    // The cornice ledge may reach 0.15 m past the walls.
+    assert.ok(x <= 8.2 || z <= 8.2, 'no roof across the concavity');
     roofArea +=
       Math.abs(
         (p.getX(i + 1) - p.getX(i)) * (p.getZ(i + 2) - p.getZ(i)) -
@@ -78,8 +79,8 @@ test('shopfronts and awnings face the sim front edge', () => {
     const g = build(record(3, 4, 0, front, rect(0, 0, 16, 12)));
     g.computeBoundingBox();
     const { min, max } = g.boundingBox;
-    if (side < 0) assert.ok(min.z < -1.5 && max.z <= 12.1, 'front 0 juts out toward -z');
-    else assert.ok(max.z > 13.5 && min.z >= -0.1, 'front 2 juts out toward +z');
+    if (side < 0) assert.ok(min.z < -1.5 && max.z <= 12.2, 'front 0 juts out toward -z');
+    else assert.ok(max.z > 13.5 && min.z >= -0.2, 'front 2 juts out toward +z');
   }
 });
 
@@ -108,4 +109,35 @@ test('growth rebuilds only the tiles whose buildings changed', async () => {
   assert.equal(after[1], b, 'a distant tile keeps its geometry');
   layer.update(new Float32Array());
   assert.equal(layer.group.children.length, 0);
+});
+
+test('trim: homes sit on a plinth, flat roofs carry a cornice, doors never cover windows', async () => {
+  const THREE = await import('three');
+  const { PRESENT_DAY } = await import('../src/building-kit/style.ts');
+  const glass = new THREE.Color(PRESENT_DAY.glass);
+  const door = new THREE.Color(PRESENT_DAY.door);
+  const near = (c, i, col) =>
+    Math.abs(c.getX(i) - col.r) + Math.abs(c.getY(i) - col.g) + Math.abs(c.getZ(i) - col.b) < 1e-4;
+  for (let k = 0; k < 40; k++) {
+    const g = build(record(1, 6, 0, 0, rect(k * 30, 0, 11 + (k % 4), 10)));
+    const [p, c] = [g.getAttribute('position'), g.getAttribute('color')];
+    const span = (col, ok) => {
+      const xs = [];
+      for (let i = 0; i < p.count; i++)
+        if (near(c, i, col) && p.getZ(i) < 0 && ok(p.getY(i))) xs.push(p.getX(i));
+      return [Math.min(...xs), Math.max(...xs)];
+    };
+    const [d0, d1] = span(door, () => true);
+    let lowest = Infinity;
+    for (let i = 0; i < p.count; i += 3) {
+      if (!near(c, i, glass) || p.getZ(i) >= 0 || p.getY(i) > 2.5) continue;
+      const xs = [p.getX(i), p.getX(i + 1), p.getX(i + 2)];
+      assert.ok(Math.max(...xs) < d0 - 0.2 || Math.min(...xs) > d1 + 0.2, 'window clear of door');
+    }
+    for (let i = 0; i < p.count; i++) if (p.getZ(i) < -0.07) lowest = Math.min(lowest, p.getY(i));
+    assert.equal(lowest, 0, 'a plinth stands proud of the front wall');
+  }
+  const flats = build(record(2, 15, 0, 0, rect(0, 0, 16, 14)));
+  flats.computeBoundingBox();
+  assert.ok(flats.boundingBox.min.z <= -0.14, 'a cornice juts out under the parapet');
 });

@@ -34,6 +34,10 @@ affect play yet, and later eras (village, town) need to restyle buildings withou
   centre line and white edge lines, streets a dashed yellow centre line, alleys none. Paint
   stops at junctions where three or more segments meet. Traffic signals draw as mast arms
   from the signals snapshot, with the lamps its state calls for lit. Both are display only.
+- Buildings carry trim from the same `Style`: a plinth, window frames with sills, framed doors
+  on a step, and a cornice under flat roofs. Glass office blocks and factories skip window
+  frames. Trim roughly doubles building triangles, so new detail should stay per wall or per
+  opening, not per brick.
 
 ## Consequences
 

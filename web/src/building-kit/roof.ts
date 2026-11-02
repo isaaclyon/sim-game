@@ -2,6 +2,7 @@
 import type * as THREE from 'three';
 import type { MeshBuilder } from './mesh.ts';
 import { type Box, clip, offset, type Pt } from './polygon.ts';
+import { cornice } from './trim.ts';
 
 /** Height `base + slope * (reach - distance along n from c)`. */
 interface Plane {
@@ -125,6 +126,7 @@ export function flatRoofed(
     mb.wall(p, q, base, h, wall, n);
     if (parapet > 0) mb.wall(p, q, h, h + parapet, cap, n);
   }
+  if (parapet > 0) cornice(mb, ring, h, cap);
   mb.poly(ring, h, roof);
   return () => h;
 }

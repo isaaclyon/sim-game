@@ -3,9 +3,10 @@
 import * as THREE from 'three';
 import { balconies, door, loadingDoors, rooftop, shopfront, windows } from './facade.ts';
 import type { MeshBuilder } from './mesh.ts';
-import { at, type Box, clip, convex, obb, type Pt } from './polygon.ts';
+import { at, type Box, clip, convex, edge, obb, type Pt } from './polygon.ts';
 import { flatRoofed, roofed, roofPlanes } from './roof.ts';
 import type { Style } from './style.ts';
+import { PLINTH, plinth } from './trim.ts';
 
 export interface Building {
   /** `Zone` value: 1/2 residential, 3/4 commercial, 5/6 industrial, low then high density. */
@@ -35,6 +36,12 @@ export function seeded(ring: Pt[]): () => number {
 
 const pick = (list: number[], r: number) => new THREE.Color(list[Math.floor(r * list.length)]);
 
+/** Surround colour that stands out from `wall`. */
+function trimFor(wall: THREE.Color, style: Style): THREE.Color {
+  const { l } = wall.getHSL({ h: 0, s: 0, l: 0 });
+  return new THREE.Color(l > 0.78 ? style.trim.dark : style.trim.light);
+}
+
 export function building(mb: MeshBuilder, b: Building, style: Style) {
   const rand = seeded(b.ring);
   const box = obb(b.ring);
@@ -62,17 +69,17 @@ const house: Part = (mb, b, box, style, rand, glass) => {
     s.pitch[0] + rand() * (s.pitch[1] - s.pitch[0]),
   ] as const;
   const pitched = convex(b.ring);
+  const base = new THREE.Color(style.plinth);
+  plinth(mb, b.ring, PLINTH, base);
+  const frame = trimFor(wall, style);
   const top = pitched
     ? roofed(mb, b.ring, 0, roofPlanes(form, box, b.height, pitch), wall, roof, 0.45)
     : flatRoofed(mb, b.ring, 0, b.height, wall, roof, 0.4, wall);
-  windows(
-    mb,
-    b.ring,
-    top,
-    { storey: 3, floors: Math.max(1, Math.round(b.height / 3)), h: 1.25 },
-    glass,
-  );
-  door(mb, b.ring, b.front, 0.35 + rand() * 0.3, new THREE.Color(style.door));
+  const doorAt = edge(b.ring, b.front).L * (0.35 + rand() * 0.3);
+  const floors = Math.max(1, Math.round(b.height / 3));
+  const rows = { storey: 3, floors, h: 1.25, door: { edge: b.front, at: doorAt } };
+  windows(mb, b.ring, top, rows, glass, frame);
+  door(mb, b.ring, b.front, doorAt, new THREE.Color(style.door), frame, base);
   if (pitched && rand() < 0.65) {
     const c = at(box, box.L * (rand() - 0.5) * 0.8, 0);
     mb.box(
@@ -92,8 +99,10 @@ const flats: Part = (mb, b, box, style, rand, glass) => {
   const wall = pick(s.walls, rand());
   const cap = new THREE.Color(s.parapet);
   const top = flatRoofed(mb, b.ring, 0, b.height, wall, new THREE.Color(s.roof), 0.7, cap);
+  plinth(mb, b.ring, 0.6, new THREE.Color(style.plinth));
   const floors = Math.floor(b.height / 3);
-  windows(mb, b.ring, top, { storey: 3, floors, h: 1.4, w: 1.4, gap: 1.2 }, glass);
+  const rows = { storey: 3, floors, h: 1.4, w: 1.4, gap: 1.2 };
+  windows(mb, b.ring, top, rows, glass, trimFor(wall, style));
   // A stair and lift housing on the roof, kept inside the walls.
   rooftop(mb, b.ring, box, b.height, 1, true, rand, cap);
   if (rand() < 0.6) balconies(mb, b.ring, b.front, floors, cap);
@@ -113,13 +122,15 @@ const shop: Part = (mb, b, box, style, rand, glass) => {
     const inner = clipBox(b.ring, box, 2.2);
     if (inner.length >= 3) flatRoofed(mb, inner, body, b.height, wall, roof, 0.5, cap);
   }
+  plinth(mb, b.ring, 0.35, new THREE.Color(style.plinth));
   const awning = !high || rand() < 0.5 ? pick(style.awnings, rand()) : null;
   shopfront(mb, b.ring, b.front, awning, style);
   const upper = { storey: 4, first: 4, floors: Math.floor(body / 4) - 1 };
   const rows = high
     ? { ...upper, sill: 0.6, h: 2.2, w: 2.6, gap: 0.6 }
     : { ...upper, h: 1.4, w: 1.3 };
-  windows(mb, b.ring, () => body, rows, glass);
+  // Glass office blocks keep plain windows; their panes nearly touch.
+  windows(mb, b.ring, () => body, rows, glass, high ? null : trimFor(wall, style));
   rooftop(mb, b.ring, box, b.height, high ? 3 : 1, false, rand, new THREE.Color(style.rooftop));
 };
 
@@ -155,12 +166,14 @@ const industry: Part = (mb, b, box, style, rand, glass) => {
     } else rooftop(mb, b.ring, box, h, 4, true, rand, new THREE.Color(style.rooftop));
   }
   loadingDoors(mb, b.ring, b.front, h, new THREE.Color(s.door));
+  plinth(mb, b.ring, 0.5, new THREE.Color(style.plinth), b.front);
   windows(
     mb,
     b.ring,
     () => h,
     { storey: h, floors: 1, sill: h - 2.4, h: 1, w: 2.4, gap: 2.2, skip: b.front },
     glass,
+    null,
   );
 };
 

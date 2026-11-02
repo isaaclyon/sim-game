@@ -4,9 +4,7 @@ import type { MeshBuilder } from './mesh.ts';
 import { along, type Box, edge, inside, type Pt } from './polygon.ts';
 import type { Roof } from './roof.ts';
 import type { Style } from './style.ts';
-
-/** Windows stand this far proud of the wall so they never z-fight with it. */
-const PROUD = 0.06;
+import { HEAD_ROOM, PLINTH, PROUD, step, surround } from './trim.ts';
 
 export interface WindowRows {
   storey: number;
@@ -19,17 +17,31 @@ export interface WindowRows {
   gap?: number;
   /** An edge left blank, such as the industrial loading front. */
   skip?: number;
+  /** A door `at` metres along `edge`; ground-floor windows give way to it. */
+  door?: { edge: number; at: number };
 }
 
-/** Rows of window quads on every wall long enough, kept below the roof line. */
+/** Rows of windows on every wall long enough, kept below the roof line; framed with sills
+ * unless `frame` is null. */
 export function windows(
   mb: MeshBuilder,
   ring: Pt[],
   top: Roof,
   rows: WindowRows,
   glass: THREE.Color,
+  frame: THREE.Color | null,
 ) {
-  const { storey, floors, first = 0, sill = 0.9, h = 1.3, w = 1.2, gap = 1.4, skip = -1 } = rows;
+  const {
+    storey,
+    floors,
+    first = 0,
+    sill = 0.9,
+    h = 1.3,
+    w = 1.2,
+    gap = 1.4,
+    skip = -1,
+    door,
+  } = rows;
   for (let i = 0; i < ring.length; i++) {
     if (i === skip) continue;
     const e = edge(ring, i);
@@ -41,9 +53,11 @@ export function windows(
       const y1 = y0 + h;
       for (let k = 0; k < count; k++) {
         const s = start + k * (w + gap);
+        if (f === 0 && door?.edge === i && Math.abs(s + w / 2 - door.at) < w / 2 + 0.8) continue;
         const [p, q] = [along(e, s, PROUD), along(e, s + w, PROUD)];
-        if (top(p) < y1 + 0.35 || top(q) < y1 + 0.35) continue;
+        if (top(p) < y1 + HEAD_ROOM || top(q) < y1 + HEAD_ROOM) continue;
         mb.wall(p, q, y0, y1, glass, e.n);
+        if (frame) surround(mb, e, s, s + w, y0, y1, frame, true);
       }
     }
   }
@@ -78,12 +92,21 @@ export function shopfront(
   mb.wall(d, c, 2.5, 2.85, awning.clone().multiplyScalar(0.85), e.n);
 }
 
-/** A front door at `t` (0–1) along the front edge. */
-export function door(mb: MeshBuilder, ring: Pt[], front: number, t: number, col: THREE.Color) {
+/** A framed front door `m` metres along the front edge, up a step from the plinth. */
+export function door(
+  mb: MeshBuilder,
+  ring: Pt[],
+  front: number,
+  m: number,
+  col: THREE.Color,
+  frame: THREE.Color,
+  plinth: THREE.Color,
+) {
   const e = edge(ring, front);
   if (e.L < 4) return;
-  const m = e.L * t;
-  mb.wall(along(e, m - 0.5, PROUD), along(e, m + 0.5, PROUD), 0, 2.1, col, e.n);
+  mb.wall(along(e, m - 0.5, PROUD), along(e, m + 0.5, PROUD), PLINTH, PLINTH + 2.1, col, e.n);
+  surround(mb, e, m - 0.5, m + 0.5, PLINTH, PLINTH + 2.1, frame, false);
+  step(mb, e, m, plinth);
 }
 
 /** Large doors every 7 m along an industrial front. */
