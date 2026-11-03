@@ -105,7 +105,9 @@ test('lot scenery follows standing buildings, clears on removal and reuses uncha
 });
 
 test('garden boundaries enclose all sides and meet at corners, leaving only the entrance open', () => {
-  const p = buildLotGeometry(lot, building(), new Clearance(), false).getAttribute('position');
+  const mb = new MeshBuilder();
+  boundary(mb, lot, [rect(11.25, -1, 5.5, 8)], new Clearance(), 'hedge');
+  const p = mb.geometry().getAttribute('position');
   const sides = [[], [], [], []];
   for (let i = 0; i < p.count; i += 3) {
     if (![0, 1, 2].every((k) => Math.abs(p.getY(i + k) - 0.9) < 0.001)) continue;
@@ -135,7 +137,7 @@ test('garden boundaries enclose all sides and meet at corners, leaving only the 
 });
 
 test('one obstruction cuts only its opening rather than removing the whole boundary', () => {
-  const shapes = boundary(new MeshBuilder(), lot, [rect(12, 38, 4, 3)], new Clearance(), false);
+  const shapes = boundary(new MeshBuilder(), lot, [rect(12, 38, 4, 3)], new Clearance(), 'hedge');
   const covered = (p) => shapes.some((shape) => inside(p, shape));
   assert.ok(covered([5, 39.6]), 'rear boundary survives to the left of an obstruction');
   assert.ok(covered([22, 39.6]), 'rear boundary survives to the right of an obstruction');
@@ -151,20 +153,27 @@ test('one obstruction cuts only its opening rather than removing the whole bound
     assert.ok(covered(p), 'other sides reach their corners');
 });
 
-test('industrial yards use tall metal fences rather than garden hedges', () => {
-  const g = buildLotGeometry(lot, building(5), new Clearance(), false);
-  const p = g.getAttribute('position');
-  const colors = g.getAttribute('color');
-  let boundaryVertices = 0;
-  let high = 0;
-  for (let i = 0; i < p.count; i++) {
-    if (p.getX(i) > 1 && p.getX(i) < 27 && p.getZ(i) > 1 && p.getZ(i) < 39) continue;
-    boundaryVertices++;
-    high = Math.max(high, p.getY(i));
-    assert.ok(Math.abs(colors.getX(i) - colors.getY(i)) < 0.08, 'neutral metal, not green hedging');
+test('industrial boundaries are tall and neutral, never garden hedges', () => {
+  let enclosed = 0;
+  for (let i = 0; i < 16; i++) {
+    const shifted = lot.map(([x, z]) => [x + i * 40, z]);
+    const b = { ...building(5), ring: building(5).ring.map(([x, z]) => [x + i * 40, z]) };
+    const g = buildLotGeometry(shifted, b, new Clearance(), false);
+    const p = g.getAttribute('position');
+    const colors = g.getAttribute('color');
+    let high = 0;
+    for (let k = 0; k < p.count; k++) {
+      const x = p.getX(k) - i * 40;
+      if (x > 1 && x < 27 && p.getZ(k) > 1 && p.getZ(k) < 39) continue;
+      high = Math.max(high, p.getY(k));
+      assert.ok(Math.abs(colors.getX(k) - colors.getY(k)) < 0.08, 'neutral, not green hedging');
+    }
+    if (high > 0) {
+      enclosed++;
+      assert.ok(high >= 1.7, 'an industrial-height fence or wall');
+    }
   }
-  assert.ok(boundaryVertices > 0);
-  assert.ok(high >= 1.7, 'an industrial-height fence');
+  assert.ok(enclosed > 0, 'most yards are enclosed');
 });
 
 test('shallow shop setbacks still fit entrance planters without reaching asphalt', () => {

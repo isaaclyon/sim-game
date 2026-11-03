@@ -6,7 +6,7 @@ import type { MeshBuilder } from './mesh.ts';
 import { along, at, type Box, clip, convex, edge, obb, type Pt } from './polygon.ts';
 import { flatRoofed, roofed, roofPlanes } from './roof.ts';
 import type { Style } from './style.ts';
-import { PLINTH, plinth } from './trim.ts';
+import { PLINTH, PROUD, plinth } from './trim.ts';
 
 export interface Building {
   /** `Zone` value: 1/2 residential, 3/4 commercial, 5/6 industrial, low then high density. */
@@ -32,6 +32,11 @@ export function seeded(ring: Pt[]): () => number {
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
+}
+
+/** Shared by the house facade and its garden path; independent of other visual choices. */
+export function houseDoorAt(b: Building): number {
+  return edge(b.ring, b.front).L * (0.35 + seeded(b.ring)() * 0.3);
 }
 
 const pick = (list: number[], r: number) => new THREE.Color(list[Math.floor(r * list.length)]);
@@ -75,7 +80,7 @@ const house: Part = (mb, b, box, style, rand, glass) => {
   const top = pitched
     ? roofed(mb, b.ring, 0, roofPlanes(form, box, b.height, pitch), wall, roof, 0.45)
     : flatRoofed(mb, b.ring, 0, b.height, wall, roof, 0.4, wall);
-  const doorAt = edge(b.ring, b.front).L * (0.35 + rand() * 0.3);
+  const doorAt = houseDoorAt(b);
   const floors = Math.max(1, Math.round(b.height / 3));
   const rows = { storey: 3, floors, h: 1.25, door: { edge: b.front, at: doorAt } };
   windows(mb, b.ring, top, rows, glass, frame);
@@ -231,7 +236,8 @@ function sawtooth(
       wall,
       roof,
     );
-    const [p, q] = [at(box, lo + 0.02, -box.W + 0.6), at(box, lo + 0.02, box.W - 0.6)];
+    // The glass stands proud of the tall face, outside the strip, so the wall cannot show through.
+    const [p, q] = [at(box, lo - PROUD, -box.W + 0.6), at(box, lo - PROUD, box.W - 0.6)];
     mb.wall(p, q, h + 0.4, h + 2.4, glass, [-box.u[0], -box.u[1]]);
   }
 }

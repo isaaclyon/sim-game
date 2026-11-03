@@ -1,6 +1,16 @@
 // Conservative placement: omit details rather than cross a property, wall or road.
-import { inside, type Pt } from '../building-kit/polygon.ts';
+import { along, ccw, type Edge, inside, type Pt } from '../building-kit/polygon.ts';
 import type { Clearance } from '../scenery/clearance.ts';
+
+/** A rectangle aligned to a building edge, with its centre `out` metres outside it. */
+export function rectangle(e: Edge, s: number, out: number, width: number, depth: number): Pt[] {
+  return ccw([
+    along(e, s - width / 2, out - depth / 2),
+    along(e, s + width / 2, out - depth / 2),
+    along(e, s + width / 2, out + depth / 2),
+    along(e, s - width / 2, out + depth / 2),
+  ]);
+}
 
 function cross(a: Pt, b: Pt, c: Pt) {
   return (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
@@ -38,4 +48,42 @@ export function fits(shape: Pt[], lot: Pt[], occupied: Pt[][], roads: Clearance)
     }
   }
   return true;
+}
+
+/** First property exit along an outward ray, including concave lot edges. */
+export function reach(lot: Pt[], e: Edge, s: number, start: number): number {
+  const local = (p: Pt): Pt => [
+    (p[0] - e.a[0]) * e.u[0] + (p[1] - e.a[1]) * e.u[1],
+    (p[0] - e.a[0]) * e.n[0] + (p[1] - e.a[1]) * e.n[1],
+  ];
+  let end = Infinity;
+  for (let i = 0; i < lot.length; i++) {
+    const [a, b] = [local(lot[i]), local(lot[(i + 1) % lot.length])];
+    if (Math.abs(b[0] - a[0]) < 1e-8) continue;
+    const t = (s - a[0]) / (b[0] - a[0]);
+    const out = a[1] + t * (b[1] - a[1]);
+    if (t >= 0 && t <= 1 && out > start) end = Math.min(end, out);
+  }
+  return end;
+}
+
+/** Connect to the nearest frontage, not an arbitrary-length strip through the property. */
+export function access(
+  lot: Pt[],
+  e: Edge,
+  s: number,
+  width: number,
+  start: number,
+  occupied: Pt[][],
+  roads: Clearance,
+): Pt[] | null {
+  const samples = [s - width / 2, s, s + width / 2];
+  let end = Math.min(...samples.map((at) => reach(lot, e, at, start))) - 0.22;
+  if (!Number.isFinite(end)) return null;
+  // Main roads can extend inside the fixed lot kerb. Stop paving just before their asphalt.
+  while (end > start && samples.some((at) => roads.roadGap(...along(e, at, end)) < 0.2))
+    end -= 0.25;
+  if (end - start < 0.25) return null;
+  const shape = rectangle(e, s, (start + end) / 2, width, end - start);
+  return fits(shape, lot, occupied, roads) ? shape : null;
 }

@@ -110,15 +110,23 @@ The point where the toy starts to look like a place.
   natural ground rather than zoning colors or prepared plots outside zoning mode. Painting
   still clears wild trees and fields, leaving grass before development. Outdoor details
   follow the standing building's use during closure, not the newly painted zone, and go
-  away when the building does. Drawn lot outlines appear only in zoning mode. Residential
-  yards are enclosed by joined hedges, industrial yards by open metal fences; entrances stay
-  open and boundaries stop at buildings and roads. Shops keep open frontages. Boundaries
-  take priority over loose props so a tree or planter cannot remove a property side.
-  Fit details to the available outdoor space rather than changing building footprints.
+  away when the building does. Drawn lot outlines appear only in zoning mode. Houses choose
+  stable front gardens, lawns or street-connected parking where space allows, with narrow paths
+  aligned to their doors. Backyards choose lawn, a furnished patio, vegetable beds or a tree,
+  rather than repeating every prop. Residential boundaries mix joined hedges, warm-white picket
+  fences and open lots. Factory yards choose stable ground, a metal fence, block wall or no
+  boundary, a truck court or single drive to a loading door, and one main use: pallets,
+  containers, storage tanks or staff parking. Paths, driveways and aprons stay open,
+  and boundaries stop at buildings and roads. Shops keep open frontages. Boundaries take priority
+  over loose props so a tree or planter cannot remove a property side. These choices are visual
+  only, not parking rules. Fit details to the available outdoor space rather than changing
+  building footprints.
 - Lighting and shadows, and a day/night cycle that follows the sim clock (lit windows, headlights).
 - Varied vehicles (cars, vans, trucks), and detailed pedestrian figures in place of the M2
   placeholders.
-- Ambient sound that changes with the camera (traffic hum, birds, city noise).
+- Ambient sound (implemented): soft engine pass-bys near moving cars and daytime birds.
+  No continuous traffic or building-noise loops. Sparse traffic stays quiet, stopped/hidden
+  cars are silent, and zooming out only reduces volume rather than collecting more sources.
 - Juice: buildings rising on construction, zone paint feedback, smooth tool previews.
 
 Done when: a screenshot or short clip is something you'd post.

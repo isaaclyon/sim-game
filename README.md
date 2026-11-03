@@ -19,9 +19,10 @@ The bend control pulls the curve toward it; it is not a point the road passes th
 Both construction tools continue from the last successful end. `B` toggles bulldoze: hover to
 highlight a whole road between junctions, then click to remove both directions. All tools work
 while paused. Esc or right-click cancels. Space pauses, 1/2/3 set speed.
-Ambient sound follows the camera: traffic hum over busy roads, city noise among buildings and
-walkers, and birds over open land by day. It starts on the first click or key press; `N` or the
-sound button turns it on and off, and the choice is remembered.
+Ambient sound follows the camera: quiet, brief engine sounds near moving cars and birds over
+open land by day. Sparse traffic stays quiet; no moving cars means no traffic sound. Buildings
+never produce a static noise loop. Zooming out makes sound quieter, not louder. Sound starts
+on the first click or key press; `N` or the sound button toggles it, and the choice is remembered.
 The HUD shows the sim's day clock and speed (`Day 1   06:00   1×`). The game starts on Day 1 at
 06:00, and each sim second advances the clock six seconds, so a day lasts 4 real hours at 1× and 24
 minutes at 10×. Speed changes how many sim seconds pass per real second; pausing stops the clock.
@@ -34,10 +35,17 @@ zoned blocks into lots facing their roads, and adds alleys or connector streets 
 is too deep to reach from its edges; these are ordinary roads you can bulldoze.
 Zoning colors and lot outlines appear only while a zoning brush (including unzone) is active.
 Outside zoning mode, developed lots show lawns, garden trees and beds, paths, shop planters,
-and paved industrial yards with stored goods. Hedges enclose residential yards; open metal
-fences enclose industrial yards. Their sides meet at corners, with openings for entrances,
-buildings and roads. Shops keep open frontages. Benches and small marked parking bays appear
-where space allows; dense shops may have room only for shallow entrance planters. Small shops
+and factory yards. Houses mix front gardens, simple lawns and
+street-connected driveways where a full parking space fits. Narrow paths align with their
+front doors. Backyards vary between open lawn, a patio with seating, vegetable beds and a tree.
+Each house keeps its yard choices across reloads. Residential boundaries mix joined hedges,
+warm-white picket fences and open lots. Factory yards vary too: asphalt, concrete or gravel
+ground; open metal fences, solid block walls or no boundary; a truck court across the loading
+doors or one drive to a door; and one main yard use (pallets of goods, shipping containers,
+storage tanks or a row of staff parking), sometimes with a skip. Enclosed
+sides meet at corners, with openings for paths, driveways, buildings and roads. Shops keep
+open frontages. Benches and small marked parking bays appear where space allows; dense shops
+may have room only for shallow entrance planters. Small shops
 have planted side and rear space rather than paving their entire lots.
 These details are decoration, not parking or growth rules. They follow the standing building
 through rezoning and disappear with it. Vacant zoned land stays grassy; painting still clears
