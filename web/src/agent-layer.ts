@@ -50,10 +50,7 @@ export class AgentLayer {
   private readonly sphere = new THREE.Sphere();
   private readonly eye = new THREE.Vector3();
   private readonly figure: Partial<Record<Part, THREE.InstancedMesh>> = {};
-  private readonly material = new THREE.MeshLambertMaterial({
-    vertexColors: true,
-    flatShading: true,
-  });
+  private readonly material: THREE.MeshLambertMaterial;
   private readonly matrix = new THREE.Matrix4();
   private readonly limb = new THREE.Matrix4();
   private readonly quat = new THREE.Quaternion();
@@ -72,8 +69,12 @@ export class AgentLayer {
   /** Colours cars by speed instead of paint: red stopped, yellow slow, green at the limit. */
   trafficView = false;
 
-  constructor(scene: THREE.Object3D) {
+  constructor(
+    scene: THREE.Object3D,
+    material = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }),
+  ) {
     this.scene = scene;
+    this.material = material;
   }
 
   /**

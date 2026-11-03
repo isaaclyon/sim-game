@@ -82,6 +82,8 @@ export class TreeLayer {
     this.canopies = new THREE.InstancedMesh(canopy, material, capacity);
     this.cones = new THREE.InstancedMesh(cone, material, capacity * 2);
     for (const mesh of [this.trunks, this.canopies, this.cones]) {
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
       mesh.frustumCulled = false;
       mesh.count = 0;
       this.group.add(mesh);
