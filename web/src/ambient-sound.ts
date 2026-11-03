@@ -1,6 +1,5 @@
-// Ambient sound that follows the camera: traffic hum, city noise and birds, synthesised with Web
-// Audio so there are no sample files to license or download. `ambience.ts` decides how loud each
-// layer is; this only plays it.
+// Quiet, short engine pass-bys and birds, synthesised with Web Audio. No continuous noise loops
+// or sound generated just because buildings exist. `ambience.ts` decides what is audible.
 //
 // Browsers only allow audio after a click or key press, so the audio graph is built on the first
 // one. Sound pauses while the tab is hidden, and the on/off choice is remembered.
@@ -12,8 +11,8 @@ const MIX_EVERY = 0.25;
 /** Seconds for a layer's volume to cover about two thirds of a change. */
 const RAMP = 0.6;
 /** Overall volume and each layer's volume at full mix. */
-const MASTER = 0.5;
-const LAYER = { traffic: 0.9, city: 0.35, birds: 0.25 };
+const MASTER = 0.35;
+const LAYER = { traffic: 0.45, birds: 0.2 };
 /** Average seconds between bird calls at full birdsong. */
 const BIRD_GAP = 1.2;
 const STORAGE_KEY = 'sound';
@@ -35,7 +34,8 @@ export class AmbientSound {
   private graph: Graph | null = null;
   private buildings: Float32Array = new Float32Array();
   private mixedAt = Number.NEGATIVE_INFINITY;
-  private mix: AmbientMix = { traffic: 0, city: 0, birds: 0 };
+  private mix: AmbientMix = { traffic: 0, birds: 0 };
+  private nextPass = 0;
   /** Audio-clock time of the next bird call. */
   private nextCall = 0;
 
@@ -70,13 +70,14 @@ export class AmbientSound {
     if (seconds - this.mixedAt >= MIX_EVERY) {
       this.mixedAt = seconds;
       this.mix = ambientMix(agents, this.buildings, at, secondOfDay);
-      for (const layer of ['traffic', 'city', 'birds'] as const)
+      for (const layer of ['traffic', 'birds'] as const)
         g.layers[layer].gain.setTargetAtTime(
           this.mix[layer] * LAYER[layer],
           g.ctx.currentTime,
-          RAMP,
+          this.mix[layer] === 0 ? 0.1 : RAMP,
         );
     }
+    this.scheduleTraffic(g);
     this.scheduleBirds(g);
   }
 
@@ -100,6 +101,20 @@ export class AmbientSound {
     g.master.gain.setTargetAtTime(play ? MASTER : 0, g.ctx.currentTime, 0.1);
     if (play) void g.ctx.resume();
     else void g.ctx.suspend();
+  }
+
+  /** Sparse traffic has separate, quiet passes, not an uninterrupted noise bed. */
+  private scheduleTraffic(g: Graph) {
+    const now = g.ctx.currentTime;
+    if (this.mix.traffic < 0.002) {
+      this.nextPass = now;
+      return;
+    }
+    this.nextPass = Math.max(this.nextPass, now);
+    if (this.nextPass < now + 0.3) {
+      trafficPass(g.ctx, g.layers.traffic, this.nextPass);
+      this.nextPass += (1.5 + Math.random() * 1.5) / Math.sqrt(this.mix.traffic);
+    }
   }
 
   /** Schedules bird calls a little ahead, more often the more birdsong the mix asks for. */
@@ -127,30 +142,41 @@ function buildGraph(ctx: AudioContext): Graph {
     gain.connect(master);
     return gain;
   };
-  const layers = { traffic: layer(), city: layer(), birds: layer() };
-  const noise = ctx.createBuffer(1, ctx.sampleRate * 4, ctx.sampleRate);
-  const samples = noise.getChannelData(0);
-  for (let i = 0; i < samples.length; i++) samples[i] = Math.random() * 2 - 1;
-  const play = (offset: number, ...chain: AudioNode[]) => {
-    const source = ctx.createBufferSource();
-    source.buffer = noise;
-    source.loop = true;
-    let node: AudioNode = source;
-    for (const next of chain) node = node.connect(next);
-    source.start(0, offset);
+  return { ctx, master, layers: { traffic: layer(), birds: layer() } };
+}
+
+/** A soft engine fundamental and overtone, with a short pass-by envelope instead of hiss. */
+function trafficPass(ctx: AudioContext, out: AudioNode, at: number) {
+  const duration = 2.4 + Math.random() * 0.6;
+  const base = 58 + Math.random() * 34;
+  const direction = Math.random() < 0.5 ? -1 : 1;
+  const pan = new StereoPannerNode(ctx, { pan: direction * 0.45 });
+  pan.pan.setValueAtTime(direction * 0.45, at);
+  pan.pan.linearRampToValueAtTime(-direction * 0.45, at + duration);
+  const filter = new BiquadFilterNode(ctx, { type: 'lowpass', frequency: 280, Q: 0.5 });
+  const env = new GainNode(ctx, { gain: 0 });
+  env.gain.setValueAtTime(0, at);
+  env.gain.linearRampToValueAtTime(0.12, at + 0.4);
+  env.gain.linearRampToValueAtTime(0.07, at + duration * 0.55);
+  env.gain.linearRampToValueAtTime(0, at + duration);
+  env.connect(filter).connect(pan).connect(out);
+  const engine = new OscillatorNode(ctx, { type: 'triangle', frequency: base });
+  const overtone = new OscillatorNode(ctx, { type: 'sine', frequency: base * 2 });
+  const blend = new GainNode(ctx, { gain: 0.16 });
+  engine.connect(env);
+  overtone.connect(blend).connect(env);
+  for (const [osc, pitch] of [
+    [engine, base],
+    [overtone, base * 2],
+  ] as const) {
+    osc.frequency.setValueAtTime(pitch * 1.06, at);
+    osc.frequency.linearRampToValueAtTime(pitch * 0.88, at + duration);
+    osc.start(at);
+    osc.stop(at + duration + 0.02);
+  }
+  overtone.onended = () => {
+    for (const node of [engine, overtone, blend, env, filter, pan]) node.disconnect();
   };
-  const filter = (type: BiquadFilterType, frequency: number, Q = 0.7) =>
-    new BiquadFilterNode(ctx, { type, frequency, Q });
-  // Traffic: a deep rumble that slowly swells and fades, like cars passing.
-  const swell = ctx.createGain();
-  const lfo = new OscillatorNode(ctx, { frequency: 0.13 });
-  const depth = new GainNode(ctx, { gain: 0.3 });
-  lfo.connect(depth).connect(swell.gain);
-  lfo.start();
-  play(0, filter('lowpass', 160), filter('lowpass', 420), swell, layers.traffic);
-  // City: a band of mid-range noise, like distant voices, air vents and footsteps.
-  play(1.7, filter('bandpass', 900, 0.5), filter('lowpass', 2500), layers.city);
-  return { ctx, master, layers };
 }
 
 /** A few quick rising or falling chirps at `at`, panned somewhere left or right. */

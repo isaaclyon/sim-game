@@ -1,5 +1,5 @@
-// What the ambient sound should be at the spot the camera looks at: how loud traffic, city noise
-// and birds are. Pure and read-only, from the same snapshots the renderer draws; the sim never
+// Quiet traffic and birds at the spot the camera looks at. Buildings and walkers only soften
+// birdsong; they never invent traffic noise. Pure and read-only; the sim never
 // hears about it. `ambient-sound.ts` turns the mix into audio.
 
 import type { AGENT_STRIDE, AgentKind } from './protocol';
@@ -11,7 +11,6 @@ const WALKER: (typeof AgentKind)['Walker'] = 1;
 /** Volumes from 0 to 1 per layer. */
 export interface AmbientMix {
   traffic: number;
-  city: number;
   birds: number;
 }
 
@@ -39,14 +38,12 @@ export function buildingCentres(data: Float32Array): Float32Array {
   return new Float32Array(out);
 }
 
-/** Smallest and largest hearing radius in metres around the listened-to point. */
-const MIN_RADIUS = 60;
-const MAX_RADIUS = 800;
-/** Camera distance at which detail sounds drop to half. */
-const HALF_DISTANCE = 400;
-/** Weighted counts that bring a layer to about two thirds of full volume. */
-const TRAFFIC_FULL = 3;
-const CITY_FULL = 15;
+/** Local sounds never collect more sources just because the camera zooms out. */
+const HEARING_RADIUS = 120;
+/** Camera distance at which sound drops to half; there is no minimum-volume floor. */
+const HALF_DISTANCE = 180;
+/** Weighted moving-car count that brings traffic to about two thirds of full volume. */
+const TRAFFIC_FULL = 24;
 const OPEN_FULL = 25;
 
 const clamp01 = (v: number) => Math.min(Math.max(v, 0), 1);
@@ -61,9 +58,9 @@ export function daylight(secondOfDay: number): number {
 
 /**
  * The mix heard at `at`. Each car, building and walker within the hearing radius counts more
- * the closer it is; moving cars hum more than stopped ones. Birds need open, quiet land and
- * daylight. Zooming out widens the radius, so the whole city blends into a hum, and fades the
- * detail. `agents` is the agent snapshot, `buildings` comes from `buildingCentres`.
+ * the closer it is. Only moving cars produce traffic sound. Birds need open, quiet land and
+ * daylight. Zooming out only reduces volume, never expands the listening area.
+ * `agents` is the agent snapshot, `buildings` comes from `buildingCentres`.
  */
 export function ambientMix(
   agents: Float32Array | undefined,
@@ -71,11 +68,10 @@ export function ambientMix(
   at: Listener,
   secondOfDay: number,
 ): AmbientMix {
-  const radius = Math.min(Math.max(at.distance * 0.6, MIN_RADIUS), MAX_RADIUS);
-  const near = 1 / (1 + Math.max(at.distance, 0) / HALF_DISTANCE);
+  const near = 1 / (1 + (Math.max(at.distance, 0) / HALF_DISTANCE) ** 2);
   const weight = (x: number, y: number) => {
     const d = Math.hypot(x - at.x, y - at.y);
-    return d < radius ? 1 - d / radius : 0;
+    return d < HEARING_RADIUS ? (1 - d / HEARING_RADIUS) ** 2 : 0;
   };
   let traffic = 0;
   let city = 0;
@@ -86,15 +82,14 @@ export function ambientMix(
       const w = weight(agents[o], agents[o + 1]);
       if (w === 0) continue;
       if (agents[o + 4] === WALKER) city += w * 0.5;
-      else traffic += w * (0.3 + 0.7 * Math.min(ratio, 1));
+      else traffic += w * Math.min(ratio, 1);
     }
   }
   for (let i = 0; i + 3 <= buildings.length; i += 3)
     city += weight(buildings[i], buildings[i + 1]) * Math.max(buildings[i + 2], 3) * 0.2;
   const open = Math.exp(-(traffic + city) / OPEN_FULL);
   return {
-    traffic: saturate(traffic, TRAFFIC_FULL) * (0.4 + 0.6 * near),
-    city: saturate(city, CITY_FULL) * (0.4 + 0.6 * near),
+    traffic: saturate(traffic, TRAFFIC_FULL) * near,
     birds: open * daylight(secondOfDay) * near,
   };
 }
