@@ -77,6 +77,7 @@ function centre(f: Field): [number, number] {
 
 function flat(geometry: THREE.BufferGeometry, material: THREE.Material, order: number) {
   const mesh = new THREE.Mesh(geometry, material);
+  mesh.receiveShadow = true;
   mesh.renderOrder = order;
   mesh.frustumCulled = false;
   return mesh;

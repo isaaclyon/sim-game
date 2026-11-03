@@ -110,6 +110,7 @@ worker.onmessage = (e: MessageEvent<FromWorker>) => {
     currAt = now;
     stats = msg.stats;
     tickMs = msg.tickMs;
+    renderer.setTime(stats.secondOfDay);
     renderer.drawSignals(msg.signals);
   }
 };
@@ -453,7 +454,6 @@ addEventListener('keydown', (e) => {
   else if (e.key === '3') setSpeed(10);
 });
 
-// --- frame loop ---
 const fmt = (n: number) => n.toLocaleString('en-US');
 /** Share of finished trips made on foot (ADR 0026). */
 const walkShare = (s: Stats) =>

@@ -61,6 +61,7 @@ export async function tools() {
   const cars = { at: null, visible: true, drawnSelected: [], follows: [], following: [] };
   // Ambient sound: what main.ts asked of it.
   const sound = { toggles: 0, buildings: [], updates: [] };
+  const lightingTimes = [];
   class AmbientSound {
     toggle() {
       sound.toggles++;
@@ -85,6 +86,9 @@ export async function tools() {
   }
   class Renderer {
     onUserPan = null;
+    setTime(time) {
+      lightingTimes.push(time);
+    }
     constructor() {
       renderer = this;
     }
@@ -242,6 +246,7 @@ export async function tools() {
     zoneDrags,
     cars,
     sound,
+    lightingTimes,
     userPan: () => renderer.onUserPan?.(),
     down: (x, y) => canvas.events.pointerdown({ clientX: x, clientY: y, button: 0 }),
     up: (x, y) => canvas.events.pointerup({ clientX: x, clientY: y, button: 0 }),

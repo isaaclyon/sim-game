@@ -56,7 +56,10 @@ export function windows(
         if (f === 0 && door?.edge === i && Math.abs(s + w / 2 - door.at) < w / 2 + 0.8) continue;
         const [p, q] = [along(e, s, PROUD), along(e, s + w, PROUD)];
         if (top(p) < y1 + HEAD_ROOM || top(q) < y1 + HEAD_ROOM) continue;
+        // Stable variation in which windows are lit, independent of gameplay RNG.
+        if (Math.sin(p[0] * 12.9898 + p[1] * 78.233 + f * 37.7) > -0.25) mb.glow.set(0xffcf83);
         mb.wall(p, q, y0, y1, glass, e.n);
+        mb.glow.set(0x000000);
         if (frame) surround(mb, e, s, s + w, y0, y1, frame, true);
       }
     }
@@ -73,6 +76,7 @@ export function shopfront(
 ) {
   const e = edge(ring, front);
   if (e.L < 3) return;
+  mb.glow.set(0xffdfab);
   mb.wall(
     along(e, 0.6, PROUD),
     along(e, e.L - 0.6, PROUD),
@@ -81,6 +85,7 @@ export function shopfront(
     new THREE.Color(style.shopGlass),
     e.n,
   );
+  mb.glow.set(0x000000);
   if (!awning) return;
   const [a, b] = [along(e, 0.4, PROUD), along(e, e.L - 0.4, PROUD)];
   const [c, d] = [along(e, e.L - 0.4, 1.7), along(e, 0.4, 1.7)];
