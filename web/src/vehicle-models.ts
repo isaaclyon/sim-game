@@ -75,8 +75,11 @@ function wheels(mb: MeshBuilder, axle: number[], track: number, r = 0.34) {
 /** Head and tail lights on a body `length` long and `width` wide, at height `y`. */
 function lights(mb: MeshBuilder, length: number, width: number, y: number) {
   for (const z of [-width / 2 + 0.3, width / 2 - 0.3]) {
+    mb.glow.copy(HEAD);
     mb.box([length / 2, z], y, 0.06, 0.14, 0.34, 0, HEAD);
+    mb.glow.copy(TAIL);
     mb.box([-length / 2, z], y, 0.06, 0.14, 0.34, 0, TAIL);
+    mb.glow.set(0x000000);
   }
 }
 
@@ -162,6 +165,21 @@ function far(length: number, width: number, top: number, roof: number, [x0, x1]:
     const mb = new MeshBuilder();
     mb.box([0, 0], 0.15, length, top - 0.15, width, 0, WHITE);
     mb.box([(x0 + x1) / 2, 0], top, x1 - x0, roof - top, width - 0.2, 0, FAR_CABIN);
+    // Flat lamp pairs keep the distant model cheap (eight triangles).
+    for (const side of [-1, 1]) {
+      const x = side * (length / 2 + 0.02);
+      mb.glow.copy(side > 0 ? HEAD : TAIL);
+      for (const z of [-width / 2 + 0.3, width / 2 - 0.3])
+        mb.quad(
+          [x, top - 0.3, z - 0.17],
+          [x, top - 0.3, z + 0.17],
+          [x, top - 0.16, z + 0.17],
+          [x, top - 0.16, z - 0.17],
+          mb.glow,
+          [side, 0, 0],
+        );
+    }
+    mb.glow.set(0x000000);
     return mb.geometry();
   };
 }

@@ -22,8 +22,9 @@ import type { Listener } from './ambience';
 import { BuildingLayer } from './building-kit/layer.ts';
 import { followPoint, KeyCamera } from './camera';
 import { carPosition, nearestCar } from './car-pick';
+import { Lighting, nightMaterial } from './lighting.ts';
 import { LotLayer } from './lot-scenery/layer.ts';
-import { LIGHT, ROADS, SIDEWALK, SKY } from './palette';
+import { ROADS, SIDEWALK, SKY } from './palette';
 import { buildRoadGeometry } from './road-geometry';
 import { buildRoadMarkings } from './road-markings.ts';
 import { createSimScene } from './scene';
@@ -56,13 +57,12 @@ export class Renderer {
   private roads?: THREE.Mesh;
   private sidewalks?: THREE.Mesh;
   private markings?: THREE.Mesh;
-  private readonly buildings = new BuildingLayer(
-    new THREE.MeshLambertMaterial({ vertexColors: true }),
-  );
+  private readonly lighting = new Lighting(this.scene);
+  private readonly buildings = new BuildingLayer(nightMaterial(this.lighting.night));
   private readonly scenery = new Scenery();
   private readonly lotScenery = new LotLayer();
   private readonly overlay = new ZoneOverlay();
-  private readonly agents = new AgentLayer(this.scene);
+  private readonly agents = new AgentLayer(this.scene, nightMaterial(this.lighting.night));
   private readonly signals = new SignalLayer(this.scene);
   private readonly preview: THREE.Line;
   private readonly markers: THREE.Points;
@@ -77,7 +77,8 @@ export class Renderer {
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     this.renderer.setSize(innerWidth, innerHeight);
     container.appendChild(this.renderer.domElement);
-    this.scene.background = new THREE.Color(SKY);
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.scene.add(
       this.scenery.group,
       this.lotScenery.group,
@@ -106,11 +107,6 @@ export class Renderer {
     this.controls.addEventListener('control', () => {
       if (this.controls.currentAction & pans) this.onUserPan?.();
     });
-
-    this.scene.add(new THREE.HemisphereLight(LIGHT.sky, LIGHT.groundBounce, LIGHT.hemisphere));
-    const sun = new THREE.DirectionalLight(LIGHT.sun, LIGHT.sunIntensity);
-    sun.position.set(...LIGHT.sunFrom);
-    this.scene.add(sun);
 
     this.preview = new THREE.Line(
       new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]),
@@ -142,19 +138,19 @@ export class Renderer {
     this.sidewalks = this.flatLayer(
       this.sidewalks,
       buildRoadGeometry(segments, SIDEWALK_WIDTH),
-      new THREE.MeshBasicMaterial({ color: SIDEWALK }),
+      new THREE.MeshLambertMaterial({ color: SIDEWALK }),
       3,
     );
     this.roads = this.flatLayer(
       this.roads,
       buildRoadGeometry(segments, 0, ROAD_COLORS),
-      new THREE.MeshBasicMaterial({ vertexColors: true }),
+      new THREE.MeshLambertMaterial({ vertexColors: true }),
       4,
     );
     this.markings = this.flatLayer(
       this.markings,
       buildRoadMarkings(segments),
-      new THREE.MeshBasicMaterial({ vertexColors: true }),
+      new THREE.MeshLambertMaterial({ vertexColors: true }),
       5,
     );
     this.scenery.setRoads(segments);
@@ -195,6 +191,7 @@ export class Renderer {
     }
     Object.assign(material, { transparent: true, depthWrite: false });
     const created = new THREE.Mesh(geometry, material);
+    created.receiveShadow = true;
     created.renderOrder = order;
     created.frustumCulled = false;
     this.scene.add(created);
@@ -385,11 +382,21 @@ export class Renderer {
     this.preview.visible = line.length > 1;
   }
 
+  /** Snapshot time only: paused frames keep the same lighting. */
+  setTime(secondOfDay: number) {
+    this.lighting.setTime(secondOfDay);
+  }
+
   /** Draws a frame; true if the camera moved. */
   render(): boolean {
     const moved = this.controls.update(this.clock.getDelta());
     this.scenery.update();
     this.lotScenery.update();
+    this.lighting.update(
+      this.scene,
+      this.controls.getTarget(this.look, false),
+      this.controls.distance,
+    );
     this.renderer.render(this.scene, this.camera);
     return moved;
   }

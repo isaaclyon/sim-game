@@ -133,6 +133,7 @@ worker.onmessage = (e: MessageEvent<FromWorker>) => {
     currAt = now;
     stats = msg.stats;
     tickMs = msg.tickMs;
+    renderer.setTime(stats.secondOfDay);
     renderer.drawSignals(msg.signals);
   }
 };

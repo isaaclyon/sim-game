@@ -82,6 +82,8 @@ export class BuildingLayer {
         tile.hash = hash;
       } else {
         const mesh = new THREE.Mesh(geometry, this.material);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
         this.group.add(mesh);
         this.tiles.set(key, { hash, mesh, ids: tileIds });
       }

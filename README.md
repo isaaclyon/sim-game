@@ -26,6 +26,11 @@ on the first click or key press; `N` or the sound button toggles it, and the cho
 The HUD shows the sim's day clock and speed (`Day 1   06:00   1×`). The game starts on Day 1 at
 06:00, and each sim second advances the clock six seconds, so a day lasts 4 real hours at 1× and 24
 minutes at 10×. Speed changes how many sim seconds pass per real second; pausing stops the clock.
+Lighting follows that same clock: warm dawn and dusk fade into daylight and a blue night.
+Building windows, shopfronts and vehicle head/tail lamps glow after dark; pausing holds the
+lighting too. Buildings and trees cast sun shadows onto the ground and roads. Shadows cover
+a bounded area around the camera focus so they stay detailed when viewing a large city;
+vehicle lamps use emissive faces rather than individual light sources.
 Cars whose remaining route uses a deleted road park and retry; other traffic continues.
 The zone brush paints residential (`Z`), commercial (`X`) or industrial (`C`); press the key
 again to switch between low and high density, or use the tool bar. `U` unzones. Click inside a

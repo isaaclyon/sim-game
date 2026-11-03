@@ -74,6 +74,22 @@ test('city reset clears tools, follow and interpolation, and synchronizes pause 
     type: 'frame',
     agents: new Float32Array(5),
     signals: new Float32Array(),
+    stats: {
+      day: 1,
+      secondOfDay: 43200,
+      population: 0,
+      unemployed: 0,
+      unemploymentPercent: 0,
+      demand: { residential: 0, commercial: 0, industrial: 0 },
+      driving: 0,
+      parked: 0,
+      walking: 0,
+      walksCompleted: 0,
+      tripsCompleted: 0,
+      despawnedStuck: 0,
+      pathsFailed: 0,
+      despawnedByEdit: 0,
+    },
     tickMs: 0,
   };
   t.reply(frame);
