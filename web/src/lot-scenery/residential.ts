@@ -6,6 +6,7 @@ import { along, type Edge, edge, type Pt } from '../building-kit/polygon.ts';
 import type { Clearance } from '../scenery/clearance.ts';
 import { type BoundaryStyle, boundary } from './boundary.ts';
 import { access, fits, reach, rectangle } from './placement.ts';
+import { tree } from './props.ts';
 
 const paving = new THREE.Color(0xc8bda8);
 const asphalt = new THREE.Color(0x858b87);
@@ -14,7 +15,6 @@ const timber = new THREE.Color(0xa58a65);
 const soil = new THREE.Color(0x76644c);
 const green = new THREE.Color(0x56794d);
 const flowers = [0xc88791, 0xe0c077, 0xb4a0c7];
-const leaves = [0x6b9054, 0x7e9b5e, 0x527c51];
 
 export function residentialGeometry(
   mb: MeshBuilder,
@@ -67,21 +67,9 @@ export function residentialGeometry(
     occupied.push(shape);
     return true;
   };
-  const tree = (e: Edge, s: number, out: number) => {
+  const plantTree = (e: Edge, s: number, out: number) => {
     const shape = rectangle(e, s, out, 3.6, 3.6);
-    place(shape, () => {
-      const c = along(e, s, out);
-      mb.cylinder(c, 0, 0.17, 2.2, 5, timber);
-      mb.cylinder(
-        c,
-        1.5,
-        1.65,
-        2.5 + rand(),
-        7,
-        new THREE.Color(leaves[Math.floor(rand() * leaves.length)]),
-        0.25,
-      );
-    });
+    place(shape, () => tree(mb, along(e, s, out), rand));
   };
   const bed = (
     e: Edge,
@@ -110,7 +98,7 @@ export function residentialGeometry(
       bed(front, front.L * fraction, deep ? 3 : 1.5, deep ? 3.2 : 2.6, deep ? 2 : 1, false);
     if (deep) bed(front, front.L * 0.2, frontDepth * 0.7, 3.2, 1.6, false);
   } else if (frontKind === 2 && frontDepth > 5.2) {
-    tree(front, front.L * 0.2, Math.min(frontDepth / 2, 4));
+    plantTree(front, front.L * 0.2, Math.min(frontDepth / 2, 4));
   }
 
   const back = edge(b.ring, (b.front + Math.floor(b.ring.length / 2)) % b.ring.length);
@@ -130,6 +118,6 @@ export function residentialGeometry(
   } else if (backKind === 2) {
     for (const fraction of [0.3, 0.7]) bed(back, back.L * fraction, 2.5, 2.2, 3, true);
   } else if (backKind === 3) {
-    tree(back, back.L / 2, 4);
+    plantTree(back, back.L / 2, 4);
   }
 }

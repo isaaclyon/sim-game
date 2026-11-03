@@ -45,16 +45,30 @@ test('outdoor geometry is stable, varied by use, and stays inside its lot', () =
 });
 
 test('small shops leave planted rear space instead of paving the entire property', () => {
-  const small = buildLotGeometry(lot, building(3), new Clearance());
-  const dense = buildLotGeometry(lot, building(4), new Clearance());
-  const grass = small.getAttribute('color');
-  const paved = dense.getAttribute('color');
-  assert.ok(grass.getY(0) > grass.getX(0) && grass.getY(0) > grass.getZ(0), 'green ground');
-  assert.ok(paved.getX(0) > paved.getY(0), 'dense commerce keeps its paved treatment');
-  small.computeBoundingBox();
-  dense.computeBoundingBox();
-  assert.ok(small.boundingBox.max.y > 3, 'rear space accommodates a small tree');
-  assert.ok(dense.boundingBox.max.y < 2, 'dense lots keep their existing low details');
+  let trees = 0;
+  for (let i = 0; i < 16; i++) {
+    const shift = (ring) => ring.map(([x, z]) => [x + i * 40, z]);
+    const site = shift(lot);
+    const small = buildLotGeometry(
+      site,
+      { ...building(3), ring: shift(building().ring) },
+      new Clearance(),
+    );
+    const dense = buildLotGeometry(
+      site,
+      { ...building(4), ring: shift(building().ring) },
+      new Clearance(),
+    );
+    const grass = small.getAttribute('color');
+    const paved = dense.getAttribute('color');
+    assert.ok(grass.getY(0) > grass.getX(0) && grass.getY(0) > grass.getZ(0), 'green ground');
+    assert.ok(Math.abs(paved.getX(0) - paved.getY(0)) < 0.2, 'dense commerce is paved, not green');
+    small.computeBoundingBox();
+    dense.computeBoundingBox();
+    if (small.boundingBox.max.y > 3) trees++;
+    assert.ok(dense.boundingBox.max.y < 2, 'dense lots keep low details');
+  }
+  assert.ok(trees > 0, 'some rear spaces accommodate a small tree');
 });
 
 test('placement rejects concave crossings, building overlaps and road intrusions', () => {

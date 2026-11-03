@@ -1,5 +1,5 @@
 // Conservative placement: omit details rather than cross a property, wall or road.
-import { along, ccw, type Edge, inside, type Pt } from '../building-kit/polygon.ts';
+import { along, ccw, clip, type Edge, inside, type Pt } from '../building-kit/polygon.ts';
 import type { Clearance } from '../scenery/clearance.ts';
 
 /** A rectangle aligned to a building edge, with its centre `out` metres outside it. */
@@ -86,4 +86,29 @@ export function access(
   if (end - start < 0.25) return null;
   const shape = rectangle(e, s, (start + end) / 2, width, end - start);
   return fits(shape, lot, occupied, roads) ? shape : null;
+}
+
+/**
+ * The part of the lot directly in front of edge `e`, out to the first asphalt. Unlike
+ * `access`, it follows tapered and irregular lot sides instead of needing a rectangle.
+ */
+export function frontage(lot: Pt[], e: Edge, roads: Clearance): Pt[] | null {
+  // Roads draw over lot ground, so the frontage may run right up to the asphalt edge.
+  let end = 60;
+  for (const s of [0, e.L / 2, e.L]) {
+    // roadGap is a distance, so each step can safely jump that far (sphere tracing).
+    let out = 0.02;
+    for (let gap = roads.roadGap(...along(e, s, out)); out < end && gap > 0.02; ) {
+      out += gap;
+      gap = roads.roadGap(...along(e, s, out));
+    }
+    end = Math.min(end, out);
+  }
+  const s = (p: Pt) => (p[0] - e.a[0]) * e.u[0] + (p[1] - e.a[1]) * e.u[1];
+  const out = (p: Pt) => (p[0] - e.a[0]) * e.n[0] + (p[1] - e.a[1]) * e.n[1];
+  let shape = clip(lot, (p) => out(p) - 0.02);
+  shape = clip(shape, (p) => end - out(p));
+  shape = clip(shape, s);
+  shape = clip(shape, (p) => e.L - s(p));
+  return shape.length >= 3 ? shape : null;
 }

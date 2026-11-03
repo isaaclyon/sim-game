@@ -44,9 +44,13 @@ ground; open metal fences, solid block walls or no boundary; a truck court acros
 doors or one drive to a door; and one main yard use (pallets of goods, shipping containers,
 storage tanks or a row of staff parking), sometimes with a skip. Enclosed
 sides meet at corners, with openings for paths, driveways, buildings and roads. Shops keep
-open frontages. Benches and small marked parking bays appear where space allows; dense shops
-may have room only for shallow entrance planters. Small shops
-have planted side and rear space rather than paving their entire lots.
+open frontages paved in sand, grey slab or brick, with planters, cafe tables, cycle hoops and a
+bench, or bollards. Shops set well back from the street park cars in front instead: one asphalt
+car park from the shop to the street, with no bays marked in front of the door. Small shops keep
+green rear space with
+one use: trees, a terrace with parasols, open lawn with a bench, or (most often) a storage yard
+with a shed, pallets of stock and bins. Dense shops may have room only for shallow entrance
+planters and a bin corner.
 These details are decoration, not parking or growth rules. They follow the standing building
 through rezoning and disappear with it. Vacant zoned land stays grassy; painting still clears
 wild trees and fields.

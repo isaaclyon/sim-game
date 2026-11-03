@@ -117,7 +117,9 @@ The point where the toy starts to look like a place.
   fences and open lots. Factory yards choose stable ground, a metal fence, block wall or no
   boundary, a truck court or single drive to a loading door, and one main use: pallets,
   containers, storage tanks or staff parking. Paths, driveways and aprons stay open,
-  and boundaries stop at buildings and roads. Shops keep open frontages. Boundaries take priority
+  and boundaries stop at buildings and roads. Shops keep open frontages with varied paving and
+  one kind of frontage prop, or front parking when set well back; small shops add one rear use,
+  most often a storage yard with a shed and stock. Boundaries take priority
   over loose props so a tree or planter cannot remove a property side. These choices are visual
   only, not parking rules. Fit details to the available outdoor space rather than changing
   building footprints.
