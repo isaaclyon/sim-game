@@ -44,7 +44,8 @@ for (const type of ['buildRoad', 'buildCurve', 'deleteRoad']) {
       class: 0,
       id: 99,
     });
-    if (type !== 'deleteRoad') assert.equal(w.messages.at(-1).success, true);
+    if (type !== 'deleteRoad')
+      assert.equal(w.messages.findLast((m) => m.type === 'buildResult').success, true);
     assert.equal(w.messages.filter((msg) => msg.type === 'frame').length, frames + 1);
     const after = w.messages.findLast((msg) => msg.type === 'frame');
     assert.notEqual(after, before, 'paused construction must publish new statistics');

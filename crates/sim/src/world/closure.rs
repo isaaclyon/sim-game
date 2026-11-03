@@ -5,6 +5,7 @@
 //! finds none removes the building, and the lot grows for whatever zone it has by then.
 //! Restoring the exact original zone cancels the remaining steps.
 
+use serde::{Deserialize, Serialize};
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
 
@@ -18,7 +19,7 @@ pub(crate) const STEP_MAX_S: f32 = 12.0;
 /// A former worker at or heading to a closing workplace sets off home after this long.
 const LEAVE_AFTER_S: f32 = 30.0;
 
-#[derive(Default)]
+#[derive(Default, Serialize, Deserialize)]
 pub(super) struct Closures {
     /// Next closure step per building id; `u64::MAX` when the building is not closing.
     pub due: Vec<u64>,

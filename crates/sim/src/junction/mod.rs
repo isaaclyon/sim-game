@@ -8,6 +8,7 @@
 //!
 //! Junction ids are node ids, so they inherit the node's append-only id.
 
+use serde::{Deserialize, Serialize};
 use std::f32::consts::{PI, TAU};
 
 use crate::agents::{AgentId, Agents};
@@ -24,7 +25,7 @@ pub const JUNCTION_RADIUS: f32 = 8.0;
 /// Right-hand traffic: arriving lanes sit counter-clockwise of the road, leaving lanes clockwise.
 const LANE_ANGLE: f32 = 0.2;
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum Control {
     None,
@@ -58,14 +59,14 @@ pub enum Verdict {
     Red,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 struct Crossing {
     from: LaneId,
     to: LaneId,
     until: u64,
 }
 
-#[derive(Default)]
+#[derive(Default, Serialize, Deserialize)]
 pub struct Junctions {
     seen_version: Option<u32>,
     control: Vec<Control>,
@@ -232,4 +233,50 @@ impl Junctions {
 pub fn next_lane(agents: &Agents, agent: AgentId) -> Option<LaneId> {
     let a = agent as usize;
     agents.path[a].get(agents.path_idx[a] as usize + 1).copied()
+}
+
+impl Junctions {
+    /// Internal consistency of loaded junctions (ADR 0033). Arrays sized at the last `sync`
+    /// may trail the network until the next one, unless that sync saw the current version.
+    pub(crate) fn check(&self, net: &RoadNetwork) -> crate::check::Check {
+        use crate::check::{below, ensure, lens};
+        let lanes = self.stop.len();
+        let per_lane = [
+            self.heading.len(),
+            self.departure.len(),
+            self.arrive.len(),
+            self.chord_in.len(),
+            self.chord_out.len(),
+            self.group.len(),
+        ];
+        lens(&per_lane, lanes, "junction lanes")?;
+        let nodes = self.control.len();
+        let per_node = [
+            self.groups.len(),
+            self.phase.len(),
+            self.protected.len(),
+            self.elapsed.len(),
+            self.crossings.len(),
+            self.walk_call.len(),
+        ];
+        lens(&per_node, nodes, "junction nodes")?;
+        let current = self.seen_version == Some(net.version);
+        let fits = |have: usize, total: usize| have == total || (!current && have <= total);
+        ensure(fits(lanes, net.lane_count()), "junction lane count")?;
+        ensure(fits(nodes, net.node_count()), "junction node count")?;
+        below(&self.signals, nodes, "signal nodes")?;
+        ensure(
+            self.signals.iter().all(|&n| {
+                let n = n as usize;
+                self.control[n] == Control::Signal && self.phase[n] < self.groups[n]
+            }),
+            "signal phases",
+        )?;
+        let crossing_lanes = self
+            .crossings
+            .iter()
+            .flatten()
+            .flat_map(|c| [&c.from, &c.to]);
+        below(crossing_lanes, net.lane_count(), "crossing lanes")
+    }
 }

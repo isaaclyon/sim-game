@@ -1,7 +1,7 @@
 // The zone grid as a translucent tint over the ground, and lot edges over it. Both draw in
 // the transparent pass after every opaque mesh, then roads cover them.
 import * as THREE from 'three';
-import { ZONE_OVERLAY, ZONE_OVERLAY_ALPHA } from './palette';
+import { ZONE_OVERLAY, ZONE_OVERLAY_ALPHA } from './palette.ts';
 
 const ZONE_COLORS = ZONE_OVERLAY.map((c) => (c === null ? null : new THREE.Color(c)));
 const LOT_COLOR = 0x5d6656;
@@ -10,6 +10,10 @@ export class ZoneOverlay {
   readonly group = new THREE.Group();
   private zones?: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
   private lots?: THREE.LineSegments;
+
+  constructor() {
+    this.group.visible = false;
+  }
 
   /**
    * `cells` is one `Zone` byte per cell, row-major; `layout` is

@@ -37,14 +37,19 @@
       #inspector .actions { display: flex; gap: 6px; margin-top: 8px; }
       #controls { position: fixed; bottom: 12px; left: 12px; right: 12px; display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none; }
       #toolbar { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
-      #toolbar button, #inspector button {
+      #toolbar button, #inspector button, #city-controls button {
         background: #1c2530; color: #c9d4df; border: 1px solid #2e3a47; border-radius: 6px;
         padding: 6px 10px; font: 12px ui-monospace, Menlo, monospace; cursor: pointer;
         white-space: nowrap; pointer-events: auto;
       }
-      #toolbar button:hover, #inspector button:hover:enabled { border-color: #6b7b8f; }
-      #toolbar button:focus-visible, #inspector button:focus-visible { outline: 2px solid #c9d4df; outline-offset: 2px; }
-      #inspector button:disabled { opacity: 0.5; cursor: default; }
+      #toolbar button:hover:enabled, #inspector button:hover:enabled, #city-controls button:hover:enabled { border-color: #6b7b8f; }
+      #toolbar button:focus-visible, #inspector button:focus-visible, #city-controls button:focus-visible { outline: 2px solid #c9d4df; outline-offset: 2px; }
+      #toolbar button:disabled, #inspector button:disabled, #city-controls button:disabled { opacity: 0.5; cursor: default; }
+      #city-controls { align-self: flex-end; max-width: 440px; padding: 10px 12px; border-radius: 8px; background: rgba(15, 20, 25, 0.85); color: #c9d4df; font: 12px/1.5 ui-monospace, Menlo, monospace; pointer-events: auto; }
+      #city-controls .actions { display: flex; gap: 6px; margin-bottom: 6px; }
+      #save-status { overflow-wrap: anywhere; }
+      #save-status[data-error="true"] { color: #ffb4ab; }
+      #save-note { margin-top: 4px; }
       #road-help { color: #c9d4df; background: #0f1419; padding: 6px 10px; font: 12px/1.5 ui-monospace, monospace; text-align: center; }
       #road-help:empty { display: none; }
       #toolbar button.active, #inspector button[aria-pressed="true"] { background: #2f6fb0; border-color: #4a8bd0; color: white; }
@@ -57,7 +62,7 @@
       <div class="use"><div class="track"><div class="fill" id="demand-commercial"></div></div>C</div>
       <div class="use"><div class="track"><div class="fill" id="demand-industrial"></div></div>I</div>
     </div>
-    <section id="inspector" aria-label="citizen" hidden>
+    <section id="inspector" aria-label="inspection" hidden>
       <div id="inspector-text" aria-live="polite"></div>
       <div class="actions">
         <button type="button" id="follow" aria-pressed="false" title="camera follows this citizen's car (F)">follow (F)</button>
@@ -65,6 +70,14 @@
       </div>
     </section>
     <div id="controls">
+    <section id="city-controls" aria-label="City saving">
+      <div class="actions">
+        <button type="button" id="save-city" disabled>Save city</button>
+        <button type="button" id="new-city" disabled>New city</button>
+      </div>
+      <div id="save-status" role="status" aria-live="polite" aria-atomic="true">Opening city…</div>
+      <div id="save-note">Autosaves every minute in this browser.<br />Clearing browser data removes your city.</div>
+    </section>
     <div id="road-help" role="status" aria-live="polite"></div>
     <div id="toolbar">
       <button type="button" data-speed="0">pause</button>

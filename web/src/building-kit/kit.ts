@@ -3,10 +3,10 @@
 import * as THREE from 'three';
 import { balconies, door, loadingDoors, rooftop, shopfront, windows } from './facade.ts';
 import type { MeshBuilder } from './mesh.ts';
-import { at, type Box, clip, convex, edge, obb, type Pt } from './polygon.ts';
+import { along, at, type Box, clip, convex, edge, obb, type Pt } from './polygon.ts';
 import { flatRoofed, roofed, roofPlanes } from './roof.ts';
 import type { Style } from './style.ts';
-import { PLINTH, plinth } from './trim.ts';
+import { PLINTH, PROUD, plinth } from './trim.ts';
 
 export interface Building {
   /** `Zone` value: 1/2 residential, 3/4 commercial, 5/6 industrial, low then high density. */
@@ -32,6 +32,11 @@ export function seeded(ring: Pt[]): () => number {
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
+}
+
+/** Shared by the house facade and its garden path; independent of other visual choices. */
+export function houseDoorAt(b: Building): number {
+  return edge(b.ring, b.front).L * (0.35 + seeded(b.ring)() * 0.3);
 }
 
 const pick = (list: number[], r: number) => new THREE.Color(list[Math.floor(r * list.length)]);
@@ -75,7 +80,7 @@ const house: Part = (mb, b, box, style, rand, glass) => {
   const top = pitched
     ? roofed(mb, b.ring, 0, roofPlanes(form, box, b.height, pitch), wall, roof, 0.45)
     : flatRoofed(mb, b.ring, 0, b.height, wall, roof, 0.4, wall);
-  const doorAt = edge(b.ring, b.front).L * (0.35 + rand() * 0.3);
+  const doorAt = houseDoorAt(b);
   const floors = Math.max(1, Math.round(b.height / 3));
   const rows = { storey: 3, floors, h: 1.25, door: { edge: b.front, at: doorAt } };
   windows(mb, b.ring, top, rows, glass, frame);
@@ -117,21 +122,46 @@ const shop: Part = (mb, b, box, style, rand, glass) => {
   // Taller blocks on convex lots step back to a smaller top floor.
   const setback = high && b.height > 20 && rand() < 0.6 && convex(b.ring);
   const body = setback ? b.height - 4 : b.height;
-  flatRoofed(mb, b.ring, 0, body, wall, roof, high ? 0.6 : 1, cap);
+  if (!high && convex(b.ring) && rand() < 0.35)
+    roofed(mb, b.ring, 0, roofPlanes('hip', box, body, 18), wall, roof, 0.25);
+  else flatRoofed(mb, b.ring, 0, body, wall, roof, high ? 0.6 : 0.35, cap);
   if (setback) {
     const inner = clipBox(b.ring, box, 2.2);
     if (inner.length >= 3) flatRoofed(mb, inner, body, b.height, wall, roof, 0.5, cap);
   }
   plinth(mb, b.ring, 0.35, new THREE.Color(style.plinth));
   const awning = !high || rand() < 0.5 ? pick(style.awnings, rand()) : null;
-  shopfront(mb, b.ring, b.front, awning, style);
+  const entrance = high ? null : edge(b.ring, b.front).L * 0.3;
+  shopfront(mb, b.ring, b.front, awning, style, entrance);
+  if (!high) {
+    const frame = trimFor(wall, style);
+    const front = edge(b.ring, b.front);
+    door(
+      mb,
+      b.ring,
+      b.front,
+      front.L * 0.3,
+      new THREE.Color(style.door),
+      frame,
+      new THREE.Color(style.plinth),
+    );
+    // A shop-sized fascia above its own awning, not a continuous block-wide band.
+    mb.wall(
+      along(front, 0.6, 0.18),
+      along(front, front.L - 0.6, 0.18),
+      3.5,
+      3.95,
+      awning ?? frame,
+      front.n,
+    );
+  }
   const upper = { storey: 4, first: 4, floors: Math.floor(body / 4) - 1 };
   const rows = high
     ? { ...upper, sill: 0.6, h: 2.2, w: 2.6, gap: 0.6 }
     : { ...upper, h: 1.4, w: 1.3 };
   // Glass office blocks keep plain windows; their panes nearly touch.
   windows(mb, b.ring, () => body, rows, glass, high ? null : trimFor(wall, style));
-  rooftop(mb, b.ring, box, b.height, high ? 3 : 1, false, rand, new THREE.Color(style.rooftop));
+  if (high) rooftop(mb, b.ring, box, b.height, 3, false, rand, new THREE.Color(style.rooftop));
 };
 
 /** The footprint pulled in by `d` on every side of its bounding box. */
@@ -206,7 +236,8 @@ function sawtooth(
       wall,
       roof,
     );
-    const [p, q] = [at(box, lo + 0.02, -box.W + 0.6), at(box, lo + 0.02, box.W - 0.6)];
+    // The glass stands proud of the tall face, outside the strip, so the wall cannot show through.
+    const [p, q] = [at(box, lo - PROUD, -box.W + 0.6), at(box, lo - PROUD, box.W - 0.6)];
     mb.wall(p, q, h + 0.4, h + 2.4, glass, [-box.u[0], -box.u[1]]);
   }
 }

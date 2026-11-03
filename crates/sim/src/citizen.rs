@@ -2,6 +2,7 @@
 use crate::agents::AgentId;
 use crate::building::BuildingId;
 use crate::rng::Rng;
+use serde::{Deserialize, Serialize};
 
 pub type CitizenId = u32;
 pub type HouseholdId = u32;
@@ -16,14 +17,14 @@ const CARLESS_WALK_M: (f32, f32) = (500.0, 1500.0);
 /// Walking speeds, m/s, drawn per person.
 const WALK_SPEED: (f32, f32) = (1.2, 1.6);
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Activity {
     Home,
     Work,
     Shop,
 }
 
-#[derive(Default)]
+#[derive(Default, Serialize, Deserialize)]
 pub struct Citizens {
     pub active: Vec<bool>,
     pub household: Vec<HouseholdId>,
@@ -84,13 +85,13 @@ impl Citizens {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Serialize, Deserialize)]
 pub struct Households {
     pub active: Vec<bool>,
     pub home: Vec<HomeId>,
     pub members: Vec<Vec<CitizenId>>,
 }
-#[derive(Default)]
+#[derive(Default, Serialize, Deserialize)]
 pub struct Homes {
     pub building: Vec<BuildingId>,
     pub capacity: Vec<u8>,

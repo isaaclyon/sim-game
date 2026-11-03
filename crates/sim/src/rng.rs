@@ -1,6 +1,8 @@
+use serde::{Deserialize, Serialize};
+
 /// SplitMix64. Small, fast, and seedable. The sim must only draw randomness from here so
 /// runs stay reproducible.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Rng(u64);
 
 impl Rng {

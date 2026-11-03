@@ -4,14 +4,14 @@ use crate::agents::AgentState;
 use crate::citizen::Activity;
 use crate::{Command, Config, Zone};
 
-fn advance(w: &mut World, seconds: u32) {
+pub(super) fn advance(w: &mut World, seconds: u32) {
     for _ in 0..seconds * 10 {
         w.tick();
     }
 }
 
 /// Homes, shops and industry on one lattice, with residents settled in.
-fn town() -> World {
+pub(super) fn town() -> World {
     let mut w = World::new(
         Config::default(),
         crate::road::RoadNetwork::generate_lattice(4, 3, 120.0),

@@ -1,7 +1,6 @@
-// Citizen inspector (ADR 0022): which car is selected and whether the camera follows it. The
-// sim owns every fact shown; this only picks a visible car and prints what the worker sends.
+// Citizen and building inspector: one selected subject, with sim-owned live counts and facts.
 
-import type { Citizen, Place, ToWorker } from './protocol';
+import type { Building, Citizen, Place, ToWorker } from './protocol';
 
 /** Words for a building by its original use, indexed by `Zone`. */
 const BUILDING_WORDS = ['building', 'house', 'apartments', 'shop', 'store', 'factory', 'factory'];
@@ -29,6 +28,23 @@ export function describe(c: Citizen): string {
   ].join('\n');
 }
 
+/** Counts describe residency or assigned jobs, never physical attendance. */
+export function describeBuilding(b: Building): string {
+  const residential = b.zone === 1 || b.zone === 2;
+  return [
+    label(b),
+    `${b.zone % 2 ? 'low' : 'high'} density${b.closing ? ' · closing' : ''}`,
+    ...(residential
+      ? [`resident capacity   ${b.capacity}`, `residents           ${b.occupied}`]
+      : [
+          `total jobs      ${b.capacity}`,
+          `filled jobs     ${b.occupied}`,
+          `unfilled jobs   ${b.capacity - b.occupied}`,
+        ]),
+    ...(b.closing ? ['Not accepting new residents or workers.'] : []),
+  ].join('\n');
+}
+
 interface Panel {
   hidden: boolean | string;
 }
@@ -36,6 +52,7 @@ interface Text {
   textContent: string | null;
 }
 interface Button {
+  hidden: boolean | string;
   disabled: boolean;
   setAttribute(key: string, value: string): void;
   onclick: ((event: never) => unknown) | null;
@@ -55,6 +72,7 @@ export class Inspector {
   /** The selected car slot, which belongs to one citizen for good (ADR 0021). */
   private agent: number | null = null;
   private citizen: Citizen | null = null;
+  private building: number | null = null;
   private following = false;
 
   private readonly send: (msg: ToWorker) => void;
@@ -92,13 +110,36 @@ export class Inspector {
 
   /** Selects the resident of car `agent`, or clears with null. Reselecting is a no-op. */
   select(agent: number | null) {
-    if (agent === this.agent) return;
+    if (agent === this.agent && this.building === null) return;
     this.selection++;
+    this.building = null;
+    this.followButton.hidden = false;
     this.agent = agent;
     this.citizen = null;
     this.setFollow(false);
     this.panel.hidden = true;
     this.send({ type: 'inspect', agent, selection: this.selection });
+  }
+
+  /** Selects a stable building ID. Citizen and building inspection share one panel. */
+  selectBuilding(building: number) {
+    if (building === this.building) return;
+    this.selection++;
+    this.building = building;
+    this.agent = null;
+    this.citizen = null;
+    this.setFollow(false);
+    this.followButton.hidden = true;
+    this.panel.hidden = true;
+    this.send({ type: 'inspectBuilding', building, selection: this.selection });
+  }
+
+  receiveBuilding(selection: number, building: Building | null) {
+    if (selection !== this.selection || this.building === null) return;
+    if (!building) return this.select(null);
+    const text = describeBuilding(building);
+    if (this.text.textContent !== text) this.text.textContent = text;
+    this.panel.hidden = false;
   }
 
   /** A `citizen` reply from the worker. */

@@ -29,7 +29,7 @@ export const PRESENT_DAY: Style = {
     gableShare: 0.62,
   },
   resHigh: { walls: [0xe3d2bc, 0xc99a7c, 0xd9d6cf], roof: 0xcfc6b6, parapet: 0xb9ae9c },
-  comLow: { walls: [0xe7e3da, 0xd7dce0, 0xe9ddcb], roof: 0xbfc6cc },
+  comLow: { walls: [0xeee4d0, 0xd9bfa7, 0xe0d1b3, 0xc7d0b9], roof: 0x929a9e },
   comHigh: { walls: [0xc9d3db, 0xb7c2cc, 0xdadcd8], roof: 0x8f9ba8 },
   industry: {
     walls: [0xd8cdb4, 0xc9c3b5, 0xb8bfb4],

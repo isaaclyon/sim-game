@@ -8,6 +8,7 @@ use crate::block::{LotPlan, Rect};
 use crate::geometry::Point;
 use crate::road::RoadId;
 use crate::zone::{Zone, ZoneGrid};
+use serde::{Deserialize, Serialize};
 
 /// A recut lot whose outline points all lie this close to an old lot's keeps its id, metres.
 const SAME_OUTLINE: f32 = 0.01;
@@ -15,7 +16,7 @@ const SAME_OUTLINE: f32 = 0.01;
 pub type LotId = u32;
 const NO_LOT: LotId = LotId::MAX;
 
-#[derive(Default)]
+#[derive(Default, Serialize, Deserialize)]
 pub struct Lots {
     /// The road the lot faces.
     pub road: Vec<RoadId>,
@@ -170,5 +171,35 @@ impl Lots {
             out.push(ring.len() as f32);
             out.extend(ring.iter().flat_map(|p| [p.0, p.1]));
         }
+    }
+}
+
+impl Lots {
+    /// Internal consistency of loaded lots (ADR 0033).
+    pub(crate) fn check(&self, grid_cells: usize, roads: usize) -> crate::check::Check {
+        use crate::check::{below, csr, ensure, lens};
+        let n = self.len();
+        let fields = [
+            self.road.len(),
+            self.frontage.len(),
+            self.front_x.len(),
+            self.front_y.len(),
+            self.facing_x.len(),
+            self.facing_y.len(),
+            self.block.len(),
+        ];
+        lens(&fields, n, "lot fields")?;
+        csr(&self.outline_start, n, self.outline.len(), "lot outlines")?;
+        csr(&self.cell_start, n, self.cells.len(), "lot cells")?;
+        below(&self.cells, grid_cells, "lot cell ids")?;
+        below(&self.road, roads, "lot roads")?;
+        ensure(
+            self.owner.is_empty() || self.owner.len() == grid_cells,
+            "cell owners",
+        )?;
+        ensure(
+            self.owner.iter().all(|&l| l == NO_LOT || (l as usize) < n),
+            "cell owner ids",
+        )
     }
 }

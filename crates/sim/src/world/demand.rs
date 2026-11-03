@@ -9,6 +9,7 @@
 use super::World;
 use crate::building::BuildingId;
 use crate::zone::Zone;
+use serde::{Deserialize, Serialize};
 
 /// Residents the town wants before any jobs exist, so an empty map can start a village.
 const RESIDENTIAL_BASE: i32 = 40;
@@ -22,7 +23,7 @@ const INDUSTRIAL_SHARE: i32 = 60;
 const ROOM_PER_VACANT_HOME: i32 = 2;
 
 /// Demand per use, in people: positive wants more buildings, negative has a surplus.
-#[derive(Clone, Copy, Default, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Default, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Demand {
     pub residential: i32,
     pub commercial: i32,
@@ -31,12 +32,12 @@ pub struct Demand {
 
 /// Jobs offered by open buildings: active and not closing. Derived from hashed state, so it is
 /// not hashed; `supply_holds` checks it against a full scan.
-#[derive(Default)]
+#[derive(Default, Serialize, Deserialize)]
 pub(super) struct Supply {
     /// Whether each building's jobs are in the totals below.
-    counted: Vec<bool>,
-    commercial_jobs: u32,
-    industrial_jobs: u32,
+    pub(super) counted: Vec<bool>,
+    pub(super) commercial_jobs: u32,
+    pub(super) industrial_jobs: u32,
 }
 
 impl World {

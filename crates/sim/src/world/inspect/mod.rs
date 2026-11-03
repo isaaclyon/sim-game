@@ -1,5 +1,7 @@
-//! Read-only details about one citizen, for the citizen inspector (ADR 0022). Nothing here
+//! Read-only details about one citizen or building (ADRs 0022, 0029). Nothing here
 //! mutates the world or draws from its RNGs, so inspecting cannot change the simulation.
+#[cfg(test)]
+mod buildings_tests;
 mod names;
 #[cfg(test)]
 mod tests;
@@ -38,7 +40,50 @@ pub struct CitizenInfo {
     pub on_foot: bool,
 }
 
+/// Counts for one standing building. Occupancy means residents or assigned workers,
+/// including those currently elsewhere; capacity is not an offer of new assignments.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct BuildingInfo {
+    pub building: BuildingId,
+    pub zone: Zone,
+    pub capacity: u32,
+    pub occupied: u32,
+    pub closing: bool,
+}
+
 impl World {
+    /// Read-only totals for a building, absent after demolition or for an unknown ID.
+    pub fn building_info(&self, b: BuildingId) -> Option<BuildingInfo> {
+        let i = b as usize;
+        if self.buildings.active.get(i) != Some(&true) {
+            return None;
+        }
+        let zone = self.buildings.zone[i];
+        let (capacity, occupied) = if matches!(zone, Zone::ResidentialLow | Zone::ResidentialHigh) {
+            // Homes are appended in building ID order, as in closure processing.
+            let start = self.homes.building.partition_point(|&home| home < b);
+            let end = self.homes.building.partition_point(|&home| home <= b);
+            (start..end).fold((0, 0), |(capacity, occupied), h| {
+                let residents = self.homes.household[h]
+                    .filter(|&hh| self.households.active[hh as usize])
+                    .map_or(0, |hh| self.households.members[hh as usize].len() as u32);
+                (
+                    capacity + self.homes.capacity[h] as u32,
+                    occupied + residents,
+                )
+            })
+        } else {
+            (self.residents.jobs[i], self.residents.workers[i])
+        };
+        Some(BuildingInfo {
+            building: b,
+            zone,
+            capacity,
+            occupied,
+            closing: self.building_closing(b),
+        })
+    }
+
     /// The resident who owns travel slot `agent`, or `None` for synthetic or unknown slots.
     pub fn citizen_of_agent(&self, agent: AgentId) -> Option<CitizenId> {
         self.agents.citizen.get(agent as usize).copied().flatten()

@@ -2,6 +2,7 @@
 //! while its use has demand; otherwise it waits and checks again (ADR 0025).
 //! Lot geometry is read only at construction; rezoning never changes an existing building,
 //! it only starts the building's gradual closure (ADR 0023).
+use serde::{Deserialize, Serialize};
 mod footprint;
 
 use std::cmp::Reverse;
@@ -19,7 +20,7 @@ pub type BuildingId = u32;
 const DEFER_MIN_S: f32 = 10.0;
 const DEFER_MAX_S: f32 = 30.0;
 
-#[derive(Default)]
+#[derive(Default, Serialize, Deserialize)]
 pub struct Buildings {
     pub lot: Vec<LotId>,
     pub zone: Vec<Zone>,
@@ -172,7 +173,13 @@ impl Buildings {
         let height = match zone {
             Zone::ResidentialLow => 3.0 * (1 + rng.below(2)) as f32,
             Zone::ResidentialHigh => 3.0 * (4 + rng.below(5)) as f32,
-            Zone::CommercialLow => 4.0 * (1 + rng.below(2)) as f32,
+            Zone::CommercialLow => {
+                if rng.below(5) == 0 {
+                    8.0
+                } else {
+                    4.0
+                }
+            }
             Zone::CommercialHigh => 4.0 * (3 + rng.below(5)) as f32,
             Zone::IndustrialLow | Zone::IndustrialHigh => {
                 let base = if lots.frontage[l] < 24.0 {
@@ -280,4 +287,36 @@ fn front_edge(ring: &[Point], facing: Point) -> usize {
         .filter(|&k| score(k, 2.0).is_finite())
         .or_else(|| best(0.0))
         .unwrap_or(0)
+}
+
+impl Buildings {
+    /// Internal consistency of loaded buildings (ADR 0033).
+    pub(crate) fn check(&self, lots: usize) -> crate::check::Check {
+        use crate::check::{below, csr, ensure, lens};
+        let n = self.active.len();
+        let fields = [
+            self.lot.len(),
+            self.zone.len(),
+            self.height.len(),
+            self.roof.len(),
+        ];
+        lens(&fields, n, "building fields")?;
+        csr(
+            &self.outline_start,
+            n,
+            self.outline.len(),
+            "building outlines",
+        )?;
+        below(&self.lot, lots, "building lots")?;
+        ensure(
+            self.owner.len() <= lots && self.due.len() == self.owner.len(),
+            "lot schedules",
+        )?;
+        below(self.owner.iter().flatten(), n, "lot owners")?;
+        below(
+            self.pending.iter().map(|Reverse((_, lot))| lot),
+            self.due.len(),
+            "pending lots",
+        )
+    }
 }

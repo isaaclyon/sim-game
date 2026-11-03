@@ -4,6 +4,7 @@
 //! directly ahead. A tick is O(vehicles) with no spatial queries or collision checks, and jams
 //! still emerge because a full lane refuses new entries.
 
+use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 
 use crate::agents::{AgentId, AgentState, Agents};
@@ -17,10 +18,12 @@ pub const ACCEL: f32 = 3.0;
 /// seconds, so it can keep its speed through when the way is clear.
 pub const LOOKAHEAD_S: f32 = 1.5;
 
-#[derive(Default)]
+#[derive(Default, Serialize, Deserialize)]
 pub struct Traffic {
     /// Per lane, front vehicle first.
     pub queues: Vec<VecDeque<AgentId>>,
+    /// Scratch reused between ticks.
+    #[serde(skip)]
     exits: Vec<LaneId>,
 }
 
@@ -129,5 +132,13 @@ impl Traffic {
     /// Hands the buffer from `advance` back so its allocation is reused next tick.
     pub fn recycle_exits(&mut self, exits: Vec<LaneId>) {
         self.exits = exits;
+    }
+}
+
+impl Traffic {
+    /// Internal consistency of loaded lane queues (ADR 0033).
+    pub(crate) fn check(&self, lanes: usize, agents: usize) -> crate::check::Check {
+        crate::check::ensure(self.queues.len() <= lanes, "lane queues")?;
+        crate::check::below(self.queues.iter().flatten(), agents, "queued agents")
     }
 }

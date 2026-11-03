@@ -1,8 +1,10 @@
 //! The world: owns all sim state and advances it one fixed step at a time.
 
+use serde::{Deserialize, Serialize};
 mod closure;
 mod demand;
 mod inspect;
+mod persist;
 mod residents;
 mod roads;
 mod snapshot;
@@ -26,7 +28,8 @@ use crate::traffic::Traffic;
 use crate::zone::{Zone, ZoneGrid};
 
 pub use demand::Demand;
-pub use inspect::{CitizenInfo, Place};
+pub use inspect::{BuildingInfo, CitizenInfo, Place};
+pub use persist::{SAVE_VERSION, SaveError};
 
 /// Floats per agent in `write_agent_snapshot`.
 pub const SNAPSHOT_STRIDE: usize = 5;
@@ -36,7 +39,7 @@ pub const SIGNAL_STRIDE: usize = 4;
 /// spreads off backed-up avenues.
 const QUEUE_DELAY_S: f32 = 1.0;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Config {
     pub seed: u64,
     /// Sim seconds per tick. The frontend's tick clock must match.
@@ -115,7 +118,7 @@ pub enum Command {
     },
 }
 
-#[derive(Clone, Copy, Default, Debug)]
+#[derive(Clone, Copy, Default, Debug, Serialize, Deserialize)]
 pub struct Stats {
     pub tick: u64,
     /// Allocated travel slots, including dormant citizen reservations and departed tombstones.
@@ -150,6 +153,7 @@ pub struct Stats {
     pub detours: u64,
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct World {
     pub cfg: Config,
     pub roads: RoadNetwork,
@@ -163,16 +167,22 @@ pub struct World {
     closures: closure::Closures,
     supply: demand::Supply,
     /// Faces of the road network, traced again when `blocks_version` falls behind the roads.
+    #[serde(skip)]
     blocks: Blocks,
+    #[serde(skip)]
     blocks_version: Option<u32>,
     pub agents: Agents,
     traffic: Traffic,
     pub junctions: Junctions,
+    #[serde(skip)]
     pathfinder: Pathfinder,
     path_queue: VecDeque<AgentId>,
+    #[serde(skip)]
     lane_delay: Vec<f32>,
+    #[serde(skip)]
     detour: Vec<LaneId>,
     /// Scratch for `resolve_exits`: front cars that stay put this tick.
+    #[serde(skip)]
     held: Vec<(AgentId, LaneId, bool)>,
     entering: Vec<AgentId>,
     /// Citizens on foot, in the order their walks started.

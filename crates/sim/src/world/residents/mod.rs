@@ -1,4 +1,5 @@
 //! Event-driven residents. No idle citizen scan on the traffic tick.
+use serde::{Deserialize, Serialize};
 mod allocation;
 mod hash;
 mod lifecycle;
@@ -11,6 +12,7 @@ use crate::rng::Rng;
 use std::cmp::Reverse;
 use std::collections::{BTreeSet, BinaryHeap};
 
+#[derive(Serialize, Deserialize)]
 pub(super) struct Residents {
     pub rng: Rng,
     pub registered: usize,

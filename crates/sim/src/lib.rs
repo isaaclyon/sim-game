@@ -7,6 +7,7 @@
 pub mod agents;
 pub mod block;
 pub mod building;
+mod check;
 pub mod citizen;
 pub mod clock;
 mod geometry;
@@ -21,5 +22,5 @@ pub mod traffic;
 pub mod world;
 pub mod zone;
 
-pub use world::{Command, Config, Stats, World};
+pub use world::{Command, Config, SaveError, Stats, World};
 pub use zone::Zone;

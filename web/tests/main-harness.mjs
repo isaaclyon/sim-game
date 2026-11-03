@@ -12,6 +12,7 @@ export async function tools() {
       hidden: false,
       disabled: false,
       style: {},
+      dataset: {},
       events: {},
       attributes: {},
       classList: { toggle() {} },
@@ -42,6 +43,9 @@ export async function tools() {
       'inspector-close',
       'sound',
       'traffic',
+      'save-city',
+      'new-city',
+      'save-status',
     ].map((id) => [id, element()]),
   );
   const zoneButtons = Object.values(Zone).map((zone) => ({
@@ -57,8 +61,17 @@ export async function tools() {
   const documentEvents = {};
   const pans = [];
   const clock = { now: 0, cameraMoved: false };
+  const confirm = { answer: false, prompts: [] };
   // Inspector: the car under the next click, and what the renderer was asked to do.
-  const cars = { at: null, visible: true, drawnSelected: [], follows: [], following: [] };
+  const cars = {
+    at: null,
+    visible: true,
+    drawnSelected: [],
+    follows: [],
+    following: [],
+    draws: [],
+  };
+  const buildings = { at: null };
   // Ambient sound: what main.ts asked of it.
   const sound = { toggles: 0, buildings: [], updates: [] };
   const lightingTimes = [];
@@ -96,6 +109,9 @@ export async function tools() {
       cars.clicked = [x, y];
       return cars.at;
     }
+    buildingAt() {
+      return buildings.at;
+    }
     follow(agent, seconds) {
       cars.follows.push([agent, seconds]);
       return cars.visible;
@@ -119,6 +135,7 @@ export async function tools() {
       },
     };
     drawAgents(...args) {
+      cars.draws.push(args);
       const selected = args[3];
       cars.drawnSelected.push(selected);
     }
@@ -138,6 +155,9 @@ export async function tools() {
     }
     setPreview(stops) {
       previews.push({ type: 'road', stops });
+    }
+    setZoningVisible(visible) {
+      previews.push({ type: 'zoningVisible', visible });
     }
     setLeftDragPans(on) {
       leftDragPans.push(on);
@@ -170,6 +190,10 @@ export async function tools() {
     },
     URL,
     Worker,
+    confirm: (prompt) => {
+      confirm.prompts.push(prompt);
+      return confirm.answer;
+    },
     performance: { now: () => clock.now },
     requestAnimationFrame: (fn) => {
       frame = fn;
@@ -192,39 +216,51 @@ export async function tools() {
     stripTypeScriptTypes(readFileSync(new URL('../src/inspector.ts', import.meta.url), 'utf8')),
     { context },
   );
+  const cityControls = new SourceTextModule(
+    stripTypeScriptTypes(readFileSync(new URL('../src/city-controls.ts', import.meta.url), 'utf8')),
+    { context },
+  );
+  const hud = new SourceTextModule(
+    stripTypeScriptTypes(readFileSync(new URL('../src/hud.ts', import.meta.url), 'utf8')),
+    { context },
+  );
   const demandMeter = new SourceTextModule(
     stripTypeScriptTypes(readFileSync(new URL('../src/demand-meter.ts', import.meta.url), 'utf8')),
     { context },
   );
   await module.link((specifier) =>
-    specifier === './inspector'
-      ? inspector
-      : specifier === './ambient-sound'
-        ? new SyntheticModule(
-            ['AmbientSound'],
-            function () {
-              this.setExport('AmbientSound', AmbientSound);
-            },
-            { context },
-          )
-        : specifier === './demand-meter'
-          ? demandMeter
-          : specifier === './protocol'
+    specifier === './city-controls'
+      ? cityControls
+      : specifier === './hud'
+        ? hud
+        : specifier === './inspector'
+          ? inspector
+          : specifier === './ambient-sound'
             ? new SyntheticModule(
-                ['RoadClass', 'Zone'],
+                ['AmbientSound'],
                 function () {
-                  this.setExport('RoadClass', RoadClass);
-                  this.setExport('Zone', Zone);
+                  this.setExport('AmbientSound', AmbientSound);
                 },
                 { context },
               )
-            : new SyntheticModule(
-                ['Renderer'],
-                function () {
-                  this.setExport('Renderer', Renderer);
-                },
-                { context },
-              ),
+            : specifier === './demand-meter'
+              ? demandMeter
+              : specifier === './protocol'
+                ? new SyntheticModule(
+                    ['RoadClass', 'Zone'],
+                    function () {
+                      this.setExport('RoadClass', RoadClass);
+                      this.setExport('Zone', Zone);
+                    },
+                    { context },
+                  )
+                : new SyntheticModule(
+                    ['Renderer'],
+                    function () {
+                      this.setExport('Renderer', Renderer);
+                    },
+                    { context },
+                  ),
   );
   await module.evaluate();
   const move = (x, y) => canvas.events.pointermove({ clientX: x, clientY: y });
@@ -235,6 +271,7 @@ export async function tools() {
   };
   return {
     elements,
+    confirm,
     frame: () => frame(),
     messages,
     previews,
@@ -245,6 +282,7 @@ export async function tools() {
     clock,
     zoneDrags,
     cars,
+    buildings,
     sound,
     lightingTimes,
     userPan: () => renderer.onUserPan?.(),
