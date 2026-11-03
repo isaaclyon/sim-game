@@ -5,6 +5,18 @@ use crate::road::NodeId;
 use crate::zone::Zone;
 use std::cmp::Reverse;
 
+/// Employment capacity, not physical attendance. Low shops staff their ground-floor trade;
+/// dense commerce uses all floors, while industrial height never implies extra job floors.
+fn job_capacity(zone: Zone, area: f32, height: f32) -> u32 {
+    match zone {
+        Zone::CommercialLow => (area / 25.0).floor().max(2.0) as u32,
+        Zone::CommercialHigh => (area * (height / 4.0).floor() / 30.0).floor().max(1.0) as u32,
+        Zone::IndustrialLow => (area / 30.0).floor().max(5.0) as u32,
+        Zone::IndustrialHigh => (area / 10.0).floor().max(10.0) as u32,
+        _ => 0,
+    }
+}
+
 impl World {
     /// Original use is retained on repaint; only new assignments are blocked. The closing
     /// flag (ADR 0023) is a cheap first test; the zone and access tests remain authoritative.
@@ -43,15 +55,7 @@ impl World {
             .abs();
             let zone = self.buildings.zone[b];
             let residential = matches!(zone, Zone::ResidentialLow | Zone::ResidentialHigh);
-            let jobs = match zone {
-                Zone::CommercialLow | Zone::CommercialHigh => {
-                    (area * (self.buildings.height[b] / 4.0).floor() / 30.0)
-                        .floor()
-                        .max(1.0) as u32
-                }
-                Zone::IndustrialLow | Zone::IndustrialHigh => (area / 60.0).floor().max(1.0) as u32,
-                _ => 0,
-            };
+            let jobs = job_capacity(zone, area, self.buildings.height[b]);
             self.residents.jobs.push(jobs);
             self.residents.workers.push(0);
             if residential && self.buildings.active[b] {
@@ -194,5 +198,35 @@ impl World {
             }
         }
         best.map(|(_, b)| b)
+    }
+}
+
+#[cfg(test)]
+mod capacity_tests {
+    use super::{Zone, job_capacity};
+
+    #[test]
+    fn low_shops_do_not_staff_every_upper_floor_as_retail() {
+        // A compact 200 m² shop needs a small team, not just two employees.
+        assert_eq!(job_capacity(Zone::CommercialLow, 200.0, 4.0), 8);
+        assert_eq!(job_capacity(Zone::CommercialLow, 200.0, 8.0), 8);
+        assert_eq!(job_capacity(Zone::CommercialLow, 130.0, 4.0), 5);
+        assert_eq!(job_capacity(Zone::CommercialLow, 256.0, 4.0), 10);
+        // Older, larger footprints still scale by ground floor, never upper floors.
+        assert_eq!(job_capacity(Zone::CommercialLow, 810.0, 8.0), 32);
+        assert_eq!(job_capacity(Zone::CommercialLow, 810.0, 4.0), 32);
+        assert_eq!(job_capacity(Zone::CommercialLow, 40.0, 4.0), 2);
+        // Dense commerce retains multi-floor capacity rather than becoming corner shops.
+        assert_eq!(job_capacity(Zone::CommercialHigh, 810.0, 16.0), 108);
+    }
+
+    #[test]
+    fn small_industry_has_a_team_and_large_halls_still_scale_by_area() {
+        assert_eq!(job_capacity(Zone::IndustrialLow, 45.0, 4.0), 5);
+        assert_eq!(job_capacity(Zone::IndustrialHigh, 15.0, 6.0), 10);
+        assert_eq!(job_capacity(Zone::IndustrialLow, 900.0, 8.0), 30);
+        assert_eq!(job_capacity(Zone::IndustrialHigh, 900.0, 12.0), 90);
+        assert_eq!(job_capacity(Zone::IndustrialHigh, 900.0, 20.0), 90);
+        assert_eq!(job_capacity(Zone::ResidentialLow, 100.0, 6.0), 0);
     }
 }

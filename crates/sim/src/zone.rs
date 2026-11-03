@@ -1,12 +1,14 @@
 //! The zone grid: what the player painted, one byte per square cell (ADR 0014).
 
+use serde::{Deserialize, Serialize};
+
 /// Side of one zone cell, metres.
 pub const ZONE_CELL: f32 = 8.0;
 /// Land past the starting road network that can still be zoned, metres.
 pub const ZONE_MARGIN: f32 = 480.0;
 
 /// A zone, including its density. The discriminant is the stored cell byte.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum Zone {
     None = 0,
@@ -35,6 +37,7 @@ impl Zone {
 
 /// A fixed, row-major grid of zone cells. Cell `(c, r)` covers
 /// `[x0 + c * ZONE_CELL, x0 + (c + 1) * ZONE_CELL)` and likewise in y.
+#[derive(Serialize, Deserialize)]
 pub struct ZoneGrid {
     pub x0: f32,
     pub y0: f32,
@@ -162,6 +165,25 @@ impl ZoneGrid {
             self.cols as f32,
             self.rows as f32,
         ]
+    }
+}
+
+impl ZoneGrid {
+    /// Internal consistency of a loaded grid (ADR 0033).
+    pub(crate) fn check(&self) -> crate::check::Check {
+        use crate::check::ensure;
+        let cells = (self.cols as usize).checked_mul(self.rows as usize);
+        ensure(cells == Some(self.cells.len()), "zone grid size")?;
+        ensure(
+            self.cells.iter().all(|&c| Zone::from_u8(c).is_some()),
+            "zone cells",
+        )?;
+        let zoned = self
+            .cells
+            .iter()
+            .filter(|&&c| c != Zone::None as u8)
+            .count();
+        ensure(zoned == self.zoned as usize, "zoned count")
     }
 }
 

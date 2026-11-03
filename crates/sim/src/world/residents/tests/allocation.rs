@@ -35,7 +35,7 @@ fn apartments_have_independent_homes_and_halls_have_only_one_job_floor() {
                     .all(|&h| (2..=7).contains(&w.homes.capacity[h]))
             );
         } else {
-            assert_eq!(w.residents.jobs[i], (area / 60.0).floor().max(1.0) as u32);
+            assert_eq!(w.residents.jobs[i], (area / 10.0).floor().max(10.0) as u32);
         }
     }
 }

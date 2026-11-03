@@ -4,6 +4,10 @@
 export type ToWorker =
   | { type: 'init'; seed: number; cols: number; rows: number; agents: number }
   | { type: 'setSpeed'; speed: number }
+  /** Replace the single local save with the current sim state. */
+  | { type: 'saveCity' }
+  /** The UI must confirm before requesting a fresh city and replacing the save. */
+  | { type: 'newCity' }
   /** Explicit synthetic benchmark traffic, not normal play. */
   | { type: 'spawn'; count: number }
   | {
@@ -58,7 +62,10 @@ export type ToWorker =
    * citizen, not the car slot. Answered with `citizen` at once, paused or not, then after every
    * frame and edit while selected. `selection` is echoed so replies to an older one are dropped.
    */
-  | { type: 'inspect'; agent: number | null; selection: number };
+  | { type: 'inspect'; agent: number | null; selection: number }
+  /** Selects a stable building ID, replacing any citizen selection. Same refresh and
+   * selection-counter contract as inspect; null clears either kind of selection. */
+  | { type: 'inspectBuilding'; building: number | null; selection: number };
 
 /** Road classes, matching the sim's `RoadClass` (ADR 0017). Main roads carry long
  * trips; the sim lays alleys to reach deep lots. */
@@ -129,6 +136,15 @@ export interface Citizen {
   onFoot: boolean;
 }
 
+/** Sim-owned counts, not physical attendance. Original use persists during closure. */
+export interface Building extends Place {
+  /** Resident places for homes, total jobs for workplaces. */
+  capacity: number;
+  /** People living here or employees assigned here, including those currently elsewhere. */
+  occupied: number;
+  closing: boolean;
+}
+
 export interface Demand {
   residential: number;
   commercial: number;
@@ -168,7 +184,21 @@ export interface Stats {
   despawnedByEdit: number;
 }
 
+/** Persistence metadata only. A commit acknowledges the captured revision, not later edits. */
+export interface CityStatus {
+  type: 'cityStatus';
+  ready: boolean;
+  busy: boolean;
+  dirty: boolean;
+  savedAt: number | null;
+  error: string | null;
+}
+
 export type FromWorker =
+  | CityStatus
+  /** Sent before all geometry and the first frame of a newly installed world. Clears
+   * interpolation and transient selections/previews. Restored cities always resume paused. */
+  | { type: 'cityReset'; speed: number }
   /**
    * `segments` is `[ax, ay, bx, by, class]` per active rendered segment (many per curve), not
    * per road ID. `class` is a `RoadClass`.
@@ -198,11 +228,12 @@ export type FromWorker =
    * counter-clockwise, without a repeated closing point. Zone is the original use, not the
    * repainted zone. Roof is a stable palette index (0–3 for industry; 0 for other uses).
    * Front is the footprint edge, from point `front` to the next, facing the lot's road (ADR 0027).
-   * Closing buildings stay until they empty out (ADR 0023).
+   * Closing buildings stay until they empty out (ADR 0023). `ids` contains the stable ID
+   * for each packed record in this same message, never a snapshot index.
    * Growth and closure are coalesced to at most four snapshots per real second. Start, edits and pause
    * flush immediately, so paused road edits never leave displaced buildings visible.
    */
-  | { type: 'buildings'; data: Float32Array }
+  | { type: 'buildings'; data: Float32Array; ids: Uint32Array }
   /** `[x, y]` per outline sample of the block under the cursor, closed; empty outside blocks. */
   | { type: 'blockPreview'; outline: Float32Array; revision: number }
   | { type: 'buildResult'; id: number; success: boolean }
@@ -210,6 +241,8 @@ export type FromWorker =
   | { type: 'bulldozePreview'; segment: Float32Array; revision: number }
   /** The inspected citizen, or null if the selected agent has no resident. Answers `inspect`. */
   | { type: 'citizen'; selection: number; citizen: Citizen | null }
+  /** Selected building, or null on a miss or after demolition. Answers inspectBuilding. */
+  | { type: 'building'; selection: number; building: Building | null }
   /**
    * `agents` is `[x, y, heading, speedRatio, kind]` per agent id (`AGENT_STRIDE`); speedRatio
    * < 0 means hidden; kind is an `AgentKind` (ADR 0026).

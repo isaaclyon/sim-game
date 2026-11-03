@@ -4,10 +4,13 @@
 //! `2k + 1` (b→a). Lanes are append-only, so a `LaneId` stays valid for the life of the world.
 //! Centrelines are straight or quadratic Bézier curves; geometry queries use travel distance.
 
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
 use crate::geometry::{Point, Shape};
 use crate::rng::Rng;
+
+mod check;
 
 pub type NodeId = u32;
 pub type LaneId = u32;
@@ -22,7 +25,7 @@ pub const MAIN_SPEED: f32 = 20.0;
 
 /// What a road is for. Local streets reach places; main roads carry the middle of long trips,
 /// are faster, and win right of way and signals at junctions (ADR 0017).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum RoadClass {
     #[default]
@@ -53,7 +56,7 @@ impl RoadClass {
 /// Alley speed limit, m/s (30 km/h). The sim lays alleys to reach deep lots (ADR 0016).
 pub const ALLEY_SPEED: f32 = 8.3;
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Serialize, Deserialize)]
 pub struct RoadNetwork {
     pub node_x: Vec<f32>,
     pub node_y: Vec<f32>,

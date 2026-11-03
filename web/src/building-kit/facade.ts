@@ -70,17 +70,28 @@ export function shopfront(
   front: number,
   awning: THREE.Color | null,
   style: Style,
+  entrance: number | null = null,
 ) {
   const e = edge(ring, front);
   if (e.L < 3) return;
-  mb.wall(
-    along(e, 0.6, PROUD),
-    along(e, e.L - 0.6, PROUD),
-    0.35,
-    3.1,
-    new THREE.Color(style.shopGlass),
-    e.n,
-  );
+  const panes =
+    entrance === null
+      ? [[0.6, e.L - 0.6]]
+      : [
+          [0.6, entrance - 0.7],
+          [entrance + 0.7, e.L - 0.6],
+        ];
+  for (const [start, end] of panes) {
+    if (end <= start) continue;
+    mb.wall(
+      along(e, start, PROUD),
+      along(e, end, PROUD),
+      0.35,
+      3.1,
+      new THREE.Color(style.shopGlass),
+      e.n,
+    );
+  }
   if (!awning) return;
   const [a, b] = [along(e, 0.4, PROUD), along(e, e.L - 0.4, PROUD)];
   const [c, d] = [along(e, e.L - 0.4, 1.7), along(e, 0.4, 1.7)];

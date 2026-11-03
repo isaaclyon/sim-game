@@ -59,6 +59,17 @@ pub struct CitizenView {
     pub on_foot: bool,
 }
 
+/// Sim-owned counts for one standing building; no attendance or visitor counts.
+#[wasm_bindgen]
+#[derive(Clone, Copy)]
+pub struct BuildingView {
+    pub building: u32,
+    pub zone: u8,
+    pub capacity: u32,
+    pub occupied: u32,
+    pub closing: bool,
+}
+
 #[wasm_bindgen]
 impl Sim {
     #[wasm_bindgen(constructor)]
@@ -71,6 +82,20 @@ impl Sim {
             world: World::generate(cfg, cols, rows),
             buf: Vec::new(),
         }
+    }
+
+    /// The complete city as opaque save bytes (ADR 0033). Changes nothing.
+    pub fn save(&self) -> Result<Vec<u8>, JsValue> {
+        self.world.save().map_err(save_error)
+    }
+
+    /// A city from `save` bytes. Throws an `Error` with a readable message for missing,
+    /// damaged or other-version saves; nothing is loaded then.
+    pub fn load(bytes: &[u8]) -> Result<Sim, JsValue> {
+        Ok(Sim {
+            world: World::load(bytes).map_err(save_error)?,
+            buf: Vec::new(),
+        })
     }
 
     /// Sim seconds per tick, so the frontend clock can't drift from the sim's.
@@ -183,6 +208,22 @@ impl Sim {
     pub fn lot_outlines(&mut self) -> Vec<f32> {
         self.world.write_lot_outlines(&mut self.buf);
         self.buf.clone()
+    }
+
+    /// Stable IDs alongside the packed building snapshot, in the same active-building order.
+    pub fn building_ids(&self) -> Vec<u32> {
+        self.world.buildings.active_buildings().collect()
+    }
+
+    pub fn building_info(&self, id: u32) -> Option<BuildingView> {
+        let b = self.world.building_info(id)?;
+        Some(BuildingView {
+            building: b.building,
+            zone: b.zone as u8,
+            capacity: b.capacity,
+            occupied: b.occupied,
+            closing: b.closing,
+        })
     }
 
     pub fn buildings_version(&self) -> u32 {
@@ -318,4 +359,9 @@ impl Sim {
             despawned_by_edit: s.despawned_by_edit as f64,
         }
     }
+}
+
+/// A JS `Error` whose message says why the save failed.
+fn save_error(e: sim::SaveError) -> JsValue {
+    JsError::new(&e.to_string()).into()
 }

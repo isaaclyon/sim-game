@@ -32,15 +32,32 @@ block (land enclosed by roads, outlined on hover) to zone all of it, or drag a r
 paint just that (left-drag paints instead of panning while the brush is on). The sim cuts
 zoned blocks into lots facing their roads, and adds alleys or connector streets where a block
 is too deep to reach from its edges; these are ordinary roads you can bulldoze.
+Zoning colors and lot outlines appear only while a zoning brush (including unzone) is active.
+Outside zoning mode, developed lots show lawns, garden trees and beds, paths, shop planters,
+and paved industrial yards with stored goods. Hedges enclose residential yards; open metal
+fences enclose industrial yards. Their sides meet at corners, with openings for entrances,
+buildings and roads. Shops keep open frontages. Benches and small marked parking bays appear
+where space allows; dense shops may have room only for shallow entrance planters. Small shops
+have planted side and rear space rather than paving their entire lots.
+These details are decoration, not parking or growth rules. They follow the standing building
+through rezoning and disappear with it. Vacant zoned land stays grassy; painting still clears
+wild trees and fields.
 
 Buildings start appearing after a few simulation seconds and fill suitable zoned lots within
-about a minute at normal speed. Low-density homes have yards; apartments and shops follow lot
-shapes and share side walls. Newly zoned industrial land mixes small workshop lots, wider
+about a minute at normal speed. Low-density homes have yards. Low-density commerce grows
+small, shallow shops, mostly one storey, with individual doors and awnings, mixed flat and
+pitched roofs, and occasional attached pairs. Most shops keep side gaps and rear space.
+Apartments and high-density commerce follow lot shapes and share side walls
+([ADR 0031](docs/adrs/0031-small-low-density-shops.md)). Newly zoned industrial land mixes small workshop lots, wider
 warehouses and occasional factory-sized sites, with varied hall sizes, heights, yards and roof
 colours. Larger sites need adjoining land of the same industrial zone; curves and small blocks
 may leave smaller lots. Industrial halls stay rectangular; corners too narrow for a hall stay
 open rather than growing pointed sheds. Repainting preserves existing lot sizes and buildings. Density changes
-building height. Very small or awkward lots can stay open. A partly painted lot also stays
+building height. Low-density shops provide one job per 25 m² of footprint, with at least two
+jobs; a 200 m² shop supports eight jobs, and upper floors do not add jobs. High-density commerce retains one job per 30 m² across
+its floors. Industry provides one job per 30 m² of footprint at low density (at least five)
+and per 10 m² at high density (at least ten), independent of hall height. This lets fewer
+industrial lots support the town; demand shares stay unchanged. Very small or awkward lots can stay open. A partly painted lot also stays
 empty if unzoned cells outnumber or tie its most common zone; click to fill the whole block
 to zone those gaps. Growth pauses with the simulation.
 This is quick visual growth for testing zoning, not demand-driven development yet.
@@ -50,6 +67,37 @@ or leave town, one every few seconds. An empty building then disappears and the 
 in its place; unzoned land stays vacant. Painting the original zone back before that stops
 the closure. A road edit that removes a lot removes its building immediately
 ([ADR 0023](docs/adrs/0023-gradual-closure-of-rezoned-buildings.md)). Demand comes in a later issue.
+
+## Saving
+
+The game keeps one city in this browser, at this site address. **Save city** saves immediately;
+autosave saves changes every 60 real seconds, including edits made while paused. The status
+shows unsaved changes, the last successful save time or a storage error. Returning to the game
+automatically restores the saved city, paused, with its residents, jobs, traffic and scheduled
+events intact. Camera position, tools and inspection are not saved.
+
+**New city** asks before replacing the current city and its save. Cancel keeps both. A failed
+write keeps the previous saved city; use Save city to retry. If an existing save cannot load,
+the game reports the error rather than silently starting over or overwriting it. If another
+tab saves first, an outdated tab cannot overwrite it; reload that tab before saving again.
+
+This is not a backup: clearing site data or browser eviction can remove the city. Another
+browser, profile or site address has a separate save. There is no save history, file export
+or conversion of incompatible save formats yet. Save before closing if you need the latest
+changes; tab-close saving is not guaranteed. See [ADR 0033](docs/adrs/0033-single-city-state-saves.md).
+
+## Inspection
+
+With no tool active, click a building to see its use, density and live counts. Homes show
+resident capacity and how many people live there, including residents who are currently out.
+Shops and factories show total, filled and unfilled jobs; filled jobs count assigned employees,
+not people physically at work. Closing buildings keep their original use and show their status.
+Demolition clears the selection. Counts refresh while selected, including after paused edits.
+
+Click a car or walker to inspect its citizen instead; `F` toggles following that citizen.
+Buildings and citizens share one panel. Click empty ground, press Esc or use Close to dismiss it.
+Construction and zoning tools keep their normal click behavior. Inspection is read-only and
+shows counts only, not resident or employee lists.
 
 ## Citizens
 

@@ -1,6 +1,8 @@
 import type * as THREE from 'three';
 import { AmbientSound } from './ambient-sound';
+import { CityControls } from './city-controls';
 import { drawDemand } from './demand-meter';
+import { hudText } from './hud';
 import { Inspector } from './inspector';
 import { type FromWorker, RoadClass, type Stats, type ToWorker, Zone } from './protocol';
 import { Renderer } from './renderer';
@@ -18,6 +20,12 @@ const demand = byId('demand');
 const demandFills = ['residential', 'commercial', 'industrial'].map((u) => byId(`demand-${u}`));
 const worker = new Worker(new URL('./sim.worker.ts', import.meta.url), { type: 'module' });
 const send = (msg: ToWorker) => worker.postMessage(msg);
+const cityControls = new CityControls(
+  send,
+  byId('save-city') as HTMLButtonElement,
+  byId('new-city') as HTMLButtonElement,
+  byId('save-status'),
+);
 // Pan keys held when follow starts are ignored until released, so they cannot fight it.
 const ignoredCameraKeys = new Set<string>();
 const inspector = new Inspector(
@@ -42,7 +50,6 @@ const toggleTraffic = () =>
   trafficButton.setAttribute('aria-pressed', String(renderer.toggleTrafficView()));
 trafficButton.onclick = toggleTraffic;
 
-// Two most recent snapshots, and when they arrived, for interpolation.
 let prev: Float32Array | undefined;
 let curr: Float32Array | undefined;
 let currAt = 0;
@@ -53,7 +60,21 @@ let roadsSeen = false;
 
 worker.onmessage = (e: MessageEvent<FromWorker>) => {
   const msg = e.data;
-  if (msg.type === 'roads') {
+  if (msg.type === 'cityStatus') {
+    cityControls.receive(msg);
+    hud.hidden = !msg.ready;
+  } else if (msg.type === 'cityReset') {
+    setTool(null);
+    inspector.select(null);
+    stopKeyCamera();
+    pointer = null;
+    blockInFlight = previewInFlight = false;
+    prev = curr = undefined;
+    stats = undefined;
+    roadsSeen = false;
+    frameGap = 100;
+    setSpeed(msg.speed);
+  } else if (msg.type === 'roads') {
     renderer.setRoads(msg.segments, msg.bounds, !roadsSeen);
     roadsSeen = true;
     // Blocks change with roads, including alleys the sim adds after zoning.
@@ -93,10 +114,12 @@ worker.onmessage = (e: MessageEvent<FromWorker>) => {
   } else if (msg.type === 'lots') {
     renderer.setLots(msg.rings);
   } else if (msg.type === 'buildings') {
-    renderer.setBuildings(msg.data);
+    renderer.setBuildings(msg.data, msg.ids);
     sound.setBuildings(msg.data);
   } else if (msg.type === 'citizen') {
     inspector.receive(msg.selection, msg.citizen);
+  } else if (msg.type === 'building') {
+    inspector.receiveBuilding(msg.selection, msg.building);
   } else if (msg.type === 'blockPreview') {
     blockInFlight = false;
     if (msg.revision === blockRevision && zone !== null && !zoneStart && blockHover)
@@ -116,7 +139,6 @@ worker.onmessage = (e: MessageEvent<FromWorker>) => {
 
 send({ type: 'init', seed: 1, cols: 60, rows: 60, agents: 0 });
 
-// --- speed controls ---
 let speed = 1;
 const speedButtons = [...document.querySelectorAll<HTMLButtonElement>('[data-speed]')];
 function setSpeed(s: number) {
@@ -126,7 +148,6 @@ function setSpeed(s: number) {
 }
 for (const b of speedButtons) b.onclick = () => setSpeed(Number(b.dataset.speed));
 
-// Straight: start → end. Curve: start → bend control → end. Both chain after success.
 const roadButton = byId('road');
 const curveButton = byId('curve');
 const roadHelp = byId('road-help');
@@ -136,17 +157,7 @@ const mainRoadButton = byId('main-road');
 let roadClass: RoadClass = RoadClass.Street;
 const bulldozeButton = byId('bulldoze');
 let bulldozeTool = false;
-// --- zone brush: pick a zone, then drag a rectangle; every cell inside takes that zone ---
 const zoneButtons = [...document.querySelectorAll<HTMLButtonElement>('[data-zone]')];
-const ZONE_NAMES = [
-  'unzone',
-  'residential low',
-  'residential high',
-  'commercial low',
-  'commercial high',
-  'industrial low',
-  'industrial high',
-];
 let zone: Zone | null = null;
 let zoneStart: THREE.Vector3 | null = null;
 // The block under the cursor while the zone brush hovers, asked of the sim like road previews:
@@ -173,10 +184,7 @@ let refused = false;
 let nextBuildId = 0;
 let pendingBuild: { id: number; end: THREE.Vector3 } | null = null;
 let previewRevision = 0;
-// The sim works out where a road snaps; the preview asks it: where the road would start while
-// hovering, then the whole road once it has a start. Only one question is in flight at a time,
-// and only the latest cursor position is asked about, so a busy worker never falls behind the
-// mouse.
+// One sim-owned snapping preview in flight, using only the latest cursor position.
 let previewEnd: THREE.Vector3 | null = null;
 let previewWanted = false;
 let previewInFlight = false;
@@ -232,6 +240,7 @@ function setTool(tool: typeof roadTool | 'bulldoze', brush: Zone | null = null) 
   zoneStart = null;
   hideBlockOutline();
   renderer.setLeftDragPans(zone === null);
+  renderer.setZoningVisible(zone !== null);
   for (const b of zoneButtons) {
     const on = Number(b.dataset.zone) === zone;
     b.classList.toggle('active', on);
@@ -311,7 +320,12 @@ canvas.addEventListener('pointerup', (e) => {
   // Treat it as a click only if the pointer barely moved, so panning still works.
   const still = Math.hypot(e.clientX - downX, e.clientY - downY) <= 4;
   if (!roadTool && !bulldozeTool) {
-    if (e.button === 0 && still) inspector.select(renderer.carAt(e.clientX, e.clientY));
+    if (e.button === 0 && still) {
+      const agent = renderer.carAt(e.clientX, e.clientY);
+      const building = agent === null ? renderer.buildingAt(e.clientX, e.clientY) : null;
+      if (building !== null) inspector.selectBuilding(building);
+      else inspector.select(agent);
+    }
     return;
   }
   if (e.button === 2) return setTool(null);
@@ -454,10 +468,6 @@ addEventListener('keydown', (e) => {
 });
 
 // --- frame loop ---
-const fmt = (n: number) => n.toLocaleString('en-US');
-/** Share of finished trips made on foot (ADR 0026). */
-const walkShare = (s: Stats) =>
-  `${s.tripsCompleted ? ((100 * s.walksCompleted) / s.tripsCompleted).toFixed(0) : 0}%`;
 let fps = 60;
 let lastFrame = performance.now();
 function frame() {
@@ -476,25 +486,9 @@ function frame() {
   sound.update(now / 1000, curr, stats?.secondOfDay ?? 43200, renderer.listener());
   if (stats) {
     drawDemand(demand, demandFills, stats.demand);
-    const hh = String(Math.floor(stats.secondOfDay / 3600)).padStart(2, '0');
-    const mm = String(Math.floor((stats.secondOfDay % 3600) / 60)).padStart(2, '0');
-    hud.textContent =
-      `Day ${stats.day}   ${hh}:${mm}   ${speed === 0 ? 'paused' : `${speed}×`}\n` +
-      `fps        ${fps.toFixed(0)}   tick ${tickMs.toFixed(2)} ms\n` +
-      `population ${fmt(stats.population)}   unemployed ${fmt(stats.unemployed)} (${stats.unemploymentPercent.toFixed(1)}%)\n` +
-      `driving    ${fmt(stats.driving)}   walking ${fmt(stats.walking)}   parked ${fmt(stats.parked)}\n` +
-      `trips      ${fmt(stats.tripsCompleted)}   on foot ${walkShare(stats)}\n` +
-      `stuck      ${fmt(stats.despawnedStuck)}   no path ${fmt(stats.pathsFailed)}\n` +
-      `road edits ${fmt(stats.despawnedByEdit)} cars removed\n` +
-      `camera     WASD or drag pans, Q/E turns, right-drag orbits, wheel zooms\n` +
-      `inspect    click a car or walker; F follows, Esc closes   N sound   T traffic\n` +
-      (zone !== null
-        ? `\nZONE: ${ZONE_NAMES[zone]}. Click a block to fill it, drag a rectangle to paint, Esc to stop` +
-          `\n(Z/X/C pick a zone, press again for the other density; U unzones)`
-        : '');
+    hud.textContent = hudText(stats, fps, tickMs, speed, zone);
   }
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
-
 if (import.meta.env.DEV) Object.assign(window, { renderer, sound });

@@ -80,6 +80,10 @@ despawns, and the road tool feels good with snapping, curves and bulldozing.
 - Citizen inspector: click a car to see the citizen's name, home, job and destination; a follow
   camera rides along. Implemented as a read-only query for the selected citizen
   ([ADR 0022](adrs/0022-citizen-inspection-query.md)).
+- Building inspector: click a building to see resident capacity and residents, or total,
+  filled and unfilled jobs. Counts describe residency/employment, not physical attendance.
+  Shares the citizen panel and refreshes only the selected building; implemented
+  ([ADR 0029](adrs/0029-building-inspection-query.md)).
 - Demand: a simple R/C/I balance decides what gets built next. Implemented: zoned lots build
   only while their use has demand, shown as R/C/I bars in the HUD
   ([ADR 0025](adrs/0025-rci-demand-gates-growth.md)).
@@ -96,6 +100,21 @@ The point where the toy starts to look like a place.
 
 - Low-poly art pass: building variety by zone and density, trees, terrain color, water. Build
   the building kit so it can carry an era style (village cottages vs. town blocks) later.
+  Low-density commerce now grows small, shallow shops, mostly one storey, with individual
+  doors and awnings, varied roof forms, planted rear space and occasional attached pairs;
+  high-density commerce keeps full-lot buildings ([ADR 0031](adrs/0031-small-low-density-shops.md)).
+- Lot scenery (implemented): hide zoning colors outside zoning
+  mode. Developed lots get display-only outdoor details in the existing low-poly style:
+  green, varied house gardens and paths, planted shop entrances and paved factory service
+  yards, with modest parking. These details do not affect gameplay. Vacant zoned land shows
+  natural ground rather than zoning colors or prepared plots outside zoning mode. Painting
+  still clears wild trees and fields, leaving grass before development. Outdoor details
+  follow the standing building's use during closure, not the newly painted zone, and go
+  away when the building does. Drawn lot outlines appear only in zoning mode. Residential
+  yards are enclosed by joined hedges, industrial yards by open metal fences; entrances stay
+  open and boundaries stop at buildings and roads. Shops keep open frontages. Boundaries
+  take priority over loose props so a tree or planter cannot remove a property side.
+  Fit details to the available outdoor space rather than changing building footprints.
 - Lighting and shadows, and a day/night cycle that follows the sim clock (lit windows, headlights).
 - Varied vehicles (cars, vans, trucks), and detailed pedestrian figures in place of the M2
   placeholders.
@@ -106,15 +125,86 @@ Done when: a screenshot or short clip is something you'd post.
 
 ## M4 – Save, load, share
 
-- Save and load. **ADR** for the save format: seed plus command log (ADR 0004), a state dump,
-  or both, plus versioning. Scenarios (M5) are built on this format, so plan for a "start state
-  plus goals" file.
+- Save and load. The first slice is implemented: one local full-state save with autosave
+  and versioning ([ADR 0033](adrs/0033-single-city-state-saves.md)). This slice is pulled
+  forward at the player's request; the rest of M4 remains later work. Scenarios (M5) can
+  later use the state payload as their start state, with goals kept separate.
 - Share a city as a link or file. Opening one forks it: the friend keeps building their own copy
   from where you left off.
 - Replay-based regression tests built from saved command logs.
 
 Done when: a city survives a reload, and a friend can open a city you sent them and keep
 building it.
+
+### First slice: one city with autosave — implemented
+
+Simulation, worker, storage and UI checks pass, including identical continued evolution after
+restoring a developed town. `scripts/check.sh` and the production build pass. The browser
+save/reload/new-city smoke test remains unverified: terminal-browser requires Ghostty to be
+running, and it is unavailable in this session. Sharing and backups remain later work.
+
+**Player flow**
+
+- Opening the game reads the local slot before creating a fresh city. A saved city resumes
+  paused at its saved tick. A missing save starts a normal fresh city. A failed read or
+  invalid save shows an error without silently clearing or overwriting the slot.
+- Save city saves immediately. Autosave requests a save every 60 real seconds when the
+  simulation has changed, including paused edits; it does not depend on simulation speed.
+  Ordinary ticks and successful gameplay edits make the city unsaved; previews, inspection,
+  camera motion and speed controls do not. Do not rely on asynchronous work at tab close.
+- Show saving progress, the last successfully saved time, unsaved changes and clear errors.
+  A commit acknowledges only the state it captured: changes made while saving remain unsaved.
+  Failed saves retain the prior committed city and can be retried.
+- New city asks before discarding progress and replacing the saved city. Cancel changes
+  nothing. Confirm creates the normal fresh city and immediately attempts to save it, with
+  errors reported honestly and no late save from the previous city able to overwrite it.
+- Explain that storage belongs to this browser and site, and clearing browser data can lose
+  the city. No save history, file backups, sharing, accounts, camera persistence or conversion
+  of incompatible older saves is included.
+
+**Delivery record**
+
+1. **Sim persistence and tests — complete.** Add a persistence module under `crates/sim/src/world/` with
+   byte-oriented save/load methods. Inventory every authoritative field and distinguish it
+   from reconstructible scratch state. Write failing round-trip and continued-evolution tests
+   before adding the codec. Keep IDs, event ordering and RNG streams intact; reject malformed
+   or incompatible data before replacing a world. Follow the existing module structure and
+   500-line limit rather than concentrating serialization in `world/mod.rs`.
+2. **WASM and worker lifecycle — complete.** Expose thin byte conversions in `crates/sim-wasm`; extend
+   `web/src/protocol.ts` for persistence requests and status. In the worker, serialize saves
+   between complete ticks and coordinate startup, manual saves, autosaves and confirmed city
+   replacement. Reset version caches, selections and clock backlog on replacement; publish
+   all geometry even if the new world's version numbers equal the old world's. Keep one tick
+   loop, release replaced WASM worlds and prevent stale requests from changing the new city.
+3. **Browser storage and controls — complete.** Add a small persistence module beside `sim.worker.ts`
+   using IndexedDB, not a new service or backend. Store payload and timestamp atomically in
+   one slot. Add Save city, New city, confirmation and accessible status/error text in
+   `web/index.html`; put UI coordination in a focused module rather than growing `main.ts`
+   past the line limit. Clear interpolation, previews and inspector state on replacement.
+4. **Integration checks and documentation — automated checks complete; browser smoke test
+   blocked as noted above.** Extend the existing Rust, WASM-worker and frontend
+   test harnesses. Update the root README only once saving is implemented; mark this plan's
+   completed steps and ADR 0033's implementation status accurately. Run `scripts/check.sh`,
+   the production build and a browser save/reload/new-city smoke test.
+
+**Acceptance checks**
+
+- A developed town with moving cars and walkers, pending growth, edited roads and occupied
+  buildings closing after rezoning survives save/load. Compare state hashes, statistics,
+  snapshots and inspection counts immediately, then compare subsequent ticks and gameplay
+  commands on the same build and target. Exercise cached indexes both before and after load.
+- Empty and paused worlds round-trip. Encoding a save changes neither the live world nor
+  its future evolution. Truncated, corrupt and unsupported saves fail safely.
+- Reload restores the stored city paused; a missing slot starts fresh. Read failures and
+  invalid saves cannot be overwritten by autosave. Failed and aborted writes preserve the
+  previous committed payload and timestamp, and the UI does not report success prematurely.
+  Writes from an outdated tab are rejected atomically; confirmed New city can replace the
+  slot. Save retries reopen unexpectedly closed database connections.
+- The autosave timer skips unchanged worlds, includes paused edits, and does not mark later
+  edits saved when an earlier snapshot commits. Manual saving works without waiting for it.
+- Canceling New city retains the current city and save. Confirming cannot be undone by an
+  in-flight old save; the new city saves immediately, or clearly reports a storage failure.
+  Repeated replacement leaves one clock loop and no stale geometry or inspector selection.
 
 ## M5 – A game loop
 

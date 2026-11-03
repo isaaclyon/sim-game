@@ -99,15 +99,15 @@ test('growth rebuilds only the tiles whose buildings changed', async () => {
   const layer = new BuildingLayer(new THREE.MeshBasicMaterial());
   const near = record(1, 6, 0, 0, rect(10, 10, 12, 10));
   const far = record(1, 6, 0, 0, rect(2000, 10, 12, 10));
-  layer.update(new Float32Array([...near, ...far]));
+  layer.update(new Float32Array([...near, ...far]), new Uint32Array([0, 1]));
   assert.equal(layer.group.children.length, 2);
   const [a, b] = layer.group.children.map((m) => m.geometry);
   const grown = record(3, 4, 0, 0, rect(40, 10, 16, 12));
-  layer.update(new Float32Array([...near, ...grown, ...far]));
+  layer.update(new Float32Array([...near, ...grown, ...far]), new Uint32Array([0, 2, 1]));
   const after = layer.group.children.map((m) => m.geometry);
   assert.notEqual(after[0], a, 'the tile that grew is rebuilt');
   assert.equal(after[1], b, 'a distant tile keeps its geometry');
-  layer.update(new Float32Array());
+  layer.update(new Float32Array(), new Uint32Array());
   assert.equal(layer.group.children.length, 0);
 });
 

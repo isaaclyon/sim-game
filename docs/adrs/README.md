@@ -23,16 +23,22 @@ rewriting history; mark the old one `Superseded by NNNN`.
 | [0015](0015-curved-road-snapshots.md) | Curved roads use simulation-sampled segment snapshots | Accepted; road speed field superseded by 0017 |
 | [0016](0016-blocks-lots-and-alleys.md) | Blocks are derived road faces; lots are zone-cell sets; the sim adds alleys | Accepted; lots superseded by 0018 |
 | [0017](0017-road-classes-and-main-road-routing.md) | Road classes and main-road routing | Accepted |
-| [0018](0018-lots-cut-along-roads.md) | Lots are shapes cut along roads; buildings take their shape from lots | Industrial frontage and buildings superseded by 0019; otherwise accepted |
+| [0018](0018-lots-cut-along-roads.md) | Lots are shapes cut along roads; buildings take their shape from lots | Industrial frontage and buildings superseded by 0019; low-density commercial footprints by 0031; otherwise accepted |
 | [0019](0019-industrial-lot-variety.md) | Industrial lots combine neighbouring frontage strips | Industrial footprint fallback superseded by 0020; snapshot extended with `front` by 0027; otherwise accepted |
 | [0020](0020-rectangular-industrial-halls.md) | Industrial halls stay rectangular | Accepted |
-| [0021](0021-citizens-households-and-trips.md) | Citizens, households, homes, jobs and trips | Accepted; residents of repainted buildings superseded by 0023; walking and travel slots by 0026 |
+| [0021](0021-citizens-households-and-trips.md) | Citizens, households, homes, jobs and trips | Accepted; residents of repainted buildings superseded by 0023; walking and travel slots by 0026; industrial job-capacity tuning by 0028; low-density commercial capacity by 0030 |
 | [0022](0022-citizen-inspection-query.md) | Citizen inspection is a read-only query for one selected citizen | Accepted; pedestrian picking superseded by 0026 |
 | [0023](0023-gradual-closure-of-rezoned-buildings.md) | Gradual closure of rezoned buildings | Accepted; replacement growth gated by demand in 0025 |
 | [0024](0024-per-driver-route-noise.md) | Per-driver route noise | Accepted |
 | [0025](0025-rci-demand-gates-growth.md) | R/C/I demand gates growth | Accepted |
 | [0026](0026-walking-trips-and-household-cars.md) | Walking trips and household cars | Accepted |
 | [0027](0027-display-only-scenery-and-building-kit.md) | Display-only scenery, building kit and agent looks | Accepted |
+| [0028](0028-industrial-employment-density.md) | Industrial employment density | Accepted; industrial minimum job counts superseded by 0030 |
+| [0029](0029-building-inspection-query.md) | Building inspection is a read-only query for one selected building | Accepted |
+| [0030](0030-small-workplace-capacity.md) | Small-workplace employment capacity | Low-density commercial staffing rate superseded by 0032; otherwise accepted |
+| [0031](0031-small-low-density-shops.md) | Low-density commerce grows small shops, not full-lot blocks | Accepted |
+| [0032](0032-compact-shop-staffing.md) | Compact shops support small teams | Accepted |
+| [0033](0033-single-city-state-saves.md) | Save one complete city locally and resume it on return | Accepted; implemented |
 
 ADRs are only for decisions that are hard to reverse. See [AGENTS.md](AGENTS.md) for when to
 write one and how.

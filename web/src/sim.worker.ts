@@ -1,7 +1,17 @@
 // Runs the WASM sim on a fixed-timestep clock, off the main thread.
 
-import init, { Sim } from './pkg/sim_wasm';
-import type { Activity, Citizen, FromWorker, Place, Stats, ToWorker, Zone } from './protocol';
+import { CitySession } from './city-session';
+import init, { type Sim } from './pkg/sim_wasm';
+import type {
+  Activity,
+  Building,
+  Citizen,
+  FromWorker,
+  Place,
+  Stats,
+  ToWorker,
+  Zone,
+} from './protocol';
 
 /** If the sim falls this far behind, drop the backlog instead of spiralling. */
 const MAX_TICKS_PER_STEP = 20;
@@ -16,8 +26,8 @@ let zonesVersion = -1;
 let lotsVersion = -1;
 let buildingsVersion = -1;
 let buildingsSentAt = -Infinity;
-/** The inspector's selection: a citizen, kept even when its car slot is hidden. */
-let inspected: { selection: number; citizen: number } | null = null;
+/** One inspector subject. Citizens persist even while their travel slot is hidden. */
+let inspected: { selection: number; kind: 'citizen' | 'building'; id: number } | null = null;
 /** Full meshes are expensive; faster simulation must not flood the main thread. */
 const BUILDING_SNAPSHOT_INTERVAL_MS = 250;
 
@@ -59,7 +69,8 @@ function sendBuildingsIfChanged(s: Sim, force = false) {
   buildingsVersion = version;
   buildingsSentAt = now;
   const data = s.building_snapshot();
-  post({ type: 'buildings', data }, [data.buffer]);
+  const ids = s.building_ids();
+  post({ type: 'buildings', data, ids }, [data.buffer, ids.buffer]);
 }
 
 /** After an edit: zoning can add alleys, and road edits can recut lots (ADR 0016). */
@@ -70,6 +81,20 @@ function sendEdits(s: Sim) {
   sendBuildingsIfChanged(s, true);
   sendFrame(s); // Cars and signals also change while paused.
 }
+
+const cities = new CitySession(post, (next, initialSpeed) => {
+  sim = next;
+  tickMs = next.dt() * 1000;
+  speed = initialSpeed;
+  backlogMs = 0;
+  last = performance.now();
+  roadsVersion = zonesVersion = lotsVersion = buildingsVersion = -1;
+  buildingsSentAt = -Infinity;
+  inspected = null;
+  post({ type: 'cityReset', speed });
+  sendEdits(next);
+});
+let started = false;
 
 function readStats(s: Sim): Stats {
   const st = s.stats();
@@ -109,6 +134,7 @@ function sendFrame(s: Sim, perTick = 0) {
     signals.buffer,
   ]);
   sendCitizen(s);
+  sendBuilding(s);
 }
 
 function place(building: number | undefined, zone: number | undefined): Place | null {
@@ -117,12 +143,12 @@ function place(building: number | undefined, zone: number | undefined): Place | 
 
 /** Details of the selected citizen, sent only while someone is selected. */
 function sendCitizen(s: Sim) {
-  if (!inspected) return;
-  const v = s.citizen_info(inspected.citizen);
+  if (inspected?.kind !== 'citizen') return;
+  const v = s.citizen_info(inspected.id);
   let citizen: Citizen | null = null;
   if (v) {
     citizen = {
-      id: inspected.citizen,
+      id: inspected.id,
       name: v.name,
       resident: v.resident,
       home: place(v.home, v.home_zone),
@@ -140,12 +166,30 @@ function sendCitizen(s: Sim) {
   if (!citizen) inspected = null;
 }
 
+/** One building only, using the same live query contract as citizen inspection. */
+function sendBuilding(s: Sim) {
+  if (inspected?.kind !== 'building') return;
+  const v = s.building_info(inspected.id);
+  const building: Building | null = v
+    ? {
+        building: v.building,
+        zone: v.zone as Zone,
+        capacity: v.capacity,
+        occupied: v.occupied,
+        closing: v.closing,
+      }
+    : null;
+  v?.free();
+  post({ type: 'building', selection: inspected.selection, building });
+  if (!building) inspected = null;
+}
+
 function step() {
   const now = performance.now();
   backlogMs += (now - last) * speed;
   last = now;
 
-  if (sim) {
+  if (sim && cities.ready) {
     let n = Math.floor(backlogMs / tickMs);
     if (n > MAX_TICKS_PER_STEP) {
       n = MAX_TICKS_PER_STEP;
@@ -156,6 +200,7 @@ function step() {
     if (n > 0) {
       const t0 = performance.now();
       sim.tick(n);
+      cities.changed();
       const perTick = (performance.now() - t0) / n;
       sendRoadsIfChanged(sim);
       sendBuildingsIfChanged(sim);
@@ -169,44 +214,59 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
   const msg = e.data;
   switch (msg.type) {
     case 'init':
+      if (started) return;
+      started = true;
       await init();
-      sim = new Sim(msg.seed, msg.cols, msg.rows);
-      tickMs = sim.dt() * 1000;
-      if (msg.agents > 0) sim.spawn_agents(msg.agents);
-      sendRoadsIfChanged(sim);
-      sendZonesIfChanged(sim);
-      sendLotsIfChanged(sim);
-      sendBuildingsIfChanged(sim, true);
-      sendFrame(sim);
+      await cities.start(msg);
       last = performance.now();
       step();
       break;
+    case 'saveCity':
+      await cities.save();
+      break;
+    case 'newCity':
+      await cities.newCity();
+      break;
     case 'setSpeed':
+      if (!cities.ready) break;
       speed = msg.speed;
       if (speed === 0 && sim) sendBuildingsIfChanged(sim, true);
       break;
     case 'spawn':
-      sim?.spawn_agents(msg.count);
+      if (cities.ready && sim?.spawn_agents(msg.count)) cities.changed();
       break;
     case 'buildRoad':
     case 'buildCurve': {
-      const success = sim
-        ? msg.type === 'buildCurve'
-          ? sim.build_curve(msg.ax, msg.ay, msg.cx, msg.cy, msg.bx, msg.by, msg.class)
-          : sim.build_road(msg.ax, msg.ay, msg.bx, msg.by, msg.class)
-        : false;
-      if (success && sim) sendEdits(sim);
+      const success =
+        sim && cities.ready
+          ? msg.type === 'buildCurve'
+            ? sim.build_curve(msg.ax, msg.ay, msg.cx, msg.cy, msg.bx, msg.by, msg.class)
+            : sim.build_road(msg.ax, msg.ay, msg.bx, msg.by, msg.class)
+          : false;
+      if (success && sim) {
+        cities.changed();
+        sendEdits(sim);
+      }
       post({ type: 'buildResult', id: msg.id, success });
       break;
     }
     case 'deleteRoad':
-      if (sim?.delete_road(msg.x, msg.y)) sendEdits(sim);
+      if (cities.ready && sim?.delete_road(msg.x, msg.y)) {
+        cities.changed();
+        sendEdits(sim);
+      }
       break;
     case 'paintZone':
-      if (sim?.paint_zone(msg.ax, msg.ay, msg.bx, msg.by, msg.zone)) sendEdits(sim);
+      if (cities.ready && sim?.paint_zone(msg.ax, msg.ay, msg.bx, msg.by, msg.zone)) {
+        cities.changed();
+        sendEdits(sim);
+      }
       break;
     case 'fillBlock':
-      if (sim?.fill_block(msg.x, msg.y, msg.zone)) sendEdits(sim);
+      if (cities.ready && sim?.fill_block(msg.x, msg.y, msg.zone)) {
+        cities.changed();
+        sendEdits(sim);
+      }
       break;
     case 'previewBlock': {
       const outline = sim?.block_preview(msg.x, msg.y) ?? new Float32Array();
@@ -234,9 +294,21 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
         inspected = null;
         if (msg.agent !== null) post({ type: 'citizen', selection: msg.selection, citizen: null });
       } else if (sim) {
-        inspected = { selection: msg.selection, citizen };
+        inspected = { selection: msg.selection, kind: 'citizen', id: citizen };
         sendCitizen(sim);
       }
+      break;
+    }
+    case 'inspectBuilding': {
+      inspected =
+        msg.building === null
+          ? null
+          : {
+              selection: msg.selection,
+              kind: 'building',
+              id: msg.building,
+            };
+      if (sim) sendBuilding(sim);
       break;
     }
     case 'previewSnap': {

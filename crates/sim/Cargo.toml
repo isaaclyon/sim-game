@@ -7,6 +7,8 @@ publish.workspace = true
 
 [dependencies]
 i_overlay = { version = "9", default-features = false }
+postcard = { version = "1", default-features = false, features = ["alloc"] }
+serde = { version = "1", features = ["derive"] }
 
 [lints]
 workspace = true

@@ -7,7 +7,7 @@
 // - camera-controls for the camera (MapControls was cruder at damping, bounds, zoom-to-cursor).
 // - Agent matrices are written on the CPU each frame. If that becomes the bottleneck, move
 //   interpolation and orientation into a vertex shader fed by the raw snapshot.
-// - Picking is a ray against the ground plane. Add three-mesh-bvh once we pick against meshes.
+// - Tools pick against the ground plane; building inspection picks roof and facade triangles.
 // - Roads share one static mesh, rebuilt only when the road snapshot changes.
 // - Ground, water, fields and trees are decoration from `scenery/`, never sim state.
 // - Flat layers share y = 0 without depth writes. Ground draws first; the zone overlay, lots,
@@ -22,6 +22,7 @@ import type { Listener } from './ambience';
 import { BuildingLayer } from './building-kit/layer.ts';
 import { followPoint, KeyCamera } from './camera';
 import { carPosition, nearestCar } from './car-pick';
+import { LotLayer } from './lot-scenery/layer.ts';
 import { LIGHT, ROADS, SIDEWALK, SKY } from './palette';
 import { buildRoadGeometry } from './road-geometry';
 import { buildRoadMarkings } from './road-markings.ts';
@@ -59,6 +60,7 @@ export class Renderer {
     new THREE.MeshLambertMaterial({ vertexColors: true }),
   );
   private readonly scenery = new Scenery();
+  private readonly lotScenery = new LotLayer();
   private readonly overlay = new ZoneOverlay();
   private readonly agents = new AgentLayer(this.scene);
   private readonly signals = new SignalLayer(this.scene);
@@ -76,7 +78,12 @@ export class Renderer {
     this.renderer.setSize(innerWidth, innerHeight);
     container.appendChild(this.renderer.domElement);
     this.scene.background = new THREE.Color(SKY);
-    this.scene.add(this.scenery.group, this.overlay.group, this.buildings.group);
+    this.scene.add(
+      this.scenery.group,
+      this.lotScenery.group,
+      this.overlay.group,
+      this.buildings.group,
+    );
 
     this.camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 1, 50000);
     this.controls = new CameraControls(this.camera, this.renderer.domElement);
@@ -151,6 +158,7 @@ export class Renderer {
       5,
     );
     this.scenery.setRoads(segments);
+    this.lotScenery.setRoads(segments);
 
     if (fitCamera) {
       const [x0, y0, x1, y1] = bounds;
@@ -194,8 +202,9 @@ export class Renderer {
   }
 
   /** Sim-owned footprints, heights and fronts; only changed tiles are rebuilt. */
-  setBuildings(data: Float32Array) {
-    this.buildings.update(data);
+  setBuildings(data: Float32Array, ids: Uint32Array) {
+    this.buildings.update(data, ids);
+    this.lotScenery.setBuildings(data);
   }
 
   /** `signals` is `[x, y, heading, state]` per signalised approach; see `SignalLayer`. */
@@ -244,6 +253,16 @@ export class Renderer {
       innerWidth,
       innerHeight,
     );
+  }
+
+  /** Stable ID of the nearest drawn building under this screen point, or null. */
+  buildingAt(clientX: number, clientY: number): number | null {
+    const ray = new THREE.Raycaster();
+    ray.setFromCamera(
+      new THREE.Vector2((clientX / innerWidth) * 2 - 1, -(clientY / innerHeight) * 2 + 1),
+      this.camera,
+    );
+    return this.buildings.pick(ray);
   }
 
   /** Eases the camera toward agent `agent`; holds still and returns false while it is hidden. */
@@ -317,6 +336,11 @@ export class Renderer {
     this.scenery.setZones(cells, layout);
   }
 
+  /** Colors and property outlines are editing aids, not permanent scenery. */
+  setZoningVisible(visible: boolean) {
+    this.overlay.group.visible = visible;
+  }
+
   /** Outlines the rectangle the zone brush would paint from `a` to `b`; `null` hides it. */
   setZoneDrag(a: THREE.Vector3 | null, b: THREE.Vector3 | null, zone: number) {
     this.zoneDrag.visible = !!(a && b);
@@ -345,6 +369,7 @@ export class Renderer {
   setLots(rings: Float32Array) {
     this.overlay.setLots(rings);
     this.scenery.setLots(rings);
+    this.lotScenery.setLots(rings);
   }
 
   /** Draw the full centreline selected by the sim, in the destructive-action color. */
@@ -364,6 +389,7 @@ export class Renderer {
   render(): boolean {
     const moved = this.controls.update(this.clock.getDelta());
     this.scenery.update();
+    this.lotScenery.update();
     this.renderer.render(this.scene, this.camera);
     return moved;
   }

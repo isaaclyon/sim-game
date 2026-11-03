@@ -1,11 +1,7 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { stripTypeScriptTypes } from 'node:module';
 import test from 'node:test';
-import { createContext, SourceTextModule, SyntheticModule } from 'node:vm';
-import { initSync, Sim } from '../src/pkg/sim_wasm.js';
-
-initSync({ module: readFileSync(new URL('../src/pkg/sim_wasm_bg.wasm', import.meta.url)) });
+import { Sim } from '../src/pkg/sim_wasm.js';
+import { worker as makeWorker } from './worker-harness.mjs';
 
 test('WASM sends sim-owned building footprints, fronts, heights and original zones', () => {
   const s = new Sim(1, 3, 3);
@@ -35,15 +31,24 @@ test('WASM sends sim-owned building footprints, fronts, heights and original zon
   s.free();
 });
 
-test('industrial snapshots carry varied roofs and halls until repainting replaces them', () => {
-  const s = new Sim(1, 3, 3);
+test('industrial snapshots keep varied roofs and halls until repainting closes them', () => {
+  const s = new Sim(1, 6, 6);
+  // A populated block supplies enough demand for variety; an empty town now needs only
+  // one high-capacity factory, which is the intended industrial land balance.
+  assert.ok(s.fill_block(60, 300, 2));
+  assert.ok(s.fill_block(300, 300, 4));
+  s.tick(1800);
   assert.ok(s.fill_block(50, 50, 6));
-  s.tick(610);
+  s.tick(2400);
   const data = s.building_snapshot();
   const roofs = new Set();
   const heights = new Set();
   let i = 0;
   while (i < data.length) {
+    if (data[i] === 2 || data[i] === 4) {
+      i += 5 + 2 * data[i + 4];
+      continue;
+    }
     assert.equal(data[i], 6);
     assert.ok(data[i + 2] >= 0 && data[i + 2] <= 3);
     roofs.add(data[i + 2]);
@@ -56,7 +61,8 @@ test('industrial snapshots carry varied roofs and halls until repainting replace
   assert.ok(heights.size > 1);
   s.fill_block(50, 50, 1);
   assert.deepEqual(s.building_snapshot(), data, 'repainting keeps halls until they close');
-  // Empty workplaces close at their first step, 3–12 sim seconds; houses grow within a minute.
+  // Workplaces close at their first step, 3–12 sim seconds. Removing their jobs leaves
+  // housing oversupplied in this populated fixture, so replacement houses wait for demand.
   s.tick(730);
   const zones = new Set();
   const after = s.building_snapshot();
@@ -64,55 +70,19 @@ test('industrial snapshots carry varied roofs and halls until repainting replace
     zones.add(after[j]);
     j += 5 + 2 * after[j + 4];
   }
-  assert.deepEqual([...zones], [1]);
+  assert.deepEqual(
+    zones,
+    new Set([2, 4]),
+    'closed industry disappears while the original housing and shops remain',
+  );
   s.free();
 });
 
 async function worker() {
-  let now = 0;
-  let step;
-  const messages = [];
-  const publishedAt = [];
-  const self = {
-    postMessage: (msg) => {
-      messages.push(msg);
-      if (msg.type === 'buildings') publishedAt.push(now);
-    },
-  };
-  const context = createContext({
-    self,
-    performance: { now: () => now },
-    setTimeout: (fn) => {
-      step = fn;
-    },
-  });
-  const module = new SourceTextModule(
-    stripTypeScriptTypes(readFileSync(new URL('../src/sim.worker.ts', import.meta.url), 'utf8')),
-    { context },
-  );
-  const wasm = new SyntheticModule(
-    ['default', 'Sim'],
-    function () {
-      this.setExport('default', async () => {});
-      this.setExport('Sim', Sim);
-    },
-    { context },
-  );
-  await module.link(() => wasm);
-  await module.evaluate();
-  const send = (data) => self.onmessage({ data });
-  await send({ type: 'init', seed: 1, cols: 3, rows: 3, agents: 0 });
-  const buildings = () => messages.filter((m) => m.type === 'buildings');
-  return {
-    send,
-    messages,
-    buildings,
-    publishedAt,
-    advance(ms) {
-      now += ms;
-      step();
-    },
-  };
+  const w = await makeWorker(0, 3);
+  w.ready();
+  await w.init;
+  return { ...w, buildings: () => w.messages.filter((m) => m.type === 'buildings') };
 }
 
 test('worker publishes growing buildings and paused road edits, but no unchanged geometry', async () => {

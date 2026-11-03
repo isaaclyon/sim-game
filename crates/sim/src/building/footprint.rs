@@ -56,6 +56,35 @@ pub(super) fn make(
             ((lots.frontage[l] - 4.0).clamp(5.0, 14.0), 14.0),
             8.0,
         ),
+        Zone::CommercialLow => {
+            // Keep the trading floor small even when the lot reaches deep into a block.
+            // Two frontage slots in each eight-slot run may share walls; the other six
+            // keep side gaps. Curved and irregular sites still have to fit a rectangle.
+            let (ax, ay) = (roads.node_x[a as usize], roads.node_y[a as usize]);
+            let (bx, by) = (roads.node_x[b as usize], roads.node_y[b as usize]);
+            let length = (bx - ax).hypot(by - ay);
+            let along = ((front.0 - ax) * (bx - ax) + (front.1 - ay) * (by - ay)) / length;
+            let slot = (along / crate::block::LOT_WIDTH).floor() as i32;
+            let paired = matches!(slot.rem_euclid(8), 3 | 4) && lots.frontage[l] <= 18.0;
+            let width = if paired {
+                lots.frontage[l]
+            } else {
+                lots.frontage[l] - 3.0
+            };
+            let depth = 10.0 + rng.below(7) as f32;
+            let half_width = if roads.road_class(road) == RoadClass::Main {
+                6.0
+            } else {
+                ROAD_HALF_WIDTH
+            };
+            road_box(
+                &clear,
+                front,
+                facing,
+                (width.clamp(5.0, 18.0), depth),
+                half_width + 2.0,
+            )
+        }
         Zone::IndustrialLow | Zone::IndustrialHigh => {
             // Integer offsets are deterministic, including at concave corners.
             let gap = 2.0 + rng.below(3) as f32;
@@ -78,7 +107,7 @@ pub(super) fn make(
             // A pointed lot can be a yard, but must not turn into a wedge-shaped shed.
             road_box(&inset, front, facing, (width, depth), setback)
         }
-        Zone::ResidentialHigh | Zone::CommercialLow | Zone::CommercialHigh => Some(clear),
+        Zone::ResidentialHigh | Zone::CommercialHigh => Some(clear),
         Zone::None => None,
     }?;
     Some(ring.into_iter().map(poly::to_point).collect())
@@ -198,6 +227,11 @@ mod tests {
                     assert!(bounds[0] > 10.0 && bounds[2] < 26.0);
                     assert!(bounds[1] >= 8.0 && bounds[3] < 60.0);
                 }
+                Zone::CommercialLow => {
+                    assert!(bounds[2] - bounds[0] <= 18.01);
+                    assert!(bounds[3] - bounds[1] <= 16.01);
+                    assert!(bounds[3] < 60.0, "shops leave rear space");
+                }
                 Zone::IndustrialLow => {
                     assert!(bounds[0] >= 12.0 && bounds[2] <= 24.0);
                     assert!(bounds[1] >= 6.79 && bounds[3] <= 58.0);
@@ -227,6 +261,7 @@ mod tests {
             for zone in [
                 Zone::ResidentialLow,
                 Zone::IndustrialHigh,
+                Zone::CommercialLow,
                 Zone::CommercialHigh,
             ] {
                 let Some(ring) = make(&lots, 0, &roads, zone, &mut Rng::new(1)) else {
@@ -312,6 +347,7 @@ mod tests {
         for zone in [
             Zone::ResidentialLow,
             Zone::IndustrialLow,
+            Zone::CommercialLow,
             Zone::ResidentialHigh,
         ] {
             assert!(make(&lots, 0, &roads, zone, &mut Rng::new(1)).is_none());

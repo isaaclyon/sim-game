@@ -45,7 +45,8 @@ What to build next and why lives in `docs/ROADMAP.md`. Work on the current miles
   repeated closing point. Roof is a stable palette index (0–3 for industry, 0 otherwise; ADR 0019).
   Front is the footprint edge (point `front` to the next) facing the lot's road, derived on
   write, not stored or hashed (ADR 0027).
-  Zone is the building's original use. Sent whole when the buildings version changes,
+  Zone is the building's original use. The worker sends a parallel `ids: Uint32Array`, one
+  stable building ID per packed record in the same message (ADR 0029). Sent whole when the buildings version changes,
   including growth, closure removals (ADR 0023)
   and removals from paused road edits. Growth snapshots are capped at four
   per real second; start, edits and pause flush immediately.
@@ -53,6 +54,11 @@ What to build next and why lives in `docs/ROADMAP.md`. Work on the current miles
   to a citizen and answers `citizen` for that one citizen only, at once and after every frame
   and edit while selected (ADR 0022). Read-only, not hashed; names are derived from the seed and
   IDs, never stored or drawn from a gameplay RNG. Places are absent once their building is gone.
+- Building inspection: `inspectBuilding` selects a stable building ID from the geometry message's
+  parallel `ids` array. Replaces citizen inspection and vice versa. The worker answers `building`
+  at once and after every frame/edit while selected, echoing the selection counter; null after
+  demolition. Capacity and occupancy are sim-owned residency/employment counts, not attendance.
+  Read-only, not hashed (ADR 0029).
 Change both sides (Rust writer, `protocol.ts` doc, `renderer.ts` reader) together.
 
 ## Checks before finishing a change

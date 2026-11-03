@@ -6,10 +6,11 @@
 //! Population comes from the separate resident table, not these allocated slots.
 
 use crate::road::{LaneId, NodeId};
+use serde::{Deserialize, Serialize};
 
 pub type AgentId = u32;
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum AgentState {
     /// Sitting at `node` until its wake-up tick. Costs nothing per tick.
@@ -26,7 +27,7 @@ pub enum AgentState {
     Walking,
 }
 
-#[derive(Default)]
+#[derive(Default, Serialize, Deserialize)]
 pub struct Agents {
     pub state: Vec<AgentState>,
     pub citizen: Vec<Option<crate::citizen::CitizenId>>,
