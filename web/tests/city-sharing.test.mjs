@@ -107,14 +107,19 @@ test('exporting before a city is ready reports an error instead of bytes', async
 
 test('fresh cities record a replayable command log; opened copies have none', async () => {
   const { a, file } = await shared();
-  await a.send({ type: 'buildRoad', id: 1, ax: 10, ay: 10.25, bx: 200, by: 10.25, class: 1 });
+  await a.send({
+    type: 'buildRoad',
+    id: 1,
+    points: [-500, -500.25, 0, -300, -500.25, 0],
+    class: 1,
+  });
   await a.send({ type: 'commandLog' });
   const lines = latest(a, 'commandLog').text.trim().split('\n');
   const tick = latest(a, 'frame').stats.tick;
   assert.deepEqual(lines.slice(0, 3), ['sim-game command log 1', 'seed 1', 'grid 3 3']);
   assert.equal(lines[3], '0 spawn 12');
   assert.equal(lines[4], '0 fill 50 50 residential-low');
-  assert.equal(lines[5], `${tick} road 10 10.25 200 10.25 main`);
+  assert.equal(lines[5], `${tick} road -500 -500.25 -300 -500.25 main`);
   assert.equal(lines.at(-1), `end ${tick}`);
 
   await a.send({ type: 'openCity', bytes: file.bytes });

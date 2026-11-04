@@ -81,7 +81,9 @@ export class CitySession {
   private create() {
     const options = this.options;
     if (!options) throw new Error('The game is still starting.');
-    const sim = new Sim(options.seed, options.cols, options.rows);
+    const sim = options.grid
+      ? new Sim(options.seed, options.cols, options.rows)
+      : Sim.empty(options.seed, options.cols, options.rows);
     if (options.agents > 0) sim.spawn_agents(options.agents);
     return sim;
   }

@@ -1,8 +1,6 @@
-//! Who gets power (ADR 0036). Starter power goes to the oldest buildings first, wherever they
+//! Who gets power (ADR 0041). Starter power goes to the oldest buildings first, wherever they
 //! stand, until one does not fit. Then each grid serves the rest oldest first until one does not
 //! fit; that building and every newer one on the grid are unpowered.
-
-use std::collections::BTreeSet;
 
 use serde::{Deserialize, Serialize};
 
@@ -25,7 +23,7 @@ pub struct PowerStats {
     /// Demand of every standing building.
     pub demand: u32,
     pub unpowered: u32,
-    /// Lots that last waited for power, not for demand.
+    /// Scheduled lots that last waited for power, not demand; saved with their schedules.
     pub waiting: u32,
 }
 
@@ -52,7 +50,6 @@ pub(in crate::world) struct PowerCache {
     pub(super) version: u32,
     pub(super) blocked_key: Option<(u32, u32)>,
     pub(super) blocked: Vec<bool>,
-    waiting: BTreeSet<LotId>,
 }
 
 /// Which pool would power a new building.
@@ -79,7 +76,7 @@ impl World {
         self.power_cache.powered.get(b as usize) == Some(&true)
     }
 
-    /// New homes and jobs fill only in open, powered buildings (ADR 0023, ADR 0036).
+    /// New homes and jobs fill only in open, powered buildings (ADR 0023, ADR 0041).
     pub(in crate::world) fn building_fills_vacancies(&self, b: BuildingId) -> bool {
         self.building_accepts_assignments(b) && self.building_powered(b)
     }
@@ -211,16 +208,6 @@ impl World {
             key.2 = self.buildings.version;
         }
         c.version = c.version.wrapping_add(1);
-        c.waiting.remove(&lot);
-    }
-
-    /// Notes why a due lot waits, for the readout.
-    pub(in crate::world) fn note_waiting(&mut self, lot: LotId, for_power: bool) {
-        if for_power {
-            self.power_cache.waiting.insert(lot);
-        } else {
-            self.power_cache.waiting.remove(&lot);
-        }
     }
 
     pub fn power_stats(&self) -> PowerStats {
@@ -240,11 +227,7 @@ impl World {
                 s.unpowered += 1;
             }
         }
-        s.waiting = c
-            .waiting
-            .iter()
-            .filter(|&&l| self.lots.active.get(l as usize) == Some(&true))
-            .count() as u32;
+        s.waiting = self.buildings.waiting_for_power();
         s
     }
 }

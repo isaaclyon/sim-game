@@ -91,6 +91,18 @@ test('browser shortcuts, text entry and native buttons keep their keys', async (
   assert.equal(t.messages.length, before, 'Space still only activates the button');
 });
 
+/** A sim answer to `previewRoad` for one point at (1, 1). */
+const preview = (ask) => ({
+  type: 'roadPreview',
+  revision: ask.revision,
+  points: new Float32Array([1, 1]),
+  stops: new Float32Array([1, 1, 0]),
+  guides: new Float32Array(),
+  angles: new Float32Array(),
+  length: 0,
+  angle: Number.NaN,
+});
+
 test('panning works paused and with tools, and keeps tool previews under the cursor', async () => {
   const t = await tools();
   t.key(' ');
@@ -104,22 +116,22 @@ test('panning works paused and with tools, and keeps tool previews under the cur
   assert.equal(t.elements.curve.attributes['aria-pressed'], 'true');
   t.move(10, 10);
   const asked = t.messages.at(-1);
-  assert.equal(asked.type, 'previewSnap');
+  assert.equal(asked.type, 'previewRoad');
   t.clock.cameraMoved = true;
   step(t, 16);
   assert.equal(t.messages.at(-1), asked, 'one preview question in flight at a time');
-  t.reply({ type: 'roadPreview', revision: asked.revision, stops: new Float32Array([1, 1, 0]) });
+  t.reply(preview(asked));
   const again = t.messages.at(-1);
   assert.notEqual(again, asked, 'the reply sends the queued question about the moved camera');
-  assert.deepEqual([again.type, again.x, again.y], ['previewSnap', 10, 10]);
+  assert.deepEqual([again.type, ...again.points.slice(0, 2)], ['previewRoad', 10, 10]);
   const count = t.messages.length;
   step(t, 16);
   step(t, 16);
   assert.equal(t.messages.length, count, 'still one question in flight while moving');
   t.clock.cameraMoved = false;
-  t.reply({ type: 'roadPreview', revision: again.revision, stops: new Float32Array([1, 1, 0]) });
+  t.reply(preview(again));
   assert.equal(t.messages.length, count + 1, 'the moves while waiting collapse into one');
-  t.reply({ type: 'roadPreview', revision: again.revision, stops: new Float32Array([1, 1, 0]) });
+  t.reply(preview(again));
   step(t, 16);
   assert.equal(t.messages.length, count + 1, 'a still camera asks nothing');
   t.event('blur');

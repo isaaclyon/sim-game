@@ -46,7 +46,7 @@ fn building_counts_are_residency_and_employment_not_attendance() {
 #[test]
 fn apartments_sum_all_homes_and_closure_keeps_original_use() {
     let mut w = town();
-    // Apartments need more than starter power (ADR 0036).
+    // Apartments need more than starter power (ADR 0041).
     assert!(w.apply(Command::PlacePlant {
         kind: crate::power::PlantKind::Coal,
         x: 391.0,

@@ -1,4 +1,4 @@
-// Plants, transmission lines and power markers (ADR 0036). The sim decides everything; this
+// Plants, transmission lines and power markers (ADR 0041). The sim decides everything; this
 // draws its `power` snapshot. Unpowered buildings always get a marker above the roof; the power
 // view adds a marker coloured by grid over every building, so separate grids stand out.
 import * as THREE from 'three';

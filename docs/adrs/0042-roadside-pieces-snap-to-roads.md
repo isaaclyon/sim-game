@@ -1,12 +1,12 @@
-# 0037. Roadside pieces snap to the road and face it
+# 0042. Roadside pieces snap to the road and face it
 
 - Status: Accepted
 - Date: 2026-11-04
-- Extends: [0036](0036-power-grids-follow-roads.md)
+- Extends: [0041](0041-power-grids-follow-roads.md)
 
 ## Context
 
-ADR 0036 placed every plant as an axis-aligned square centred on the cursor. Coal had to
+ADR 0041 placed every plant as an axis-aligned square centred on the cursor. Coal had to
 touch a road, so the player had to find, by trial, a spot close enough to the road but clear
 of it, and on any road that is not axis-aligned the plant sat at an angle to its street.
 Line ends joined a plant anywhere inside it and a road at its centreline, so poles stood in
@@ -33,7 +33,7 @@ come will also stand on a street and face it, so this needs one rule rather than
   1 m inside the kerb, on the side facing the line's other end, so a line never crosses the
   road it joins. Line ends still prefer an existing line end first.
 - Plant fronts are saved and hashed. The save format changes on the same unreleased branch as
-  ADR 0036, so the version bump there covers it.
+  ADR 0041, so the version bump there covers it.
 
 ## Consequences
 

@@ -20,7 +20,7 @@ fn built(w: &World, zones: [Zone; 2]) -> usize {
         .count()
 }
 
-/// Places a coal plant beside the town, so growth waits only on demand (ADR 0036).
+/// Places a coal plant beside the town, so growth waits only on demand (ADR 0041).
 fn power(w: &mut World) {
     let kind = sim::power::PlantKind::Coal;
     let spot = (0..400)

@@ -1,4 +1,4 @@
-//! Power in the world (ADR 0036): placing and removing plants and lines, the land they take,
+//! Power in the world (ADR 0041): placing and removing plants and lines, the land they take,
 //! and which buildings are powered.
 //!
 //! Plants and lines are stored state. Everything else here is derived from stored state and

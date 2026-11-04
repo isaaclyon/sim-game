@@ -1,4 +1,4 @@
-# 0036. Power grids follow roads and gate growth
+# 0041. Power grids follow roads and gate growth
 
 - Status: Accepted
 - Date: 2026-11-04
@@ -7,8 +7,8 @@
 ## Context
 
 ROADMAP M5 adds services, and power comes first. It must give the player a reason to place
-plants and plan a network without making sandbox fail, and it lands before money,
-pollution and happiness exist. The sim already has a day clock derived from the tick, a
+plants and plan a network without making sandbox fail. It was designed before money and
+pollution landed on main; integration preserves those systems and keeps power free. The sim already has a day clock derived from the tick, a
 growth gate on R/C/I demand (ADR 0025) and one versioned save format (ADR 0033).
 
 ## Decision
@@ -38,6 +38,10 @@ growth gate on R/C/I demand (ADR 0025) and one versioned save format (ADR 0033).
 - **Effect.** A lot builds only if it would be powered, in addition to ADR 0025's demand
   gate. An unpowered building keeps its residents and workers, but its vacant homes and jobs
   do not fill until power returns. Power never closes or removes a building.
+- **Waiting warning.** A scheduled lot remembers whether its last growth check failed for
+  lack of power. This reason is saved and hashed with the construction schedule, so loading
+  preserves the warning. Unzoning, rezoning or removing the schedule clears it; growth
+  checks update it as demand and supply change.
 - Plants and lines are authoritative state and enter the save and state hash. The save
   version is bumped and older saves and shared links are refused, as ADR 0033 already
   requires; no conversion is written.
@@ -52,3 +56,11 @@ city saved before this change stops loading. Line corridors depend on building f
 and lot outlines but do not change block or lot generation (ADR 0016, ADR 0018). Commands,
 snapshot formats for plants, lines, power state and the overlay, and their frontend readers
 are fixed when this is implemented and listed in `CLAUDE.md`.
+
+## Integration note
+
+Money (ADR 0036) and pollution (ADR 0037) landed before this branch. Power remains free to
+build and maintain, without new pollution sources. Growth must pass both the land-value
+threshold and power allocation. Save version 4 holds all three systems; older versions are
+refused. The planned display-only coal smoke is not yet implemented. Road-facing placement
+and line terminals extend this decision in [0042](0042-roadside-pieces-snap-to-roads.md).

@@ -32,8 +32,9 @@ pub struct Buildings {
     outline: Vec<Point>,
     /// Building occupying each lot, including retired slots.
     owner: Vec<Option<BuildingId>>,
-    /// Scheduled construction per lot; the heap is just an index into these deadlines.
-    due: Vec<Option<(u64, Zone)>>,
+    /// Scheduled construction per lot: (tick, zone, last deferred for power).
+    /// The waiting reason survives saves and disappears with the schedule on unzoning.
+    due: Vec<Option<(u64, Zone, bool)>>,
     pending: BinaryHeap<Reverse<(u64, LotId)>>,
     pub version: u32,
 }
@@ -79,7 +80,7 @@ impl Buildings {
             let zone = lots.zone(l as LotId, zones);
             if zone == Zone::None {
                 self.due[l] = None;
-            } else if self.due[l].is_none_or(|(_, old)| old != zone) {
+            } else if self.due[l].is_none_or(|(_, old, _)| old != zone) {
                 self.schedule(l, zone, tick, dt, seed);
             }
         }
@@ -87,7 +88,7 @@ impl Buildings {
             .due
             .iter()
             .enumerate()
-            .filter_map(|(l, due)| due.map(|(at, _)| Reverse((at, l as LotId))))
+            .filter_map(|(l, due)| due.map(|(at, _, _)| Reverse((at, l as LotId))))
             .collect();
         if changed {
             self.version = self.version.wrapping_add(1);
@@ -100,7 +101,7 @@ impl Buildings {
         let seconds = 2.0 + rng.below(580) as f32 / 10.0;
         let delay = (seconds / dt).ceil().max(1.0) as u64;
         let at = tick.saturating_add(delay);
-        self.due[l] = Some((at, zone));
+        self.due[l] = Some((at, zone, false));
         self.pending.push(Reverse((at, l as LotId)));
     }
 
@@ -139,26 +140,44 @@ impl Buildings {
             }
             self.pending.pop();
             // Entries whose deadline was replaced are stale.
-            if let Some((_, zone)) = self.due[lot as usize].take_if(|&mut (due, _)| due == at) {
+            if let Some((_, zone, _)) = self.due[lot as usize].take_if(|&mut (due, _, _)| due == at)
+            {
                 return Some((lot, zone));
             }
         }
         None
     }
 
-    /// Puts a due lot back to wait for demand (ADR 0025). The retry delay is drawn from the
-    /// lot and tick, so it stays independent of traffic RNG and edit order.
-    pub(crate) fn defer(&mut self, lot: LotId, zone: Zone, tick: u64, dt: f32, seed: u64) {
+    /// Puts a due lot back to wait for demand or power (ADR 0025, 0041). The retry delay is
+    /// drawn from the lot and tick, independent of traffic RNG and edit order.
+    pub(crate) fn defer(
+        &mut self,
+        lot: LotId,
+        zone: Zone,
+        tick: u64,
+        dt: f32,
+        seed: u64,
+        for_power: bool,
+    ) {
         let mut rng = Rng::new(seed ^ (u64::from(lot) << 32) ^ tick.wrapping_mul(0x9E37_79B9));
         let seconds =
             DEFER_MIN_S + rng.below(((DEFER_MAX_S - DEFER_MIN_S) * 10.0) as u32) as f32 / 10.0;
         let at = tick.saturating_add((seconds / dt).ceil().max(1.0) as u64);
-        self.due[lot as usize] = Some((at, zone));
+        self.due[lot as usize] = Some((at, zone, for_power));
         self.pending.push(Reverse((at, lot)));
     }
 
+    /// Scheduled lots whose most recent growth check failed for lack of power.
+    pub(crate) fn waiting_for_power(&self) -> u32 {
+        self.due
+            .iter()
+            .flatten()
+            .filter(|(_, _, power)| *power)
+            .count() as u32
+    }
+
     /// The building a lot that `next_due` returned would get; `None` if nothing fits.
-    /// Changes nothing, so the caller can check power first (ADR 0036).
+    /// Changes nothing, so the caller can check power first (ADR 0041).
     pub(crate) fn plan(
         lot: LotId,
         zone: Zone,
@@ -268,10 +287,11 @@ impl Buildings {
         mix(self.due.len() as u64);
         for due in &self.due {
             match due {
-                Some((tick, zone)) => {
+                Some((tick, zone, for_power)) => {
                     mix(1);
                     mix(*tick);
                     mix(*zone as u64);
+                    mix(u64::from(*for_power));
                 }
                 None => mix(0),
             }

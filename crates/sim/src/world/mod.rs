@@ -4,7 +4,9 @@ use serde::{Deserialize, Serialize};
 mod closure;
 mod demand;
 mod inspect;
+mod money;
 mod persist;
+mod pollution;
 mod power;
 mod residents;
 mod roads;
@@ -23,6 +25,7 @@ use crate::geometry::Shape;
 use crate::junction::Junctions;
 use crate::lot::Lots;
 use crate::path::Pathfinder;
+use crate::pollution::Pollution;
 use crate::power::{PlantKind, Power};
 use crate::rng::Rng;
 use crate::road::{LaneId, RoadClass, RoadNetwork};
@@ -31,6 +34,7 @@ use crate::zone::{Zone, ZoneGrid};
 
 pub use demand::Demand;
 pub use inspect::{BuildingInfo, CitizenInfo, Place};
+pub use money::{JOB_TAX, Money, RESIDENT_TAX, START_FUNDS};
 pub use persist::{SAVE_VERSION, SaveError};
 pub use power::{PLANT_STRIDE, POWER_BUILDING_STRIDE, PowerStats};
 
@@ -56,7 +60,7 @@ pub struct Config {
     pub stuck_limit_s: f32,
     pub grid_spacing: f32,
     /// Builds every due lot whatever the demand (ADR 0025) and powers every building (ADR
-    /// 0036). For tests and benchmarks that need full blocks; the game leaves it off.
+    /// 0041). For tests and benchmarks that need full blocks; the game leaves it off.
     pub ignore_demand: bool,
 }
 
@@ -104,8 +108,8 @@ pub enum Command {
         x: f32,
         y: f32,
     },
-    /// Places a power plant centred on the point (ADR 0036). Refused over roads and other
-    /// plants, and for coal away from roads.
+    /// Places a power plant at the point; coal snaps beside a road and faces it (ADR 0042).
+    /// Refused over roads and other plants, and for coal away from roads.
     PlacePlant {
         kind: PlantKind,
         x: f32,
@@ -149,8 +153,10 @@ pub struct Stats {
     pub unemployment_percent: f32,
     /// What the town wants built next (ADR 0025).
     pub demand: Demand,
-    /// Supply and use of power (ADR 0036).
+    /// Supply and use of power (ADR 0041).
     pub power: PowerStats,
+    /// Balance, taxes and upkeep (ADR 0036).
+    pub money: Money,
     /// Synthetic vehicles waiting between random trips; dormant citizen slots are excluded.
     pub parked: u32,
     pub awaiting_path: u32,
@@ -183,7 +189,7 @@ pub struct World {
     pub citizens: crate::citizen::Citizens,
     pub households: crate::citizen::Households,
     pub homes: crate::citizen::Homes,
-    /// Plants and transmission lines (ADR 0036).
+    /// Plants and transmission lines (ADR 0041).
     pub power: Power,
     /// Grids and who is powered, derived from the rest.
     #[serde(skip)]
@@ -191,6 +197,7 @@ pub struct World {
     residents: residents::Residents,
     closures: closure::Closures,
     supply: demand::Supply,
+    treasury: money::Treasury,
     /// Faces of the road network, traced again when `blocks_version` falls behind the roads.
     #[serde(skip)]
     blocks: Blocks,
@@ -216,6 +223,8 @@ pub struct World {
     wake: BinaryHeap<Reverse<(u64, AgentId)>>,
     rng: Rng,
     totals: Stats,
+    /// Air, ground, noise, traffic flow and land value (ADR 0037).
+    pub pollution: Pollution,
 }
 
 impl World {
@@ -224,6 +233,7 @@ impl World {
             residents: residents::Residents::new(cfg.seed),
             closures: Default::default(),
             supply: Default::default(),
+            treasury: Default::default(),
             citizens: Default::default(),
             households: Default::default(),
             homes: Default::default(),
@@ -231,6 +241,7 @@ impl World {
             power_cache: Default::default(),
             cfg,
             zones: ZoneGrid::covering(roads.bounds()),
+            pollution: Pollution::default(),
             roads,
             lots: Lots::default(),
             buildings: Buildings::default(),
@@ -250,9 +261,28 @@ impl World {
             rng,
             totals: Stats::default(),
         };
+        world.pollution = Pollution::covering(&world.zones);
         world.sync_roads();
         world.ensure_power();
+        world.refresh_upkeep();
         world
+    }
+
+    /// A fresh city: no roads, on a map the size of a `cols` × `rows` street grid.
+    pub fn empty(cfg: Config, cols: u32, rows: u32) -> Self {
+        let size = |n: u32| n.saturating_sub(1) as f32 * cfg.grid_spacing;
+        let zones = ZoneGrid::covering([0.0, 0.0, size(cols), size(rows)]);
+        let rng = Rng::new(cfg.seed);
+        let mut world = Self::new(cfg, RoadNetwork::default(), rng);
+        world.pollution = Pollution::covering(&zones);
+        world.zones = zones;
+        world
+    }
+
+    /// `[min_x, min_y, max_x, max_y]` of the map: the land the zone grid covers.
+    pub fn bounds(&self) -> [f32; 4] {
+        let [x0, y0, cell, cols, rows] = self.zones.layout();
+        [x0, y0, x0 + cell * cols, y0 + cell * rows]
     }
 
     /// A world on a generated `cols` × `rows` street grid.
@@ -268,6 +298,7 @@ impl World {
 
     pub fn apply(&mut self, cmd: Command) -> bool {
         let versions = (self.lots.version, self.zones.version, self.power.version);
+        let roads = self.roads.version;
         let changed = match cmd {
             Command::SpawnAgents { count } => self.spawn_agents(count),
             Command::BuildRoad {
@@ -331,6 +362,9 @@ impl World {
             self.reconcile_residents();
         }
         self.ensure_power();
+        if roads != self.roads.version {
+            self.refresh_upkeep();
+        }
         changed
     }
 
@@ -361,6 +395,8 @@ impl World {
         self.resolve_exits(&exits);
         self.traffic.recycle_exits(exits);
         self.totals.tick += 1;
+        self.tick_pollution();
+        self.settle_money();
         self.grow_buildings();
         // Current at every tick boundary, so a loaded world reads the same allocation.
         self.ensure_power();
@@ -373,6 +409,7 @@ impl World {
         s.unemployed = self.residents.population - self.residents.employed;
         s.demand = self.demand();
         s.power = self.power_stats();
+        s.money = self.money();
         if s.population > 0 {
             s.unemployment_percent = s.unemployed as f32 * 100.0 / s.population as f32;
         }

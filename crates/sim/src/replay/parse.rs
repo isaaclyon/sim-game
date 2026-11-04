@@ -1,6 +1,6 @@
 //! Reads the command log text format described in `replay/mod.rs`.
 
-use super::{CLASSES, CommandLog, LOG_VERSION, LogError, Outcome, PLANTS, TITLE, ZONES};
+use super::{CLASSES, CommandLog, LOG_VERSION, LogError, Outcome, PLANTS, Start, TITLE, ZONES};
 use crate::Command;
 
 struct Line<'a> {
@@ -161,12 +161,17 @@ pub(super) fn parse(text: &str) -> Result<CommandLog, LogError> {
     seed_line.keyword("seed")?;
     let seed = seed_line.number("seed")?;
     seed_line.done()?;
-    let mut grid = next("grid")?;
-    grid.keyword("grid")?;
+    let mut grid = next("map")?;
+    let start = match grid.word("map")? {
+        "grid" => Start::Grid,
+        "map" => Start::Map,
+        other => return grid.fail(format!("expected `map` or `grid`, found `{other}`")),
+    };
     let (cols, rows) = (grid.number("column count")?, grid.number("row count")?);
     grid.done()?;
 
     let mut log = CommandLog::new(seed, cols, rows);
+    log.start = start;
     let mut previous = 0;
     loop {
         let mut line = next("end")?;

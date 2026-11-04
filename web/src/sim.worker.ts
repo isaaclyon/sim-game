@@ -28,10 +28,14 @@ let buildingsVersion = -1;
 let buildingsSentAt = -Infinity;
 let powerVersion = -1;
 let powerSentAt = -Infinity;
+let pollutionVersion = -1;
+let pollutionSentAt = -Infinity;
 /** One inspector subject. Citizens persist even while their travel slot is hidden. */
 let inspected: { selection: number; kind: 'citizen' | 'building'; id: number } | null = null;
 /** Full meshes are expensive; faster simulation must not flood the main thread. */
 const BUILDING_SNAPSHOT_INTERVAL_MS = 250;
+/** Pollution changes slowly (every 10 sim seconds) and its grid can be large. */
+const POLLUTION_SNAPSHOT_INTERVAL_MS = 1000;
 
 function post(msg: FromWorker, transfer: Transferable[] = []) {
   self.postMessage(msg, { transfer });
@@ -75,7 +79,7 @@ function sendBuildingsIfChanged(s: Sim, force = false) {
   post({ type: 'buildings', data, ids }, [data.buffer, ids.buffer]);
 }
 
-/** Power changes with growth too, so it is coalesced like buildings (ADR 0036). */
+/** Power changes with growth too, so it is coalesced like buildings (ADR 0041). */
 function sendPowerIfChanged(s: Sim, force = false) {
   const version = s.power_version();
   if (version === powerVersion) return;
@@ -93,6 +97,18 @@ function sendPowerIfChanged(s: Sim, force = false) {
   ]);
 }
 
+function sendPollutionIfChanged(s: Sim, force = false) {
+  const version = s.pollution_version();
+  if (version === pollutionVersion) return;
+  const now = performance.now();
+  if (!force && now - pollutionSentAt < POLLUTION_SNAPSHOT_INTERVAL_MS) return;
+  pollutionVersion = version;
+  pollutionSentAt = now;
+  const cells = s.pollution_cells();
+  const [x0, y0, cell, cols, rows] = s.pollution_layout();
+  post({ type: 'pollution', cells, layout: [x0, y0, cell, cols, rows] }, [cells.buffer]);
+}
+
 /** After an edit: zoning can add alleys, and road edits can recut lots (ADR 0016). */
 function sendEdits(s: Sim) {
   sendRoadsIfChanged(s);
@@ -100,6 +116,7 @@ function sendEdits(s: Sim) {
   sendLotsIfChanged(s);
   sendBuildingsIfChanged(s, true);
   sendPowerIfChanged(s, true);
+  sendPollutionIfChanged(s, true);
   sendFrame(s); // Cars and signals also change while paused.
 }
 
@@ -109,8 +126,14 @@ const cities = new CitySession(post, (next, initialSpeed) => {
   speed = initialSpeed;
   backlogMs = 0;
   last = performance.now();
-  roadsVersion = zonesVersion = lotsVersion = buildingsVersion = powerVersion = -1;
-  buildingsSentAt = powerSentAt = -Infinity;
+  roadsVersion =
+    zonesVersion =
+    lotsVersion =
+    buildingsVersion =
+    powerVersion =
+    pollutionVersion =
+      -1;
+  buildingsSentAt = powerSentAt = pollutionSentAt = -Infinity;
   inspected = null;
   post({ type: 'cityReset', speed });
   sendEdits(next);
@@ -150,6 +173,9 @@ function readStats(s: Sim): Stats {
     pathsFailed: st.paths_failed,
     despawnedStuck: st.despawned_stuck,
     despawnedByEdit: st.despawned_by_edit,
+    balance: st.balance,
+    taxes: st.taxes,
+    upkeep: st.upkeep,
   };
   st.free();
   return out;
@@ -235,6 +261,7 @@ function step() {
       sendRoadsIfChanged(sim);
       sendBuildingsIfChanged(sim);
       sendPowerIfChanged(sim);
+      sendPollutionIfChanged(sim);
       sendFrame(sim, perTick);
     }
   }
@@ -281,24 +308,21 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
       if (speed === 0 && sim) {
         sendBuildingsIfChanged(sim, true);
         sendPowerIfChanged(sim, true);
+        sendPollutionIfChanged(sim, true);
       }
       break;
     case 'spawn':
       if (cities.ready && sim?.spawn_agents(msg.count)) cities.changed();
       break;
-    case 'buildRoad':
-    case 'buildCurve': {
-      const success =
-        sim && cities.ready
-          ? msg.type === 'buildCurve'
-            ? sim.build_curve(msg.ax, msg.ay, msg.cx, msg.cy, msg.bx, msg.by, msg.class)
-            : sim.build_road(msg.ax, msg.ay, msg.bx, msg.by, msg.class)
-          : false;
-      if (success && sim) {
+    case 'buildRoad': {
+      const built =
+        sim && cities.ready ? sim.build_draft(new Float32Array(msg.points), msg.class) : null;
+      const end: [number, number] | null = built?.length === 2 ? [built[0], built[1]] : null;
+      if (end && sim) {
         cities.changed();
         sendEdits(sim);
       }
-      post({ type: 'buildResult', id: msg.id, success });
+      post({ type: 'buildResult', id: msg.id, success: end !== null, end });
       break;
     }
     case 'deleteRoad':
@@ -355,14 +379,28 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
       post({ type: 'bulldozePreview', segment, revision: msg.revision }, [segment.buffer]);
       break;
     }
-    case 'previewRoad':
-    case 'previewCurve': {
-      const stops = sim
-        ? msg.type === 'previewCurve'
-          ? sim.curve_preview(msg.ax, msg.ay, msg.cx, msg.cy, msg.bx, msg.by)
-          : sim.road_preview(msg.ax, msg.ay, msg.bx, msg.by)
-        : new Float32Array();
-      post({ type: 'roadPreview', revision: msg.revision, stops }, [stops.buffer]);
+    case 'previewRoad': {
+      // `[n, m, length, angle, k]`, guided points, guide lines, angle marks, then stops
+      // (ADR 0038).
+      const d = sim?.road_draft(new Float32Array(msg.points), msg.plan) ?? new Float32Array(5);
+      const [n, m, length, angle, k] = d;
+      const at = 5 + 2 * n;
+      const points = d.slice(5, at);
+      const guides = d.slice(at, at + 4 * m);
+      const angles = d.slice(at + 4 * m, at + 4 * m + 6 * k);
+      const stops = d.slice(at + 4 * m + 6 * k);
+      // What the guided road would charge (ADR 0036); nothing when no road is planned.
+      const raw = new Float32Array(msg.points);
+      const cost = msg.plan && stops.length > 0 ? (sim?.draft_cost(raw, msg.class) ?? null) : null;
+      const affordable = cost !== null && !!sim?.can_afford(cost);
+      post(
+        {
+          type: 'roadPreview',
+          ...{ revision: msg.revision, stops, points, guides, angles, length, angle },
+          ...{ cost, affordable },
+        },
+        [stops.buffer, points.buffer, guides.buffer, angles.buffer],
+      );
       break;
     }
     case 'inspect': {
@@ -386,11 +424,6 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
               id: msg.building,
             };
       if (sim) sendBuilding(sim);
-      break;
-    }
-    case 'previewSnap': {
-      const stops = sim?.snap_preview(msg.x, msg.y) ?? new Float32Array();
-      post({ type: 'roadPreview', stops, revision: msg.revision }, [stops.buffer]);
       break;
     }
   }

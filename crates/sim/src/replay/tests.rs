@@ -4,7 +4,7 @@ use super::*;
 fn session() -> (CommandLog, World) {
     let mut log = CommandLog::new(5, 4, 4);
     let mut world = log.world();
-    let steps: [(u32, Command); 7] = [
+    let steps: [(u32, Command); 9] = [
         (0, Command::SpawnAgents { count: 20 }),
         (
             30,
@@ -46,6 +46,23 @@ fn session() -> (CommandLog, World) {
                 class: RoadClass::Street,
             },
         ),
+        (
+            0,
+            Command::PlacePlant {
+                kind: PlantKind::Wind,
+                x: 500.0,
+                y: 60.0,
+            },
+        ),
+        (
+            0,
+            Command::BuildLine {
+                ax: 500.0,
+                ay: 60.0,
+                bx: 360.0,
+                by: 60.0,
+            },
+        ),
         (10, Command::DeleteRoad { x: 300.0, y: 120.0 }),
         (
             0,
@@ -72,7 +89,7 @@ fn session() -> (CommandLog, World) {
 #[test]
 fn recorded_session_replays_to_the_same_world() {
     let (log, live) = session();
-    assert_eq!(log.commands.len(), 7);
+    assert_eq!(log.commands.len(), 9);
     let replayed = log.replay();
     assert_eq!(replayed.tick_count(), live.tick_count());
     assert_eq!(Outcome::of(&replayed), Outcome::of(&live));
@@ -101,6 +118,31 @@ fn a_save_and_load_partway_through_does_not_change_the_replay() {
     let mut loaded = World::load(&world.save().unwrap()).unwrap();
     log.advance(&mut loaded, next, log.end);
     assert_eq!(Outcome::of(&loaded), Outcome::of(&live));
+}
+
+#[test]
+fn empty_map_logs_start_without_roads_and_round_trip() {
+    let mut log = CommandLog::empty(3, 10, 10);
+    let mut world = log.world();
+    assert_eq!(world.roads.road_count(), 0);
+    let road = Command::BuildRoad {
+        ax: 0.0,
+        ay: 0.0,
+        bx: 240.0,
+        by: 0.0,
+        class: RoadClass::Street,
+    };
+    assert!(log.apply(&mut world, road));
+    let text = log.to_string();
+    assert!(text.contains("\nmap 10 10\n"), "{text}");
+    let parsed = CommandLog::parse(&text).unwrap();
+    assert_eq!(parsed, log);
+    assert_eq!(parsed.replay().state_hash(), world.state_hash());
+    let head = "sim-game command log 1\nseed 1\nmesh 3 3\nend 0\n";
+    assert_eq!(
+        error(head),
+        "line 3: expected `map` or `grid`, found `mesh`"
+    );
 }
 
 fn error(text: &str) -> String {

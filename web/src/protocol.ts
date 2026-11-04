@@ -2,7 +2,11 @@
 // thread only sends commands and draws snapshots.
 
 export type ToWorker =
-  | { type: 'init'; seed: number; cols: number; rows: number; agents: number }
+  /**
+   * `grid` starts on the generated `cols` × `rows` street grid (tests and benchmarks); false
+   * starts on an empty map of that size, as the game does.
+   */
+  | { type: 'init'; seed: number; cols: number; rows: number; agents: number; grid: boolean }
   | { type: 'setSpeed'; speed: number }
   /** Replace the single local save with the current sim state. */
   | { type: 'saveCity' }
@@ -20,33 +24,16 @@ export type ToWorker =
   | { type: 'commandLog' }
   /** Explicit synthetic benchmark traffic, not normal play. */
   | { type: 'spawn'; count: number }
-  | {
-      type: 'buildRoad';
-      id: number;
-      ax: number;
-      ay: number;
-      bx: number;
-      by: number;
-      class: RoadClass;
-    }
-  | {
-      type: 'buildCurve';
-      id: number;
-      ax: number;
-      ay: number;
-      cx: number;
-      cy: number;
-      bx: number;
-      by: number;
-      class: RoadClass;
-    }
+  /** Builds the road through guided `points`, as in `previewRoad` with two points, or three for
+   * a curve. Answered with `buildResult`. */
+  | { type: 'buildRoad'; id: number; points: number[]; class: RoadClass }
   /** Removes the plant under the point, else the nearest line, else the nearest road. */
   | { type: 'deleteRoad'; x: number; y: number }
   /** Places a power plant at the point: coal snaps beside the nearest road and faces it, others
-   * centre on the point (ADR 0036, 0037). Refusals change nothing. */
+   * centre on the point (ADR 0041, 0042). Refusals change nothing. */
   | { type: 'placePlant'; kind: PlantKind; x: number; y: number }
   /** Draws a transmission line; each end snaps to a line end, a plant's terminal, or the
-   * sidewalk of a road in reach on the side facing the other end (ADR 0037). */
+   * sidewalk of a road in reach on the side facing the other end (ADR 0042). */
   | { type: 'buildLine'; ax: number; ay: number; bx: number; by: number }
   /** Asks whether a plant fits here. Answered with `plantPreview`. */
   | { type: 'previewPlant'; kind: PlantKind; x: number; y: number; revision: number }
@@ -62,20 +49,14 @@ export type ToWorker =
   /** Asks for the outline of the block containing the point. Answered with `blockPreview`. */
   | { type: 'previewBlock'; x: number; y: number; revision: number }
   | { type: 'previewBulldoze'; x: number; y: number; revision: number }
-  /** Asks where a road would snap. Changes nothing; answered with `roadPreview`. */
-  | { type: 'previewRoad'; revision: number; ax: number; ay: number; bx: number; by: number }
-  | {
-      type: 'previewCurve';
-      revision: number;
-      ax: number;
-      ay: number;
-      cx: number;
-      cy: number;
-      bx: number;
-      by: number;
-    }
-  /** Asks where a road started here would start. Answered with a one-stop `roadPreview`. */
-  | { type: 'previewSnap'; revision: number; x: number; y: number }
+  /**
+   * Asks how a road of `class` being drawn would be guided, built and charged (ADR 0036,
+   * ADR 0038). `points` is `[x, y, snap]` per clicked point in drawing order, then the cursor:
+   * one point asks where a road would start, two a straight road, three a curve (start,
+   * control, end). `snap` is a `Snap` bitmask. `plan` false only guides the points (a curve's
+   * control point). Changes nothing; answered with `roadPreview`.
+   */
+  | { type: 'previewRoad'; revision: number; class: RoadClass; points: number[]; plan: boolean }
   /**
    * Selects the resident who owns agent `agent` (a car or walker, an index into the `frame`
    * agents snapshot) for
@@ -97,6 +78,13 @@ export const RoadClass = {
 } as const;
 export type RoadClass = (typeof RoadClass)[keyof typeof RoadClass];
 
+/** Drawing guide flags, matching `sim::guide` (ADR 0038). Joining roads is always on. */
+export const Snap = {
+  Angle: 1,
+  Guides: 2,
+  Length: 4,
+} as const;
+
 /** Zone cell values, matching the sim's `Zone` (ADR 0014). Density is part of the zone. */
 export const Zone = {
   None: 0,
@@ -109,7 +97,7 @@ export const Zone = {
 } as const;
 export type Zone = (typeof Zone)[keyof typeof Zone];
 
-/** Power plant kinds, matching the sim's `PlantKind` (ADR 0036). */
+/** Power plant kinds, matching the sim's `PlantKind` (ADR 0041). */
 export const PlantKind = {
   Coal: 0,
   Solar: 1,
@@ -177,7 +165,7 @@ export interface Building extends Place {
   /** People living here or employees assigned here, including those currently elsewhere. */
   occupied: number;
   closing: boolean;
-  /** Starter power or its grid covers it (ADR 0036); if not, its vacancies stay empty. */
+  /** Starter power or its grid covers it (ADR 0041); if not, its vacancies stay empty. */
   powered: boolean;
 }
 
@@ -187,7 +175,7 @@ export interface Demand {
   industrial: number;
 }
 
-/** The town's power from the sim (ADR 0036), in the units of a building's demand. */
+/** The town's power from the sim (ADR 0041), in the units of a building's demand. */
 export interface PowerStats {
   /** What all plants produce now, not counting starter power. */
   supply: number;
@@ -198,7 +186,7 @@ export interface PowerStats {
   /** Demand of every standing building. */
   demand: number;
   unpowered: number;
-  /** Zoned lots waiting for power rather than demand. */
+  /** Scheduled lots whose last growth check failed for power, preserved across loads. */
   waiting: number;
 }
 
@@ -213,8 +201,8 @@ export interface Stats {
   unemployed: number;
   /** Sim-computed `unemployed` as a percentage of `population`; 0 with no residents. */
   unemploymentPercent: number;
-  /** R/C/I demand from the sim, in people (ADR 0025). A zoned lot builds only while its use
-   *  is positive; negative is a surplus. */
+  /** R/C/I demand from the sim, in people (ADR 0025). Growth also needs demand above its
+   * land-value threshold and available power; negative demand is a surplus. */
   demand: Demand;
   power: PowerStats;
   /** Allocated travel slots, including dormant reservations and departed citizens' slots. */
@@ -234,6 +222,12 @@ export interface Stats {
   despawnedStuck: number;
   /** Cars removed because a road on their remaining route was split or deleted. */
   despawnedByEdit: number;
+  /** The city's money in whole dollars, from the sim (ADR 0036); negative is debt. */
+  balance: number;
+  /** Taxes from residents and filled jobs, dollars per clock hour. */
+  taxes: number;
+  /** Road upkeep, dollars per clock hour. */
+  upkeep: number;
 }
 
 /** Persistence metadata only. A commit acknowledges the captured revision, not later edits. */
@@ -263,16 +257,43 @@ export type FromWorker =
   /**
    * `stops` is `[x, y, join]` per stop of the previewed road, in order; join is 0 = new end,
    * 1 = existing node, 2 = splits an existing road, -1 = interior curve sample (no marker).
-   * Empty means refused. Answers `previewRoad` / `previewCurve`, or `previewSnap` with one stop.
+   * Empty means refused, or not asked for (`plan` false). One stop answers a one-point request.
+   * `points` is the guided `[x, y]` per requested point. `guides` is `[x0, y0, x1, y1]` per
+   * guide line used for the last point, from the line's origin to the point. `length` is metres
+   * along the road so far; `angle` is degrees from the road its start joins, NaN for none.
+   * `angles` is `[x, y, rx, ry, dx, dy]` per angle mark: a junction where the road's start (or,
+   * when planned, its end) joins a road, the unit direction along the road measured from, and
+   * along the new road, both away from the junction.
    * `revision` echoes the construction stage so cancelled or previous-stage previews are discarded.
+   * `cost` is what building the guided road would charge in dollars, null when no road is
+   * planned (one point, a control point, or refused);
+   * `affordable` is false when the city cannot pay it, and building would be refused (ADR 0036).
    */
-  | { type: 'roadPreview'; stops: Float32Array; revision: number }
+  | {
+      type: 'roadPreview';
+      stops: Float32Array;
+      points: Float32Array;
+      guides: Float32Array;
+      angles: Float32Array;
+      length: number;
+      angle: number;
+      revision: number;
+      cost: number | null;
+      affordable: boolean;
+    }
   /**
    * The whole zone grid: one `Zone` byte per cell, row-major from the origin. `layout` is
    * `[originX, originY, cellSize, cols, rows]`; cell (c, r) spans x from originX + c * cellSize.
    * Sent at start and whenever a paint changes a cell.
    */
   | { type: 'zones'; cells: Uint8Array; layout: [number, number, number, number, number] }
+  /**
+   * The whole pollution grid (ADR 0037): `[air, ground, noise, landValue]` bytes per cell,
+   * row-major from the origin, 0 = none (for land value: worthless) to 255 = full. `layout` is
+   * as for `zones`; cells are 4×4 zone cells. Sent at start, after edits and pauses, and at
+   * most once a real second while it changes.
+   */
+  | { type: 'pollution'; cells: Uint8Array; layout: [number, number, number, number, number] }
   /**
    * `rings` is `[n, x0, y0, …, x(n-1), y(n-1)]` per lot: its outline's point count, then its
    * points (ADR 0018). Sent at start and whenever lots change.
@@ -291,25 +312,26 @@ export type FromWorker =
    */
   | { type: 'buildings'; data: Float32Array; ids: Uint32Array }
   /**
-   * Power (ADR 0036), sent whole when plants, lines, grids or who is powered change; growth
+   * Power (ADR 0041), sent whole when plants, lines, grids or who is powered change; growth
    * is coalesced like `buildings`. `plants` is `[kind, x, y, halfSize, frontX, frontY,
    * terminalX, terminalY, output, grid]` per plant (`PLANT_STRIDE`): its footprint is the
    * square `halfSize` around (x, y), turned so its front faces the unit direction (frontX,
-   * frontY) (toward its road for coal; ADR 0037); lines join it at the terminal. `lines` is
+   * frontY) (toward its road for coal; ADR 0042); lines join it at the terminal. `lines` is
    * `[ax, ay, bx, by]` per line. `buildings` is `[x, y, height, grid, powered]` per standing
    * building (`POWER_BUILDING_STRIDE`): footprint mean point, metres, grid (-1 = none), 1 or 0.
    * Grid numbers are only stable within one message.
    */
   | { type: 'power'; plants: Float32Array; lines: Float32Array; buildings: Float32Array }
   /** `outline` is the closed `[x, y]` footprint the plant asked about would take, snapped
-   * beside a road for coal (ADR 0037); `ok` if it fits. */
+   * beside a road for coal (ADR 0042); `ok` if it fits. */
   | { type: 'plantPreview'; outline: Float32Array; ok: boolean; revision: number }
   /** `[ax, ay, aJoin, bx, by, bJoin]`, join 1 where an end meets a line, plant or road and 0
    * where it stands free; empty means refused. */
   | { type: 'linePreview'; ends: Float32Array; revision: number }
   /** `[x, y]` per outline sample of the block under the cursor, closed; empty outside blocks. */
   | { type: 'blockPreview'; outline: Float32Array; revision: number }
-  | { type: 'buildResult'; id: number; success: boolean }
+  /** `end` is the built road's guided end, where a chained road starts; null when refused. */
+  | { type: 'buildResult'; id: number; success: boolean; end: [number, number] | null }
   /** Selected road's `[x, y]` centreline samples, or empty on a miss. Sim-owned hit testing.
    * A plant's target is its closed outline and a line's its two ends. */
   | { type: 'bulldozePreview'; segment: Float32Array; revision: number }

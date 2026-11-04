@@ -1,5 +1,5 @@
 //! Placing things beside a road, facing it: the shared snap for anything the player sets down
-//! along a street (plants now; service buildings and other roadside pieces later; ADR 0037).
+//! along a street (plants now; service buildings and other roadside pieces later; ADR 0042).
 //! Planning only; nothing here mutates the network.
 
 use crate::geometry::{Point, dist, lerp, project};

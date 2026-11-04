@@ -162,6 +162,8 @@ impl World {
                 self.entering.push(agent);
             } else {
                 self.totals.paths_failed += 1;
+                // The search emptied the route; progress through the old one no longer applies.
+                self.agents.path_idx[a] = 0;
                 self.park(agent, RETRY_AFTER_S);
             }
         }

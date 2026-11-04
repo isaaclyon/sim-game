@@ -269,6 +269,10 @@ fn splitting_a_road_removes_cars_that_use_it() {
     );
     net.add_road(w, c, RoadClass::Street);
     net.add_road(c, e, RoadClass::Street);
+    // A side street makes `c` a real junction, so the build does not join west and east
+    // into one road (ADR 0040).
+    let s = net.add_node(0.0, 200.0);
+    net.add_road(c, s, RoadClass::Street);
     let mut world = World::new(Config::default(), net, Rng::new(1));
     let drive = |world: &mut World, path: Vec<LaneId>| {
         let agent = world.agents.push(world.roads.lane_from[path[0] as usize]);

@@ -1,4 +1,4 @@
-//! Power plants and transmission lines (ADR 0036). Only what the player placed is stored here;
+//! Power plants and transmission lines (ADR 0041). Only what the player placed is stored here;
 //! grids, supply and which buildings are powered are derived from it (`grid`, `world::power`).
 
 mod geom;

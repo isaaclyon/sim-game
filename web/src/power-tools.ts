@@ -1,4 +1,4 @@
-// The plant and transmission line tools and the power view (ADR 0036). Like the road tools,
+// The plant and transmission line tools and the power view (ADR 0041). Like the road tools,
 // they ask the sim what a click would do and draw its answer; they never decide it themselves.
 import { type FromWorker, PlantKind, type ToWorker } from './protocol';
 
@@ -92,11 +92,11 @@ export class PowerTools {
     this.set(tool);
   }
 
-  /** P cycles coal, solar, wind and off; L toggles the line tool; O the power view. */
+  /** G cycles coal, solar, wind and off; L toggles the line tool; O the power view. */
   key(key: string): boolean {
     const k = key.toLowerCase();
     const t = this.tool;
-    if (k === 'p')
+    if (k === 'g')
       this.choose(
         typeof t !== 'number'
           ? PlantKind.Coal
@@ -151,7 +151,6 @@ export class PowerTools {
     this.ask();
   }
 
-  /** Handles the worker's power messages; false for any other message. */
   /** Handles the power messages; true means `msg` was one of them. */
   receive(
     msg: FromWorker,
@@ -208,7 +207,7 @@ export class PowerTools {
         ? ''
         : t === 'line'
           ? `${no}${this.start ? 'Click the line end.' : 'Click where the power line starts: a plant, road or line.'} Esc or right-click stops.`
-          : `${PLANT_NAMES[t]}: click to place. ${PLANT_HELP[t]} P switches plant, Esc stops.`;
+          : `${PLANT_NAMES[t]}: click to place. ${PLANT_HELP[t]} G switches plant, Esc stops.`;
   }
 }
 

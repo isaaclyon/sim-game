@@ -30,8 +30,11 @@ test('lighting receives sim snapshot time and never advances from animation fram
       despawnedStuck: 0,
       pathsFailed: 0,
       despawnedByEdit: 0,
-      demand: [0, 0, 0],
+      demand: { residential: 0, commercial: 0, industrial: 0 },
       power: { supply: 0, starter: 150, used: 0, demand: 0, unpowered: 0, waiting: 0 },
+      balance: 100_000,
+      taxes: 0,
+      upkeep: 0,
     },
   });
   t.frame();

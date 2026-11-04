@@ -254,35 +254,101 @@ confirmed New city.
   in-flight old save; the new city saves immediately, or clearly reports a storage failure.
   Repeated replacement leaves one clock loop and no stale geometry or inspector selection.
 
+## M4.5 – A great road tool
+
+Building is the core fantasy, and M5's build costs will reward precise tools, so the road tool
+gets a Cities: Skylines 2–level pass first. The sim plans every snap, grid and undo, as it
+already plans roads: answers stay deterministic and testable, and M6 councilors can reuse the
+same builders through ordinary commands. Slices ship in this order; each is judged in the
+browser before the next starts.
+
+1. **Angle snapping and guide lines** ([ADR 0038](adrs/0038-sim-owned-drawing-guides.md)).
+   New roads snap to 15° steps (90° and 45° pull hardest) measured from the road they start
+   on, or the map axes on empty land. Dashed guide lines line new ends up with nearby road
+   ends, along their extensions and perpendiculars. Lengths snap to whole 8 m zone cells.
+   Length and angle show beside the cursor while drawing. Where the road joins a road, the
+   map shows the angle as an arc, or a square at 90°. Angle, guide and length snapping
+   toggle separately; holding Shift turns all three off. Joining existing junctions and roads
+   always stays on.
+   Straight roads that meet end to end in a line become one road, so no hidden junction pulls
+   new roads off their angle ([ADR 0040](adrs/0040-straight-joins.md)).
+   Done when: a player can draw a square block and a T-junction exactly at 90° without
+   zooming in, and can draw a free-angle road by holding Shift.
+2. **Continuous curves.** Each click adds a curved piece that leaves the previous piece
+   tangentially, so a long winding road is a chain of clicks. Freehand drag is not planned.
+   Done when: a winding road of five pieces has no visible kinks.
+3. **Grid tool.** Pick a cell size (60, 80 or 100 m), drag the first edge to set the angle,
+   then drag out the area in whole blocks. Each grid line is planned like a hand-drawn road:
+   it joins and splits existing roads, and lines that would overlap are left out. The preview
+   shows exactly what will be built. **ADR** for the grid command.
+   Done when: a grid dragged across the edge of a town connects into it with no slivers.
+4. **Upgrade.** Click a road or drag along connected roads to switch between street and main
+   road; alleys can become streets. Cars reroute rather than despawn.
+5. **Undo and redo** for road edits only, many steps, Ctrl+Z and Ctrl+Shift+Z. Undo removes the
+   roads an edit added and rejoins roads it split, as a new edit with new IDs; buildings it
+   cleared stay gone. History lives in the sim and is saved with the city
+   ([ADR 0039](adrs/0039-road-edit-history.md), proposed).
+   Done when: building, upgrading and bulldozing can each be undone and redone, also after a
+   reload, and replay tests stay exact.
+
+Done when: someone used to Cities: Skylines lays out a town's roads without fighting the tool.
+
 ## M5 – A game loop
 
 Goals and consequences, kept light so they don't crowd out building.
 
-### First slice: power — designed, not started
+- Money: build costs, taxes, upkeep (implemented, [ADR 0036](adrs/0036-money-build-costs-taxes-upkeep.md)).
+  A fresh city starts on an empty map with $50,000. Roads cost money to build by length and
+  class and refuse to build when the city cannot pay; the road tool quotes the cost. Every road
+  costs upkeep, and residents and filled jobs pay taxes, per clock hour. Upkeep can push the
+  balance into debt, which only stops new roads. The HUD shows balance, taxes and upkeep.
+  Bulldozing, zoning and sim-built alleys are free. Tax rates are fixed for now.
+- **First slice: pollution and land value — implemented** ([ADR 0037](adrs/0037-pollution-and-land-value-steer-growth.md)).
+  Industry and traffic make air pollution, ground pollution and noise, which lower land value.
+  Homes, and shops a little, grow first on high land value; industry ignores it. Nothing
+  standing is closed or emptied. It needs only buildings and traffic, so it comes before
+  services.
+  - Sim: a pollution grid aligned to the zone grid (4×4 zone cells per cell). Smoothed
+    traffic flow per road and ground pollution per cell build up over time. Air, noise and
+    land value are rebuilt on a fixed sim-time cadence, not every tick. All are saved. The
+    ADR 0025 growth check gains a land value threshold for residential (strong) and commercial (mild).
+  - Saves: version 3 holds money and pollution. Older saves and links are refused, like other
+    version changes (ADR 0033). Bless replay `expect` lines once.
+  - Display: overlays for air, ground, noise and land value; display-only haze and stained
+    ground. Add the snapshot format to CLAUDE.md with the Rust writer and renderer reader.
+  - Perf: compare `traffic_bench` ms/tick at the default size and `--scale la`.
+  - Built: the P button cycles air, ground, noise and land value; the plain view keeps a faint
+    haze and stain, and factory chimneys puff display-only smoke. At `--scale la` (about
+    600,000 cells) an update costs about 10 ms once every 100 ticks, about 0.1 ms a tick on
+    average; the default bench is unchanged. In a test town, the strip beside a factory
+    district (and a main road) grew 5 homes against 11 to 19 in strips farther away.
+    Not yet checked by hand: the full browser save and reload flow.
 
-Power comes before money and is free to build ([ADR 0036](adrs/0036-power-grids-follow-roads.md),
-proposed).
+  Done when: in a town with a factory district and a busy main road, new homes visibly fill
+  the quiet, clean blocks first and the dirty ones only when housing demand is high; an
+  old factory site stays tainted for a few sim days after rezoning; the overlays explain
+  why.
 
-- Roads carry power. Coal plants must touch a road and employ industrial workers; solar and
-  wind plants need neither, and a transmission line brings their power in. Lines also join
-  road networks that are not joined by road.
-- Solar follows the day clock; wind changes slowly from the seed; coal is constant and shows
-  smoke with no other effect yet.
-- Lots don't build without power. Unpowered buildings keep their people but don't fill
-  vacancies. A shortfall leaves the newest buildings dark. Starter power lets a hamlet grow
-  before the first plant.
-- Line corridors remove buildings they cross and block those lots while the line stands.
-- UI: a power supply and demand readout beside the R/C/I bars, a marker on unpowered
-  buildings, "no power" as the reason a lot waits, and a power overlay showing grids and
-  powered buildings.
-- Older saves and links stop loading (ADR 0033).
+- **Power — implemented** ([ADR 0041](adrs/0041-power-grids-follow-roads.md),
+  [ADR 0042](adrs/0042-roadside-pieces-snap-to-roads.md)). Roads carry power. Coal snaps beside
+  roads and offers industrial jobs; off-road solar and wind connect through transmission lines.
+  Plants and lines remain free, alongside the road economy. Solar follows daylight, wind
+  varies from the seed, and coal output is constant regardless of staffing.
+  - Lots need both sufficient R/C/I demand for their land value and available power.
+    Unpowered buildings keep their residents and workers but fill no vacancies. Starter
+    power supports a hamlet before the first plant; shortages leave newer buildings dark.
+  - Plants clear their land; line corridors remove buildings and block growth until removed.
+    Lines snap to plant terminals, roadside poles and other line ends.
+  - The HUD reports supply, use and waiting lots. Unpowered buildings have markers; the power
+    view colours grids. Detailed low-poly models show each plant type without changing state.
+  - Save version 4 combines money, pollution and power. Older saves and links are refused.
+    Display-only coal smoke remains a follow-up; plants do not yet add pollution or costs.
 
-Done when: a new player starts a village on starter power, sees growth stop with a clear
-reason, adds a plant, and connects an off-road wind farm with a line.
+  Done when: a player grows a village on starter power, sees why growth stops, adds a plant,
+  and connects an off-road wind farm with a line.
 
-- Money: build costs, taxes, upkeep.
-- Services with coverage areas: power, water, roads maintenance, then fire, police, health and
-  schools.
+- Remaining services with coverage areas: water, roads maintenance, then fire, police, health
+  and schools.
 - Citizen happiness from services, traffic and pollution, feeding back into demand and growth.
   The citizen inspector shows each person's mood and complaints.
 - Data overlays: traffic, coverage, land value, happiness.

@@ -1,5 +1,5 @@
 # Scripted through the WASM build: every command kind, a rezoning and a deleted road.
-# Power lines added by hand (ADR 0036): a wind plant joined by a line, a coal plant, a
+# Power lines added by hand (ADR 0041): a wind plant joined by a line, a coal plant, a
 # bulldozed plant.
 sim-game command log 1
 seed 1
@@ -17,4 +17,4 @@ grid 4 4
 1950 fill 170 50 residential-high
 2500 delete 430 200
 end 4950
-expect hash 11f46ffb2f4b92c8 population 208 buildings 33 trips 203
+expect hash 71d94e5d136409dd population 208 buildings 33 trips 203

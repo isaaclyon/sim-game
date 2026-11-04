@@ -8,9 +8,9 @@ import { coalSpot, worker } from './worker-harness.mjs';
 const last = (t, type) => t.messages.findLast((m) => m.type === type);
 const pressed = (t, id) => t.elements[id].attributes['aria-pressed'] === 'true';
 
-test('P cycles coal, solar and wind; clicks place the plant the sim was asked about', async () => {
+test('G cycles coal, solar and wind; clicks place the plant the sim was asked about', async () => {
   const t = await tools();
-  t.key('p');
+  t.key('g');
   assert.ok(pressed(t, 'plant-coal'));
   t.move(10, 20);
   const ask = last(t, 'previewPlant');
@@ -32,13 +32,13 @@ test('P cycles coal, solar and wind; clicks place the plant the sim was asked ab
       y: 40,
     },
   );
-  t.key('P');
+  t.key('G');
   assert.ok(pressed(t, 'plant-solar') && !pressed(t, 'plant-coal'));
-  t.key('p');
+  t.key('g');
   assert.ok(pressed(t, 'plant-wind'));
-  t.key('p');
+  t.key('g');
   assert.ok(!pressed(t, 'plant-wind'), 'a fourth press stops placing');
-  t.key('p');
+  t.key('g');
   t.key('r');
   assert.ok(!pressed(t, 'plant-coal'), 'another tool switches the plant tool off');
   t.key('l');
@@ -106,6 +106,10 @@ test('the worker places plants and lines, answers previews and reports power', a
   await w.init;
   await w.send({ type: 'setSpeed', speed: 0 });
   assert.equal(last(w, 'frame').stats.power.starter, 150);
+  const balance = last(w, 'frame').stats.balance;
+  const upkeep = last(w, 'frame').stats.upkeep;
+  assert.ok(balance > 0, 'money and power arrive in the same frame');
+  assert.ok(last(w, 'pollution').cells.length > 0, 'pollution also arrives at startup');
   await w.send({ type: 'previewPlant', kind: PlantKind.Solar, x: 120, y: 0, revision: 3 });
   const refused = w.messages.at(-1);
   assert.deepEqual([refused.type, refused.ok, refused.revision], ['plantPreview', false, 3]);
@@ -118,6 +122,8 @@ test('the worker places plants and lines, answers previews and reports power', a
   const [fx, fy] = power.plants.subarray(4, 6);
   assert.ok(Math.abs(Math.hypot(fx, fy) - 1) < 1e-5, 'faces its street along a unit direction');
   assert.ok(last(w, 'frame').stats.power.supply > 0);
+  assert.equal(last(w, 'frame').stats.balance, balance, 'plants remain free');
+  assert.equal(last(w, 'frame').stats.upkeep, upkeep, 'plants add no upkeep');
 
   const { Sim } = await import('../src/pkg/sim_wasm.js');
   const mirror = new Sim(1, 3, 3);
@@ -135,7 +141,22 @@ test('the worker places plants and lines, answers previews and reports power', a
   assert.deepEqual([...preview.ends.subarray(0, 2)], [...power.plants.subarray(6, 8)]);
   await w.send({ type: 'buildLine', ...line });
   assert.equal(last(w, 'power').lines.length, 4);
+  assert.equal(last(w, 'frame').stats.balance, balance, 'lines remain free');
+  assert.equal(last(w, 'frame').stats.upkeep, upkeep, 'lines add no upkeep');
   const [ax, ay, bx, by] = last(w, 'power').lines;
   await w.send({ type: 'deleteRoad', x: (ax + bx) / 2, y: (ay + by) / 2 + 1 });
   assert.equal(last(w, 'power').lines.length, 0, 'bulldozing takes the line first');
+  const beforeReset = w.messages.length;
+  await w.send({ type: 'newCity' });
+  const reset = w.messages.slice(beforeReset);
+  assert.ok(
+    reset.some((m) => m.type === 'power'),
+    'new city republishes power',
+  );
+  assert.ok(
+    reset.some((m) => m.type === 'pollution'),
+    'new city republishes pollution',
+  );
+  assert.equal(last(w, 'power').plants.length, 0);
+  assert.equal(last(w, 'frame').stats.balance, balance);
 });

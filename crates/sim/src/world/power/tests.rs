@@ -66,6 +66,47 @@ fn starter_power_caps_growth_until_a_plant_arrives() {
 }
 
 #[test]
+fn unzoning_clears_the_power_waiting_warning_immediately() {
+    let mut w = zoned();
+    advance(&mut w, 900);
+    assert!(w.power_stats().waiting > 0);
+    assert!(w.apply(Command::PaintZone {
+        ax: -1000.0,
+        ay: -1000.0,
+        bx: 1000.0,
+        by: 1000.0,
+        zone: Zone::None,
+    }));
+    assert!(
+        w.lots.active_lots().count() > 0,
+        "lots remain after unzoning"
+    );
+    assert_eq!(w.power_stats().waiting, 0);
+    advance(&mut w, 60);
+    assert_eq!(w.power_stats().waiting, 0);
+}
+
+#[test]
+fn loading_preserves_power_waiting_and_subsequent_growth_checks() {
+    let mut w = zoned();
+    advance(&mut w, 900);
+    assert!(w.power_stats().waiting > 0);
+    let mut loaded = World::load(&w.save().unwrap()).unwrap();
+    assert_eq!(w.power_stats(), loaded.power_stats());
+    assert_eq!(w.state_hash(), loaded.state_hash());
+    for world in [&mut w, &mut loaded] {
+        assert!(plant(world, PlantKind::Coal, COAL.0, COAL.1));
+    }
+    for _ in 0..600 {
+        w.tick();
+        loaded.tick();
+        assert_eq!(w.power_stats(), loaded.power_stats());
+    }
+    assert_eq!(w.state_hash(), loaded.state_hash());
+    assert_eq!(w.power_stats().waiting, 0);
+}
+
+#[test]
 fn plants_keep_clear_of_roads_and_each_other() {
     let mut w = lattice();
     assert!(!plant(&mut w, PlantKind::Solar, 120.0, 60.0), "over a road");
@@ -300,4 +341,88 @@ fn lines_snap_to_plant_terminals_and_the_sidewalk_facing_them() {
         w.power_cache.grids.node[0] as f32, grid,
         "the road grid reaches the turbine"
     );
+}
+
+#[test]
+fn powered_homes_still_wait_for_the_land_value_threshold() {
+    let mut w = lattice();
+    assert!(plant(&mut w, PlantKind::Coal, COAL.0, COAL.1));
+    assert!(w.apply(Command::FillBlock {
+        x: 60.0,
+        y: 60.0,
+        zone: Zone::ResidentialLow,
+    }));
+    // A former factory site with lingering ground pollution but ample power.
+    w.pollution.ground.fill(u16::MAX);
+    w.pollution.derive(&w.pollution.sources());
+    let lot = w.lots.active_lots().next().unwrap();
+    assert!(w.land_threshold(lot, Zone::ResidentialLow) > w.demand().residential);
+    assert!(w.power_stats().supply > STARTER_POWER);
+    advance(&mut w, 300);
+    assert_eq!(w.buildings.active_buildings().count(), 0);
+    assert_eq!(
+        w.power_stats().waiting,
+        0,
+        "land, not power, holds these lots"
+    );
+
+    w.pollution = crate::pollution::Pollution::covering(&w.zones);
+    advance(&mut w, 300);
+    assert!(w.buildings.active_buildings().count() > 0);
+    assert!(
+        w.buildings
+            .active_buildings()
+            .all(|b| w.building_powered(b))
+    );
+}
+
+#[test]
+fn power_placement_and_bulldozing_are_free_even_in_debt() {
+    for balance in [crate::world::START_FUNDS, 0, -100] {
+        let mut w = lattice();
+        w.treasury.balance = balance;
+        let money = w.money();
+        let roads = w.roads.road_count();
+        for (kind, x, y) in [
+            (PlantKind::Coal, COAL.0, COAL.1),
+            (PlantKind::Wind, 500.0, 60.0),
+            (PlantKind::Solar, 500.0, 180.0),
+        ] {
+            assert!(plant(&mut w, kind, x, y));
+            assert_eq!(w.money(), money, "plants have no build cost or upkeep");
+        }
+        assert!(line(&mut w, (500.0, 60.0), (362.0, 60.0)));
+        assert_eq!(w.money(), money);
+        for (x, y) in [(450.0, 60.0), (500.0, 60.0), (500.0, 180.0), COAL] {
+            assert!(w.apply(Command::DeleteRoad { x, y }));
+            assert_eq!(w.money(), money, "power demolition is free");
+        }
+        assert_eq!(w.power.active_plants().count(), 0);
+        assert_eq!(w.power.active_lines().count(), 0);
+        assert_eq!(w.roads.road_count(), roads, "power targets win over roads");
+    }
+}
+
+#[test]
+fn an_empty_map_has_starter_power_before_the_first_tick() {
+    let w = World::empty(Config::default(), 20, 20);
+    assert!(w.power_source(STARTER_POWER, u32::MAX).is_some());
+    assert!(w.power_source(STARTER_POWER + 1, u32::MAX).is_none());
+    let loaded = World::load(&w.save().unwrap()).unwrap();
+    assert!(loaded.power_source(STARTER_POWER, u32::MAX).is_some());
+    assert_eq!(w.power_stats(), loaded.power_stats());
+}
+
+#[test]
+fn power_plants_do_not_add_pollution_sources() {
+    let mut w = lattice();
+    assert!(plant(&mut w, PlantKind::Coal, COAL.0, COAL.1));
+    assert!(plant(&mut w, PlantKind::Wind, 500.0, 60.0));
+    assert!(plant(&mut w, PlantKind::Solar, 500.0, 180.0));
+    let mut before = Vec::new();
+    w.pollution.write_snapshot(&mut before);
+    advance(&mut w, 120);
+    let mut after = Vec::new();
+    w.pollution.write_snapshot(&mut after);
+    assert_eq!(before, after, "only factories and traffic emit pollution");
 }

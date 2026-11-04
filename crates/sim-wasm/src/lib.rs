@@ -29,7 +29,7 @@ pub struct SimStats {
     pub demand_residential: i32,
     pub demand_commercial: i32,
     pub demand_industrial: i32,
-    /// Power (ADR 0036): plant output now, starter power, demand of powered and of all
+    /// Power (ADR 0041): plant output now, starter power, demand of powered and of all
     /// buildings, unpowered buildings and lots waiting for power.
     pub power_supply: u32,
     pub power_starter: u32,
@@ -47,6 +47,10 @@ pub struct SimStats {
     pub paths_failed: f64,
     pub despawned_stuck: f64,
     pub despawned_by_edit: f64,
+    /// Money in whole dollars (ADR 0036); taxes and upkeep are per clock hour.
+    pub balance: f64,
+    pub taxes: f64,
+    pub upkeep: f64,
 }
 
 /// One citizen's details for the inspector (ADR 0022); see `World::citizen_info`. Places are
@@ -93,9 +97,18 @@ impl Sim {
 
 #[wasm_bindgen]
 impl Sim {
+    /// A city on the generated `cols` × `rows` street grid, for tests and benchmarks.
     #[wasm_bindgen(constructor)]
     pub fn new(seed: u32, cols: u32, rows: u32) -> Sim {
-        let log = CommandLog::new(seed as u64, cols, rows);
+        Self::start(CommandLog::new(seed as u64, cols, rows))
+    }
+
+    /// A fresh city as the game starts one: no roads, on a map the size of that grid.
+    pub fn empty(seed: u32, cols: u32, rows: u32) -> Sim {
+        Self::start(CommandLog::empty(seed as u64, cols, rows))
+    }
+
+    fn start(log: CommandLog) -> Sim {
         Sim {
             world: log.world(),
             log: Some(log),
@@ -140,57 +153,40 @@ impl Sim {
         self.apply(Command::SpawnAgents { count })
     }
 
-    /// `class` is 0 = street, 1 = main road, 2 = alley. Unknown values build nothing.
-    pub fn build_road(&mut self, ax: f32, ay: f32, bx: f32, by: f32, class: u8) -> bool {
-        let Some(class) = RoadClass::from_u8(class) else {
-            return false;
-        };
-        self.apply(Command::BuildRoad {
-            ax,
-            ay,
-            bx,
-            by,
-            class,
-        })
-    }
-
-    #[allow(clippy::too_many_arguments)] // Mirrors the coordinate-only WASM command boundary.
-    pub fn build_curve(
-        &mut self,
-        ax: f32,
-        ay: f32,
-        cx: f32,
-        cy: f32,
-        bx: f32,
-        by: f32,
-        class: u8,
-    ) -> bool {
-        let Some(class) = RoadClass::from_u8(class) else {
-            return false;
-        };
-        self.apply(Command::BuildCurve {
-            ax,
-            ay,
-            cx,
-            cy,
-            bx,
-            by,
-            class,
-        })
-    }
-
-    pub fn curve_preview(
-        &mut self,
-        ax: f32,
-        ay: f32,
-        cx: f32,
-        cy: f32,
-        bx: f32,
-        by: f32,
-    ) -> Vec<f32> {
-        self.world
-            .write_curve_preview(ax, ay, cx, cy, bx, by, &mut self.buf);
+    /// Guides raw `[x, y, snap]` points and, if `plan`, previews the road through them; see
+    /// `World::write_road_draft` (ADR 0038).
+    pub fn road_draft(&mut self, points: &[f32], plan: bool) -> Vec<f32> {
+        self.world.write_road_draft(points, plan, &mut self.buf);
         self.buf.clone()
+    }
+
+    /// Builds the road through guided raw `[x, y, snap]` points (two, or three for a curve).
+    /// Returns the guided end `[x, y]`, or nothing if refused. `class` is 0 = street,
+    /// 1 = main road, 2 = alley; unknown values build nothing.
+    pub fn build_draft(&mut self, points: &[f32], class: u8) -> Vec<f32> {
+        let Some(class) = RoadClass::from_u8(class) else {
+            return Vec::new();
+        };
+        let Some(cmd) = self.world.draft_command(points, class) else {
+            return Vec::new();
+        };
+        let end = match cmd {
+            Command::BuildRoad { bx, by, .. } | Command::BuildCurve { bx, by, .. } => vec![bx, by],
+            _ => Vec::new(),
+        };
+        if self.apply(cmd) { end } else { Vec::new() }
+    }
+
+    /// What `build_draft` would charge in dollars (ADR 0036), or undefined if it would be
+    /// refused for its shape. Unknown classes cost nothing to quote and build nothing.
+    pub fn draft_cost(&self, points: &[f32], class: u8) -> Option<f64> {
+        let class = RoadClass::from_u8(class)?;
+        Some(self.world.draft_cost(points, class)? as f64)
+    }
+
+    /// Whether the city can pay `cost` dollars now; a city in debt can afford nothing.
+    pub fn can_afford(&self, cost: f64) -> bool {
+        self.world.can_afford(cost as i64)
     }
 
     pub fn delete_road(&mut self, x: f32, y: f32) -> bool {
@@ -227,7 +223,7 @@ impl Sim {
         self.buf.clone()
     }
 
-    /// `kind` is 0 = coal, 1 = solar, 2 = wind (ADR 0036). Unknown values build nothing.
+    /// `kind` is 0 = coal, 1 = solar, 2 = wind (ADR 0041). Unknown values build nothing.
     pub fn place_plant(&mut self, kind: u8, x: f32, y: f32) -> bool {
         let Some(kind) = PlantKind::from_u8(kind) else {
             return false;
@@ -331,23 +327,26 @@ impl Sim {
         self.world.zones.layout().to_vec()
     }
 
+    pub fn pollution_version(&self) -> u32 {
+        self.world.pollution.version
+    }
+
+    /// `[air, ground, noise, land_value]` bytes per pollution cell, row-major; see
+    /// `pollution_layout` (ADR 0037).
+    pub fn pollution_cells(&mut self) -> Vec<u8> {
+        let mut out = Vec::new();
+        self.world.pollution.write_snapshot(&mut out);
+        out
+    }
+
+    /// `[origin_x, origin_y, cell_size, cols, rows]` of the pollution grid.
+    pub fn pollution_layout(&self) -> Vec<f32> {
+        self.world.pollution.layout().to_vec()
+    }
+
     /// `[x, y]` per centreline sample of the selected road, or empty on a miss.
     pub fn bulldoze_preview(&mut self, x: f32, y: f32) -> Vec<f32> {
         self.world.write_bulldoze_preview(x, y, &mut self.buf);
-        self.buf.clone()
-    }
-
-    /// `[x, y, join]` per stop of the road `build_road` would build; see
-    /// `World::write_road_preview`. Empty if it would be refused.
-    pub fn road_preview(&mut self, ax: f32, ay: f32, bx: f32, by: f32) -> Vec<f32> {
-        self.world.write_road_preview(ax, ay, bx, by, &mut self.buf);
-        self.buf.clone()
-    }
-
-    /// `[x, y, join]` for where a road started here would start; see
-    /// `World::write_snap_preview`.
-    pub fn snap_preview(&mut self, x: f32, y: f32) -> Vec<f32> {
-        self.world.write_snap_preview(x, y, &mut self.buf);
         self.buf.clone()
     }
 
@@ -406,9 +405,9 @@ impl Sim {
         self.buf.clone()
     }
 
-    /// `[min_x, min_y, max_x, max_y]`.
+    /// `[min_x, min_y, max_x, max_y]` of the map.
     pub fn bounds(&self) -> Vec<f32> {
-        self.world.roads.bounds().to_vec()
+        self.world.bounds().to_vec()
     }
 
     pub fn stats(&self) -> SimStats {
@@ -441,6 +440,9 @@ impl Sim {
             paths_failed: s.paths_failed as f64,
             despawned_stuck: s.despawned_stuck as f64,
             despawned_by_edit: s.despawned_by_edit as f64,
+            balance: s.money.balance as f64,
+            taxes: s.money.taxes as f64,
+            upkeep: s.money.upkeep as f64,
         }
     }
 }

@@ -287,3 +287,85 @@ fn counters_that_would_underflow_are_refused() {
     w.supply.commercial_jobs += 1;
     assert_eq!(refused(&w), SaveError::Invalid("job supply"));
 }
+
+#[test]
+fn a_mismatched_pollution_grid_is_refused() {
+    let mut w = zoned_town();
+    w.pollution.cols += 1;
+    assert_eq!(refused(&w), SaveError::Invalid("pollution grid"));
+    let mut w = zoned_town();
+    w.pollution.flow.push(f32::NAN);
+    assert_eq!(refused(&w), SaveError::Invalid("traffic flow"));
+}
+
+/// All three systems have non-default saved state and derived caches.
+fn combined_town() -> World {
+    let mut w = zoned_town();
+    assert!(w.apply(Command::PlacePlant {
+        kind: crate::power::PlantKind::Coal,
+        x: 510.0,
+        y: 60.0,
+    }));
+    assert!(w.apply(Command::BuildLine {
+        ax: 600.0,
+        ay: 60.0,
+        bx: 480.0,
+        by: 60.0,
+    }));
+    w.cfg.ignore_demand = false;
+    for _ in 0..1000 {
+        w.tick();
+    }
+    assert!(w.power_stats().supply > 0);
+    assert!(w.money().upkeep > 0);
+    assert_ne!(w.money().balance, crate::world::START_FUNDS);
+    assert!(w.pollution.ground.iter().any(|&g| g > 0));
+    w
+}
+
+#[test]
+fn combined_save_restores_power_pollution_and_money_and_keeps_evolving() {
+    let mut w = combined_town();
+    let save = w.save().unwrap();
+    assert_eq!(u32::from_le_bytes(le(&save, 8)), 4);
+    let mut loaded = World::load(&save).unwrap();
+    assert_eq!(loaded.save().unwrap(), save);
+    assert_eq!(loaded.state_hash(), w.state_hash());
+    assert_eq!(loaded.money(), w.money());
+    let (mut a, mut b) = (Vec::new(), Vec::new());
+    w.write_power_buildings(&mut a);
+    loaded.write_power_buildings(&mut b);
+    assert_eq!(a, b, "power allocation is restored before ticking");
+    assert_eq!(loaded.power_stats(), w.power_stats());
+    let (mut a, mut b) = (Vec::new(), Vec::new());
+    w.pollution.write_snapshot(&mut a);
+    loaded.pollution.write_snapshot(&mut b);
+    assert_eq!(a, b);
+    for _ in 0..1000 {
+        w.tick();
+        loaded.tick();
+    }
+    assert_eq!(loaded.money(), w.money());
+    assert_eq!(loaded.state_hash(), w.state_hash());
+}
+
+#[test]
+fn combined_save_validates_and_hashes_each_system() {
+    let mut w = combined_town();
+    let hash = w.state_hash();
+    w.treasury.carry = 60;
+    assert_ne!(w.state_hash(), hash);
+    assert_eq!(refused(&w), SaveError::Invalid("money carry"));
+
+    let mut w = combined_town();
+    let hash = w.state_hash();
+    w.power.plant_fx[0] = 2.0;
+    assert_ne!(w.state_hash(), hash);
+    assert!(matches!(refused(&w), SaveError::Invalid(_)));
+
+    let mut w = combined_town();
+    let hash = w.state_hash();
+    w.pollution.flow.push(f32::NAN);
+    assert_ne!(w.state_hash(), hash);
+    assert_eq!(refused(&w), SaveError::Invalid("traffic flow"));
+}

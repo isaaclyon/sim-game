@@ -72,8 +72,8 @@ _Avoid_: demolition (road edits remove buildings at once), eviction
 **Demand**:
 How many more people the town wants housed (residential), or wants as shop or industry jobs
 (commercial, industrial). People move in where there are jobs, and businesses open where
-there are people. A zoned lot builds only while its use has positive demand; otherwise it
-waits (ADR 0025).
+there are people. A zoned lot builds only when demand exceeds its land-value threshold and
+there is enough power; otherwise it waits.
 _Avoid_: need, desirability
 
 ## Power
@@ -124,6 +124,65 @@ A small free supply for the whole city, enough for a hamlet, so a village can gr
 its first plant.
 _Avoid_: base supply, free power
 
+## Money
+
+**Balance**:
+The city's money in whole dollars. Building roads spends it; taxes and upkeep change it every
+clock minute. It can fall below zero (ADR 0036).
+_Avoid_: funds (except the starting funds), cash
+
+**Build cost**:
+What a new road costs, by length and road class, paid from the balance when it is built. A
+road that costs more than the balance is refused. Bulldozing, zoning, sim-built alleys,
+power plants and transmission lines are free.
+_Avoid_: price
+
+**Upkeep**:
+What every road costs per clock hour to keep, by length and class.
+_Avoid_: maintenance (a later service), running cost
+
+**Taxes**:
+What residents and filled jobs pay per clock hour, at fixed rates.
+_Avoid_: income (taxes minus upkeep is the net change)
+
+**Debt**:
+A balance below zero. Upkeep keeps charging; no new roads can be built until taxes bring the
+balance back.
+_Avoid_: bankruptcy (scenarios may define it later)
+
+## Pollution and land value
+
+**Pollution**:
+Harm that industry and traffic do to the land around them, in three kinds: air pollution,
+ground pollution and noise. It lowers land value (ADR 0037).
+_Avoid_: smog (when you mean all kinds), dirt
+
+**Air pollution**:
+Pollution carried through the air from factories and busy roads, spreading evenly over a wide
+area. It follows current sources and is gone when they are.
+_Avoid_: smog (in code and docs), emissions
+
+**Ground pollution**:
+Contaminated land under and right beside factories. It builds up while a factory runs and
+fades slowly after it closes, so old factory sites stay tainted for a while.
+_Avoid_: soil pollution, contamination
+
+**Noise**:
+Pollution heard near busy roads and factories, strongest right beside the source. It follows
+current sources. Not the sound effects the game plays, and not route noise (ADR 0024).
+_Avoid_: noise pollution (just say noise), sound
+
+**Traffic flow**:
+How many cars use a road, averaged over time so it changes slowly. It decides how much air
+pollution and noise a road makes.
+_Avoid_: traffic (when you mean the cars on the road now), congestion
+
+**Land value**:
+How good a place is to build on. Pollution lowers it; later, services and parks raise it. Homes
+care most, shops a little and industry not at all. Low land value delays growth but never
+empties a standing building.
+_Avoid_: desirability, price (land is not bought or sold), happiness
+
 ## Saving and sharing
 
 **Save**:
@@ -136,7 +195,7 @@ independent copy that replaces their local city, and later edits never reach the
 _Avoid_: sync, multiplayer, import (when you mean opening a friend's city)
 
 **Command log**:
-The seed, grid size and every player command with its tick, from a fresh start. Replaying it
+The seed, map size (an empty map, or the generated street grid) and every player command with its tick, from a fresh start. Replaying it
 rebuilds the same city on the same build and target; saved logs are replay regression tests
 (ADR 0034).
 _Avoid_: save, history, undo log

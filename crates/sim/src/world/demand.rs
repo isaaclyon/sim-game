@@ -4,7 +4,7 @@
 //! demand is open jobs plus a small base, minus residents and the room left in empty homes, so
 //! it equals job vacancies minus unemployment, less the households still on their way.
 //! Commercial and industrial demand want a share of residents as jobs, plus a small base, minus
-//! the jobs they already offer. A due lot builds only while its use has positive demand.
+//! the jobs they already offer. A due lot needs demand above its land-value threshold and power.
 
 use super::World;
 use super::power::power_demand;
@@ -44,7 +44,7 @@ pub(super) struct Supply {
 impl World {
     pub fn demand(&self) -> Demand {
         let population = self.residents.population as i32;
-        // Coal plants' jobs (ADR 0036) count as industry.
+        // Coal plants' jobs (ADR 0041) count as industry.
         let industrial_jobs = self.supply.industrial_jobs
             + self
                 .power
@@ -100,21 +100,19 @@ impl World {
         }
     }
 
-    /// Due lots build while their use has demand and the building would be powered (ADR
-    /// 0036); the rest wait and check again. Lots under a plant or line are dropped until it
-    /// goes. Each new building is registered at once, so the next lot due this tick sees its
-    /// homes, jobs and power use.
+    /// Due lots build while demand clears the land-value threshold (ADR 0037) and power is
+    /// available (ADR 0041); the rest wait and check again. Lots under a plant or line are
+    /// dropped until it goes. Each new building is registered at once, so the next lot due
+    /// this tick sees its homes, jobs and power use.
     pub(super) fn grow_buildings(&mut self) {
         let tick = self.totals.tick;
         let (dt, seed) = (self.cfg.dt, self.cfg.seed);
         while let Some((lot, zone)) = self.buildings.next_due(tick) {
             if self.lot_blocked(lot) {
-                self.note_waiting(lot, false);
                 continue;
             }
-            if !self.cfg.ignore_demand && self.demand_for(zone) <= 0 {
-                self.note_waiting(lot, false);
-                self.buildings.defer(lot, zone, tick, dt, seed);
+            if !self.cfg.ignore_demand && self.demand_for(zone) <= self.land_threshold(lot, zone) {
+                self.buildings.defer(lot, zone, tick, dt, seed, false);
                 continue;
             }
             let Some(plan) = Buildings::plan(lot, zone, &self.lots, &self.roads, seed) else {
@@ -126,8 +124,7 @@ impl World {
                 self.powered_new_building(demand, lot, source);
                 self.register_buildings();
             } else {
-                self.note_waiting(lot, true);
-                self.buildings.defer(lot, zone, tick, dt, seed);
+                self.buildings.defer(lot, zone, tick, dt, seed, true);
             }
         }
     }

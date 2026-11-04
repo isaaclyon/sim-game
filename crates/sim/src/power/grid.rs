@@ -1,4 +1,4 @@
-//! Grids: everything joined for power (ADR 0036). Roads conduct, so road nodes joined by a road
+//! Grids: everything joined for power (ADR 0041). Roads conduct, so road nodes joined by a road
 //! share a grid; plants join the roads beside them; lines join whatever their ends touch.
 
 use super::{LINE_REACH, PLANT_REACH, Power};

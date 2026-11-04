@@ -27,7 +27,7 @@ pub fn clock_at(tick: u64, dt: f32) -> ClockTime {
     }
 }
 
-/// Clock seconds since midnight before Day 1 after `tick` ticks of `dt` sim seconds each.
+/// Clock seconds from midnight of day 1 to the end of `tick` ticks of `dt`.
 pub fn clock_seconds(tick: u64, dt: f32) -> u64 {
     let dt_ms = (f64::from(dt) * 1000.0).round() as u64;
     tick * dt_ms * CLOCK_SECONDS_PER_SIM_SECOND / 1000 + START_SECOND_OF_DAY

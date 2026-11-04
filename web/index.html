@@ -37,7 +37,7 @@
       #inspector .actions { display: flex; gap: 6px; margin-top: 8px; }
       #controls { position: fixed; bottom: 12px; left: 12px; right: 12px; display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none; }
       #toolbar { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
-      #toolbar button, #inspector button, #city-controls button {
+      #toolbar button, #snap-options button, #inspector button, #city-controls button {
         background: #1c2530; color: #c9d4df; border: 1px solid #2e3a47; border-radius: 6px;
         padding: 6px 10px; font: 12px ui-monospace, Menlo, monospace; cursor: pointer;
         white-space: nowrap; pointer-events: auto;
@@ -55,7 +55,10 @@
       #save-note { margin-top: 4px; }
       #road-help { color: #c9d4df; background: #0f1419; padding: 6px 10px; font: 12px/1.5 ui-monospace, monospace; text-align: center; }
       #road-help:empty { display: none; }
-      #toolbar button.active, #inspector button[aria-pressed="true"] { background: #2f6fb0; border-color: #4a8bd0; color: white; }
+      #snap-options { display: flex; justify-content: center; gap: 6px; }
+      #snap-options[hidden] { display: none; }
+      #road-readout { position: fixed; pointer-events: none; color: #e8eef4; background: rgba(15, 20, 25, 0.85); padding: 2px 6px; border-radius: 3px; font: 12px/1.4 ui-monospace, monospace; }
+      #toolbar button.active, #snap-options button[aria-pressed="true"], #inspector button[aria-pressed="true"] { background: #2f6fb0; border-color: #4a8bd0; color: white; }
     </style>
   </head>
   <body>
@@ -91,6 +94,12 @@
       <div id="save-note">Autosaves every minute in this browser.<br />Clearing browser data removes your city.<br />Shared links and files give friends their own copy.</div>
     </section>
     <div id="road-help" role="status" aria-live="polite"></div>
+    <div id="snap-options" hidden>
+      <button type="button" id="snap-angle" aria-pressed="true" title="snap to 15° steps from the road you start on">angle snap</button>
+      <button type="button" id="snap-guides" aria-pressed="true" title="line up with nearby road ends">guide lines</button>
+      <button type="button" id="snap-length" aria-pressed="true" title="snap lengths to whole 8 m cells">length snap</button>
+    </div>
+    <div id="road-readout" aria-hidden="true" hidden></div>
     <div id="toolbar">
       <button type="button" data-speed="0">pause</button>
       <button type="button" data-speed="1" class="active">1×</button>
@@ -107,13 +116,14 @@
       <button type="button" data-zone="5" aria-pressed="false" title="industrial, low density (C)">ind low</button>
       <button type="button" data-zone="6" aria-pressed="false" title="industrial, high density (C twice)">ind high</button>
       <button type="button" data-zone="0" aria-pressed="false" title="remove zoning (U)">unzone (U)</button>
-      <button type="button" id="plant-coal" aria-pressed="false" title="coal plant: steady power, must stand beside a road (P)">coal (P)</button>
-      <button type="button" id="plant-solar" aria-pressed="false" title="solar farm: power by day only; join it to a road with a power line (P twice)">solar</button>
-      <button type="button" id="plant-wind" aria-pressed="false" title="wind turbine: power that rises and falls with the wind; join it with a power line (P three times)">wind</button>
+      <button type="button" id="plant-coal" aria-pressed="false" title="coal plant: steady power, must stand beside a road (G)">coal (G)</button>
+      <button type="button" id="plant-solar" aria-pressed="false" title="solar farm: power by day only; join it to a road with a power line (G twice)">solar</button>
+      <button type="button" id="plant-wind" aria-pressed="false" title="wind turbine: power that rises and falls with the wind; join it with a power line (G three times)">wind</button>
       <button type="button" id="power-line" aria-pressed="false" title="power line: joins a plant to a road, or one road network to another (L)">power line (L)</button>
       <button type="button" id="power-view" aria-pressed="false" title="mark every building with its grid's colour; red marks buildings without power (O)">power view (O)</button>
       <button type="button" id="sound" aria-pressed="true" title="ambient sound that follows the camera (N)">sound on (N)</button>
       <button type="button" id="traffic" aria-pressed="false" title="colour cars by speed: red stopped, green at the limit (T)">traffic view (T)</button>
+      <button type="button" id="pollution" aria-pressed="false" title="show air pollution, ground pollution, noise, then land value (P)">pollution view (P)</button>
     </div>
     </div>
     <script type="module" src="/src/main.ts"></script>
