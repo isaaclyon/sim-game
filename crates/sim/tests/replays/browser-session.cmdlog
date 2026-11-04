@@ -10,4 +10,4 @@ grid 60 60
 1300 curve 1658.554 5263.5835 3542.1035 6611.4937 5425.653 5263.5835 street
 1301 fill 3542.1035 5860.0117 residential-low
 end 3800
-expect hash 9d034a688752fc8b population 137 buildings 74 trips 40
+expect hash eebbab6b469c0f6c population 137 buildings 74 trips 40

@@ -64,7 +64,7 @@ export function hudText(s: Stats, fps: number, tickMs: number, speed: number, zo
     `stuck      ${fmt(s.despawnedStuck)}   no path ${fmt(s.pathsFailed)}\n` +
     `road edits ${fmt(s.despawnedByEdit)} cars removed\n` +
     `camera     WASD or drag pans, Q/E turns, right-drag orbits, wheel zooms\n` +
-    'inspect    click building/car/walker; F follows, Esc closes   N sound   T traffic\n' +
+    'inspect    click building/car/walker; F follows, Esc closes   N sound   T traffic   P pollution\n' +
     (zone === null
       ? ''
       : `\nZONE: ${ZONE_NAMES[zone]}.  Click a block to fill it, drag a rectangle to paint, Esc to stop` +

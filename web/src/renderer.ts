@@ -10,7 +10,7 @@
 // - Tools pick against the ground plane; building inspection picks roof and facade triangles.
 // - Roads share one static mesh, rebuilt only when the road snapshot changes.
 // - Ground, water, fields and trees are decoration from `scenery/`, never sim state.
-// - Flat layers share y = 0 without depth writes. Ground draws first; the zone overlay, lots,
+// - Flat layers share y = 0 without depth writes. Ground draws first; the zone overlay, pollution, lots,
 //   sidewalks, roads and lane paint draw in the transparent pass, after buildings and cars, in that order.
 // - Curve sampling belongs to the sim. Tool previews (`tool-preview.ts`) draw the sim's answers.
 // - Rising buildings, zone paint flashes and gliding markers are display-only motion, skipped
@@ -27,12 +27,15 @@ import { carPosition, nearestCar } from './car-pick';
 import { Lighting, nightMaterial } from './lighting.ts';
 import { LotLayer } from './lot-scenery/layer.ts';
 import { ROADS, SIDEWALK, SKY } from './palette';
+import { PollutionOverlay } from './pollution-overlay.ts';
 import { buildRoadGeometry } from './road-geometry';
 import { buildRoadMarkings } from './road-markings.ts';
 import { createSimScene } from './scene';
 import { Scenery } from './scenery/index.ts';
 import { SignalLayer } from './signal-layer.ts';
+import { SmokeLayer } from './smoke-layer.ts';
 import { ToolPreview } from './tool-preview.ts';
+import type { PollutionView } from './view-buttons.ts';
 import { ZoneOverlay } from './zone-overlay';
 
 CameraControls.install({ THREE });
@@ -60,6 +63,8 @@ export class Renderer {
   private readonly scenery = new Scenery();
   private readonly lotScenery = new LotLayer();
   private readonly overlay = new ZoneOverlay();
+  private readonly pollution = new PollutionOverlay();
+  private readonly smoke = new SmokeLayer(this.lighting.night);
   private readonly agents = new AgentLayer(this.scene, nightMaterial(this.lighting.night));
   private readonly signals = new SignalLayer(this.scene);
   private readonly tools = new ToolPreview();
@@ -79,7 +84,9 @@ export class Renderer {
       this.scenery.group,
       this.lotScenery.group,
       this.overlay.group,
+      this.pollution.group,
       this.buildings.group,
+      this.smoke.group,
       this.tools.group,
     );
 
@@ -182,7 +189,9 @@ export class Renderer {
    * building IDs rise from the ground; a city's first snapshot should appear at once.
    */
   setBuildings(data: Float32Array, ids: Uint32Array, rise = false) {
-    this.buildings.update(data, ids, rise && !reducedMotion() ? seconds() : null);
+    const from = rise && !reducedMotion() ? seconds() : null;
+    this.buildings.update(data, ids, from);
+    this.smoke.update(data, ids, from);
     this.lotScenery.setBuildings(data);
   }
 
@@ -212,6 +221,16 @@ export class Renderer {
   toggleTrafficView(): boolean {
     this.agents.trafficView = !this.agents.trafficView;
     return this.agents.trafficView;
+  }
+
+  /** `cells` and `layout` as in the `pollution` message (ADR 0037). */
+  setPollution(cells: Uint8Array, layout: [number, number, number, number, number]) {
+    this.pollution.setCells(cells, layout);
+  }
+
+  /** Plain shows faint haze and stains; the others tint the ground by one measure. */
+  setPollutionView(view: PollutionView) {
+    this.pollution.setView(view);
   }
 
   /** Left drag pans the camera, unless a tool needs the drag (the zone brush). */
@@ -336,6 +355,9 @@ export class Renderer {
     const now = seconds();
     this.buildings.animate(now);
     this.overlay.animate(now);
+    // Reduced motion holds the smoke still, at a moment when every chimney has puffs out.
+    const target = this.scene.worldToLocal(this.controls.getTarget(this.look, false));
+    this.smoke.animate(reducedMotion() ? 1000 : now, [target.x, target.z]);
     this.tools.update(delta, !reducedMotion());
     this.scenery.update();
     this.lotScenery.update();

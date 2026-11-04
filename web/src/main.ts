@@ -6,6 +6,7 @@ import { hudText, type Quote, roadHelpText } from './hud';
 import { Inspector } from './inspector';
 import { type FromWorker, RoadClass, type Stats, type ToWorker, Zone } from './protocol';
 import { Renderer } from './renderer';
+import { bindViewButtons } from './view-buttons';
 
 const byId = (id: string): HTMLElement => {
   const el = document.getElementById(id);
@@ -40,10 +41,7 @@ const inspector = new Inspector(
   byId('inspector-close') as HTMLButtonElement,
 );
 renderer.onUserPan = () => inspector.setFollow(false);
-const trafficButton = byId('traffic');
-const toggleTraffic = () =>
-  trafficButton.setAttribute('aria-pressed', String(renderer.toggleTrafficView()));
-trafficButton.onclick = toggleTraffic;
+const views = bindViewButtons(byId, renderer);
 
 let prev: Float32Array | undefined;
 let curr: Float32Array | undefined;
@@ -117,6 +115,8 @@ worker.onmessage = (e: MessageEvent<FromWorker>) => {
   } else if (msg.type === 'zones') {
     renderer.setZones(msg.cells, msg.layout, zonesSeen);
     zonesSeen = true;
+  } else if (msg.type === 'pollution') {
+    renderer.setPollution(msg.cells, msg.layout);
   } else if (msg.type === 'lots') {
     renderer.setLots(msg.rings);
   } else if (msg.type === 'buildings') {
@@ -453,6 +453,7 @@ addEventListener('keydown', (e) => {
   if (e.repeat) return;
   // Space activates a focused button natively; it must not also pause the sim.
   if (e.key === ' ' && target?.closest('button, a[href], [role="button"]')) return;
+  if (views.key(e.key)) return;
   if (e.key === 'r' || e.key === 'R') setTool(roadTool === 'straight' ? null : 'straight');
   else if (e.key === 'v' || e.key === 'V') setTool(roadTool === 'curve' ? null : 'curve');
   else if (e.key === 'b' || e.key === 'B') setTool(bulldozeTool ? null : 'bulldoze');
@@ -463,7 +464,6 @@ addEventListener('keydown', (e) => {
   else if (e.key === 'u' || e.key === 'U') setZone(Zone.None);
   else if (e.key === 'f' || e.key === 'F') inspector.toggleFollow();
   else if (e.key === 'n' || e.key === 'N') sound.toggle();
-  else if (e.key === 't' || e.key === 'T') toggleTraffic();
   // Esc cancels a tool first, then closes the inspector.
   else if (e.key === 'Escape')
     roadTool || bulldozeTool || zone !== null ? setTool(null) : inspector.select(null);
