@@ -1,18 +1,36 @@
 // Buildings drawn in square tiles, so growth rebuilds only the tiles whose buildings changed.
-// A newly grown building rises on its own mesh, pale like scaffolding, then joins its tile.
-// The rise is display only: the sim placed the building whole (ADR 0027).
+// A newly grown building rises on its own mesh inside scaffolding, in fresh pale materials,
+// then joins its tile. The rise is display only: the sim placed the building whole (ADR 0027).
 import * as THREE from 'three';
 import { buildBuildingGeometry } from './index.ts';
+import type { Pt } from './polygon.ts';
+import { buildScaffoldGeometry } from './scaffold.ts';
 import type { Style } from './style.ts';
 
 const TILE = 256;
 /** How long a new building takes to rise, in seconds. */
-export const RISE_SECONDS = 1.6;
-/** Raw timber and fresh concrete, blended out as the building tops out. */
-const SCAFFOLD = new THREE.Color(0xe6dccb);
+export const RISE_SECONDS = 9.6;
+/** Fresh concrete and render, blended out as the building tops out. */
+const UNFINISHED = new THREE.Color(0xe6dccb);
+
+const clamp01 = (x: number) => Math.min(Math.max(x, 0), 1);
+/**
+ * Heights as a share of full and the share of finished colour, `p` of the way through a rise:
+ * the scaffold goes up first, the building climbs inside it, then the scaffold comes down.
+ */
+export function risePhase(p: number): { scaffold: number; building: number; paint: number } {
+  const climb = clamp01((p - 0.1) / 0.75);
+  return {
+    scaffold: Math.min(clamp01(p / 0.12), clamp01((1 - p) / 0.08)),
+    // Fast at first, easing into its full height.
+    building: 1 - (1 - climb) ** 3,
+    paint: THREE.MathUtils.smoothstep(p, 0.55, 0.95),
+  };
+}
 
 interface Rising {
   mesh: THREE.Mesh;
+  scaffold: THREE.Mesh;
   /** The kit's colours, restored as the scaffold tint fades. */
   colors: Float32Array;
   start: number;
@@ -44,7 +62,8 @@ export class BuildingLayer {
     this.group.updateWorldMatrix(true, true);
     const hit = ray.intersectObject(this.group, true)[0];
     if (hit?.faceIndex == null) return null;
-    for (const [id, r] of this.rising) if (r.mesh === hit.object) return id;
+    for (const [id, r] of this.rising)
+      if (r.mesh === hit.object || r.scaffold === hit.object) return id;
     const tile = [...this.tiles.values()].find((t) => t.mesh === hit.object);
     if (!tile) return null;
     const vertex = hit.faceIndex * 3;
@@ -122,23 +141,22 @@ export class BuildingLayer {
   animate(now: number): boolean {
     let settled = false;
     for (const [id, r] of this.rising) {
-      const p = Math.min(Math.max((now - r.start) / RISE_SECONDS, 0), 1);
+      const p = clamp01((now - r.start) / RISE_SECONDS);
       if (p >= 1) {
         this.settle(id, r);
         settled = true;
         continue;
       }
-      // Fast at first, easing into its full height.
-      r.mesh.scale.y = Math.max(1 - (1 - p) ** 3, 1e-3);
-      // Scaffold pale until half-way, then the building's own colours come through.
-      const paint = THREE.MathUtils.smoothstep(p, 0.45, 1);
+      const { scaffold, building, paint } = risePhase(p);
+      r.scaffold.scale.y = Math.max(scaffold, 1e-3);
+      r.mesh.scale.y = Math.max(building, 1e-3);
       const color = r.mesh.geometry.getAttribute('color') as THREE.InterleavedBufferAttribute;
       for (let i = 0; i < color.count; i++)
         color.setXYZ(
           i,
-          SCAFFOLD.r + (r.colors[3 * i] - SCAFFOLD.r) * paint,
-          SCAFFOLD.g + (r.colors[3 * i + 1] - SCAFFOLD.g) * paint,
-          SCAFFOLD.b + (r.colors[3 * i + 2] - SCAFFOLD.b) * paint,
+          UNFINISHED.r + (r.colors[3 * i] - UNFINISHED.r) * paint,
+          UNFINISHED.g + (r.colors[3 * i + 1] - UNFINISHED.g) * paint,
+          UNFINISHED.b + (r.colors[3 * i + 2] - UNFINISHED.b) * paint,
         );
       color.data.needsUpdate = true;
     }
@@ -152,17 +170,26 @@ export class BuildingLayer {
     const colors = new Float32Array(color.count * 3);
     for (let i = 0; i < color.count; i++)
       colors.set([color.getX(i), color.getY(i), color.getZ(i)], 3 * i);
+    // Nobody lives there yet: no lit windows until it joins its tile.
+    (geometry.getAttribute('nightEmission').array as Float32Array).fill(0);
     const mesh = new THREE.Mesh(geometry, this.material);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     mesh.scale.y = 1e-3;
-    this.group.add(mesh);
-    this.rising.set(id, { mesh, colors, start: now });
+    const ring: Pt[] = [];
+    for (let i = 0; i < record[4]; i++) ring.push([record[5 + 2 * i], record[6 + 2 * i]]);
+    const scaffold = new THREE.Mesh(buildScaffoldGeometry(ring, record[1]), this.material);
+    scaffold.castShadow = true;
+    scaffold.receiveShadow = true;
+    scaffold.scale.y = 1e-3;
+    this.group.add(mesh, scaffold);
+    this.rising.set(id, { mesh, scaffold, colors, start: now });
   }
 
   private settle(id: number, r: Rising) {
-    this.group.remove(r.mesh);
+    this.group.remove(r.mesh, r.scaffold);
     r.mesh.geometry.dispose();
+    r.scaffold.geometry.dispose();
     this.rising.delete(id);
   }
 }

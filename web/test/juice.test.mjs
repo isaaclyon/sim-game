@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as THREE from 'three';
-import { BuildingLayer, RISE_SECONDS } from '../src/building-kit/layer.ts';
+import { BuildingLayer, RISE_SECONDS, risePhase } from '../src/building-kit/layer.ts';
+import { buildScaffoldGeometry } from '../src/building-kit/scaffold.ts';
 import { PREVIEW_REFUSED_COLOR, ToolPreview } from '../src/tool-preview.ts';
 import { FLASH_SECONDS, ZoneOverlay } from '../src/zone-overlay.ts';
 
@@ -16,14 +17,15 @@ test("a city's first buildings appear at once; later growth rises, then joins it
   assert.equal(layer.animate(0), false);
 
   layer.update(snapshot(0, 20), new Uint32Array([0, 1]), 10);
-  const rising = layer.group.children.find((m) => m.scale.y < 1);
-  assert.ok(rising, 'the new building rises on its own mesh');
+  const [rising, scaffold] = layer.group.children.filter((m) => m.scale.y < 1);
+  assert.ok(rising && scaffold, 'the new building rises on its own mesh, inside scaffolding');
   assert.equal(tiles(layer), 1);
 
   assert.equal(layer.animate(10 + RISE_SECONDS / 2), true);
   assert.ok(rising.scale.y > 0.5 && rising.scale.y < 1, 'half-way up, already past half height');
+  assert.equal(scaffold.scale.y, 1, 'the scaffold stands at full height');
   const color = rising.geometry.getAttribute('color');
-  assert.ok(color.getX(0) > 0.7, 'pale like scaffolding while it rises');
+  assert.ok(color.getX(0) > 0.7, 'pale, unfinished materials while it rises');
 
   assert.equal(layer.animate(10.01 + RISE_SECONDS), false);
   assert.equal(layer.group.children.length, 1, 'topped out buildings join their tile');
@@ -36,7 +38,7 @@ test('without a start time, or when demolished mid-rise, nothing is left rising'
   layer.update(snapshot(0, 20), new Uint32Array([0, 1]));
   assert.equal(layer.animate(0), false, 'no time means no rise');
   layer.update(snapshot(0, 20, 40), new Uint32Array([0, 1, 2]), 0);
-  assert.equal(layer.group.children.length, 2);
+  assert.equal(layer.group.children.length, 3, 'tile, building and scaffold');
   layer.update(snapshot(0, 20), new Uint32Array([0, 1]), 0.1);
   assert.equal(layer.animate(0.2), false);
   assert.equal(layer.group.children.length, 1);
@@ -49,6 +51,33 @@ test('a rising building can be inspected', () => {
   layer.animate(RISE_SECONDS * 0.9);
   const ray = new THREE.Raycaster(new THREE.Vector3(26, 100, 5), new THREE.Vector3(0, -1, 0));
   assert.equal(layer.pick(ray), 7);
+});
+
+test('the scaffold goes up first, the building climbs inside it, then the scaffold comes down', () => {
+  assert.deepEqual(risePhase(0), { scaffold: 0, building: 0, paint: 0 });
+  const early = risePhase(0.12);
+  assert.ok(early.scaffold === 1 && early.building < 0.2);
+  const late = risePhase(0.9);
+  assert.equal(late.building, 1, 'topped out before the scaffold is struck');
+  assert.ok(late.scaffold === 1 && late.paint > 0.5);
+  assert.ok(risePhase(0.97).scaffold < 0.5);
+});
+
+test('scaffolding wraps the footprint just outside the walls and reaches past the roof line', () => {
+  const ring = [
+    [0, 0],
+    [12, 0],
+    [12, 10],
+    [0, 10],
+  ];
+  const g = buildScaffoldGeometry(ring, 8);
+  g.computeBoundingBox();
+  const { min, max } = g.boundingBox;
+  assert.equal(min.y, 0);
+  assert.ok(max.y >= 9, 'guard rail above the top lift');
+  assert.ok(min.x < -1 && min.x > -2.5 && max.x > 13 && max.x < 14.5, `x ${min.x}..${max.x}`);
+  assert.ok(min.z < -1 && max.z > 11);
+  assert.equal(buildScaffoldGeometry([...ring].reverse(), 8).getAttribute('position').count, 0);
 });
 
 test('painted cells flash a lighter shade, then fade to the plain tint', () => {
