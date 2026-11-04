@@ -149,7 +149,7 @@ pub(crate) fn plan(net: &RoadNetwork, mut shape: Shape) -> Option<Plan> {
 
 /// Nearest node in reach, otherwise nearest point on a road, otherwise a new node.
 pub fn snap_end(net: &RoadNetwork, x: f32, y: f32) -> Stop {
-    if let Some(n) = net.nearest_node(x, y, SNAP_RADIUS) {
+    if let Some(n) = net.nearest_junction(x, y, SNAP_RADIUS) {
         return node_stop(net, n);
     }
     let mut best = None;

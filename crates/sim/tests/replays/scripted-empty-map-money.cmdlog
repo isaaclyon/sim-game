@@ -15,4 +15,4 @@ map 20 20
 100 road 0 400 9000 400 main
 3000 delete 240 60
 end 9000
-expect hash 32795c8c250b9611 population 639 buildings 46 trips 715
+expect hash 4d97a16df6f01d78 population 639 buildings 46 trips 713

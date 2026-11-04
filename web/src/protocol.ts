@@ -24,26 +24,9 @@ export type ToWorker =
   | { type: 'commandLog' }
   /** Explicit synthetic benchmark traffic, not normal play. */
   | { type: 'spawn'; count: number }
-  | {
-      type: 'buildRoad';
-      id: number;
-      ax: number;
-      ay: number;
-      bx: number;
-      by: number;
-      class: RoadClass;
-    }
-  | {
-      type: 'buildCurve';
-      id: number;
-      ax: number;
-      ay: number;
-      cx: number;
-      cy: number;
-      bx: number;
-      by: number;
-      class: RoadClass;
-    }
+  /** Builds the road through guided `points`, as in `previewRoad` with two points, or three for
+   * a curve. Answered with `buildResult`. */
+  | { type: 'buildRoad'; id: number; points: number[]; class: RoadClass }
   | { type: 'deleteRoad'; x: number; y: number }
   /**
    * Zones every cell whose centre is inside the rectangle with these corners (ADR 0014).
@@ -55,30 +38,14 @@ export type ToWorker =
   /** Asks for the outline of the block containing the point. Answered with `blockPreview`. */
   | { type: 'previewBlock'; x: number; y: number; revision: number }
   | { type: 'previewBulldoze'; x: number; y: number; revision: number }
-  /** Asks where a road of `class` would snap and what it costs. Changes nothing; answered with
-   * `roadPreview`. */
-  | {
-      type: 'previewRoad';
-      revision: number;
-      class: RoadClass;
-      ax: number;
-      ay: number;
-      bx: number;
-      by: number;
-    }
-  | {
-      type: 'previewCurve';
-      revision: number;
-      class: RoadClass;
-      ax: number;
-      ay: number;
-      cx: number;
-      cy: number;
-      bx: number;
-      by: number;
-    }
-  /** Asks where a road started here would start. Answered with a one-stop `roadPreview`. */
-  | { type: 'previewSnap'; revision: number; x: number; y: number }
+  /**
+   * Asks how a road of `class` being drawn would be guided, built and charged (ADR 0036,
+   * ADR 0038). `points` is `[x, y, snap]` per clicked point in drawing order, then the cursor:
+   * one point asks where a road would start, two a straight road, three a curve (start,
+   * control, end). `snap` is a `Snap` bitmask. `plan` false only guides the points (a curve's
+   * control point). Changes nothing; answered with `roadPreview`.
+   */
+  | { type: 'previewRoad'; revision: number; class: RoadClass; points: number[]; plan: boolean }
   /**
    * Selects the resident who owns agent `agent` (a car or walker, an index into the `frame`
    * agents snapshot) for
@@ -99,6 +66,13 @@ export const RoadClass = {
   Alley: 2,
 } as const;
 export type RoadClass = (typeof RoadClass)[keyof typeof RoadClass];
+
+/** Drawing guide flags, matching `sim::guide` (ADR 0038). Joining roads is always on. */
+export const Snap = {
+  Angle: 1,
+  Guides: 2,
+  Length: 4,
+} as const;
 
 /** Zone cell values, matching the sim's `Zone` (ADR 0014). Density is part of the zone. */
 export const Zone = {
@@ -241,14 +215,26 @@ export type FromWorker =
   /**
    * `stops` is `[x, y, join]` per stop of the previewed road, in order; join is 0 = new end,
    * 1 = existing node, 2 = splits an existing road, -1 = interior curve sample (no marker).
-   * Empty means refused. Answers `previewRoad` / `previewCurve`, or `previewSnap` with one stop.
+   * Empty means refused, or not asked for (`plan` false). One stop answers a one-point request.
+   * `points` is the guided `[x, y]` per requested point. `guides` is `[x0, y0, x1, y1]` per
+   * guide line used for the last point, from the line's origin to the point. `length` is metres
+   * along the road so far; `angle` is degrees from the road its start joins, NaN for none.
+   * `angles` is `[x, y, rx, ry, dx, dy]` per angle mark: a junction where the road's start (or,
+   * when planned, its end) joins a road, the unit direction along the road measured from, and
+   * along the new road, both away from the junction.
    * `revision` echoes the construction stage so cancelled or previous-stage previews are discarded.
-   * `cost` is what building it would charge in dollars, null for snaps and refused shapes;
+   * `cost` is what building the guided road would charge in dollars, null when no road is
+   * planned (one point, a control point, or refused);
    * `affordable` is false when the city cannot pay it, and building would be refused (ADR 0036).
    */
   | {
       type: 'roadPreview';
       stops: Float32Array;
+      points: Float32Array;
+      guides: Float32Array;
+      angles: Float32Array;
+      length: number;
+      angle: number;
       revision: number;
       cost: number | null;
       affordable: boolean;
@@ -285,7 +271,8 @@ export type FromWorker =
   | { type: 'buildings'; data: Float32Array; ids: Uint32Array }
   /** `[x, y]` per outline sample of the block under the cursor, closed; empty outside blocks. */
   | { type: 'blockPreview'; outline: Float32Array; revision: number }
-  | { type: 'buildResult'; id: number; success: boolean }
+  /** `end` is the built road's guided end, where a chained road starts; null when refused. */
+  | { type: 'buildResult'; id: number; success: boolean; end: [number, number] | null }
   /** Selected road's `[x, y]` centreline samples, or empty on a miss. Sim-owned hit testing. */
   | { type: 'bulldozePreview'; segment: Float32Array; revision: number }
   /** The inspected citizen, or null if the selected agent has no resident. Answers `inspect`. */

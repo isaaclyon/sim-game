@@ -36,7 +36,7 @@ export function roadHelpText(
   const problem = refused
     ? 'Cannot build here. Move the end away from overlaps or short joins. '
     : costText(quote);
-  return `${main ? 'Main road. ' : ''}${problem}${STAGES[stage]} Esc or right-click cancels.`;
+  return `${main ? 'Main road. ' : ''}${problem}${STAGES[stage]} Hold Shift to place freely. Esc or right-click cancels.`;
 }
 const ZONE_NAMES = [
   'unzone',

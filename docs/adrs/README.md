@@ -43,6 +43,9 @@ rewriting history; mark the old one `Superseded by NNNN`.
 | [0035](0035-share-cities-as-forked-copies.md) | Share cities as files and links that open as independent copies | Accepted; implemented |
 | [0036](0036-money-build-costs-taxes-upkeep.md) | Money: build costs, taxes and upkeep on an empty starting map | Accepted; implemented |
 | [0037](0037-pollution-and-land-value-steer-growth.md) | Pollution lowers land value, and land value steers growth | Accepted |
+| [0038](0038-sim-owned-drawing-guides.md) | Drawing guides are planned by the sim and travel as raw points with snap flags | Accepted |
+| [0039](0039-road-edit-history.md) | Road edit history lives in the sim and is saved with the city | Proposed |
+| [0040](0040-straight-joins.md) | Straight roads that meet end to end in a line become one road | Accepted |
 
 ADRs are only for decisions that are hard to reverse. See [AGENTS.md](AGENTS.md) for when to
 write one and how.

@@ -1,8 +1,24 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { RoadClass, Zone } from '../src/protocol.ts';
+import { RoadClass, Snap, Zone } from '../src/protocol.ts';
 import { tools } from './main-harness.mjs';
+
+const ALL = Snap.Angle | Snap.Guides | Snap.Length;
+/** A sim answer to `previewRoad`: the guided points, the planned stops and the readout. */
+const answer = (ask, points, stops, extra = {}) => ({
+  type: 'roadPreview',
+  revision: ask.revision,
+  points: new Float32Array(points),
+  stops: new Float32Array(stops),
+  guides: new Float32Array(),
+  angles: new Float32Array(),
+  length: 0,
+  angle: Number.NaN,
+  ...extra,
+});
+/** The last road preview drawn, skipping guide lines. */
+const lastRoad = (t) => t.previews.findLast((p) => p.type === 'road');
 
 test('normal startup has no synthetic traffic and HUD displays authoritative population and unemployment', async () => {
   const t = await tools();
@@ -103,12 +119,8 @@ test('zoning shortcuts and drags stay exclusive with curved roads and bulldozing
       assert.deepEqual([paint.ax, paint.ay, paint.bx, paint.by], [10, 20, 50, 60]);
     }
   }
-  t.reply({
-    type: 'roadPreview',
-    revision: old.revision,
-    stops: new Float32Array([0, 0, 0, 200, 0, 0]),
-  });
-  assert.equal(t.previews.at(-1).stops, null, 'late curve previews cannot cover the zone brush');
+  t.reply(answer(old, [0, 0, 200, 0], [0, 0, 0, 200, 0, 0]));
+  assert.equal(lastRoad(t).stops, null, 'late curve previews cannot cover the zone brush');
   t.key('u');
   t.click(10, 20);
   assert.equal(t.messages.at(-1).type, 'fillBlock', 'a click fills the block under it');
@@ -122,7 +134,9 @@ test('zoning shortcuts and drags stay exclusive with curved roads and bulldozing
   t.click(0, 0);
   t.click(100, 100);
   t.click(200, 0);
-  assert.equal(t.messages.at(-1).type, 'buildCurve', 'V still builds a curve after zoning');
+  const curve = t.messages.at(-1);
+  assert.equal(curve.type, 'buildRoad', 'V still builds a curve after zoning');
+  assert.equal(curve.points.length, 9, 'start, control and end');
   t.zoneButtons.find((b) => Number(b.dataset.zone) === Zone.ResidentialLow).onclick();
   t.key('b');
   assert.equal(t.pans.at(-1), true);
@@ -179,17 +193,15 @@ test('switching from curve to bulldoze discards a delayed preview and resets con
   t.click(100, 100);
   t.move(200, 0);
   const old = t.messages.at(-1);
-  assert.equal(old.type, 'previewCurve');
+  assert.equal(old.type, 'previewRoad');
+  assert.deepEqual([...old.points], [0, 0, ALL, 100, 100, ALL, 200, 0, ALL]);
+  assert.equal(old.plan, true);
   t.key('b');
   assert.equal(t.elements.curve.attributes['aria-pressed'], 'false');
   assert.equal(t.elements.bulldoze.attributes['aria-pressed'], 'true');
   t.move(100, 50);
-  t.reply({
-    type: 'roadPreview',
-    revision: old.revision,
-    stops: new Float32Array([0, 0, 0, 200, 0, 0]),
-  });
-  assert.equal(t.previews.at(-1).stops, null, 'old curve cannot appear in bulldoze mode');
+  t.reply(answer(old, [0, 0, 200, 0], [0, 0, 0, 200, 0, 0]));
+  assert.equal(lastRoad(t).stops, null, 'old curve cannot appear in bulldoze mode');
   const target = t.messages.at(-1);
   assert.equal(target.type, 'previewBulldoze');
   const segment = new Float32Array([0, 0, 100, 50, 200, 0]);
@@ -199,10 +211,12 @@ test('switching from curve to bulldoze discards a delayed preview and resets con
   assert.equal(t.messages.at(-1).type, 'deleteRoad');
   t.key('r');
   t.move(300, 0);
-  assert.equal(t.messages.at(-1).type, 'previewSnap', 'switching tools starts a new road');
+  const fresh = t.messages.at(-1);
+  assert.equal(fresh.type, 'previewRoad');
+  assert.equal(fresh.points.length, 3, 'switching tools starts a new road');
   t.key('Escape');
   assert.equal(t.elements.road.attributes['aria-pressed'], 'false');
-  assert.equal(t.previews.at(-1).stops, null);
+  assert.equal(lastRoad(t).stops, null);
 });
 
 test('refused curves retain their control, successful curves chain, and late build replies cannot revive a cancelled tool', async () => {
@@ -212,22 +226,20 @@ test('refused curves retain their control, successful curves chain, and late bui
   t.click(100, 100);
   t.click(200, 0);
   const first = t.messages.at(-1);
-  assert.equal(first.type, 'buildCurve');
-  t.reply({ type: 'buildResult', id: first.id, success: false });
+  assert.equal(first.type, 'buildRoad');
+  t.reply({ type: 'buildResult', id: first.id, success: false, end: null });
   assert.match(t.elements['road-help'].textContent, /Cannot build here/);
   t.click(250, 0);
   const retry = t.messages.at(-1);
-  assert.equal(retry.ax, 0);
-  assert.equal(retry.cx, 100);
-  assert.equal(retry.bx, 250);
-  t.reply({ type: 'buildResult', id: retry.id, success: true });
+  assert.deepEqual([...retry.points], [0, 0, ALL, 100, 100, ALL, 250, 0, ALL]);
+  // The sim reports where the guided end landed; the next road starts there, unsnapped.
+  t.reply({ type: 'buildResult', id: retry.id, success: true, end: [248, 0] });
   t.click(350, 100);
   t.click(450, 0);
   const chained = t.messages.at(-1);
-  assert.equal(chained.ax, 250);
-  assert.equal(chained.cx, 350);
+  assert.deepEqual([...chained.points], [248, 0, 0, 350, 100, ALL, 450, 0, ALL]);
   t.key('b');
-  t.reply({ type: 'buildResult', id: chained.id, success: true });
+  t.reply({ type: 'buildResult', id: chained.id, success: true, end: [450, 0] });
   assert.match(t.elements['road-help'].textContent, /remove it/);
   t.move(350, 50);
   assert.equal(t.messages.at(-1).type, 'previewBulldoze');
@@ -264,7 +276,89 @@ test('road previews are drawn at the width of the chosen road class', async () =
   t.key('m');
   t.move(10, 20);
   const ask = t.messages.at(-1);
-  assert.equal(ask.type, 'previewSnap');
-  t.reply({ type: 'roadPreview', revision: ask.revision, stops: new Float32Array([10, 20, 0]) });
-  assert.equal(t.previews.at(-1).roadClass, RoadClass.Main);
+  assert.deepEqual([ask.type, ask.points.length], ['previewRoad', 3]);
+  t.reply(answer(ask, [10, 20], [10, 20, 0]));
+  assert.equal(lastRoad(t).roadClass, RoadClass.Main);
+});
+
+test('snapping can be switched per kind, or held off with Shift, and the readout follows', async () => {
+  const t = await tools();
+  assert.equal(t.elements['snap-options'].hidden, true, 'snap options belong to road tools');
+  t.key('r');
+  assert.equal(t.elements['snap-options'].hidden, false);
+  t.click(0, 0);
+  t.move(100, 3);
+  const ask = t.messages.at(-1);
+  assert.deepEqual([...ask.points], [0, 0, ALL, 100, 3, ALL]);
+  const guides = new Float32Array([0, 0, 100, 0]);
+  t.reply(answer(ask, [0, 0, 96, 0], [0, 0, 0, 96, 0, 0], { guides, length: 96, angle: 0 }));
+  assert.equal(
+    t.previews.findLast((p) => p.type === 'guides').lines,
+    guides,
+    'guide lines are drawn as the sim sent them',
+  );
+  const { b } = lastRoad(t);
+  assert.deepEqual([b.x, b.z], [96, 0], 'the end marker sits on the guided point');
+  assert.equal(t.elements['road-readout'].hidden, false);
+  assert.equal(t.elements['road-readout'].textContent, '96 m · 0°');
+  // Shift asks again at once, with no snapping, without a cursor move.
+  t.key('Shift');
+  const free = t.messages.at(-1);
+  assert.deepEqual([free.type, ...free.points], ['previewRoad', 0, 0, ALL, 100, 3, 0]);
+  t.keyup('Shift');
+  t.elements['snap-length'].onclick();
+  assert.equal(t.elements['snap-length'].attributes['aria-pressed'], 'false');
+  t.reply(answer(free, [0, 0, 100, 3], [0, 0, 0, 100, 3, 0]));
+  const noLength = t.messages.at(-1);
+  assert.deepEqual([...noLength.points], [0, 0, ALL, 100, 3, ALL & ~Snap.Length]);
+  // A refused plan hides nothing but says why.
+  t.reply(answer(noLength, [0, 0, 100, 3], [], { length: 100, angle: 2 }));
+  assert.match(t.elements['road-help'].textContent, /Cannot build here/);
+  t.key('Escape');
+  assert.equal(t.elements['road-readout'].hidden, true);
+});
+
+test('a curve control point is guided but not planned', async () => {
+  const t = await tools();
+  t.key('v');
+  t.click(0, 0);
+  t.move(50, 50);
+  const ask = t.messages.at(-1);
+  assert.equal(ask.plan, false);
+  t.reply(answer(ask, [0, 0, 48, 48], [], { guides: new Float32Array([0, 0, 48, 48]) }));
+  assert.deepEqual(
+    [...lastRoad(t).stops],
+    [0, 0, 0, 48, 48, -1],
+    'a straight guide to the control',
+  );
+  assert.doesNotMatch(t.elements['road-help'].textContent, /Cannot build/);
+  assert.equal(t.elements['road-readout'].hidden, true);
+});
+
+test('the readout flips to the other side of the cursor near the right and bottom edges', async () => {
+  const t = await tools();
+  t.key('r');
+  t.click(0, 0);
+  const readout = t.elements['road-readout'];
+  const place = (x, y) => {
+    t.move(x, y);
+    const ask = t.messages.at(-1);
+    t.reply(answer(ask, [0, 0, x, y], [0, 0, 0, x, y, 0], { length: 10, angle: 0 }));
+    return [readout.style.left, readout.style.top, readout.style.transform];
+  };
+  assert.deepEqual(place(500, 300), ['516px', '316px', 'translate(0, 0)']);
+  assert.deepEqual(place(990, 690), ['974px', '674px', 'translate(-100%, -100%)']);
+});
+
+test('angle marks are drawn as the sim sent them and cleared with the tool', async () => {
+  const t = await tools();
+  t.key('r');
+  t.click(0, 0);
+  t.move(0, 50);
+  const angles = new Float32Array([0, 0, 1, 0, 0, 1]);
+  t.reply(answer(t.messages.at(-1), [0, 0, 0, 50], [0, 0, 1, 0, 50, 0], { angles }));
+  const marks = () => t.previews.findLast((p) => p.type === 'angles').marks;
+  assert.equal(marks(), angles);
+  t.key('Escape');
+  assert.equal(marks(), null);
 });

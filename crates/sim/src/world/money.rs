@@ -8,7 +8,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::World;
+use super::{Command, World};
 use crate::clock::clock_seconds;
 use crate::geometry::{Shape, dist};
 use crate::road::{RoadClass, RoadNetwork};
@@ -112,6 +112,24 @@ impl World {
     /// Whether the city can pay `cost` now. A city in debt can afford nothing.
     pub fn can_afford(&self, cost: i64) -> bool {
         cost <= self.treasury.balance
+    }
+
+    /// What building the road through guided raw `[x, y, snap]` points (ADR 0038) would cost,
+    /// or None if it would be refused for its shape or the points are not a road.
+    pub fn draft_cost(&self, raw: &[f32], class: RoadClass) -> Option<i64> {
+        match self.draft_command(raw, class)? {
+            Command::BuildRoad { ax, ay, bx, by, .. } => self.road_cost(ax, ay, bx, by, class),
+            Command::BuildCurve {
+                ax,
+                ay,
+                cx,
+                cy,
+                bx,
+                by,
+                ..
+            } => self.curve_cost(ax, ay, cx, cy, bx, by, class),
+            _ => None,
+        }
     }
 
     /// What `BuildRoad` with these arguments would cost, or None if it would be refused for

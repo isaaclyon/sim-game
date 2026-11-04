@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { RoadClass } from '../src/protocol.ts';
+import { RoadClass, Snap } from '../src/protocol.ts';
 import { tools } from './main-harness.mjs';
 import { worker } from './worker-harness.mjs';
 
@@ -18,19 +18,24 @@ test('a fresh game city is an empty map with starting funds, and roads are quote
   assert.ok(start > 0);
   assert.equal(frame().stats.upkeep, 0);
 
-  const street = { ax: 0, ay: 0, bx: 1000, by: 0, class: RoadClass.Street };
-  await w.send({ type: 'previewRoad', revision: 3, ...street });
+  // Snap flags 0: the points stay where they are drawn.
+  const street = { points: [0, 0, 0, 1000, 0, 0], class: RoadClass.Street };
+  await w.send({ type: 'previewRoad', revision: 3, plan: true, ...street });
   const quote = w.messages.at(-1);
   assert.equal(quote.type, 'roadPreview');
   assert.deepEqual([quote.cost, quote.affordable], [10_000, true]);
+  // The price is for the guided road: length snapping turns 1,003 m into 1,000 m.
+  const snapped = [0, 0, Snap.Length, 1003, 0, Snap.Length];
+  await w.send({ type: 'previewRoad', revision: 3, plan: true, class: 0, points: snapped });
+  assert.equal(w.messages.at(-1).cost, 10_000);
   await w.send({ type: 'setSpeed', speed: 0 });
   await w.send({ type: 'buildRoad', id: 1, ...street });
   assert.equal(w.messages.findLast((m) => m.type === 'buildResult').success, true);
   assert.equal(frame().stats.balance, start - 10_000, 'paused builds publish the new balance');
   assert.equal(frame().stats.upkeep, 100);
 
-  const main = { ax: 0, ay: 500, bx: 9000, by: 500, class: RoadClass.Main };
-  await w.send({ type: 'previewRoad', revision: 4, ...main });
+  const main = { points: [0, 500, 0, 9000, 500, 0], class: RoadClass.Main };
+  await w.send({ type: 'previewRoad', revision: 4, plan: true, ...main });
   assert.deepEqual([w.messages.at(-1).cost, w.messages.at(-1).affordable], [225_000, false]);
   await w.send({ type: 'buildRoad', id: 2, ...main });
   assert.equal(w.messages.findLast((m) => m.type === 'buildResult').success, false);
@@ -89,14 +94,26 @@ test('the road tool shows what a road costs and says when the city cannot pay', 
   assert.equal(ask.type, 'previewRoad');
   assert.equal(ask.class, RoadClass.Street);
   const stops = new Float32Array([0, 0, 0, 100, 0, 0]);
-  t.reply({ type: 'roadPreview', revision: ask.revision, stops, cost: 1000, affordable: true });
+  const preview = (revision, cost, affordable) => ({
+    type: 'roadPreview',
+    revision,
+    stops,
+    points: new Float32Array([0, 0, 100, 0]),
+    guides: new Float32Array(),
+    angles: new Float32Array(),
+    length: 100,
+    angle: Number.NaN,
+    cost,
+    affordable,
+  });
+  t.reply(preview(ask.revision, 1000, true));
   assert.match(t.elements['road-help'].textContent, /Costs \$1,000\. Click the road end/);
 
   t.key('m');
   const again = t.messages.at(-1);
   assert.equal(again.type, 'previewRoad', 'switching class asks for a new quote');
   assert.equal(again.class, RoadClass.Main);
-  t.reply({ type: 'roadPreview', revision: again.revision, stops, cost: 2500, affordable: false });
+  t.reply(preview(again.revision, 2500, false));
   assert.match(t.elements['road-help'].textContent, /Not enough money: costs \$2,500\./);
   t.click(100, 0);
   const build = t.messages.at(-1);

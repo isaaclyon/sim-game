@@ -29,12 +29,19 @@ What to build next and why lives in `docs/ROADMAP.md`. Work on the current miles
   tombstone slots.
 - Signals: `[x, y, heading, state]` per signalised approach (`SIGNAL_STRIDE`), state 0 = red,
   1 = green, 2 = protected-left green.
-- Road preview: `[x, y, join]` per sample of the road `BuildRoad` / `BuildCurve` would build,
-  join -1 = interior curve sample (no marker), 0 = new end, 1 = existing node, 2 = splits a road;
-  empty = refused. Answers `previewRoad` / `previewCurve`, or `previewSnap` with one stop
-  (where a road would start). Echoes the request revision so outdated previews can be discarded.
-  Also carries `cost` (dollars the build would charge, null for snaps and refused shapes) and
-  `affordable` (false = the build would be refused for money; ADR 0036). Changes nothing.
+- Road drafts: `previewRoad` and `buildRoad` send raw `[x, y, snap]` points (start, a curve's
+  control, end); snap bits 1 = angle, 2 = guide lines, 4 = length. The sim guides them
+  (ADR 0038) and builds with the guided coordinates, so command logs record final positions.
+  The preview answer has `points` (`[x, y]` per guided point), `guides` (`[x0, y0, x1, y1]` per
+  guide line), `length`, `angle` (NaN = none), `angles` (`[x, y, rx, ry, dx, dy]` per junction
+  the road joins: the point, then unit directions along the road measured from and the new
+  road; the end's only when planned) and `stops`: `[x, y, join]` per sample of the road
+  it would build, join -1 = interior curve sample (no marker), 0 = new end, 1 = existing node,
+  2 = splits a road; empty = refused or not planned. One point previews where a road would
+  start. Echoes the request revision so outdated previews can be discarded. Also carries `cost`
+  (dollars the guided road would charge, null when nothing is planned) and `affordable`
+  (false = the build would be refused for money; ADR 0036). Changes nothing.
+  `buildResult` carries the guided `end`, null if refused.
 - Zones: one byte per zone cell, row-major, plus layout `[origin_x, origin_y, cell_size, cols,
   rows]`; byte 0 = none, 1/2 = residential low/high, 3/4 commercial, 5/6 industrial (ADR 0014).
   Sent whole when the zone grid's version changes.

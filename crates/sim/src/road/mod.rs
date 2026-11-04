@@ -11,6 +11,7 @@ use crate::geometry::{Point, Shape};
 use crate::rng::Rng;
 
 mod check;
+mod join;
 
 pub type NodeId = u32;
 pub type LaneId = u32;

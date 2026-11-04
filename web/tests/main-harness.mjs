@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { createContext, SourceTextModule, SyntheticModule } from 'node:vm';
 
-import { RoadClass, Zone } from '../src/protocol.ts';
+import { RoadClass, Snap, Zone } from '../src/protocol.ts';
 
 // Exercise main.ts's event handlers without a WebGL context or a running clock.
 export async function tools({ hash = '', clipboard = true } = {}) {
@@ -38,6 +38,11 @@ export async function tools({ hash = '', clipboard = true } = {}) {
       'main-road',
       'bulldoze',
       'road-help',
+      'road-readout',
+      'snap-options',
+      'snap-angle',
+      'snap-guides',
+      'snap-length',
       'inspector',
       'inspector-text',
       'follow',
@@ -166,8 +171,14 @@ export async function tools({ hash = '', clipboard = true } = {}) {
     pick(x, z) {
       return { x, z };
     }
-    setPreview(stops, _a, _b, roadClass) {
-      previews.push({ type: 'road', stops, roadClass });
+    setPreview(stops, a, b, roadClass) {
+      previews.push({ type: 'road', stops, a, b, roadClass });
+    }
+    setGuides(lines) {
+      previews.push({ type: 'guides', lines });
+    }
+    setAngles(marks) {
+      previews.push({ type: 'angles', marks });
     }
     setZoningVisible(visible) {
       previews.push({ type: 'zoningVisible', visible });
@@ -198,6 +209,8 @@ export async function tools({ hash = '', clipboard = true } = {}) {
     }
   }
   const context = createContext({
+    innerWidth: 1000,
+    innerHeight: 700,
     document: {
       body: {},
       getElementById: (id) => elements[id],
@@ -281,10 +294,24 @@ export async function tools({ hash = '', clipboard = true } = {}) {
     stripTypeScriptTypes(readFileSync(new URL('../src/hud.ts', import.meta.url), 'utf8')),
     { context },
   );
+  const roadTool = new SourceTextModule(
+    stripTypeScriptTypes(readFileSync(new URL('../src/road-tool.ts', import.meta.url), 'utf8')),
+    { context },
+  );
   const demandMeter = new SourceTextModule(
     stripTypeScriptTypes(readFileSync(new URL('../src/demand-meter.ts', import.meta.url), 'utf8')),
     { context },
   );
+  const protocol = new SyntheticModule(
+    ['RoadClass', 'Snap', 'Zone'],
+    function () {
+      this.setExport('RoadClass', RoadClass);
+      this.setExport('Snap', Snap);
+      this.setExport('Zone', Zone);
+    },
+    { context },
+  );
+  await roadTool.link((specifier) => (specifier === './hud' ? hud : protocol));
   const viewButtons = new SourceTextModule(
     stripTypeScriptTypes(readFileSync(new URL('../src/view-buttons.ts', import.meta.url), 'utf8')),
     { context },
@@ -292,45 +319,40 @@ export async function tools({ hash = '', clipboard = true } = {}) {
   await module.link((specifier) =>
     specifier === './view-buttons'
       ? viewButtons
-      : specifier === './city-controls'
-        ? cityControls
-        : specifier === './city-share'
-          ? cityShare
-          : specifier === './hud'
-            ? hud
-            : specifier === './inspector'
-              ? inspector
-              : specifier === './ambient-sound'
-                ? new SyntheticModule(
-                    ['AmbientSound'],
-                    function () {
-                      this.setExport('AmbientSound', AmbientSound);
-                    },
-                    { context },
-                  )
-                : specifier === './demand-meter'
-                  ? demandMeter
-                  : specifier === './protocol'
-                    ? new SyntheticModule(
-                        ['RoadClass', 'Zone'],
-                        function () {
-                          this.setExport('RoadClass', RoadClass);
-                          this.setExport('Zone', Zone);
-                        },
-                        { context },
-                      )
-                    : new SyntheticModule(
-                        ['Renderer'],
-                        function () {
-                          this.setExport('Renderer', Renderer);
-                        },
-                        { context },
-                      ),
+      : specifier === './road-tool'
+        ? roadTool
+        : specifier === './city-controls'
+          ? cityControls
+          : specifier === './city-share'
+            ? cityShare
+            : specifier === './hud'
+              ? hud
+              : specifier === './inspector'
+                ? inspector
+                : specifier === './ambient-sound'
+                  ? new SyntheticModule(
+                      ['AmbientSound'],
+                      function () {
+                        this.setExport('AmbientSound', AmbientSound);
+                      },
+                      { context },
+                    )
+                  : specifier === './demand-meter'
+                    ? demandMeter
+                    : specifier === './protocol'
+                      ? protocol
+                      : new SyntheticModule(
+                          ['Renderer'],
+                          function () {
+                            this.setExport('Renderer', Renderer);
+                          },
+                          { context },
+                        ),
   );
   await module.evaluate();
   const move = (x, y) => canvas.events.pointermove({ clientX: x, clientY: y });
-  const click = (x, y, button = 0) => {
-    const e = { clientX: x, clientY: y, button };
+  const click = (x, y, button = 0, shiftKey = false) => {
+    const e = { clientX: x, clientY: y, button, shiftKey };
     canvas.events.pointerdown(e);
     canvas.events.pointerup(e);
   };

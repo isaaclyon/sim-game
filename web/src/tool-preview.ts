@@ -15,9 +15,22 @@ const MARKER_PX = 10;
 const ZONE_OUTLINE = [0xe5484d, 0x7bd88f, 0x2e9e4f, 0x6fb3ff, 0x2f6fd0, 0xf2c94c, 0xd9822b];
 /** Markers close this share of the remaining distance in 1/`GLIDE_RATE` seconds (about 63 %). */
 const GLIDE_RATE = 30;
+const GUIDE_COLOR = 0xc9d4df;
+/** Angle marks (ADR 0038): an arc this far from the junction, or a square this wide at 90°. */
+const ARC_M = 14;
+const SQUARE_M = 9;
+const ARC_STEPS = 24;
+/** Within this sine of square, a mark shows the right-angle square instead of an arc. */
+const RIGHT_SIN = 0.0087;
+const MARK_COLOR = new THREE.Color(0xc9d4df);
+const RIGHT_COLOR = new THREE.Color(0x7bd88f);
+const MARK_OPACITY = 0.3;
 const LINE_Y = 0.5;
 const RIBBON_Y = 0.3;
 const RIBBON_OPACITY = 0.35;
+
+/** A ground position: x and z in world space, sim x and y. */
+export type Ground = { x: number; z: number };
 
 export class ToolPreview {
   readonly group = new THREE.Group();
@@ -25,6 +38,11 @@ export class ToolPreview {
   readonly ribbon: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
   readonly markers: THREE.Points;
   readonly zoneDrag: THREE.LineLoop;
+  /** Dashed guide lines a drawn point snapped to, from each line's origin to the point. */
+  readonly guides: THREE.LineSegments<THREE.BufferGeometry, THREE.LineDashedMaterial>;
+  /** Angles where the road joins roads: translucent wedges or squares, and their outlines. */
+  readonly angleFill: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
+  readonly angleEdge: THREE.LineSegments<THREE.BufferGeometry, THREE.LineBasicMaterial>;
   /** Where the sim's latest answer puts each marker; drawn positions glide toward it. */
   private markerTarget = new Float32Array();
 
@@ -54,19 +72,35 @@ export class ToolPreview {
     );
     this.zoneDrag = new THREE.LineLoop(new THREE.BufferGeometry(), new THREE.LineBasicMaterial());
     this.zoneDrag.visible = false;
-    for (const o of [this.line, this.ribbon, this.markers, this.zoneDrag]) {
+    this.guides = new THREE.LineSegments(
+      new THREE.BufferGeometry(),
+      new THREE.LineDashedMaterial({ color: GUIDE_COLOR, dashSize: 4, gapSize: 3 }),
+    );
+    this.guides.visible = false;
+    this.angleFill = new THREE.Mesh(
+      new THREE.BufferGeometry(),
+      new THREE.MeshBasicMaterial({
+        vertexColors: true,
+        transparent: true,
+        opacity: MARK_OPACITY,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      }),
+    );
+    this.angleFill.renderOrder = 7;
+    this.angleEdge = new THREE.LineSegments(
+      new THREE.BufferGeometry(),
+      new THREE.LineBasicMaterial({ vertexColors: true }),
+    );
+    const parts = [this.line, this.ribbon, this.markers, this.zoneDrag, this.guides];
+    for (const o of [...parts, this.angleFill, this.angleEdge]) {
       o.frustumCulled = false;
       this.group.add(o);
     }
   }
 
   /** See `Renderer.setPreview`. `roadClass` sets the ribbon width. */
-  setRoad(
-    stops: Float32Array | null,
-    a: THREE.Vector3 | null,
-    b: THREE.Vector3 | null,
-    roadClass = 0,
-  ) {
+  setRoad(stops: Float32Array | null, a: Ground | null, b: Ground | null, roadClass = 0) {
     const line: number[] = [];
     const markers: number[] = [];
     const colors: number[] = [];
@@ -87,6 +121,70 @@ export class ToolPreview {
     const road = !!stops && (stops.length === 0 || stops[stops.length - 1] >= 0);
     this.setPath(line, color, road ? roadClass : null);
     this.setMarkers(markers, colors);
+  }
+
+  /** `[x0, y0, x1, y1]` per guide line; null or empty hides them. */
+  setGuides(lines: Float32Array | null) {
+    const points: THREE.Vector3[] = [];
+    for (let i = 0; lines && i + 3 < lines.length; i += 4)
+      points.push(
+        new THREE.Vector3(lines[i], LINE_Y, lines[i + 1]),
+        new THREE.Vector3(lines[i + 2], LINE_Y, lines[i + 3]),
+      );
+    this.guides.geometry.dispose();
+    this.guides.geometry = new THREE.BufferGeometry().setFromPoints(points);
+    this.guides.computeLineDistances();
+    this.guides.visible = points.length > 0;
+  }
+
+  /**
+   * `[x, y, rx, ry, dx, dy]` per angle mark: the junction, then unit directions along the road
+   * measured from and along the new road. Square marks get a right-angle square, others an
+   * arc. Null or empty hides them.
+   */
+  setAngles(marks: Float32Array | null) {
+    const fill: number[] = [];
+    const edge: number[] = [];
+    const fillColor: number[] = [];
+    const edgeColor: number[] = [];
+    const v = (x: number, y: number) => [x, LINE_Y, y];
+    for (let i = 0; marks && i + 5 < marks.length; i += 6) {
+      const [x, y, rx, ry, dx, dy] = marks.subarray(i, i + 6);
+      const right = Math.abs(rx * dx + ry * dy) < RIGHT_SIN;
+      const c = right ? RIGHT_COLOR : MARK_COLOR;
+      // The outline: points from the road measured from round to the new road.
+      const rim: number[][] = [];
+      if (right) {
+        const s = SQUARE_M;
+        rim.push(v(x + rx * s, y + ry * s), v(x + (rx + dx) * s, y + (ry + dy) * s));
+        rim.push(v(x + dx * s, y + dy * s));
+      } else {
+        const from = Math.atan2(ry, rx);
+        const sweep = Math.atan2(rx * dy - ry * dx, rx * dx + ry * dy);
+        for (let k = 0; k <= ARC_STEPS; k++) {
+          const t = from + (sweep * k) / ARC_STEPS;
+          rim.push(v(x + Math.cos(t) * ARC_M, y + Math.sin(t) * ARC_M));
+        }
+      }
+      const centre = v(x, y);
+      for (let k = 1; k < rim.length; k++) {
+        fill.push(...centre, ...rim[k - 1], ...rim[k]);
+        edge.push(...rim[k - 1], ...rim[k]);
+        for (let j = 0; j < 3; j++) fillColor.push(c.r, c.g, c.b);
+        for (let j = 0; j < 2; j++) edgeColor.push(c.r, c.g, c.b);
+      }
+    }
+    const geometry = (xyz: number[], rgb: number[]) => {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(xyz, 3));
+      g.setAttribute('color', new THREE.Float32BufferAttribute(rgb, 3));
+      return g;
+    };
+    this.angleFill.geometry.dispose();
+    this.angleFill.geometry = geometry(fill, fillColor);
+    this.angleEdge.geometry.dispose();
+    this.angleEdge.geometry = geometry(edge, edgeColor);
+    this.angleFill.visible = this.angleEdge.visible = edge.length > 0;
   }
 
   /** The full centreline the bulldozer would remove, `[x, y]` per sample, in the refusal red. */

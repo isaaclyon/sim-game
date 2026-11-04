@@ -143,87 +143,40 @@ impl Sim {
         self.apply(Command::SpawnAgents { count })
     }
 
-    /// `class` is 0 = street, 1 = main road, 2 = alley. Unknown values build nothing.
-    pub fn build_road(&mut self, ax: f32, ay: f32, bx: f32, by: f32, class: u8) -> bool {
+    /// Guides raw `[x, y, snap]` points and, if `plan`, previews the road through them; see
+    /// `World::write_road_draft` (ADR 0038).
+    pub fn road_draft(&mut self, points: &[f32], plan: bool) -> Vec<f32> {
+        self.world.write_road_draft(points, plan, &mut self.buf);
+        self.buf.clone()
+    }
+
+    /// Builds the road through guided raw `[x, y, snap]` points (two, or three for a curve).
+    /// Returns the guided end `[x, y]`, or nothing if refused. `class` is 0 = street,
+    /// 1 = main road, 2 = alley; unknown values build nothing.
+    pub fn build_draft(&mut self, points: &[f32], class: u8) -> Vec<f32> {
         let Some(class) = RoadClass::from_u8(class) else {
-            return false;
+            return Vec::new();
         };
-        self.apply(Command::BuildRoad {
-            ax,
-            ay,
-            bx,
-            by,
-            class,
-        })
-    }
-
-    #[allow(clippy::too_many_arguments)] // Mirrors the coordinate-only WASM command boundary.
-    pub fn build_curve(
-        &mut self,
-        ax: f32,
-        ay: f32,
-        cx: f32,
-        cy: f32,
-        bx: f32,
-        by: f32,
-        class: u8,
-    ) -> bool {
-        let Some(class) = RoadClass::from_u8(class) else {
-            return false;
+        let Some(cmd) = self.world.draft_command(points, class) else {
+            return Vec::new();
         };
-        self.apply(Command::BuildCurve {
-            ax,
-            ay,
-            cx,
-            cy,
-            bx,
-            by,
-            class,
-        })
+        let end = match cmd {
+            Command::BuildRoad { bx, by, .. } | Command::BuildCurve { bx, by, .. } => vec![bx, by],
+            _ => Vec::new(),
+        };
+        if self.apply(cmd) { end } else { Vec::new() }
     }
 
-    /// What `build_curve` would cost in dollars, or undefined if it would be refused for its
-    /// shape. Unknown classes cost nothing to quote and build nothing.
-    #[allow(clippy::too_many_arguments)] // Mirrors the coordinate-only WASM command boundary.
-    pub fn curve_cost(
-        &self,
-        ax: f32,
-        ay: f32,
-        cx: f32,
-        cy: f32,
-        bx: f32,
-        by: f32,
-        class: u8,
-    ) -> Option<f64> {
+    /// What `build_draft` would charge in dollars (ADR 0036), or undefined if it would be
+    /// refused for its shape. Unknown classes cost nothing to quote and build nothing.
+    pub fn draft_cost(&self, points: &[f32], class: u8) -> Option<f64> {
         let class = RoadClass::from_u8(class)?;
-        let cost = self.world.curve_cost(ax, ay, cx, cy, bx, by, class)?;
-        Some(cost as f64)
-    }
-
-    /// What `build_road` would cost in dollars; see `curve_cost`.
-    pub fn road_cost(&self, ax: f32, ay: f32, bx: f32, by: f32, class: u8) -> Option<f64> {
-        let class = RoadClass::from_u8(class)?;
-        let cost = self.world.road_cost(ax, ay, bx, by, class)?;
-        Some(cost as f64)
+        Some(self.world.draft_cost(points, class)? as f64)
     }
 
     /// Whether the city can pay `cost` dollars now; a city in debt can afford nothing.
     pub fn can_afford(&self, cost: f64) -> bool {
         self.world.can_afford(cost as i64)
-    }
-
-    pub fn curve_preview(
-        &mut self,
-        ax: f32,
-        ay: f32,
-        cx: f32,
-        cy: f32,
-        bx: f32,
-        by: f32,
-    ) -> Vec<f32> {
-        self.world
-            .write_curve_preview(ax, ay, cx, cy, bx, by, &mut self.buf);
-        self.buf.clone()
     }
 
     pub fn delete_road(&mut self, x: f32, y: f32) -> bool {
@@ -333,20 +286,6 @@ impl Sim {
     /// `[x, y]` per centreline sample of the selected road, or empty on a miss.
     pub fn bulldoze_preview(&mut self, x: f32, y: f32) -> Vec<f32> {
         self.world.write_bulldoze_preview(x, y, &mut self.buf);
-        self.buf.clone()
-    }
-
-    /// `[x, y, join]` per stop of the road `build_road` would build; see
-    /// `World::write_road_preview`. Empty if it would be refused.
-    pub fn road_preview(&mut self, ax: f32, ay: f32, bx: f32, by: f32) -> Vec<f32> {
-        self.world.write_road_preview(ax, ay, bx, by, &mut self.buf);
-        self.buf.clone()
-    }
-
-    /// `[x, y, join]` for where a road started here would start; see
-    /// `World::write_snap_preview`.
-    pub fn snap_preview(&mut self, x: f32, y: f32) -> Vec<f32> {
-        self.world.write_snap_preview(x, y, &mut self.buf);
         self.buf.clone()
     }
 
