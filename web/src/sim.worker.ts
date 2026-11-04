@@ -26,10 +26,14 @@ let zonesVersion = -1;
 let lotsVersion = -1;
 let buildingsVersion = -1;
 let buildingsSentAt = -Infinity;
+let pollutionVersion = -1;
+let pollutionSentAt = -Infinity;
 /** One inspector subject. Citizens persist even while their travel slot is hidden. */
 let inspected: { selection: number; kind: 'citizen' | 'building'; id: number } | null = null;
 /** Full meshes are expensive; faster simulation must not flood the main thread. */
 const BUILDING_SNAPSHOT_INTERVAL_MS = 250;
+/** Pollution changes slowly (every 10 sim seconds) and its grid can be large. */
+const POLLUTION_SNAPSHOT_INTERVAL_MS = 1000;
 
 function post(msg: FromWorker, transfer: Transferable[] = []) {
   self.postMessage(msg, { transfer });
@@ -73,12 +77,25 @@ function sendBuildingsIfChanged(s: Sim, force = false) {
   post({ type: 'buildings', data, ids }, [data.buffer, ids.buffer]);
 }
 
+function sendPollutionIfChanged(s: Sim, force = false) {
+  const version = s.pollution_version();
+  if (version === pollutionVersion) return;
+  const now = performance.now();
+  if (!force && now - pollutionSentAt < POLLUTION_SNAPSHOT_INTERVAL_MS) return;
+  pollutionVersion = version;
+  pollutionSentAt = now;
+  const cells = s.pollution_cells();
+  const [x0, y0, cell, cols, rows] = s.pollution_layout();
+  post({ type: 'pollution', cells, layout: [x0, y0, cell, cols, rows] }, [cells.buffer]);
+}
+
 /** After an edit: zoning can add alleys, and road edits can recut lots (ADR 0016). */
 function sendEdits(s: Sim) {
   sendRoadsIfChanged(s);
   sendZonesIfChanged(s);
   sendLotsIfChanged(s);
   sendBuildingsIfChanged(s, true);
+  sendPollutionIfChanged(s, true);
   sendFrame(s); // Cars and signals also change while paused.
 }
 
@@ -88,8 +105,8 @@ const cities = new CitySession(post, (next, initialSpeed) => {
   speed = initialSpeed;
   backlogMs = 0;
   last = performance.now();
-  roadsVersion = zonesVersion = lotsVersion = buildingsVersion = -1;
-  buildingsSentAt = -Infinity;
+  roadsVersion = zonesVersion = lotsVersion = buildingsVersion = pollutionVersion = -1;
+  buildingsSentAt = pollutionSentAt = -Infinity;
   inspected = null;
   post({ type: 'cityReset', speed });
   sendEdits(next);
@@ -204,6 +221,7 @@ function step() {
       const perTick = (performance.now() - t0) / n;
       sendRoadsIfChanged(sim);
       sendBuildingsIfChanged(sim);
+      sendPollutionIfChanged(sim);
       sendFrame(sim, perTick);
     }
   }
@@ -247,7 +265,10 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
     case 'setSpeed':
       if (!cities.ready) break;
       speed = msg.speed;
-      if (speed === 0 && sim) sendBuildingsIfChanged(sim, true);
+      if (speed === 0 && sim) {
+        sendBuildingsIfChanged(sim, true);
+        sendPollutionIfChanged(sim, true);
+      }
       break;
     case 'spawn':
       if (cities.ready && sim?.spawn_agents(msg.count)) cities.changed();

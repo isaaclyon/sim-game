@@ -76,6 +76,39 @@ there are people. A zoned lot builds only while its use has positive demand; oth
 waits (ADR 0025).
 _Avoid_: need, desirability
 
+## Pollution and land value
+
+**Pollution**:
+Harm that industry and traffic do to the land around them, in three kinds: air pollution,
+ground pollution and noise. It lowers land value (ADR 0036).
+_Avoid_: smog (when you mean all kinds), dirt
+
+**Air pollution**:
+Pollution carried through the air from factories and busy roads, spreading evenly over a wide
+area. It follows current sources and is gone when they are.
+_Avoid_: smog (in code and docs), emissions
+
+**Ground pollution**:
+Contaminated land under and right beside factories. It builds up while a factory runs and
+fades slowly after it closes, so old factory sites stay tainted for a while.
+_Avoid_: soil pollution, contamination
+
+**Noise**:
+Pollution heard near busy roads and factories, strongest right beside the source. It follows
+current sources. Not the sound effects the game plays, and not route noise (ADR 0024).
+_Avoid_: noise pollution (just say noise), sound
+
+**Traffic flow**:
+How many cars use a road, averaged over time so it changes slowly. It decides how much air
+pollution and noise a road makes.
+_Avoid_: traffic (when you mean the cars on the road now), congestion
+
+**Land value**:
+How good a place is to build on. Pollution lowers it; later, services and parks raise it. Homes
+care most, shops a little and industry not at all. Low land value delays growth but never
+empties a standing building.
+_Avoid_: desirability, price (there is no money yet), happiness
+
 ## Saving and sharing
 
 **Save**:

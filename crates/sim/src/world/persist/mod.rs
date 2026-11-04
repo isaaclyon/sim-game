@@ -3,6 +3,9 @@
 //! Layout, integers little-endian: the format tag `MAGIC`, the schema version (`u32`), the
 //! payload length (`u64`), an FNV-1a checksum of the payload (`u64`), then the payload. The
 //! payload encoding is private to this module; only derived caches and scratch are left out.
+//!
+//! The payload is the world, then its pollution grid (ADR 0036). Version 1 saves predate
+//! pollution: they hold only the world and load with a clean grid and no traffic flow.
 
 mod validate;
 
@@ -12,8 +15,10 @@ use super::World;
 
 const MAGIC: &[u8; 8] = b"CITYSAVE";
 /// Bump on any change to what the payload holds or how it is laid out. Older versions are
-/// refused, never read as something else.
-pub const SAVE_VERSION: u32 = 1;
+/// refused, never read as something else, except `PRE_POLLUTION_VERSION`.
+pub const SAVE_VERSION: u32 = 2;
+/// The one older version that still loads (ADR 0036).
+const PRE_POLLUTION_VERSION: u32 = 1;
 const HEADER: usize = 8 + 4 + 8 + 8;
 
 /// Why a save could not be written or read. Loading never yields a partial world.
@@ -23,7 +28,8 @@ pub enum SaveError {
     Encode(String),
     /// The bytes do not start with the save format tag.
     NotASave,
-    /// A save of another schema version; this build reads only `SAVE_VERSION`.
+    /// A save of another schema version; this build reads `SAVE_VERSION` and the version
+    /// before pollution.
     UnsupportedVersion(u32),
     /// The bytes end before the save does.
     Truncated,
@@ -67,7 +73,9 @@ fn le<const N: usize>(bytes: &[u8], at: usize) -> [u8; N] {
 impl World {
     /// The complete simulation state as save bytes. Changes nothing.
     pub fn save(&self) -> Result<Vec<u8>, SaveError> {
-        let payload = postcard::to_allocvec(self).map_err(|e| SaveError::Encode(e.to_string()))?;
+        let encode = |e: postcard::Error| SaveError::Encode(e.to_string());
+        let payload = postcard::to_allocvec(self).map_err(encode)?;
+        let payload = postcard::to_extend(&self.pollution, payload).map_err(encode)?;
         let mut out = Vec::with_capacity(HEADER + payload.len());
         out.extend_from_slice(MAGIC);
         out.extend_from_slice(&SAVE_VERSION.to_le_bytes());
@@ -87,7 +95,7 @@ impl World {
             return Err(SaveError::Truncated);
         }
         let version = u32::from_le_bytes(le(bytes, 8));
-        if version != SAVE_VERSION {
+        if version != SAVE_VERSION && version != PRE_POLLUTION_VERSION {
             return Err(SaveError::UnsupportedVersion(version));
         }
         if bytes.len() < HEADER {
@@ -101,12 +109,22 @@ impl World {
         if payload.len() as u64 != len || checksum(payload) != u64::from_le_bytes(le(bytes, 20)) {
             return Err(SaveError::Corrupt);
         }
-        let (world, rest): (World, _) = postcard::take_from_bytes(payload)
+        let (mut world, mut rest): (World, _) = postcard::take_from_bytes(payload)
             .map_err(|_| SaveError::Invalid("payload does not decode"))?;
+        let old = version == PRE_POLLUTION_VERSION;
+        if old {
+            world.pollution = crate::pollution::Pollution::covering(&world.zones);
+        } else {
+            (world.pollution, rest) = postcard::take_from_bytes(rest)
+                .map_err(|_| SaveError::Invalid("pollution does not decode"))?;
+        }
         if !rest.is_empty() {
             return Err(SaveError::Invalid("payload has trailing bytes"));
         }
         world.validate().map_err(SaveError::Invalid)?;
+        if old {
+            world.refresh_pollution();
+        }
         Ok(world)
     }
 }

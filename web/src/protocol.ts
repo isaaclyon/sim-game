@@ -232,6 +232,13 @@ export type FromWorker =
    */
   | { type: 'zones'; cells: Uint8Array; layout: [number, number, number, number, number] }
   /**
+   * The whole pollution grid (ADR 0036): `[air, ground, noise, landValue]` bytes per cell,
+   * row-major from the origin, 0 = none (for land value: worthless) to 255 = full. `layout` is
+   * as for `zones`; cells are 4×4 zone cells. Sent at start, after edits and pauses, and at
+   * most once a real second while it changes.
+   */
+  | { type: 'pollution'; cells: Uint8Array; layout: [number, number, number, number, number] }
+  /**
    * `rings` is `[n, x0, y0, …, x(n-1), y(n-1)]` per lot: its outline's point count, then its
    * points (ADR 0018). Sent at start and whenever lots change.
    */

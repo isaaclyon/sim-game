@@ -5,6 +5,7 @@ mod closure;
 mod demand;
 mod inspect;
 mod persist;
+mod pollution;
 mod residents;
 mod roads;
 mod snapshot;
@@ -22,6 +23,7 @@ use crate::geometry::Shape;
 use crate::junction::Junctions;
 use crate::lot::Lots;
 use crate::path::Pathfinder;
+use crate::pollution::Pollution;
 use crate::rng::Rng;
 use crate::road::{LaneId, RoadClass, RoadNetwork};
 use crate::traffic::Traffic;
@@ -191,6 +193,10 @@ pub struct World {
     wake: BinaryHeap<Reverse<(u64, AgentId)>>,
     rng: Rng,
     totals: Stats,
+    /// Saved after the rest of the world, so saves from before pollution still decode
+    /// (ADR 0036); see `persist`.
+    #[serde(skip)]
+    pub pollution: Pollution,
 }
 
 impl World {
@@ -204,6 +210,7 @@ impl World {
             homes: Default::default(),
             cfg,
             zones: ZoneGrid::covering(roads.bounds()),
+            pollution: Pollution::default(),
             roads,
             lots: Lots::default(),
             buildings: Buildings::default(),
@@ -223,6 +230,7 @@ impl World {
             rng,
             totals: Stats::default(),
         };
+        world.pollution = Pollution::covering(&world.zones);
         world.sync_roads();
         world
     }
@@ -329,6 +337,7 @@ impl World {
         self.resolve_exits(&exits);
         self.traffic.recycle_exits(exits);
         self.totals.tick += 1;
+        self.tick_pollution();
         self.grow_buildings();
     }
 

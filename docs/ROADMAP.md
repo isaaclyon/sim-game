@@ -258,6 +258,32 @@ confirmed New city.
 
 Goals and consequences, kept light so they don't crowd out building.
 
+- **First slice: pollution and land value — implemented** ([ADR 0036](adrs/0036-pollution-and-land-value-steer-growth.md)).
+  Industry and traffic make air pollution, ground pollution and noise, which lower land value.
+  Homes, and shops a little, grow first on high land value; industry ignores it. Nothing
+  standing is closed or emptied. It needs only buildings and traffic, so it comes before
+  money and services.
+  - Sim: a pollution grid aligned to the zone grid (4×4 zone cells per cell). Smoothed
+    traffic flow per road and ground pollution per cell build up over time. Air, noise and
+    land value are rebuilt on a fixed sim-time cadence, not every tick. All are saved. The ADR 0025 growth
+    check gains a land value threshold for residential (strong) and commercial (mild).
+  - Saves: bump the version; saves from before pollution load clean (no ground pollution,
+    zero flow). Bless replay `expect` lines once.
+  - Display: overlays for air, ground, noise and land value; display-only haze and stained
+    ground. Add the snapshot format to CLAUDE.md with the Rust writer and renderer reader.
+  - Perf: compare `traffic_bench` ms/tick at the default size and `--scale la`.
+  - Built: the P button cycles air, ground, noise and land value; the plain view keeps a faint
+    haze and stain, and factory chimneys puff display-only smoke. At `--scale la` (about
+    600,000 cells) an update costs about 10 ms once every 100 ticks, about 0.1 ms a tick on
+    average; the default bench is unchanged. In a test town, the strip beside a factory
+    district (and a main road) grew 5 homes against 11 to 19 in strips farther away.
+    Not yet checked by hand: the full browser save, reload and old-save flow.
+
+  Done when: in a town with a factory district and a busy main road, new homes visibly fill
+  the quiet, clean blocks first and the dirty ones only when housing demand is high; an
+  old factory site stays tainted for a few sim days after rezoning; the overlays explain
+  why; and a save from before the change still opens.
+
 - Money: build costs, taxes, upkeep.
 - Services with coverage areas: power, water, roads maintenance, then fire, police, health and
   schools.

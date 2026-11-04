@@ -177,6 +177,25 @@ function clipBox(ring: Pt[], box: Box, d: number): Pt[] {
   return out;
 }
 
+export interface Smokestack {
+  /** Centre in scene-local (x, z). */
+  at: Pt;
+  /** Height of the open top, metres. */
+  top: number;
+}
+
+/**
+ * The chimney an industrial building draws, if any: one roof style in four has one. Shared with
+ * the smoke layer so puffs leave the drawn stack. Repeats `industry`'s first two choices.
+ */
+export function smokestack(b: Building): Smokestack | null {
+  if (b.zone < 5 || Math.min(Math.max(b.roof, 0), 3) !== 3) return null;
+  const rand = seeded(b.ring);
+  rand(); // wall colour
+  const box = obb(b.ring);
+  return { at: at(box, box.L * 0.6, 0), top: b.height + 9 + rand() * 6 };
+}
+
 const industry: Part = (mb, b, box, style, rand, glass) => {
   const s = style.industry;
   const variant = Math.min(Math.max(b.roof, 0), 3);
@@ -190,8 +209,8 @@ const industry: Part = (mb, b, box, style, rand, glass) => {
   else {
     flatRoofed(mb, b.ring, 0, h, wall, roof, 0.6, wall.clone().multiplyScalar(0.88));
     if (variant === 3) {
-      const c = at(box, box.L * 0.6, 0);
-      mb.cylinder(c, h, 1, 9 + rand() * 6, 8, new THREE.Color(s.stack));
+      const stack = smokestack(b) as Smokestack;
+      mb.cylinder(stack.at, h, 1, stack.top - h, 8, new THREE.Color(s.stack));
       mb.cylinder(at(box, box.L * 0.6 - 4, 0), h, 2.2, 3.5, 8, new THREE.Color(style.rooftop));
     } else rooftop(mb, b.ring, box, h, 4, true, rand, new THREE.Color(style.rooftop));
   }
