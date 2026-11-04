@@ -15,6 +15,12 @@ const status = (overrides = {}) => ({
 const settle = async () => {
   for (let i = 0; i < 20; i++) await new Promise(setImmediate);
 };
+// Compression runs on a background thread, so its result arrives after an unknown number of
+// event-loop turns. Wait for the visible effect instead (up to two seconds).
+const until = async (done) => {
+  for (const end = Date.now() + 2000; !done() && Date.now() < end; )
+    await new Promise((resolve) => setTimeout(resolve, 5));
+};
 // Arrays from the page's realm differ only in prototype.
 const same = (a, b) => assert.deepEqual(Array.from(a), Array.from(b));
 const city = Uint8Array.from({ length: 5000 }, (_, i) => (i * 7) % 13);
@@ -50,7 +56,7 @@ test('share buttons wait for a ready city; download and copy link use exported b
 
   copy.onclick();
   t.reply({ type: 'cityFile', bytes: city, error: null });
-  await settle();
+  await until(() => t.page.copied.length > 0);
   const link = t.page.copied.at(-1);
   same(await cityFromLink(new URL(link).hash), city);
   assert.equal(t.elements['share-url'].value, link);
@@ -68,7 +74,7 @@ test('a refused clipboard leaves the link visible to copy by hand', async () => 
   t.reply(status());
   t.elements['copy-link'].onclick();
   t.reply({ type: 'cityFile', bytes: city, error: null });
-  await settle();
+  await until(() => !t.elements['share-url'].hidden);
   assert.equal(t.elements['share-url'].hidden, false);
   assert.match(t.elements['share-url'].value, /#city=/);
   assert.match(t.elements['share-status'].textContent, /Copy the link below/);
@@ -100,7 +106,7 @@ test('a city link opens once on first visit, then leaves the address', async () 
   assert.deepEqual(t.page.replaced, ['/game/']);
   t.reply(status({ busy: true, ready: false }));
   t.reply(status({ savedAt: null, dirty: true }));
-  await settle();
+  await until(() => t.messages.some((m) => m.type === 'openCity'));
   const opens = t.messages.filter((m) => m.type === 'openCity');
   assert.equal(opens.length, 1);
   same(opens[0].bytes, city);
@@ -114,14 +120,14 @@ test('a city link asks before replacing a saved city and reports damage', async 
   const link = await cityLink(city, 'https://example.test/game/');
   const kept = await tools({ hash: new URL(link).hash });
   kept.reply(status());
-  await settle();
+  await until(() => kept.confirm.prompts.length > 0);
   assert.match(kept.confirm.prompts.at(-1), /Open this city/);
   assert.equal(kept.messages.filter((m) => m.type === 'openCity').length, 0);
   assert.match(kept.elements['share-status'].textContent, /Kept your city/);
 
   const damaged = await tools({ hash: '#city=AAAA' });
   damaged.reply(status({ savedAt: null }));
-  await settle();
+  await until(() => damaged.elements['share-status'].dataset.error === 'true');
   assert.match(damaged.elements['share-status'].textContent, /damaged or incomplete/);
   assert.equal(damaged.elements['share-status'].dataset.error, 'true');
 });
@@ -133,7 +139,7 @@ test('a city link pasted into a running game asks first, even before its first s
   t.confirm.answer = true;
   t.page.hash = new URL(link).hash;
   t.event('hashchange');
-  await settle();
+  await until(() => t.messages.some((m) => m.type === 'openCity'));
   assert.deepEqual(t.page.replaced, ['/game/']);
   assert.match(t.confirm.prompts.at(-1), /Open this city/);
   same(t.messages.filter((m) => m.type === 'openCity')[0].bytes, city);
