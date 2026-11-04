@@ -10,6 +10,8 @@ fn small_world(seed: u64) -> World {
         ..Config::default()
     };
     let mut world = World::generate(cfg, 12, 12);
+    // These tests are about traffic under edits, not what the edits cost.
+    world.treasury.balance = i64::MAX / 2;
     world.apply(Command::SpawnAgents { count: 2_000 });
     world
 }

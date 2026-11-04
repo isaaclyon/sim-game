@@ -6,7 +6,7 @@ import { initSync, Sim } from '../src/pkg/sim_wasm.js';
 initSync({ module: readFileSync(new URL('../src/pkg/sim_wasm_bg.wasm', import.meta.url)) });
 
 /** Runs sim.worker.ts against the real WASM sim with a fake clock and local save slot. */
-export async function worker(agents = 100, size = 3, storage) {
+export async function worker(agents = 100, size = 3, storage, grid = true) {
   let ready;
   const initialized = new Promise((resolve) => {
     ready = resolve;
@@ -86,7 +86,7 @@ export async function worker(agents = 100, size = 3, storage) {
   const module = await source('sim.worker');
   await module.evaluate();
   const send = (data) => self.onmessage({ data });
-  const init = send({ type: 'init', seed: 1, cols: size, rows: size, agents });
+  const init = send({ type: 'init', seed: 1, cols: size, rows: size, agents, grid });
   return {
     send,
     messages,

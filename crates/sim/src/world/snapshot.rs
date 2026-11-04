@@ -197,6 +197,8 @@ impl World {
         self.hash_residents(&mut mix);
         self.hash_closures(&mut mix);
         mix(self.rng.state());
+        mix(self.treasury.balance as u64);
+        mix(self.treasury.carry as u64);
         for entry in self.wake.clone().into_sorted_vec() {
             mix(entry.0.0);
             mix(entry.0.1 as u64);

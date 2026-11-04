@@ -103,6 +103,31 @@ fn a_save_and_load_partway_through_does_not_change_the_replay() {
     assert_eq!(Outcome::of(&loaded), Outcome::of(&live));
 }
 
+#[test]
+fn empty_map_logs_start_without_roads_and_round_trip() {
+    let mut log = CommandLog::empty(3, 10, 10);
+    let mut world = log.world();
+    assert_eq!(world.roads.road_count(), 0);
+    let road = Command::BuildRoad {
+        ax: 0.0,
+        ay: 0.0,
+        bx: 240.0,
+        by: 0.0,
+        class: RoadClass::Street,
+    };
+    assert!(log.apply(&mut world, road));
+    let text = log.to_string();
+    assert!(text.contains("\nmap 10 10\n"), "{text}");
+    let parsed = CommandLog::parse(&text).unwrap();
+    assert_eq!(parsed, log);
+    assert_eq!(parsed.replay().state_hash(), world.state_hash());
+    let head = "sim-game command log 1\nseed 1\nmesh 3 3\nend 0\n";
+    assert_eq!(
+        error(head),
+        "line 3: expected `map` or `grid`, found `mesh`"
+    );
+}
+
 fn error(text: &str) -> String {
     CommandLog::parse(text).unwrap_err().to_string()
 }

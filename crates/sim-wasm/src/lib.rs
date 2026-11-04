@@ -38,6 +38,10 @@ pub struct SimStats {
     pub paths_failed: f64,
     pub despawned_stuck: f64,
     pub despawned_by_edit: f64,
+    /// Money in whole dollars (ADR 0036); taxes and upkeep are per clock hour.
+    pub balance: f64,
+    pub taxes: f64,
+    pub upkeep: f64,
 }
 
 /// One citizen's details for the inspector (ADR 0022); see `World::citizen_info`. Places are
@@ -83,9 +87,18 @@ impl Sim {
 
 #[wasm_bindgen]
 impl Sim {
+    /// A city on the generated `cols` × `rows` street grid, for tests and benchmarks.
     #[wasm_bindgen(constructor)]
     pub fn new(seed: u32, cols: u32, rows: u32) -> Sim {
-        let log = CommandLog::new(seed as u64, cols, rows);
+        Self::start(CommandLog::new(seed as u64, cols, rows))
+    }
+
+    /// A fresh city as the game starts one: no roads, on a map the size of that grid.
+    pub fn empty(seed: u32, cols: u32, rows: u32) -> Sim {
+        Self::start(CommandLog::empty(seed as u64, cols, rows))
+    }
+
+    fn start(log: CommandLog) -> Sim {
         Sim {
             world: log.world(),
             log: Some(log),
@@ -167,6 +180,36 @@ impl Sim {
             by,
             class,
         })
+    }
+
+    /// What `build_curve` would cost in dollars, or undefined if it would be refused for its
+    /// shape. Unknown classes cost nothing to quote and build nothing.
+    #[allow(clippy::too_many_arguments)] // Mirrors the coordinate-only WASM command boundary.
+    pub fn curve_cost(
+        &self,
+        ax: f32,
+        ay: f32,
+        cx: f32,
+        cy: f32,
+        bx: f32,
+        by: f32,
+        class: u8,
+    ) -> Option<f64> {
+        let class = RoadClass::from_u8(class)?;
+        let cost = self.world.curve_cost(ax, ay, cx, cy, bx, by, class)?;
+        Some(cost as f64)
+    }
+
+    /// What `build_road` would cost in dollars; see `curve_cost`.
+    pub fn road_cost(&self, ax: f32, ay: f32, bx: f32, by: f32, class: u8) -> Option<f64> {
+        let class = RoadClass::from_u8(class)?;
+        let cost = self.world.road_cost(ax, ay, bx, by, class)?;
+        Some(cost as f64)
+    }
+
+    /// Whether the city can pay `cost` dollars now; a city in debt can afford nothing.
+    pub fn can_afford(&self, cost: f64) -> bool {
+        self.world.can_afford(cost as i64)
     }
 
     pub fn curve_preview(
@@ -345,9 +388,9 @@ impl Sim {
         self.buf.clone()
     }
 
-    /// `[min_x, min_y, max_x, max_y]`.
+    /// `[min_x, min_y, max_x, max_y]` of the map.
     pub fn bounds(&self) -> Vec<f32> {
-        self.world.roads.bounds().to_vec()
+        self.world.bounds().to_vec()
     }
 
     pub fn stats(&self) -> SimStats {
@@ -374,6 +417,9 @@ impl Sim {
             paths_failed: s.paths_failed as f64,
             despawned_stuck: s.despawned_stuck as f64,
             despawned_by_edit: s.despawned_by_edit as f64,
+            balance: s.money.balance as f64,
+            taxes: s.money.taxes as f64,
+            upkeep: s.money.upkeep as f64,
         }
     }
 }
