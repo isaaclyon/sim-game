@@ -2,6 +2,7 @@
 // line, snap markers, and the zone brush outline. The sim decides every shape; this module only
 // draws its answers, and lets snap markers glide between answers instead of jumping.
 import * as THREE from 'three';
+import type { Spot } from './power-tools.ts';
 import { buildRoadGeometry } from './road-geometry.ts';
 
 export const PREVIEW_COLOR = new THREE.Color(0x4a8bd0);
@@ -191,6 +192,34 @@ export class ToolPreview {
   setBulldoze(segment: Float32Array) {
     this.setMarkers([], []);
     this.setPath([...segment], PREVIEW_REFUSED_COLOR, 0);
+  }
+
+  /** A plant's footprint, closed `[x, y]`, blue where it fits and red where it does not. */
+  setPlant(outline: Float32Array, ok: boolean) {
+    this.setMarkers([], []);
+    this.setPath([...outline], ok ? PREVIEW_COLOR : PREVIEW_REFUSED_COLOR, null);
+  }
+
+  /** A transmission line: `ends` is `[ax, ay, aJoin, bx, by, bJoin]`, white markers where an
+   * end joins; empty draws a refused red line from `a` to `b`. `null` ends hide it. */
+  setLine(ends: Float32Array | null, a: Spot | null, b: Spot | null) {
+    const markers: number[] = [];
+    const colors: number[] = [];
+    let line: number[] = [];
+    let color = PREVIEW_COLOR;
+    if (ends && ends.length === 6) {
+      line = [ends[0], ends[1], ends[3], ends[4]];
+      for (const i of [0, 3]) {
+        if (ends[i + 2] !== 1) continue;
+        markers.push(ends[i], 1, ends[i + 1]);
+        colors.push(1, 1, 1);
+      }
+    } else if (ends && a && b) {
+      color = PREVIEW_REFUSED_COLOR;
+      line = [a.x, a.z, b.x, b.z];
+    }
+    this.setPath(line, color, null);
+    this.setMarkers(markers, colors);
   }
 
   /** Outlines the rectangle the zone brush would paint from `a` to `b`; `null` hides it. */

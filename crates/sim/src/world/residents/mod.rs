@@ -9,6 +9,7 @@ mod tests;
 
 use crate::citizen::{CitizenId, HomeId};
 use crate::rng::Rng;
+pub(in crate::world) use allocation::{capacity, ring_area};
 use std::cmp::Reverse;
 use std::collections::{BTreeSet, BinaryHeap};
 

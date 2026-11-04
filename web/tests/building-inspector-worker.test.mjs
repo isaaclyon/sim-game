@@ -7,6 +7,7 @@ async function town() {
   const w = await worker(0, 6);
   w.ready();
   await w.init;
+  await w.power();
   for (const [x, zone] of [
     [60, 2],
     [180, 4],

@@ -329,8 +329,26 @@ Goals and consequences, kept light so they don't crowd out building.
   old factory site stays tainted for a few sim days after rezoning; the overlays explain
   why.
 
-- Services with coverage areas: power, water, roads maintenance, then fire, police, health and
-  schools.
+- **Power — implemented** ([ADR 0041](adrs/0041-power-grids-follow-roads.md),
+  [ADR 0042](adrs/0042-roadside-pieces-snap-to-roads.md)). Roads carry power. Coal snaps beside
+  roads and offers industrial jobs; off-road solar and wind connect through transmission lines.
+  Plants and lines remain free, alongside the road economy. Solar follows daylight, wind
+  varies from the seed, and coal output is constant regardless of staffing.
+  - Lots need both sufficient R/C/I demand for their land value and available power.
+    Unpowered buildings keep their residents and workers but fill no vacancies. Starter
+    power supports a hamlet before the first plant; shortages leave newer buildings dark.
+  - Plants clear their land; line corridors remove buildings and block growth until removed.
+    Lines snap to plant terminals, roadside poles and other line ends.
+  - The HUD reports supply, use and waiting lots. Unpowered buildings have markers; the power
+    view colours grids. Detailed low-poly models show each plant type without changing state.
+  - Save version 4 combines money, pollution and power. Older saves and links are refused.
+    Display-only coal smoke remains a follow-up; plants do not yet add pollution or costs.
+
+  Done when: a player grows a village on starter power, sees why growth stops, adds a plant,
+  and connects an off-road wind farm with a line.
+
+- Remaining services with coverage areas: water, roads maintenance, then fire, police, health
+  and schools.
 - Citizen happiness from services, traffic and pollution, feeding back into demand and growth.
   The citizen inspector shows each person's mood and complaints.
 - Data overlays: traffic, coverage, land value, happiness.

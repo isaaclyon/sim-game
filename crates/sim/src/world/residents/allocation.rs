@@ -17,6 +17,36 @@ fn job_capacity(zone: Zone, area: f32, height: f32) -> u32 {
     }
 }
 
+/// Homes, people per home and jobs a building of this use, footprint area and height has.
+pub(in crate::world) struct Capacity {
+    pub homes: u32,
+    pub home_size: u8,
+    pub jobs: u32,
+}
+
+pub(in crate::world) fn capacity(zone: Zone, area: f32, height: f32) -> Capacity {
+    let mut c = Capacity {
+        homes: 0,
+        home_size: 0,
+        jobs: job_capacity(zone, area, height),
+    };
+    if matches!(zone, Zone::ResidentialLow | Zone::ResidentialHigh) {
+        let usable = area * (height / 3.0).floor().max(1.0);
+        c.homes = if zone == Zone::ResidentialLow {
+            1
+        } else {
+            (usable / 80.0).floor().max(1.0) as u32
+        };
+        c.home_size = (usable / c.homes as f32 / 25.0).floor().clamp(2.0, 7.0) as u8;
+    }
+    c
+}
+
+/// Footprint area of a ring, square metres.
+pub(in crate::world) fn ring_area(ring: &[crate::geometry::Point]) -> f32 {
+    crate::poly::area(&crate::poly::ring(ring.iter().copied())).abs()
+}
+
 impl World {
     /// Original use is retained on repaint; only new assignments are blocked. The closing
     /// flag (ADR 0023) is a cheap first test; the zone and access tests remain authoritative.
@@ -49,24 +79,16 @@ impl World {
 
     pub(in crate::world) fn register_buildings(&mut self) {
         for b in self.residents.registered..self.buildings.active.len() {
-            let area = crate::poly::area(&crate::poly::ring(
-                self.buildings.footprint(b as u32).iter().copied(),
-            ))
-            .abs();
-            let zone = self.buildings.zone[b];
-            let residential = matches!(zone, Zone::ResidentialLow | Zone::ResidentialHigh);
-            let jobs = job_capacity(zone, area, self.buildings.height[b]);
+            let area = ring_area(self.buildings.footprint(b as u32));
+            let Capacity {
+                homes,
+                home_size: capacity,
+                jobs,
+            } = capacity(self.buildings.zone[b], area, self.buildings.height[b]);
             self.residents.jobs.push(jobs);
             self.residents.workers.push(0);
-            if residential && self.buildings.active[b] {
-                let usable = area * (self.buildings.height[b] / 3.0).floor().max(1.0);
-                let count = if zone == Zone::ResidentialLow {
-                    1
-                } else {
-                    (usable / 80.0).floor().max(1.0) as u32
-                };
-                let capacity = (usable / count as f32 / 25.0).floor().clamp(2.0, 7.0) as u8;
-                for _ in 0..count {
+            if self.buildings.active[b] {
+                for _ in 0..homes {
                     let h = self.homes.building.len() as u32;
                     self.homes.building.push(b as u32);
                     self.homes.capacity.push(capacity);
@@ -103,7 +125,7 @@ impl World {
             if self.homes.household[h].is_some() || !self.buildings.active[b as usize] {
                 continue;
             }
-            if !self.building_accepts_assignments(b) {
+            if !self.building_fills_vacancies(b) {
                 self.residents
                     .arrivals
                     .push(Reverse((self.totals.tick + self.secs_to_ticks(30.0), home)));
@@ -174,6 +196,7 @@ impl World {
         for b in 0..self.residents.registered {
             let eligible = if job {
                 self.residents.workers[b] < self.residents.jobs[b]
+                    && self.building_powered(b as u32)
             } else {
                 matches!(
                     self.buildings.zone[b],

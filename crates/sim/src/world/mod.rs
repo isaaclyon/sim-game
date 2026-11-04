@@ -7,6 +7,7 @@ mod inspect;
 mod money;
 mod persist;
 mod pollution;
+mod power;
 mod residents;
 mod roads;
 mod snapshot;
@@ -25,6 +26,7 @@ use crate::junction::Junctions;
 use crate::lot::Lots;
 use crate::path::Pathfinder;
 use crate::pollution::Pollution;
+use crate::power::{PlantKind, Power};
 use crate::rng::Rng;
 use crate::road::{LaneId, RoadClass, RoadNetwork};
 use crate::traffic::Traffic;
@@ -34,6 +36,7 @@ pub use demand::Demand;
 pub use inspect::{BuildingInfo, CitizenInfo, Place};
 pub use money::{JOB_TAX, Money, RESIDENT_TAX, START_FUNDS};
 pub use persist::{SAVE_VERSION, SaveError};
+pub use power::{PLANT_STRIDE, POWER_BUILDING_STRIDE, PowerStats};
 
 /// Floats per agent in `write_agent_snapshot`.
 pub const SNAPSHOT_STRIDE: usize = 5;
@@ -56,8 +59,8 @@ pub struct Config {
     /// most city builders.
     pub stuck_limit_s: f32,
     pub grid_spacing: f32,
-    /// Builds every due lot whatever the demand (ADR 0025). For tests and benchmarks that need
-    /// full blocks; the game leaves it off.
+    /// Builds every due lot whatever the demand (ADR 0025) and powers every building (ADR
+    /// 0041). For tests and benchmarks that need full blocks; the game leaves it off.
     pub ignore_demand: bool,
 }
 
@@ -100,9 +103,24 @@ pub enum Command {
         by: f32,
         class: RoadClass,
     },
+    /// Removes the plant under the point, else the nearest line in reach, else the nearest road.
     DeleteRoad {
         x: f32,
         y: f32,
+    },
+    /// Places a power plant at the point; coal snaps beside a road and faces it (ADR 0042).
+    /// Refused over roads and other plants, and for coal away from roads.
+    PlacePlant {
+        kind: PlantKind,
+        x: f32,
+        y: f32,
+    },
+    /// Draws a transmission line; each end snaps to a line end, plant or road in reach.
+    BuildLine {
+        ax: f32,
+        ay: f32,
+        bx: f32,
+        by: f32,
     },
     /// Sets every zone cell whose centre is inside the rectangle with these corners. `Zone::None`
     /// unzones. See ADR 0014.
@@ -135,6 +153,8 @@ pub struct Stats {
     pub unemployment_percent: f32,
     /// What the town wants built next (ADR 0025).
     pub demand: Demand,
+    /// Supply and use of power (ADR 0041).
+    pub power: PowerStats,
     /// Balance, taxes and upkeep (ADR 0036).
     pub money: Money,
     /// Synthetic vehicles waiting between random trips; dormant citizen slots are excluded.
@@ -169,6 +189,11 @@ pub struct World {
     pub citizens: crate::citizen::Citizens,
     pub households: crate::citizen::Households,
     pub homes: crate::citizen::Homes,
+    /// Plants and transmission lines (ADR 0041).
+    pub power: Power,
+    /// Grids and who is powered, derived from the rest.
+    #[serde(skip)]
+    power_cache: power::PowerCache,
     residents: residents::Residents,
     closures: closure::Closures,
     supply: demand::Supply,
@@ -212,6 +237,8 @@ impl World {
             citizens: Default::default(),
             households: Default::default(),
             homes: Default::default(),
+            power: Power::default(),
+            power_cache: Default::default(),
             cfg,
             zones: ZoneGrid::covering(roads.bounds()),
             pollution: Pollution::default(),
@@ -236,6 +263,7 @@ impl World {
         };
         world.pollution = Pollution::covering(&world.zones);
         world.sync_roads();
+        world.ensure_power();
         world.refresh_upkeep();
         world
     }
@@ -269,7 +297,7 @@ impl World {
     }
 
     pub fn apply(&mut self, cmd: Command) -> bool {
-        let versions = (self.lots.version, self.zones.version);
+        let versions = (self.lots.version, self.zones.version, self.power.version);
         let roads = self.roads.version;
         let changed = match cmd {
             Command::SpawnAgents { count } => self.spawn_agents(count),
@@ -303,7 +331,9 @@ impl World {
                 },
                 class,
             ),
-            Command::DeleteRoad { x, y } => self.delete_road(x, y),
+            Command::DeleteRoad { x, y } => self.bulldoze_power(x, y) || self.delete_road(x, y),
+            Command::PlacePlant { kind, x, y } => self.place_plant(kind, x, y),
+            Command::BuildLine { ax, ay, bx, by } => self.build_line(ax, ay, bx, by),
             Command::PaintZone {
                 ax,
                 ay,
@@ -320,7 +350,7 @@ impl World {
             }
             Command::FillBlock { x, y, zone } => self.fill_block(x, y, zone),
         };
-        if versions != (self.lots.version, self.zones.version) {
+        if versions != (self.lots.version, self.zones.version, self.power.version) {
             self.buildings.reconcile(
                 &self.lots,
                 &self.zones,
@@ -331,6 +361,7 @@ impl World {
             self.reconcile_closures();
             self.reconcile_residents();
         }
+        self.ensure_power();
         if roads != self.roads.version {
             self.refresh_upkeep();
         }
@@ -340,6 +371,7 @@ impl World {
     pub fn tick(&mut self) {
         self.sync_roads();
         self.tick_closures();
+        self.ensure_power();
         self.tick_residents();
         self.wake_parked();
         self.lane_delay.clear();
@@ -366,6 +398,8 @@ impl World {
         self.tick_pollution();
         self.settle_money();
         self.grow_buildings();
+        // Current at every tick boundary, so a loaded world reads the same allocation.
+        self.ensure_power();
     }
 
     pub fn stats(&self) -> Stats {
@@ -374,6 +408,7 @@ impl World {
         s.population = self.residents.population;
         s.unemployed = self.residents.population - self.residents.employed;
         s.demand = self.demand();
+        s.power = self.power_stats();
         s.money = self.money();
         if s.population > 0 {
             s.unemployment_percent = s.unemployed as f32 * 100.0 / s.population as f32;

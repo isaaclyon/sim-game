@@ -61,9 +61,13 @@ impl World {
         }
     }
 
-    /// Writes `[x, y]` per centreline sample of the bulldoze target, or nothing on a miss.
+    /// Writes `[x, y]` per centreline sample of the bulldoze target, or nothing on a miss. A
+    /// plant's target is its closed outline, a line's its two ends; they win over roads.
     pub fn write_bulldoze_preview(&self, x: f32, y: f32, out: &mut Vec<f32>) {
         out.clear();
+        if self.write_power_bulldoze(x, y, out) {
+            return;
+        }
         if let Some(road) = snap::bulldoze_target(&self.roads, x, y) {
             let shape = self.roads.shape(road);
             out.extend([shape.a.0, shape.a.1]);
@@ -252,6 +256,7 @@ impl World {
         }
         self.junctions.hash_into(&mut mix);
         self.buildings.hash_into(&mut mix);
+        self.power.hash_into(&mut mix);
         self.pollution.hash_into(&mut mix);
         for chunk in self.zones.cells.chunks(8) {
             let mut word = [0u8; 8];

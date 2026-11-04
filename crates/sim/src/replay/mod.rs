@@ -14,6 +14,8 @@
 //! 140 delete 60 20
 //! 150 paint 0 0 100 100 residential-low
 //! 160 fill 50 50 industrial-high
+//! 170 plant 400 40 coal
+//! 180 line 400 40 600 40
 //! end 3000
 //! expect hash 0123456789abcdef population 12 buildings 30 trips 40
 //! ```
@@ -28,6 +30,7 @@ mod parse;
 
 use std::fmt::{self, Write};
 
+use crate::power::PlantKind;
 use crate::road::RoadClass;
 use crate::{Command, Config, World, Zone};
 
@@ -38,6 +41,11 @@ const CLASSES: [(RoadClass, &str); 3] = [
     (RoadClass::Street, "street"),
     (RoadClass::Main, "main"),
     (RoadClass::Alley, "alley"),
+];
+const PLANTS: [(PlantKind, &str); 3] = [
+    (PlantKind::Coal, "coal"),
+    (PlantKind::Solar, "solar"),
+    (PlantKind::Wind, "wind"),
 ];
 const ZONES: [(Zone, &str); 7] = [
     (Zone::None, "none"),
@@ -263,6 +271,14 @@ fn command_text(cmd: &Command) -> String {
         Command::FillBlock { x, y, zone } => {
             nums("fill", &[x, y]);
             s + " " + name(&ZONES, zone)
+        }
+        Command::PlacePlant { kind, x, y } => {
+            nums("plant", &[x, y]);
+            s + " " + name(&PLANTS, kind)
+        }
+        Command::BuildLine { ax, ay, bx, by } => {
+            nums("line", &[ax, ay, bx, by]);
+            s
         }
     }
 }

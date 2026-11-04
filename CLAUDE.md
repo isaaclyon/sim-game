@@ -62,6 +62,15 @@ What to build next and why lives in `docs/ROADMAP.md`. Work on the current miles
   including growth, closure removals (ADR 0023)
   and removals from paused road edits. Growth snapshots are capped at four
   per real second; start, edits and pause flush immediately.
+- Power (ADR 0041, 0042): plants `[kind, x, y, half_size, front_x, front_y, terminal_x,
+  terminal_y, output, grid]` per plant (`PLANT_STRIDE`), kind 0 = coal, 1 = solar, 2 = wind;
+  the square footprint is turned to face the unit front (toward its road for coal), and lines
+  join at the terminal; lines `[ax, ay, bx, by]` per line; buildings
+  `[x, y, height, grid, powered]` per standing building (`POWER_BUILDING_STRIDE`), grid -1 =
+  none. Grid numbers are stable within one message only. Sent whole when plants, lines, grids
+  or who is powered change; growth is capped like buildings. Plant preview: closed `[x, y]`
+  footprint where the plant would stand (coal snapped beside a road) plus `ok`. Line preview: `[ax, ay, a_join, bx, by, b_join]`, join 1 = meets a line,
+  plant or road; empty = refused. Bulldoze removes a plant, else a line, else a road.
 - Citizen inspection: `inspect` names a car or walker by its agent snapshot index; the worker maps it once
   to a citizen and answers `citizen` for that one citizen only, at once and after every frame
   and edit while selected (ADR 0022). Read-only, not hashed; names are derived from the seed and

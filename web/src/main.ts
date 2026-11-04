@@ -4,6 +4,7 @@ import { CityControls } from './city-controls';
 import { drawDemand } from './demand-meter';
 import { hudText } from './hud';
 import { Inspector } from './inspector';
+import { PowerTools } from './power-tools';
 import { type FromWorker, RoadClass, Snap, type Stats, type ToWorker, Zone } from './protocol';
 import { Renderer } from './renderer';
 import { type RoadMode, RoadTool } from './road-tool';
@@ -23,6 +24,7 @@ const demandFills = ['residential', 'commercial', 'industrial'].map((u) => byId(
 const worker = new Worker(new URL('./sim.worker.ts', import.meta.url), { type: 'module' });
 const send = (msg: ToWorker) => worker.postMessage(msg);
 const cityControls = new CityControls(send, byId, import.meta.env.DEV);
+const power = new PowerTools(send, renderer, byId, () => setTool(null));
 // Pan keys held when follow starts are ignored until released, so they cannot fight it.
 const ignoredCameraKeys = new Set<string>();
 const inspector = new Inspector(
@@ -57,6 +59,7 @@ let buildingsSeen = false;
 
 worker.onmessage = (e: MessageEvent<FromWorker>) => {
   const msg = e.data;
+  if (power.receive(msg)) return;
   if (msg.type === 'cityStatus') {
     cityControls.receive(msg);
     hud.hidden = !msg.ready;
@@ -171,6 +174,7 @@ function hideBlockOutline() {
   renderer.setZoneDrag(null, null, 0);
 }
 function setTool(tool: RoadMode, brush: Zone | null = null) {
+  power.set(null);
   zone = tool ? null : brush;
   zoneStart = null;
   hideBlockOutline();
@@ -250,6 +254,7 @@ canvas.addEventListener('pointerup', (e) => {
   }
   // Treat it as a click only if the pointer barely moved, so panning still works.
   const still = Math.hypot(e.clientX - downX, e.clientY - downY) <= 4;
+  if (power.active) return power.release(e.button, still, renderer.pick(e.clientX, e.clientY));
   if (!roads.mode) {
     if (e.button === 0 && still) {
       const agent = renderer.carAt(e.clientX, e.clientY);
@@ -277,11 +282,13 @@ function hover(e: { clientX: number; clientY: number }) {
     }
     return;
   }
+  if (power.active) return power.hover(renderer.pick(e.clientX, e.clientY));
   if (roads.mode) roads.hover(renderer.pick(e.clientX, e.clientY), e);
 }
 canvas.addEventListener('pointermove', hover);
 canvas.addEventListener('pointerleave', () => {
   pointer = null;
+  power.hover(null);
   if (!zoneStart) hideBlockOutline();
   roads.leave();
 });
@@ -347,6 +354,7 @@ addEventListener('keydown', (e) => {
   if (e.repeat) return;
   // Space activates a focused button natively; it must not also pause the sim.
   if (e.key === ' ' && target?.closest('button, a[href], [role="button"]')) return;
+  if (power.key(e.key)) return;
   if (views.key(e.key)) return;
   if (e.key === 'r' || e.key === 'R') toggleTool('straight');
   else if (e.key === 'v' || e.key === 'V') toggleTool('curve');
@@ -359,7 +367,8 @@ addEventListener('keydown', (e) => {
   else if (e.key === 'f' || e.key === 'F') inspector.toggleFollow();
   else if (e.key === 'n' || e.key === 'N') sound.toggle();
   // Esc cancels a tool first, then closes the inspector.
-  else if (e.key === 'Escape') roads.mode || zone !== null ? setTool(null) : inspector.select(null);
+  else if (e.key === 'Escape')
+    roads.mode || zone !== null || power.active ? setTool(null) : inspector.select(null);
   else if (e.key === ' ') setSpeed(speed === 0 ? 1 : 0);
   else if (e.key === '1') setSpeed(1);
   else if (e.key === '2') setSpeed(3);

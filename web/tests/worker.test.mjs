@@ -91,7 +91,7 @@ test('curve preview, build and bulldoze agree across the worker boundary while p
     );
   }
   await w.send({ type: 'deleteRoad', x: -900, y: -950 });
-  assert.deepEqual(w.messages.at(-2).segments, before);
+  assert.deepEqual(w.messages.findLast((msg) => msg.type === 'roads').segments, before);
   assert.equal(w.messages.at(-1).type, 'frame');
   assert.equal(w.messages.at(-1).stats.tick, 0);
   await w.send({ type: 'buildRoad', points, class: 0, id: 21 });
@@ -158,8 +158,9 @@ test('every preview request gets a reply even during WASM initialization', async
   assert.equal(w.messages.at(-1).segment.length, 4);
   await w.send({ type: 'setSpeed', speed: 0 });
   await w.send({ type: 'deleteRoad', x, y });
-  assert.equal(w.messages.at(-2).type, 'roads');
-  assert.equal(w.messages.at(-2).segments.length, roads.length - 5);
+  assert.equal(w.messages.at(-3).type, 'roads');
+  assert.equal(w.messages.at(-3).segments.length, roads.length - 5);
+  assert.equal(w.messages.at(-2).type, 'power', 'grids follow roads (ADR 0041)');
   assert.equal(w.messages.at(-1).type, 'frame', 'paused edits refresh cars and signals');
   assert.equal(w.messages.at(-1).stats.tick, 0, 'deletion does not advance time');
 });

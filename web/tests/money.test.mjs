@@ -58,6 +58,7 @@ const stats = {
   despawnedStuck: 0,
   pathsFailed: 0,
   despawnedByEdit: 0,
+  power: { supply: 0, starter: 150, used: 0, demand: 0, unpowered: 0, waiting: 0 },
   balance: 12_345,
   taxes: 300,
   upkeep: 120,
@@ -81,6 +82,7 @@ test('the HUD shows the balance, net income and debt', async () => {
     t.elements.hud.textContent,
     /money {6}\$12,345 {3}\+\$180\/h \(taxes \$300, upkeep \$120\)\n/,
   );
+  assert.match(t.elements.hud.textContent, /power +0 of 150 used/);
   show(t, { balance: -40, taxes: 0, upkeep: 120 });
   assert.match(t.elements.hud.textContent, /money {6}-\$40 {3}-\$120\/h .*in debt: no new roads/);
 });

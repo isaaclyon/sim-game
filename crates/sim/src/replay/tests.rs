@@ -4,7 +4,7 @@ use super::*;
 fn session() -> (CommandLog, World) {
     let mut log = CommandLog::new(5, 4, 4);
     let mut world = log.world();
-    let steps: [(u32, Command); 7] = [
+    let steps: [(u32, Command); 9] = [
         (0, Command::SpawnAgents { count: 20 }),
         (
             30,
@@ -46,6 +46,23 @@ fn session() -> (CommandLog, World) {
                 class: RoadClass::Street,
             },
         ),
+        (
+            0,
+            Command::PlacePlant {
+                kind: PlantKind::Wind,
+                x: 500.0,
+                y: 60.0,
+            },
+        ),
+        (
+            0,
+            Command::BuildLine {
+                ax: 500.0,
+                ay: 60.0,
+                bx: 360.0,
+                by: 60.0,
+            },
+        ),
         (10, Command::DeleteRoad { x: 300.0, y: 120.0 }),
         (
             0,
@@ -72,7 +89,7 @@ fn session() -> (CommandLog, World) {
 #[test]
 fn recorded_session_replays_to_the_same_world() {
     let (log, live) = session();
-    assert_eq!(log.commands.len(), 7);
+    assert_eq!(log.commands.len(), 9);
     let replayed = log.replay();
     assert_eq!(replayed.tick_count(), live.tick_count());
     assert_eq!(Outcome::of(&replayed), Outcome::of(&live));

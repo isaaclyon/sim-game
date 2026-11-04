@@ -29,7 +29,7 @@ a road the city cannot pay for. Every road also costs upkeep each in-game hour, 
 and filled jobs pay taxes. The HUD shows the balance and the hourly taxes and upkeep. Upkeep
 can push the balance into debt, which stops new roads until taxes bring it back. Bulldozing
 and zoning are free ([ADR 0036](docs/adrs/0036-money-build-costs-taxes-upkeep.md)). Saves
-from before money was added no longer open; start a New city.
+from before power was added (versions 1–3) no longer open; start a New city.
 The HUD shows the sim's day clock and speed (`Day 1   06:00   1×`). The game starts on Day 1 at
 06:00, and each sim second advances the clock six seconds, so a day lasts 4 real hours at 1× and 24
 minutes at 10×. Speed changes how many sim seconds pass per real second; pausing stops the clock.
@@ -84,13 +84,35 @@ and per 10 m² at high density (at least ten), independent of hall height. This 
 industrial lots support the town; demand shares stay unchanged. Very small or awkward lots can stay open. A partly painted lot also stays
 empty if unzoned cells outnumber or tie its most common zone; click to fill the whole block
 to zone those gaps. Growth pauses with the simulation.
-This is quick visual growth for testing zoning, not demand-driven development yet.
+Growth needs enough R/C/I demand for the lot's land value and enough power.
 Repainting or unzoning doesn't bulldoze. Existing buildings keep their original use while
 they empty out: workers lose their jobs at once, and households move to a free home elsewhere
 or leave town, one every few seconds. An empty building then disappears and the new zone grows
 in its place; unzoned land stays vacant. Painting the original zone back before that stops
 the closure. A road edit that removes a lot removes its building immediately
-([ADR 0023](docs/adrs/0023-gradual-closure-of-rezoned-buildings.md)). Demand comes in a later issue.
+([ADR 0023](docs/adrs/0023-gradual-closure-of-rezoned-buildings.md)).
+
+## Power
+
+`G` cycles coal, solar and wind plants; `L` draws transmission lines; `O` toggles the power
+view. `P` continues to cycle the pollution views.
+
+Plants and transmission lines are free to build and maintain. Roads carry power; lines
+connect remote plants or separate road networks. Coal snaps beside a road, faces it and
+provides constant power and industrial jobs. Solar produces only in daylight. Wind output
+varies slowly. Staffing does not affect output. Each plant has a fixed connection point
+behind it; lines also snap to roadsides and existing line ends.
+
+Starter power supports a small village. When it runs out, lots wait until a plant supplies
+power. Existing buildings receive power oldest first; a shortage stops their empty homes
+and jobs from filling but does not evict anyone. The HUD reports supply, use and waiting
+lots. Unpowered buildings are marked, and the power view colours separate grids.
+
+Placing a plant clears its land. Lines remove buildings they cross and prevent rebuilding
+until the line is bulldozed. Bulldozing selects a plant first, then a line, then a road.
+Detailed plant models are display-only; power plants do not yet contribute pollution.
+See [ADR 0041](docs/adrs/0041-power-grids-follow-roads.md) and
+[ADR 0042](docs/adrs/0042-roadside-pieces-snap-to-roads.md).
 
 ## Saving
 

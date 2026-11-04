@@ -26,6 +26,8 @@ let zonesVersion = -1;
 let lotsVersion = -1;
 let buildingsVersion = -1;
 let buildingsSentAt = -Infinity;
+let powerVersion = -1;
+let powerSentAt = -Infinity;
 let pollutionVersion = -1;
 let pollutionSentAt = -Infinity;
 /** One inspector subject. Citizens persist even while their travel slot is hidden. */
@@ -77,6 +79,24 @@ function sendBuildingsIfChanged(s: Sim, force = false) {
   post({ type: 'buildings', data, ids }, [data.buffer, ids.buffer]);
 }
 
+/** Power changes with growth too, so it is coalesced like buildings (ADR 0041). */
+function sendPowerIfChanged(s: Sim, force = false) {
+  const version = s.power_version();
+  if (version === powerVersion) return;
+  const now = performance.now();
+  if (!force && now - powerSentAt < BUILDING_SNAPSHOT_INTERVAL_MS) return;
+  powerVersion = version;
+  powerSentAt = now;
+  const plants = s.plant_snapshot();
+  const lines = s.line_snapshot();
+  const buildings = s.power_buildings();
+  post({ type: 'power', plants, lines, buildings }, [
+    plants.buffer,
+    lines.buffer,
+    buildings.buffer,
+  ]);
+}
+
 function sendPollutionIfChanged(s: Sim, force = false) {
   const version = s.pollution_version();
   if (version === pollutionVersion) return;
@@ -95,6 +115,7 @@ function sendEdits(s: Sim) {
   sendZonesIfChanged(s);
   sendLotsIfChanged(s);
   sendBuildingsIfChanged(s, true);
+  sendPowerIfChanged(s, true);
   sendPollutionIfChanged(s, true);
   sendFrame(s); // Cars and signals also change while paused.
 }
@@ -105,8 +126,14 @@ const cities = new CitySession(post, (next, initialSpeed) => {
   speed = initialSpeed;
   backlogMs = 0;
   last = performance.now();
-  roadsVersion = zonesVersion = lotsVersion = buildingsVersion = pollutionVersion = -1;
-  buildingsSentAt = pollutionSentAt = -Infinity;
+  roadsVersion =
+    zonesVersion =
+    lotsVersion =
+    buildingsVersion =
+    powerVersion =
+    pollutionVersion =
+      -1;
+  buildingsSentAt = powerSentAt = pollutionSentAt = -Infinity;
   inspected = null;
   post({ type: 'cityReset', speed });
   sendEdits(next);
@@ -127,6 +154,14 @@ function readStats(s: Sim): Stats {
       residential: st.demand_residential,
       commercial: st.demand_commercial,
       industrial: st.demand_industrial,
+    },
+    power: {
+      supply: st.power_supply,
+      starter: st.power_starter,
+      used: st.power_used,
+      demand: st.power_demand,
+      unpowered: st.power_unpowered,
+      waiting: st.power_waiting,
     },
     parked: st.parked,
     awaitingPath: st.awaiting_path,
@@ -197,6 +232,7 @@ function sendBuilding(s: Sim) {
         capacity: v.capacity,
         occupied: v.occupied,
         closing: v.closing,
+        powered: v.powered,
       }
     : null;
   v?.free();
@@ -224,6 +260,7 @@ function step() {
       const perTick = (performance.now() - t0) / n;
       sendRoadsIfChanged(sim);
       sendBuildingsIfChanged(sim);
+      sendPowerIfChanged(sim);
       sendPollutionIfChanged(sim);
       sendFrame(sim, perTick);
     }
@@ -270,6 +307,7 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
       speed = msg.speed;
       if (speed === 0 && sim) {
         sendBuildingsIfChanged(sim, true);
+        sendPowerIfChanged(sim, true);
         sendPollutionIfChanged(sim, true);
       }
       break;
@@ -293,6 +331,32 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
         sendEdits(sim);
       }
       break;
+    case 'placePlant':
+    case 'buildLine':
+      if (
+        cities.ready &&
+        sim &&
+        (msg.type === 'placePlant'
+          ? sim.place_plant(msg.kind, msg.x, msg.y)
+          : sim.build_line(msg.ax, msg.ay, msg.bx, msg.by))
+      ) {
+        cities.changed();
+        sendEdits(sim);
+      }
+      break;
+    case 'previewPlant': {
+      const data = sim?.plant_preview(msg.kind, msg.x, msg.y) ?? new Float32Array();
+      const outline = data.slice(1);
+      post({ type: 'plantPreview', outline, ok: data[0] === 1, revision: msg.revision }, [
+        outline.buffer,
+      ]);
+      break;
+    }
+    case 'previewLine': {
+      const ends = sim?.line_preview(msg.ax, msg.ay, msg.bx, msg.by) ?? new Float32Array();
+      post({ type: 'linePreview', ends, revision: msg.revision }, [ends.buffer]);
+      break;
+    }
     case 'paintZone':
       if (cities.ready && sim?.paint_zone(msg.ax, msg.ay, msg.bx, msg.by, msg.zone)) {
         cities.changed();

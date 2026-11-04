@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { createContext, SourceTextModule, SyntheticModule } from 'node:vm';
 
-import { RoadClass, Snap, Zone } from '../src/protocol.ts';
+import { PlantKind, RoadClass, Snap, Zone } from '../src/protocol.ts';
 
 // Exercise main.ts's event handlers without a WebGL context or a running clock.
 export async function tools({ hash = '', clipboard = true } = {}) {
@@ -60,6 +60,11 @@ export async function tools({ hash = '', clipboard = true } = {}) {
       'open-city',
       'open-city-file',
       'command-log',
+      'plant-coal',
+      'plant-solar',
+      'plant-wind',
+      'power-line',
+      'power-view',
     ].map((id) => [id, element()]),
   );
   const zoneButtons = Object.values(Zone).map((zone) => ({
@@ -201,6 +206,18 @@ export async function tools({ hash = '', clipboard = true } = {}) {
     setLots(rings) {
       previews.push({ type: 'lots', rings });
     }
+    setPower(plants, lines, buildings) {
+      previews.push({ type: 'power', plants, lines, buildings });
+    }
+    setPowerView(on) {
+      previews.push({ type: 'powerView', on });
+    }
+    setPlantPreview(outline, ok) {
+      previews.push({ type: 'plant', outline, ok });
+    }
+    setLinePreview(ends, a, b) {
+      previews.push({ type: 'line', ends, a, b });
+    }
     setPollution(cells, layout) {
       previews.push({ type: 'pollution', cells, layout });
     }
@@ -294,6 +311,10 @@ export async function tools({ hash = '', clipboard = true } = {}) {
     stripTypeScriptTypes(readFileSync(new URL('../src/hud.ts', import.meta.url), 'utf8')),
     { context },
   );
+  const powerTools = new SourceTextModule(
+    stripTypeScriptTypes(readFileSync(new URL('../src/power-tools.ts', import.meta.url), 'utf8')),
+    { context },
+  );
   const roadTool = new SourceTextModule(
     stripTypeScriptTypes(readFileSync(new URL('../src/road-tool.ts', import.meta.url), 'utf8')),
     { context },
@@ -303,8 +324,9 @@ export async function tools({ hash = '', clipboard = true } = {}) {
     { context },
   );
   const protocol = new SyntheticModule(
-    ['RoadClass', 'Snap', 'Zone'],
+    ['PlantKind', 'RoadClass', 'Snap', 'Zone'],
     function () {
+      this.setExport('PlantKind', PlantKind);
       this.setExport('RoadClass', RoadClass);
       this.setExport('Snap', Snap);
       this.setExport('Zone', Zone);
@@ -317,37 +339,39 @@ export async function tools({ hash = '', clipboard = true } = {}) {
     { context },
   );
   await module.link((specifier) =>
-    specifier === './view-buttons'
-      ? viewButtons
-      : specifier === './road-tool'
-        ? roadTool
-        : specifier === './city-controls'
-          ? cityControls
-          : specifier === './city-share'
-            ? cityShare
-            : specifier === './hud'
-              ? hud
-              : specifier === './inspector'
-                ? inspector
-                : specifier === './ambient-sound'
-                  ? new SyntheticModule(
-                      ['AmbientSound'],
-                      function () {
-                        this.setExport('AmbientSound', AmbientSound);
-                      },
-                      { context },
-                    )
-                  : specifier === './demand-meter'
-                    ? demandMeter
-                    : specifier === './protocol'
-                      ? protocol
-                      : new SyntheticModule(
-                          ['Renderer'],
-                          function () {
-                            this.setExport('Renderer', Renderer);
-                          },
-                          { context },
-                        ),
+    specifier === './power-tools'
+      ? powerTools
+      : specifier === './view-buttons'
+        ? viewButtons
+        : specifier === './road-tool'
+          ? roadTool
+          : specifier === './city-controls'
+            ? cityControls
+            : specifier === './city-share'
+              ? cityShare
+              : specifier === './hud'
+                ? hud
+                : specifier === './inspector'
+                  ? inspector
+                  : specifier === './ambient-sound'
+                    ? new SyntheticModule(
+                        ['AmbientSound'],
+                        function () {
+                          this.setExport('AmbientSound', AmbientSound);
+                        },
+                        { context },
+                      )
+                    : specifier === './demand-meter'
+                      ? demandMeter
+                      : specifier === './protocol'
+                        ? protocol
+                        : new SyntheticModule(
+                            ['Renderer'],
+                            function () {
+                              this.setExport('Renderer', Renderer);
+                            },
+                            { context },
+                          ),
   );
   await module.evaluate();
   const move = (x, y) => canvas.events.pointermove({ clientX: x, clientY: y });
