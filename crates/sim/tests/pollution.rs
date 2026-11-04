@@ -3,8 +3,8 @@ use sim::rng::Rng;
 use sim::road::RoadNetwork;
 use sim::{Command, Config, World, Zone};
 
-/// Sim seconds in one day of the clock (`sim::clock`): 4 sim hours.
-const DAY_S: u32 = 4 * 3600;
+/// Sim seconds in one day of the clock (`sim::clock`): 80 sim minutes.
+const DAY_S: u32 = 80 * 60;
 
 fn advance(w: &mut World, seconds: u32) {
     for _ in 0..seconds * 10 {

@@ -1,7 +1,7 @@
 use super::super::World;
 use crate::agents::AgentState;
 use crate::citizen::{Activity, CitizenId};
-use crate::clock::clock_at;
+use crate::clock::{CLOCK_SECONDS_PER_SIM_SECOND, clock_at};
 use std::cmp::Reverse;
 
 impl World {
@@ -104,7 +104,7 @@ impl World {
         } else {
             86400 - now + target
         };
-        self.schedule_activity(c, delay as f32 / 6.0);
+        self.schedule_activity(c, delay as f32 / CLOCK_SECONDS_PER_SIM_SECOND as f32);
     }
 
     pub(in crate::world) fn start_citizen_trip(&mut self, c: CitizenId) {
@@ -167,7 +167,8 @@ impl World {
             }
             Activity::Work => self.schedule_activity(c, self.citizens.work_duration[i] as f32),
             Activity::Shop => {
-                let seconds = 60 + self.residents.rng.below(241);
+                // 6 to 30 clock minutes.
+                let seconds = 20 + self.residents.rng.below(81);
                 self.schedule_activity(c, seconds as f32);
             }
         }

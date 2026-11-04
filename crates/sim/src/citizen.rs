@@ -1,6 +1,7 @@
 //! Persistent residents and occupancy, separate from temporary vehicle trips (ADR 0021).
 use crate::agents::AgentId;
 use crate::building::BuildingId;
+use crate::clock::CLOCK_SECONDS_PER_SIM_SECOND;
 use crate::rng::Rng;
 use serde::{Deserialize, Serialize};
 
@@ -70,7 +71,7 @@ impl Citizens {
         self.job_due.push(u64::MAX);
         self.departure.push(7 * 3600 + rng.below(2 * 3600));
         self.work_duration
-            .push((6 * 3600 + rng.below(3 * 3600)) / 6);
+            .push((6 * 3600 + rng.below(3 * 3600)) / CLOCK_SECONDS_PER_SIM_SECOND as u32);
         let owns_car = rng.below(100) < CAR_OWNERSHIP_PERCENT;
         let (lo, hi) = if owns_car {
             OWNER_WALK_M

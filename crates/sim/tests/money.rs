@@ -4,8 +4,8 @@ use sim::road::RoadClass;
 use sim::world::{JOB_TAX, Money, RESIDENT_TAX, START_FUNDS};
 use sim::{Command, Config, World, Zone};
 
-/// Ticks in one clock hour at the default `dt` (`sim::clock`: 6 clock seconds per sim second).
-const HOUR: u32 = 6_000;
+/// Ticks in one clock hour at the default `dt` (`sim::clock`: 18 clock seconds per sim second).
+const HOUR: u32 = 2_000;
 
 fn advance(w: &mut World, ticks: u32) {
     for _ in 0..ticks {

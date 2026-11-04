@@ -31,7 +31,7 @@ The approved M2 design separates residency, employment and activities from traff
   Morning departures and work durations vary per person. Work/shopping duration starts on
   arrival. Shopping is optional, including daytime shopping for unemployed residents.
   New residents have a first activity within minutes; subsequent days use the existing
-  four-real-hour day clock. Event heaps wake residents; idle citizens are not scanned per tick.
+  day clock (80 real minutes at 1×). Event heaps wake residents; idle citizens are not scanned per tick.
 - A trip records an intended activity and destination, retaining the last valid activity
   location until arrival. Access uses a junction of the building's frontage road. Same-junction
   trips arrive immediately without a vehicle or path failure. Failed routes stay at the

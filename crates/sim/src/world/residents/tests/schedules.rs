@@ -11,7 +11,8 @@ fn first_departures_are_staggered_and_daily_departure_keeps_clock_rate() {
     let job = distant(&w, 0);
     assign_job(&mut w, 0, job);
     // Late return after midnight: next departure is still the next local morning.
-    w.totals.tick = w.secs_to_ticks(19.0 * 3600.0 / 6.0);
+    w.totals.tick =
+        w.secs_to_ticks(19.0 * 3600.0 / crate::clock::CLOCK_SECONDS_PER_SIM_SECOND as f32);
     w.schedule_day(0);
     let at = crate::clock::clock_at(w.citizens.due[0], w.cfg.dt);
     assert_eq!(at.day, 2);

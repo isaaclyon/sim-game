@@ -236,12 +236,12 @@ test('frames carry the sim-owned day clock, which pause holds and speed scales',
   };
   // A tick is f32 0.1 s, a hair over 100 ms, so give each step a little slack.
   w.advance(1001);
-  assert.deepEqual(clock(), [1, 6 * 3600 + 6], 'one second at 1x is six clock seconds');
+  assert.deepEqual(clock(), [1, 6 * 3600 + 18], 'one second at 1x is 18 clock seconds');
   await w.send({ type: 'setSpeed', speed: 0 });
   const frames = w.messages.length;
   w.advance(5000);
   assert.equal(w.messages.length, frames, 'paused: no ticks, no new frames');
   await w.send({ type: 'setSpeed', speed: 3 });
   for (let i = 0; i < 10; i++) w.advance(101);
-  assert.deepEqual(clock(), [1, 6 * 3600 + 24], 'one real second at 3x is 18 clock seconds');
+  assert.deepEqual(clock(), [1, 6 * 3600 + 72], 'one real second at 3x is 54 clock seconds');
 });

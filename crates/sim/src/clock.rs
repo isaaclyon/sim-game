@@ -1,8 +1,8 @@
 //! Day clock, derived from the tick count so it has no state of its own to drift or desync.
 
-/// Clock seconds that pass per sim second: a day lasts 4 sim hours, so 4 real hours at 1x and
-/// 24 minutes at 10x. Traffic still runs in sim seconds; only the displayed clock is faster.
-pub const CLOCK_SECONDS_PER_SIM_SECOND: u64 = 6;
+/// Clock seconds that pass per sim second: a day lasts 80 sim minutes, so 80 real minutes at 1x
+/// and 8 minutes at 10x. Traffic still runs in sim seconds; only the displayed clock is faster.
+pub const CLOCK_SECONDS_PER_SIM_SECOND: u64 = 18;
 /// The clock reads Day 1, 06:00 at tick 0.
 pub const START_SECOND_OF_DAY: u64 = 6 * 3600;
 pub const SECONDS_PER_DAY: u64 = 24 * 3600;
@@ -70,9 +70,9 @@ mod tests {
     }
 
     #[test]
-    fn a_day_lasts_four_sim_hours() {
+    fn a_day_lasts_eighty_sim_minutes() {
         assert_eq!(
-            clock_at(4 * 3600 * 10, 0.1),
+            clock_at(80 * 60 * 10, 0.1),
             ClockTime {
                 day: 2,
                 second_of_day: 6 * 3600

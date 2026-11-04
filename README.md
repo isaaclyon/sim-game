@@ -31,7 +31,7 @@ can push the balance into debt, which stops new roads until taxes bring it back.
 and zoning are free ([ADR 0036](docs/adrs/0036-money-build-costs-taxes-upkeep.md)). Saves
 from before power was added (versions 1–3) no longer open; start a New city.
 The HUD shows the sim's day clock and speed (`Day 1   06:00   1×`). The game starts on Day 1 at
-06:00, and each sim second advances the clock six seconds, so a day lasts 4 real hours at 1× and 24
+06:00, and each sim second advances the clock 18 seconds, so a day lasts 80 real minutes at 1× and 8
 minutes at 10×. Speed changes how many sim seconds pass per real second; pausing stops the clock.
 Lighting follows that same clock: warm dawn and dusk fade into daylight and a blue night.
 Building windows, shopfronts and vehicle head/tail lamps glow after dark; pausing holds the
