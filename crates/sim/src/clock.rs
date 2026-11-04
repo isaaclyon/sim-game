@@ -20,12 +20,17 @@ pub struct ClockTime {
 /// `dt` is rounded to whole milliseconds once and the rest is integer math, so long runs don't
 /// pick up float rounding drift.
 pub fn clock_at(tick: u64, dt: f32) -> ClockTime {
-    let dt_ms = (f64::from(dt) * 1000.0).round() as u64;
-    let clock_secs = tick * dt_ms * CLOCK_SECONDS_PER_SIM_SECOND / 1000 + START_SECOND_OF_DAY;
+    let clock_secs = clock_seconds(tick, dt);
     ClockTime {
         day: (clock_secs / SECONDS_PER_DAY + 1) as u32,
         second_of_day: (clock_secs % SECONDS_PER_DAY) as u32,
     }
+}
+
+/// Clock seconds since midnight before Day 1 after `tick` ticks of `dt` sim seconds each.
+pub fn clock_seconds(tick: u64, dt: f32) -> u64 {
+    let dt_ms = (f64::from(dt) * 1000.0).round() as u64;
+    tick * dt_ms * CLOCK_SECONDS_PER_SIM_SECOND / 1000 + START_SECOND_OF_DAY
 }
 
 #[cfg(test)]

@@ -15,6 +15,7 @@ test('normal startup has no synthetic traffic and HUD displays authoritative pop
     unemployed: 56,
     unemploymentPercent: 4.538087,
     demand: { residential: 0, commercial: 0, industrial: 0 },
+    power: { supply: 0, starter: 150, used: 0, demand: 0, unpowered: 0, waiting: 0 },
     agents: 9,
     parked: 0,
     driving: 2,

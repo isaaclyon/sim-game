@@ -83,7 +83,7 @@ impl World {
                 h != old
                     && self.homes.household[h].is_none()
                     && self.homes.capacity[h] as usize >= size
-                    && self.building_accepts_assignments(self.homes.building[h])
+                    && self.building_fills_vacancies(self.homes.building[h])
             })
     }
 

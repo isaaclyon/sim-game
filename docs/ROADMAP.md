@@ -258,6 +258,28 @@ confirmed New city.
 
 Goals and consequences, kept light so they don't crowd out building.
 
+### First slice: power — designed, not started
+
+Power comes before money and is free to build ([ADR 0036](adrs/0036-power-grids-follow-roads.md),
+proposed).
+
+- Roads carry power. Coal plants must touch a road and employ industrial workers; solar and
+  wind plants need neither, and a transmission line brings their power in. Lines also join
+  road networks that are not joined by road.
+- Solar follows the day clock; wind changes slowly from the seed; coal is constant and shows
+  smoke with no other effect yet.
+- Lots don't build without power. Unpowered buildings keep their people but don't fill
+  vacancies. A shortfall leaves the newest buildings dark. Starter power lets a hamlet grow
+  before the first plant.
+- Line corridors remove buildings they cross and block those lots while the line stands.
+- UI: a power supply and demand readout beside the R/C/I bars, a marker on unpowered
+  buildings, "no power" as the reason a lot waits, and a power overlay showing grids and
+  powered buildings.
+- Older saves and links stop loading (ADR 0033).
+
+Done when: a new player starts a village on starter power, sees growth stop with a clear
+reason, adds a plant, and connects an off-road wind farm with a line.
+
 - Money: build costs, taxes, upkeep.
 - Services with coverage areas: power, water, roads maintenance, then fire, police, health and
   schools.

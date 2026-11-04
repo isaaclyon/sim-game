@@ -157,15 +157,15 @@ impl Buildings {
         self.pending.push(Reverse((at, lot)));
     }
 
-    /// Builds on a lot that `next_due` returned. Returns whether a building went up.
-    pub(crate) fn build(
-        &mut self,
+    /// The building a lot that `next_due` returned would get; `None` if nothing fits.
+    /// Changes nothing, so the caller can check power first (ADR 0036).
+    pub(crate) fn plan(
         lot: LotId,
         zone: Zone,
         lots: &Lots,
         roads: &RoadNetwork,
         seed: u64,
-    ) -> bool {
+    ) -> Option<Plan> {
         let l = lot as usize;
         let mut rng = Rng::new(seed.wrapping_add(lot as u64));
         // The first draw sets growth time; use the next so height is independent.
@@ -203,23 +203,31 @@ impl Buildings {
         } else {
             0
         };
-        let Some(ring) = footprint::make(lots, lot, roads, zone, &mut rng) else {
-            return false;
-        };
+        let ring = footprint::make(lots, lot, roads, zone, &mut rng)?;
+        Some(Plan {
+            lot,
+            zone,
+            height,
+            roof,
+            ring,
+        })
+    }
+
+    /// Puts up a planned building.
+    pub(crate) fn commit(&mut self, plan: Plan) {
         let id = self.active.len() as BuildingId;
-        self.owner[l] = Some(id);
-        self.lot.push(lot);
-        self.zone.push(zone);
-        self.height.push(height);
-        self.roof.push(roof);
+        self.owner[plan.lot as usize] = Some(id);
+        self.lot.push(plan.lot);
+        self.zone.push(plan.zone);
+        self.height.push(plan.height);
+        self.roof.push(plan.roof);
         self.active.push(true);
         if self.outline_start.is_empty() {
             self.outline_start.push(0);
         }
-        self.outline.extend(ring);
+        self.outline.extend(plan.ring);
         self.outline_start.push(self.outline.len() as u32);
         self.version = self.version.wrapping_add(1);
-        true
     }
 
     /// `[zone, height, roof, front, n, x0, y0, …]` per active building in id order, not indexed
@@ -269,6 +277,15 @@ impl Buildings {
             }
         }
     }
+}
+
+/// A building `Buildings::plan` chose for a lot, not yet built.
+pub(crate) struct Plan {
+    lot: LotId,
+    pub zone: Zone,
+    pub height: f32,
+    roof: u8,
+    pub ring: Vec<Point>,
 }
 
 /// The counter-clockwise ring edge whose outward normal best matches `facing`. Edges shorter

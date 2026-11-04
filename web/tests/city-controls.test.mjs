@@ -81,6 +81,7 @@ test('city reset clears tools, follow and interpolation, and synchronizes pause 
       unemployed: 0,
       unemploymentPercent: 0,
       demand: { residential: 0, commercial: 0, industrial: 0 },
+      power: { supply: 0, starter: 150, used: 0, demand: 0, unpowered: 0, waiting: 0 },
       driving: 0,
       parked: 0,
       walking: 0,

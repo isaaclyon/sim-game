@@ -41,6 +41,8 @@ rewriting history; mark the old one `Superseded by NNNN`.
 | [0033](0033-single-city-state-saves.md) | Save one complete city locally and resume it on return | Accepted; implemented |
 | [0034](0034-command-log-replay-tests.md) | Replay regression tests from saved command logs | Accepted; implemented |
 | [0035](0035-share-cities-as-forked-copies.md) | Share cities as files and links that open as independent copies | Accepted; implemented |
+| [0036](0036-power-grids-follow-roads.md) | Power grids follow roads and gate growth | Accepted |
+| [0037](0037-roadside-pieces-snap-to-roads.md) | Roadside pieces snap to the road and face it | Accepted |
 
 ADRs are only for decisions that are hard to reverse. See [AGENTS.md](AGENTS.md) for when to
 write one and how.

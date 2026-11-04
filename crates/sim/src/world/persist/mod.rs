@@ -13,7 +13,7 @@ use super::World;
 const MAGIC: &[u8; 8] = b"CITYSAVE";
 /// Bump on any change to what the payload holds or how it is laid out. Older versions are
 /// refused, never read as something else.
-pub const SAVE_VERSION: u32 = 1;
+pub const SAVE_VERSION: u32 = 2;
 const HEADER: usize = 8 + 4 + 8 + 8;
 
 /// Why a save could not be written or read. Loading never yields a partial world.
@@ -101,12 +101,13 @@ impl World {
         if payload.len() as u64 != len || checksum(payload) != u64::from_le_bytes(le(bytes, 20)) {
             return Err(SaveError::Corrupt);
         }
-        let (world, rest): (World, _) = postcard::take_from_bytes(payload)
+        let (mut world, rest): (World, _) = postcard::take_from_bytes(payload)
             .map_err(|_| SaveError::Invalid("payload does not decode"))?;
         if !rest.is_empty() {
             return Err(SaveError::Invalid("payload has trailing bytes"));
         }
         world.validate().map_err(SaveError::Invalid)?;
+        world.ensure_power();
         Ok(world)
     }
 }

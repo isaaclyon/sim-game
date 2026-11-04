@@ -10,11 +10,13 @@ pub mod building;
 mod check;
 pub mod citizen;
 pub mod clock;
+pub mod frontage;
 mod geometry;
 pub mod junction;
 pub mod lot;
 pub mod path;
 mod poly;
+pub mod power;
 pub mod replay;
 pub mod rng;
 pub mod road;
@@ -24,5 +26,7 @@ pub mod world;
 pub mod zone;
 
 pub use replay::CommandLog;
-pub use world::{Command, Config, SaveError, Stats, World};
+pub use world::{
+    Command, Config, PLANT_STRIDE, POWER_BUILDING_STRIDE, PowerStats, SaveError, Stats, World,
+};
 pub use zone::Zone;

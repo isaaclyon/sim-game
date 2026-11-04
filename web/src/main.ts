@@ -4,6 +4,7 @@ import { CityControls } from './city-controls';
 import { drawDemand } from './demand-meter';
 import { hudText } from './hud';
 import { Inspector } from './inspector';
+import { PowerTools } from './power-tools';
 import { type FromWorker, RoadClass, type Stats, type ToWorker, Zone } from './protocol';
 import { Renderer } from './renderer';
 
@@ -21,6 +22,7 @@ const demandFills = ['residential', 'commercial', 'industrial'].map((u) => byId(
 const worker = new Worker(new URL('./sim.worker.ts', import.meta.url), { type: 'module' });
 const send = (msg: ToWorker) => worker.postMessage(msg);
 const cityControls = new CityControls(send, byId, import.meta.env.DEV);
+const power = new PowerTools(send, renderer, byId, () => setTool(null));
 // Pan keys held when follow starts are ignored until released, so they cannot fight it.
 const ignoredCameraKeys = new Set<string>();
 const inspector = new Inspector(
@@ -58,6 +60,7 @@ let buildingsSeen = false;
 
 worker.onmessage = (e: MessageEvent<FromWorker>) => {
   const msg = e.data;
+  if (power.receive(msg)) return;
   if (msg.type === 'cityStatus') {
     cityControls.receive(msg);
     hud.hidden = !msg.ready;
@@ -237,6 +240,7 @@ function sendPreview() {
   );
 }
 function setTool(tool: typeof roadTool | 'bulldoze', brush: Zone | null = null) {
+  power.set(null);
   roadTool = tool === 'bulldoze' ? null : tool;
   bulldozeTool = tool === 'bulldoze';
   zone = tool ? null : brush;
@@ -322,6 +326,7 @@ canvas.addEventListener('pointerup', (e) => {
   }
   // Treat it as a click only if the pointer barely moved, so panning still works.
   const still = Math.hypot(e.clientX - downX, e.clientY - downY) <= 4;
+  if (power.active) return power.release(e.button, still, renderer.pick(e.clientX, e.clientY));
   if (!roadTool && !bulldozeTool) {
     if (e.button === 0 && still) {
       const agent = renderer.carAt(e.clientX, e.clientY);
@@ -342,24 +347,9 @@ canvas.addEventListener('pointerup', (e) => {
   else {
     const id = ++nextBuildId;
     pendingBuild = { id, end: p };
-    const a = roadStart;
-    const c = roadControl;
-    const cls = roadClass;
-    send(
-      c
-        ? {
-            type: 'buildCurve',
-            id,
-            ax: a.x,
-            ay: a.z,
-            cx: c.x,
-            cy: c.z,
-            bx: p.x,
-            by: p.z,
-            class: cls,
-          }
-        : { type: 'buildRoad', id, ax: a.x, ay: a.z, bx: p.x, by: p.z, class: cls },
-    );
+    const [a, c] = [roadStart, roadControl];
+    const road = { id, ax: a.x, ay: a.z, bx: p.x, by: p.z, class: roadClass };
+    send(c ? { type: 'buildCurve', ...road, cx: c.x, cy: c.z } : { type: 'buildRoad', ...road });
   }
   refused = false;
   invalidatePreview();
@@ -378,6 +368,7 @@ function hover(e: { clientX: number; clientY: number }) {
     }
     return;
   }
+  if (power.active) return power.hover(renderer.pick(e.clientX, e.clientY));
   if ((!roadTool && !bulldozeTool) || pendingBuild) return;
   // Keep the latest completed preview visible during movement. Only a change of tool or
   // construction stage invalidates an in-flight response; cursor updates queue the next one.
@@ -388,6 +379,7 @@ function hover(e: { clientX: number; clientY: number }) {
 canvas.addEventListener('pointermove', hover);
 canvas.addEventListener('pointerleave', () => {
   pointer = null;
+  power.hover(null);
   if (!zoneStart) hideBlockOutline();
   previewRevision++;
   previewEnd = null;
@@ -450,6 +442,7 @@ addEventListener('keydown', (e) => {
   if (e.repeat) return;
   // Space activates a focused button natively; it must not also pause the sim.
   if (e.key === ' ' && target?.closest('button, a[href], [role="button"]')) return;
+  if (power.key(e.key)) return;
   if (e.key === 'r' || e.key === 'R') setTool(roadTool === 'straight' ? null : 'straight');
   else if (e.key === 'v' || e.key === 'V') setTool(roadTool === 'curve' ? null : 'curve');
   else if (e.key === 'b' || e.key === 'B') setTool(bulldozeTool ? null : 'bulldoze');
@@ -463,7 +456,9 @@ addEventListener('keydown', (e) => {
   else if (e.key === 't' || e.key === 'T') toggleTraffic();
   // Esc cancels a tool first, then closes the inspector.
   else if (e.key === 'Escape')
-    roadTool || bulldozeTool || zone !== null ? setTool(null) : inspector.select(null);
+    roadTool || bulldozeTool || zone !== null || power.active
+      ? setTool(null)
+      : inspector.select(null);
   else if (e.key === ' ') setSpeed(speed === 0 ? 1 : 0);
   else if (e.key === '1') setSpeed(1);
   else if (e.key === '2') setSpeed(3);

@@ -76,6 +76,54 @@ there are people. A zoned lot builds only while its use has positive demand; oth
 waits (ADR 0025).
 _Avoid_: need, desirability
 
+## Power
+
+**Power plant**:
+A player-placed structure that supplies power: coal (steady, needs a road and workers), solar
+(daylight only) or wind (changes with the wind).
+_Avoid_: generator, power station
+
+**Transmission line**:
+A line of poles the player draws to carry power where roads don't, such as from an off-road
+plant or between road networks. Nothing can be built on the land it crosses.
+_Avoid_: power line (when you mean the roads that carry power), cable
+
+**Frontage**:
+Where something placed beside a road meets it: the nearest road, and which way to face it.
+Coal plants snap to their frontage; other roadside pieces will too.
+_Avoid_: lot frontage (the width of a lot along its road)
+
+**Kerb**:
+The outer edge of a road's sidewalk. Roadside pieces stand just outside it; line poles that
+join a road stand just inside it.
+
+**Terminal**:
+The one point on a plant where transmission lines join it, behind its back edge.
+_Avoid_: socket, port
+
+**Grid**:
+Everything connected for power: roads joined by road or transmission line, and the plants
+and buildings on them. Each grid shares its own supply.
+_Avoid_: network (that is the road network), zone grid
+
+**Supply**:
+The power a grid's plants produce right now.
+_Avoid_: capacity (when output varies)
+
+**Power demand**:
+The power a building needs, set by its homes and jobs.
+_Avoid_: demand (that is R/C/I demand), load
+
+**Powered**:
+A building its grid has enough supply for. Older buildings are served first. An unpowered
+building keeps its people but fills no vacancies, and an unpowered lot does not build.
+_Avoid_: online, connected (a building can be connected and still unpowered)
+
+**Starter power**:
+A small free supply for the whole city, enough for a hamlet, so a village can grow before
+its first plant.
+_Avoid_: base supply, free power
+
 ## Saving and sharing
 
 **Save**:

@@ -5,6 +5,14 @@ import { initSync, Sim } from '../src/pkg/sim_wasm.js';
 
 initSync({ module: readFileSync(new URL('../src/pkg/sim_wasm_bg.wasm', import.meta.url)) });
 
+/** Where a coal plant fits west of a fresh city, so growth fixtures are not held back by
+ * starter power (ADR 0036). `sim` is a `Sim` with the city's seed and size. */
+export function coalSpot(sim) {
+  for (let y = 0; y < 400; y += 10)
+    for (let x = -20; x > -60; x -= 2) if (sim.plant_preview(0, x, y)[0] === 1) return { x, y };
+  throw new Error('no room for a coal plant');
+}
+
 /** Runs sim.worker.ts against the real WASM sim with a fake clock and local save slot. */
 export async function worker(agents = 100, size = 3, storage) {
   let ready;
@@ -95,5 +103,12 @@ export async function worker(agents = 100, size = 3, storage) {
     init,
     advance,
     settled: () => new Promise(setImmediate),
+    /** Places a coal plant beside the city; the worker must be initialised. */
+    async power() {
+      const mirror = new Sim(1, size, size);
+      const spot = coalSpot(mirror);
+      mirror.free();
+      await send({ type: 'placePlant', kind: 0, ...spot });
+    },
   };
 }

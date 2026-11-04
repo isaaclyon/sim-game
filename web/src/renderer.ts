@@ -27,6 +27,8 @@ import { carPosition, nearestCar } from './car-pick';
 import { Lighting, nightMaterial } from './lighting.ts';
 import { LotLayer } from './lot-scenery/layer.ts';
 import { ROADS, SIDEWALK, SKY } from './palette';
+import { PowerLayer } from './power-layer.ts';
+import type { Spot } from './power-tools.ts';
 import { buildRoadGeometry } from './road-geometry';
 import { buildRoadMarkings } from './road-markings.ts';
 import { createSimScene } from './scene';
@@ -63,6 +65,7 @@ export class Renderer {
   private readonly agents = new AgentLayer(this.scene, nightMaterial(this.lighting.night));
   private readonly signals = new SignalLayer(this.scene);
   private readonly tools = new ToolPreview();
+  private readonly power = new PowerLayer();
   private readonly up = new THREE.Vector3(0, 1, 0);
   private readonly look = new THREE.Vector3();
   /** Called when a mouse or touch drag pans the camera, so follow can let go. */
@@ -80,6 +83,7 @@ export class Renderer {
       this.lotScenery.group,
       this.overlay.group,
       this.buildings.group,
+      this.power.group,
       this.tools.group,
     );
 
@@ -324,6 +328,26 @@ export class Renderer {
     this.tools.setBulldoze(segment);
   }
 
+  /** Draws plants, lines and power markers; see `power` in protocol.ts. */
+  setPower(plants: Float32Array, lines: Float32Array, buildings: Float32Array) {
+    this.power.set(plants, lines, buildings);
+  }
+
+  /** The power view marks every building with its grid's colour, not only unpowered ones. */
+  setPowerView(on: boolean) {
+    this.power.setView(on);
+  }
+
+  /** See `ToolPreview.setPlant`. */
+  setPlantPreview(outline: Float32Array, ok: boolean) {
+    this.tools.setPlant(outline, ok);
+  }
+
+  /** See `ToolPreview.setLine`; `null` ends hide the preview. */
+  setLinePreview(ends: Float32Array | null, a: Spot | null, b: Spot | null) {
+    this.tools.setLine(ends, a, b);
+  }
+
   /** Snapshot time only: paused frames keep the same lighting. */
   setTime(secondOfDay: number) {
     this.lighting.setTime(secondOfDay);
@@ -336,6 +360,7 @@ export class Renderer {
     const now = seconds();
     this.buildings.animate(now);
     this.overlay.animate(now);
+    this.power.animate(now);
     this.tools.update(delta, !reducedMotion());
     this.scenery.update();
     this.lotScenery.update();

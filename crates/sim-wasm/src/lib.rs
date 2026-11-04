@@ -1,5 +1,6 @@
 //! Thin wasm-bindgen wrapper. Logic belongs in `sim`; this crate only converts types.
 
+use sim::power::PlantKind;
 use sim::road::RoadClass;
 use sim::{Command, CommandLog, World, Zone};
 use wasm_bindgen::prelude::*;
@@ -28,6 +29,14 @@ pub struct SimStats {
     pub demand_residential: i32,
     pub demand_commercial: i32,
     pub demand_industrial: i32,
+    /// Power (ADR 0036): plant output now, starter power, demand of powered and of all
+    /// buildings, unpowered buildings and lots waiting for power.
+    pub power_supply: u32,
+    pub power_starter: u32,
+    pub power_used: u32,
+    pub power_demand: u32,
+    pub power_unpowered: u32,
+    pub power_waiting: u32,
     pub parked: u32,
     pub awaiting_path: u32,
     pub entering: u32,
@@ -70,6 +79,7 @@ pub struct BuildingView {
     pub capacity: u32,
     pub occupied: u32,
     pub closing: bool,
+    pub powered: bool,
 }
 
 impl Sim {
@@ -217,6 +227,56 @@ impl Sim {
         self.buf.clone()
     }
 
+    /// `kind` is 0 = coal, 1 = solar, 2 = wind (ADR 0036). Unknown values build nothing.
+    pub fn place_plant(&mut self, kind: u8, x: f32, y: f32) -> bool {
+        let Some(kind) = PlantKind::from_u8(kind) else {
+            return false;
+        };
+        self.apply(Command::PlacePlant { kind, x, y })
+    }
+
+    pub fn build_line(&mut self, ax: f32, ay: f32, bx: f32, by: f32) -> bool {
+        self.apply(Command::BuildLine { ax, ay, bx, by })
+    }
+
+    /// `[ok, x0, y0, …]`; see `World::write_plant_preview`. Empty for an unknown kind.
+    pub fn plant_preview(&mut self, kind: u8, x: f32, y: f32) -> Vec<f32> {
+        self.buf.clear();
+        if let Some(kind) = PlantKind::from_u8(kind) {
+            self.world.write_plant_preview(kind, x, y, &mut self.buf);
+        }
+        self.buf.clone()
+    }
+
+    /// `[ax, ay, a_join, bx, by, b_join]`; see `World::write_line_preview`.
+    pub fn line_preview(&mut self, ax: f32, ay: f32, bx: f32, by: f32) -> Vec<f32> {
+        self.world.write_line_preview(ax, ay, bx, by, &mut self.buf);
+        self.buf.clone()
+    }
+
+    pub fn power_version(&self) -> u32 {
+        self.world.power_version()
+    }
+
+    /// `[kind, x, y, half_size, front_x, front_y, terminal_x, terminal_y, output, grid]` per
+    /// plant; see `World::write_plant_snapshot`.
+    pub fn plant_snapshot(&mut self) -> Vec<f32> {
+        self.world.write_plant_snapshot(&mut self.buf);
+        self.buf.clone()
+    }
+
+    /// `[ax, ay, bx, by]` per transmission line.
+    pub fn line_snapshot(&mut self) -> Vec<f32> {
+        self.world.write_line_snapshot(&mut self.buf);
+        self.buf.clone()
+    }
+
+    /// `[x, y, height, grid, powered]` per active building; see `World::write_power_buildings`.
+    pub fn power_buildings(&mut self) -> Vec<f32> {
+        self.world.write_power_buildings(&mut self.buf);
+        self.buf.clone()
+    }
+
     pub fn lots_version(&self) -> u32 {
         self.world.lots.version
     }
@@ -240,6 +300,7 @@ impl Sim {
             capacity: b.capacity,
             occupied: b.occupied,
             closing: b.closing,
+            powered: self.world.building_powered(id),
         })
     }
 
@@ -364,6 +425,12 @@ impl Sim {
             demand_residential: s.demand.residential,
             demand_commercial: s.demand.commercial,
             demand_industrial: s.demand.industrial,
+            power_supply: s.power.supply,
+            power_starter: s.power.starter,
+            power_used: s.power.used,
+            power_demand: s.power.demand,
+            power_unpowered: s.power.unpowered,
+            power_waiting: s.power.waiting,
             parked: s.parked,
             awaiting_path: s.awaiting_path,
             entering: s.entering,

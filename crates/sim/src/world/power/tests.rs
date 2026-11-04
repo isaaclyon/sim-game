@@ -1,0 +1,303 @@
+use super::super::World;
+use crate::power::{PlantKind, STARTER_POWER};
+use crate::{Command, Config, Zone};
+
+fn advance(w: &mut World, seconds: u32) {
+    for _ in 0..seconds * 10 {
+        w.tick();
+    }
+}
+
+/// Roads at x = 0..360 and y = 0..240, every 120 m.
+fn lattice() -> World {
+    World::new(
+        Config::default(),
+        crate::road::RoadNetwork::generate_lattice(4, 3, 120.0),
+        crate::rng::Rng::new(1),
+    )
+}
+
+/// Every block zoned, so growth is limited by demand and power only.
+fn zoned() -> World {
+    let mut w = lattice();
+    for (x, zone) in [
+        (60.0, Zone::ResidentialHigh),
+        (180.0, Zone::CommercialLow),
+        (300.0, Zone::IndustrialLow),
+    ] {
+        for y in [60.0, 180.0] {
+            assert!(w.apply(Command::FillBlock { x, y, zone }));
+        }
+    }
+    w
+}
+
+fn plant(w: &mut World, kind: PlantKind, x: f32, y: f32) -> bool {
+    w.apply(Command::PlacePlant { kind, x, y })
+}
+
+fn line(w: &mut World, a: (f32, f32), b: (f32, f32)) -> bool {
+    w.apply(Command::BuildLine {
+        ax: a.0,
+        ay: a.1,
+        bx: b.0,
+        by: b.1,
+    })
+}
+
+/// Coal beside the east road, clear of it.
+const COAL: (f32, f32) = (391.0, 60.0);
+
+#[test]
+fn starter_power_caps_growth_until_a_plant_arrives() {
+    let mut w = zoned();
+    advance(&mut w, 900);
+    let s = w.power_stats();
+    assert!(s.waiting > 0, "lots wait for power: {s:?}");
+    assert!(s.used <= STARTER_POWER && s.supply == 0, "{s:?}");
+    assert_eq!(s.unpowered, 0, "nothing is built that would be dark");
+    let before = w.buildings.active_buildings().count();
+
+    assert!(plant(&mut w, PlantKind::Coal, COAL.0, COAL.1));
+    advance(&mut w, 900);
+    let s = w.power_stats();
+    assert!(s.supply > 0 && s.used > STARTER_POWER, "{s:?}");
+    assert!(w.buildings.active_buildings().count() > before);
+}
+
+#[test]
+fn plants_keep_clear_of_roads_and_each_other() {
+    let mut w = lattice();
+    assert!(!plant(&mut w, PlantKind::Solar, 120.0, 60.0), "over a road");
+    assert!(
+        !plant(&mut w, PlantKind::Coal, 500.0, 60.0),
+        "coal needs a road"
+    );
+    assert!(
+        plant(&mut w, PlantKind::Solar, 500.0, 60.0),
+        "solar does not"
+    );
+    assert!(
+        !plant(&mut w, PlantKind::Wind, 510.0, 60.0),
+        "overlaps the farm"
+    );
+    assert!(!plant(&mut w, PlantKind::Wind, f32::NAN, 60.0));
+    assert!(plant(&mut w, PlantKind::Coal, COAL.0, COAL.1));
+}
+
+#[test]
+fn an_off_road_plant_powers_the_town_only_through_a_line() {
+    let mut w = lattice();
+    assert!(plant(&mut w, PlantKind::Wind, 500.0, 60.0));
+    let mut grids = Vec::new();
+    w.write_plant_snapshot(&mut grids);
+    let alone = grids[super::PLANT_STRIDE - 1];
+    assert!(line(&mut w, (500.0, 60.0), (362.0, 60.0)), "plant to road");
+    w.write_plant_snapshot(&mut grids);
+    assert_ne!(
+        grids[super::PLANT_STRIDE - 1],
+        alone,
+        "the plant joined the road grid"
+    );
+    assert!(!line(&mut w, (500.0, 60.0), (501.0, 60.0)), "too short");
+}
+
+#[test]
+fn a_plant_unzones_and_clears_its_land() {
+    let mut w = lattice();
+    w.cfg.ignore_demand = true;
+    assert!(w.apply(Command::FillBlock {
+        x: 60.0,
+        y: 60.0,
+        zone: Zone::ResidentialLow,
+    }));
+    advance(&mut w, 300);
+    let built = w.buildings.active_buildings().count();
+    assert!(built > 0);
+    // Lots line the north and south roads; this covers some on the south.
+    assert!(plant(&mut w, PlantKind::Solar, 60.0, 30.0));
+    assert!(w.buildings.active_buildings().count() < built);
+    assert_eq!(w.zones.zone_at(60.0, 30.0), Some(Zone::None));
+    let at = w.power.footprint(0);
+    assert!(
+        w.buildings
+            .active_buildings()
+            .all(|b| !at.hits_ring(w.buildings.footprint(b)))
+    );
+}
+
+#[test]
+fn a_line_clears_its_corridor_and_holds_lots_until_bulldozed() {
+    let mut w = lattice();
+    w.cfg.ignore_demand = true;
+    assert!(w.apply(Command::FillBlock {
+        x: 60.0,
+        y: 60.0,
+        zone: Zone::ResidentialLow,
+    }));
+    advance(&mut w, 300);
+    let full = w.buildings.active_buildings().count();
+    assert!(line(&mut w, (60.0, 0.0), (60.0, 120.0)), "road to road");
+    let cut = w.buildings.active_buildings().count();
+    assert!(cut < full, "the corridor is cleared");
+    advance(&mut w, 300);
+    assert_eq!(
+        w.buildings.active_buildings().count(),
+        cut,
+        "nothing rebuilds"
+    );
+    assert_eq!(w.zones.zone_at(60.0, 60.0), Some(Zone::ResidentialLow));
+
+    let mut target = Vec::new();
+    w.write_bulldoze_preview(61.0, 5.0, &mut target);
+    // Each end snaps to the sidewalk facing the other: 1 m inside a street's 6 m kerb.
+    assert_eq!(target, [60.0, 5.0, 60.0, 115.0], "the line, not a road");
+    assert!(w.apply(Command::DeleteRoad { x: 61.0, y: 5.0 }));
+    assert_eq!(w.power.active_lines().count(), 0);
+    advance(&mut w, 300);
+    assert!(
+        w.buildings.active_buildings().count() > cut,
+        "lots build again"
+    );
+}
+
+#[test]
+fn losing_power_keeps_residents_and_reloads_identically() {
+    let mut w = zoned();
+    assert!(plant(&mut w, PlantKind::Coal, COAL.0, COAL.1));
+    advance(&mut w, 1200);
+    let population = w.residents.population;
+    assert!(w.power_stats().used > STARTER_POWER);
+    assert!(w.apply(Command::DeleteRoad {
+        x: COAL.0,
+        y: COAL.1
+    }));
+    let s = w.power_stats();
+    assert!(s.unpowered > 0 && s.supply == 0, "{s:?}");
+    assert_eq!(w.residents.population, population, "nobody leaves");
+    let unpowered = (0..w.buildings.active.len() as u32)
+        .find(|&b| w.buildings.active[b as usize] && !w.building_powered(b))
+        .unwrap();
+    assert!(!w.building_fills_vacancies(unpowered));
+
+    advance(&mut w, 120);
+    let mut loaded = World::load(&w.save().unwrap()).unwrap();
+    let (mut a, mut b) = (Vec::new(), Vec::new());
+    w.write_power_buildings(&mut a);
+    loaded.write_power_buildings(&mut b);
+    assert_eq!(a, b, "the incremental allocation equals a fresh one");
+    assert_eq!(w.power_stats(), loaded.power_stats());
+    advance(&mut w, 120);
+    advance(&mut loaded, 120);
+    assert_eq!(w.state_hash(), loaded.state_hash());
+}
+
+#[test]
+fn plants_and_lines_are_hashed() {
+    let mut a = lattice();
+    let mut b = lattice();
+    assert_eq!(a.state_hash(), b.state_hash());
+    assert!(plant(&mut a, PlantKind::Wind, 500.0, 60.0));
+    assert_ne!(a.state_hash(), b.state_hash());
+    assert!(plant(&mut b, PlantKind::Wind, 500.0, 60.0));
+    assert!(line(&mut a, (500.0, 60.0), (362.0, 60.0)));
+    assert_ne!(a.state_hash(), b.state_hash());
+}
+
+/// One street from (0, 0) to (300, 300), at 45°.
+fn diagonal() -> World {
+    let mut roads = crate::road::RoadNetwork::default();
+    let a = roads.add_node(0.0, 0.0);
+    let b = roads.add_node(300.0, 300.0);
+    roads.add_road(a, b, crate::road::RoadClass::Street);
+    World::new(Config::default(), roads, crate::rng::Rng::new(1))
+}
+
+#[test]
+fn coal_snaps_beside_the_nearest_road_and_faces_it() {
+    let mut w = lattice();
+    // Anywhere east of the x = 360 street within reach lands at the same distance from it.
+    for x in [372.0, 391.0, 430.0] {
+        let at = w.plant_spot(PlantKind::Coal, x, 60.0).unwrap();
+        assert_eq!(at.centre, (360.0 + 6.0 + 1.0 + 22.0, 60.0), "from x = {x}");
+        assert_eq!(at.front, (-1.0, 0.0), "faces the street");
+    }
+    let mut preview = Vec::new();
+    w.write_plant_preview(PlantKind::Coal, 430.0, 60.0, &mut preview);
+    assert_eq!(preview[0], 1.0);
+    assert!(plant(&mut w, PlantKind::Coal, 430.0, 60.0));
+    let mut ring = Vec::new();
+    w.write_bulldoze_preview(389.0, 60.0, &mut ring);
+    assert_eq!(ring, preview[1..], "it stands where the preview showed");
+    assert!(
+        w.plant_spot(PlantKind::Solar, 430.0, 60.0).unwrap().centre == (430.0, 60.0),
+        "solar and wind stand where asked"
+    );
+}
+
+#[test]
+fn coal_turns_to_face_a_diagonal_road() {
+    let mut w = diagonal();
+    let at = w.plant_spot(PlantKind::Coal, 100.0, 160.0).unwrap();
+    let s = std::f32::consts::FRAC_1_SQRT_2;
+    assert!(
+        (at.front.0 - s).abs() < 1e-5 && (at.front.1 + s).abs() < 1e-5,
+        "{at:?}"
+    );
+    let back = 6.0 + 1.0 + 22.0;
+    let off = (at.centre.1 - at.centre.0) * s;
+    assert!(
+        (off - back).abs() < 1e-3,
+        "the front is just outside the kerb: {off}"
+    );
+    assert!(plant(&mut w, PlantKind::Coal, 100.0, 160.0));
+    let mut plants = Vec::new();
+    w.write_plant_snapshot(&mut plants);
+    assert!((plants[4] - s).abs() < 1e-5 && (plants[5] + s).abs() < 1e-5);
+    let terminal = w.power.terminal(0);
+    assert_eq!(&plants[6..8], [terminal.0, terminal.1]);
+    let mut loaded = World::load(&w.save().unwrap()).unwrap();
+    assert_eq!(loaded.power.footprint(0), w.power.footprint(0));
+    assert_eq!(loaded.state_hash(), w.state_hash());
+    loaded.power.plant_fx[0] = 2.0;
+    assert!(
+        World::load(&loaded.save().unwrap()).is_err(),
+        "fronts must be unit"
+    );
+}
+
+#[test]
+fn coal_with_no_road_in_reach_is_refused() {
+    let w = lattice();
+    let mut preview = Vec::new();
+    w.write_plant_preview(PlantKind::Coal, 500.0, 60.0, &mut preview);
+    assert_eq!(preview[0], 0.0);
+    assert_eq!(&preview[1..3], [478.0, 38.0], "shown unsnapped where asked");
+}
+
+#[test]
+fn lines_snap_to_plant_terminals_and_the_sidewalk_facing_them() {
+    let mut w = lattice();
+    assert!(plant(&mut w, PlantKind::Wind, 500.0, 60.0));
+    let terminal = w.power.terminal(0);
+    assert_eq!(terminal, (500.0, 60.0 - 5.0 - 2.0), "behind the back edge");
+    let mut ends = Vec::new();
+    // Anywhere on or near the turbine joins its terminal; near the street joins its sidewalk
+    // on the side the line comes from.
+    w.write_line_preview(503.0, 62.0, 358.0, 60.0, &mut ends);
+    assert_eq!(ends, [terminal.0, terminal.1, 1.0, 365.0, 60.0, 1.0]);
+    w.write_line_preview(450.0, 60.0, 440.0, 60.0, &mut ends);
+    assert_eq!(
+        ends,
+        [450.0, 60.0, 0.0, 440.0, 60.0, 0.0],
+        "free ends stay put"
+    );
+    assert!(line(&mut w, (503.0, 62.0), (358.0, 60.0)));
+    let mut plants = Vec::new();
+    w.write_plant_snapshot(&mut plants);
+    let grid = plants[super::PLANT_STRIDE - 1];
+    assert_eq!(
+        w.power_cache.grids.node[0] as f32, grid,
+        "the road grid reaches the turbine"
+    );
+}

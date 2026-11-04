@@ -10,6 +10,14 @@ const ZONE_NAMES = [
   'industrial low',
   'industrial high',
 ];
+/** Power use against supply (ADR 0036), and what is short of it. */
+export function powerText(s: Stats) {
+  const p = s.power;
+  const short = p.unpowered ? `   ${fmt(p.unpowered)} without power` : '';
+  const waiting = p.waiting ? `   ${fmt(p.waiting)} lots wait for power` : '';
+  return `power      ${fmt(p.used)} of ${fmt(p.supply + p.starter)} used (starter ${fmt(p.starter)})${short}${waiting}`;
+}
+
 /** Display-only time, traffic and active-tool information. */
 export function hudText(s: Stats, fps: number, tickMs: number, speed: number, zone: Zone | null) {
   const walkShare = s.tripsCompleted
@@ -25,8 +33,10 @@ export function hudText(s: Stats, fps: number, tickMs: number, speed: number, zo
     `trips      ${fmt(s.tripsCompleted)}   on foot ${walkShare}%\n` +
     `stuck      ${fmt(s.despawnedStuck)}   no path ${fmt(s.pathsFailed)}\n` +
     `road edits ${fmt(s.despawnedByEdit)} cars removed\n` +
+    `${powerText(s)}\n` +
     `camera     WASD or drag pans, Q/E turns, right-drag orbits, wheel zooms\n` +
     'inspect    click building/car/walker; F follows, Esc closes   N sound   T traffic\n' +
+    'power      P plant (again: solar, wind), L power line, O power view\n' +
     (zone === null
       ? ''
       : `\nZONE: ${ZONE_NAMES[zone]}.  Click a block to fill it, drag a rectangle to paint, Esc to stop` +

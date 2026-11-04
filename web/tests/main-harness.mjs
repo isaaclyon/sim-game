@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { createContext, SourceTextModule, SyntheticModule } from 'node:vm';
 
-import { RoadClass, Zone } from '../src/protocol.ts';
+import { PlantKind, RoadClass, Zone } from '../src/protocol.ts';
 
 // Exercise main.ts's event handlers without a WebGL context or a running clock.
 export async function tools({ hash = '', clipboard = true } = {}) {
@@ -54,6 +54,11 @@ export async function tools({ hash = '', clipboard = true } = {}) {
       'open-city',
       'open-city-file',
       'command-log',
+      'plant-coal',
+      'plant-solar',
+      'plant-wind',
+      'power-line',
+      'power-view',
     ].map((id) => [id, element()]),
   );
   const zoneButtons = Object.values(Zone).map((zone) => ({
@@ -189,6 +194,18 @@ export async function tools({ hash = '', clipboard = true } = {}) {
     setLots(rings) {
       previews.push({ type: 'lots', rings });
     }
+    setPower(plants, lines, buildings) {
+      previews.push({ type: 'power', plants, lines, buildings });
+    }
+    setPowerView(on) {
+      previews.push({ type: 'powerView', on });
+    }
+    setPlantPreview(outline, ok) {
+      previews.push({ type: 'plant', outline, ok });
+    }
+    setLinePreview(ends, a, b) {
+      previews.push({ type: 'line', ends, a, b });
+    }
   }
   const context = createContext({
     document: {
@@ -274,6 +291,19 @@ export async function tools({ hash = '', clipboard = true } = {}) {
     stripTypeScriptTypes(readFileSync(new URL('../src/hud.ts', import.meta.url), 'utf8')),
     { context },
   );
+  const powerTools = new SourceTextModule(
+    stripTypeScriptTypes(readFileSync(new URL('../src/power-tools.ts', import.meta.url), 'utf8')),
+    { context },
+  );
+  const protocol = new SyntheticModule(
+    ['RoadClass', 'Zone', 'PlantKind'],
+    function () {
+      this.setExport('RoadClass', RoadClass);
+      this.setExport('Zone', Zone);
+      this.setExport('PlantKind', PlantKind);
+    },
+    { context },
+  );
   const demandMeter = new SourceTextModule(
     stripTypeScriptTypes(readFileSync(new URL('../src/demand-meter.ts', import.meta.url), 'utf8')),
     { context },
@@ -298,21 +328,16 @@ export async function tools({ hash = '', clipboard = true } = {}) {
               : specifier === './demand-meter'
                 ? demandMeter
                 : specifier === './protocol'
-                  ? new SyntheticModule(
-                      ['RoadClass', 'Zone'],
-                      function () {
-                        this.setExport('RoadClass', RoadClass);
-                        this.setExport('Zone', Zone);
-                      },
-                      { context },
-                    )
-                  : new SyntheticModule(
-                      ['Renderer'],
-                      function () {
-                        this.setExport('Renderer', Renderer);
-                      },
-                      { context },
-                    ),
+                  ? protocol
+                  : specifier === './power-tools'
+                    ? powerTools
+                    : new SyntheticModule(
+                        ['Renderer'],
+                        function () {
+                          this.setExport('Renderer', Renderer);
+                        },
+                        { context },
+                      ),
   );
   await module.evaluate();
   const move = (x, y) => canvas.events.pointermove({ clientX: x, clientY: y });

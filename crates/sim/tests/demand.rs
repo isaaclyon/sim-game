@@ -20,6 +20,20 @@ fn built(w: &World, zones: [Zone; 2]) -> usize {
         .count()
 }
 
+/// Places a coal plant beside the town, so growth waits only on demand (ADR 0036).
+fn power(w: &mut World) {
+    let kind = sim::power::PlantKind::Coal;
+    let spot = (0..400)
+        .map(|i| (-20.0 - (i % 20) as f32, (i / 20) as f32 * 10.0))
+        .find(|&(x, y)| w.plant_fits(kind, x, y))
+        .expect("room for a plant west of the town");
+    assert!(w.apply(Command::PlacePlant {
+        kind,
+        x: spot.0,
+        y: spot.1,
+    }));
+}
+
 const HOMES: [Zone; 2] = [Zone::ResidentialLow, Zone::ResidentialHigh];
 const ROW: [(f32, f32); 5] = [
     (60.0, 60.0),
@@ -42,6 +56,7 @@ fn an_empty_town_wants_a_little_of_everything() {
 #[test]
 fn housing_without_jobs_stops_growing_until_jobs_arrive() {
     let mut w = World::generate(Config::default(), 6, 6);
+    power(&mut w);
     fill(&mut w, &ROW, Zone::ResidentialHigh);
     advance(&mut w, 300);
     let homes = built(&w, HOMES);

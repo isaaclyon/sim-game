@@ -7,7 +7,8 @@
 //! the jobs they already offer. A due lot builds only while its use has positive demand.
 
 use super::World;
-use crate::building::BuildingId;
+use super::power::power_demand;
+use crate::building::{BuildingId, Buildings};
 use crate::zone::Zone;
 use serde::{Deserialize, Serialize};
 
@@ -43,14 +44,21 @@ pub(super) struct Supply {
 impl World {
     pub fn demand(&self) -> Demand {
         let population = self.residents.population as i32;
-        let jobs = (self.supply.commercial_jobs + self.supply.industrial_jobs) as i32;
+        // Coal plants' jobs (ADR 0036) count as industry.
+        let industrial_jobs = self.supply.industrial_jobs
+            + self
+                .power
+                .active_plants()
+                .map(|p| self.power.plant_kind[p as usize].jobs())
+                .sum::<u32>();
+        let jobs = (self.supply.commercial_jobs + industrial_jobs) as i32;
         let room = self.residents.vacant.len() as i32 * ROOM_PER_VACANT_HOME;
         Demand {
             residential: RESIDENTIAL_BASE + jobs - population - room,
             commercial: COMMERCIAL_BASE + population * COMMERCIAL_SHARE / 100
                 - self.supply.commercial_jobs as i32,
             industrial: INDUSTRIAL_BASE + population * INDUSTRIAL_SHARE / 100
-                - self.supply.industrial_jobs as i32,
+                - industrial_jobs as i32,
         }
     }
 
@@ -92,19 +100,34 @@ impl World {
         }
     }
 
-    /// Due lots build while their use has demand; the rest wait and check again. Each new
-    /// building is registered at once, so the next lot due this tick sees its homes and jobs.
+    /// Due lots build while their use has demand and the building would be powered (ADR
+    /// 0036); the rest wait and check again. Lots under a plant or line are dropped until it
+    /// goes. Each new building is registered at once, so the next lot due this tick sees its
+    /// homes, jobs and power use.
     pub(super) fn grow_buildings(&mut self) {
         let tick = self.totals.tick;
+        let (dt, seed) = (self.cfg.dt, self.cfg.seed);
         while let Some((lot, zone)) = self.buildings.next_due(tick) {
+            if self.lot_blocked(lot) {
+                self.note_waiting(lot, false);
+                continue;
+            }
             if !self.cfg.ignore_demand && self.demand_for(zone) <= 0 {
-                self.buildings
-                    .defer(lot, zone, tick, self.cfg.dt, self.cfg.seed);
-            } else if self
-                .buildings
-                .build(lot, zone, &self.lots, &self.roads, self.cfg.seed)
-            {
+                self.note_waiting(lot, false);
+                self.buildings.defer(lot, zone, tick, dt, seed);
+                continue;
+            }
+            let Some(plan) = Buildings::plan(lot, zone, &self.lots, &self.roads, seed) else {
+                continue;
+            };
+            let demand = power_demand(plan.zone, &plan.ring, plan.height);
+            if let Some(source) = self.power_for(lot, demand) {
+                self.buildings.commit(plan);
+                self.powered_new_building(demand, lot, source);
                 self.register_buildings();
+            } else {
+                self.note_waiting(lot, true);
+                self.buildings.defer(lot, zone, tick, dt, seed);
             }
         }
     }
