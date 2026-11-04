@@ -145,7 +145,9 @@ export async function tools() {
       this.trafficView = !this.trafficView;
       return this.trafficView;
     }
-    setBuildings() {}
+    setBuildings(_data, _ids, rise) {
+      previews.push({ type: 'buildings', rise });
+    }
     listener() {
       return { x: 1, y: 2, distance: 300 };
     }
@@ -153,8 +155,8 @@ export async function tools() {
     pick(x, z) {
       return { x, z };
     }
-    setPreview(stops) {
-      previews.push({ type: 'road', stops });
+    setPreview(stops, _a, _b, roadClass) {
+      previews.push({ type: 'road', stops, roadClass });
     }
     setZoningVisible(visible) {
       previews.push({ type: 'zoningVisible', visible });
@@ -165,8 +167,8 @@ export async function tools() {
     setZoneDrag(a, b, zone) {
       zoneDrags.push({ a, b, zone });
     }
-    setZones(cells, layout) {
-      previews.push({ type: 'zones', cells, layout });
+    setZones(cells, layout, flash) {
+      previews.push({ type: 'zones', cells, layout, flash });
     }
     setBulldozePreview(segment) {
       previews.push({ type: 'bulldoze', segment });

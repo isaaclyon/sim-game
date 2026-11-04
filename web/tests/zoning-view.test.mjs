@@ -29,3 +29,23 @@ test('every zoning brush, including unzone, shows zoning; leaving the tool hides
   t.click(20, 20, 2);
   assert.equal(visible(), false, 'right-click exits zoning');
 });
+
+test("a city's first zones and buildings appear at once; later snapshots flash and rise", async () => {
+  const t = await tools();
+  const latest = (type) => t.previews.findLast((p) => p.type === type);
+  const zones = { type: 'zones', cells: new Uint8Array([1]), layout: [0, 0, 8, 1, 1] };
+  const buildings = { type: 'buildings', data: new Float32Array(), ids: new Uint32Array() };
+  t.reply(zones);
+  t.reply(buildings);
+  assert.equal(latest('zones').flash, false);
+  assert.equal(latest('buildings').rise, false);
+  t.reply(zones);
+  t.reply(buildings);
+  assert.equal(latest('zones').flash, true);
+  assert.equal(latest('buildings').rise, true);
+  t.reply({ type: 'cityReset', speed: 1 });
+  t.reply(zones);
+  t.reply(buildings);
+  assert.equal(latest('zones').flash, false, 'a loaded or new city does not flash');
+  assert.equal(latest('buildings').rise, false);
+});

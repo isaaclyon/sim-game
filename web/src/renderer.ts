@@ -12,7 +12,9 @@
 // - Ground, water, fields and trees are decoration from `scenery/`, never sim state.
 // - Flat layers share y = 0 without depth writes. Ground draws first; the zone overlay, lots,
 //   sidewalks, roads and lane paint draw in the transparent pass, after buildings and cars, in that order.
-// - Curve sampling belongs to the sim.
+// - Curve sampling belongs to the sim. Tool previews (`tool-preview.ts`) draw the sim's answers.
+// - Rising buildings, zone paint flashes and gliding markers are display-only motion, skipped
+//   when the system asks for reduced motion.
 
 import CameraControls from 'camera-controls';
 import * as THREE from 'three';
@@ -30,21 +32,17 @@ import { buildRoadMarkings } from './road-markings.ts';
 import { createSimScene } from './scene';
 import { Scenery } from './scenery/index.ts';
 import { SignalLayer } from './signal-layer.ts';
+import { ToolPreview } from './tool-preview.ts';
 import { ZoneOverlay } from './zone-overlay';
 
 CameraControls.install({ THREE });
 
 const ROAD_COLORS = ROADS.map((c) => new THREE.Color(c));
 const SIDEWALK_WIDTH = 2;
-const PREVIEW_COLOR = new THREE.Color(0x4a8bd0);
-const PREVIEW_REFUSED_COLOR = new THREE.Color(0xe5484d);
-/** Snap markers, indexed by join: new end (not drawn), existing node, split road. */
-const JOIN_COLORS = [null, new THREE.Color(0xffffff), new THREE.Color(0xf5c542)];
-/** The hover marker before a road has a start: new ends get one too, so the start is visible. */
-const JOIN_MARKER = [PREVIEW_COLOR, JOIN_COLORS[1], JOIN_COLORS[2]];
-const MARKER_PX = 10;
-/** Bright versions for the drag outline, which must stand out. */
-const ZONE_OUTLINE = [0xe5484d, 0x7bd88f, 0x2e9e4f, 0x6fb3ff, 0x2f6fd0, 0xf2c94c, 0xd9822b];
+/** Rising buildings, paint flashes and gliding markers skip their motion when asked. */
+const reducedMotion = (): boolean =>
+  globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+const seconds = () => performance.now() / 1000;
 
 export class Renderer {
   readonly renderer: THREE.WebGLRenderer;
@@ -64,9 +62,7 @@ export class Renderer {
   private readonly overlay = new ZoneOverlay();
   private readonly agents = new AgentLayer(this.scene, nightMaterial(this.lighting.night));
   private readonly signals = new SignalLayer(this.scene);
-  private readonly preview: THREE.Line;
-  private readonly markers: THREE.Points;
-  private readonly zoneDrag: THREE.LineLoop;
+  private readonly tools = new ToolPreview();
   private readonly up = new THREE.Vector3(0, 1, 0);
   private readonly look = new THREE.Vector3();
   /** Called when a mouse or touch drag pans the camera, so follow can let go. */
@@ -84,6 +80,7 @@ export class Renderer {
       this.lotScenery.group,
       this.overlay.group,
       this.buildings.group,
+      this.tools.group,
     );
 
     this.camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 1, 50000);
@@ -107,24 +104,6 @@ export class Renderer {
     this.controls.addEventListener('control', () => {
       if (this.controls.currentAction & pans) this.onUserPan?.();
     });
-
-    this.preview = new THREE.Line(
-      new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]),
-      new THREE.LineBasicMaterial({ color: PREVIEW_COLOR }),
-    );
-    this.preview.visible = false;
-    this.preview.frustumCulled = false;
-    this.scene.add(this.preview);
-    this.markers = new THREE.Points(
-      new THREE.BufferGeometry(),
-      new THREE.PointsMaterial({ size: MARKER_PX, sizeAttenuation: false, vertexColors: true }),
-    );
-    this.markers.frustumCulled = false;
-    this.scene.add(this.markers);
-    this.zoneDrag = new THREE.LineLoop(new THREE.BufferGeometry(), new THREE.LineBasicMaterial());
-    this.zoneDrag.visible = false;
-    this.zoneDrag.frustumCulled = false;
-    this.scene.add(this.zoneDrag);
 
     addEventListener('resize', () => {
       this.camera.aspect = innerWidth / innerHeight;
@@ -198,9 +177,12 @@ export class Renderer {
     return created;
   }
 
-  /** Sim-owned footprints, heights and fronts; only changed tiles are rebuilt. */
-  setBuildings(data: Float32Array, ids: Uint32Array) {
-    this.buildings.update(data, ids);
+  /**
+   * Sim-owned footprints, heights and fronts; only changed tiles are rebuilt. With `rise`, new
+   * building IDs rise from the ground; a city's first snapshot should appear at once.
+   */
+  setBuildings(data: Float32Array, ids: Uint32Array, rise = false) {
+    this.buildings.update(data, ids, rise && !reducedMotion() ? seconds() : null);
     this.lotScenery.setBuildings(data);
   }
 
@@ -296,40 +278,22 @@ export class Renderer {
    * refused: a red straight line. A single stop is where a road would start, drawn as a marker
    * even for a new end. `null` hides the preview.
    */
-  setPreview(stops: Float32Array | null, a: THREE.Vector3 | null, b: THREE.Vector3 | null) {
-    const line: THREE.Vector3[] = [];
-    const markers: number[] = [];
-    const colors: number[] = [];
-    const material = this.preview.material as THREE.LineBasicMaterial;
-    if (stops && stops.length > 0) {
-      material.color.copy(PREVIEW_COLOR);
-      for (let i = 0; i < stops.length; i += 3) {
-        line.push(new THREE.Vector3(stops[i], 0.5, stops[i + 1]));
-        const c = stops.length === 3 ? JOIN_MARKER[stops[2]] : JOIN_COLORS[stops[i + 2]];
-        if (!c) continue;
-        markers.push(stops[i], 1, stops[i + 1]);
-        colors.push(c.r, c.g, c.b);
-      }
-    } else if (stops && a && b) {
-      material.color.copy(PREVIEW_REFUSED_COLOR);
-      line.push(a.clone().setY(0.5), b.clone().setY(0.5));
-    }
-    this.preview.visible = line.length > 1;
-    this.preview.geometry.dispose();
-    this.preview.geometry = new THREE.BufferGeometry().setFromPoints(line);
-    const geom = new THREE.BufferGeometry();
-    geom.setAttribute('position', new THREE.Float32BufferAttribute(markers, 3));
-    geom.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-    this.markers.geometry.dispose();
-    this.markers.geometry = geom;
+  setPreview(
+    stops: Float32Array | null,
+    a: THREE.Vector3 | null,
+    b: THREE.Vector3 | null,
+    roadClass = 0,
+  ) {
+    this.tools.setRoad(stops, a, b, roadClass);
   }
 
   /**
    * Tints zoned ground. `cells` is one `Zone` byte per cell, row-major; `layout` is
-   * `[originX, originY, cellSize, cols, rows]` (see `zones` in protocol.ts).
+   * `[originX, originY, cellSize, cols, rows]` (see `zones` in protocol.ts). With `flash`,
+   * cells that changed since the last grid briefly glow.
    */
-  setZones(cells: Uint8Array, layout: [number, number, number, number, number]) {
-    this.overlay.setZones(cells, layout);
+  setZones(cells: Uint8Array, layout: [number, number, number, number, number], flash = false) {
+    this.overlay.setZones(cells, layout, flash && !reducedMotion() ? seconds() : null);
     this.scenery.setZones(cells, layout);
   }
 
@@ -340,26 +304,12 @@ export class Renderer {
 
   /** Outlines the rectangle the zone brush would paint from `a` to `b`; `null` hides it. */
   setZoneDrag(a: THREE.Vector3 | null, b: THREE.Vector3 | null, zone: number) {
-    this.zoneDrag.visible = !!(a && b);
-    if (!a || !b) return;
-    const corners = [a.x, a.z, b.x, a.z, b.x, b.z, a.x, b.z];
-    const points = [];
-    for (let i = 0; i < corners.length; i += 2)
-      points.push(new THREE.Vector3(corners[i], 0.5, corners[i + 1]));
-    this.zoneDrag.geometry.dispose();
-    this.zoneDrag.geometry = new THREE.BufferGeometry().setFromPoints(points);
-    (this.zoneDrag.material as THREE.LineBasicMaterial).color.set(ZONE_OUTLINE[zone] ?? 0xffffff);
+    this.tools.setZoneDrag(a, b, zone);
   }
 
   /** Outlines the block the zone brush would fill: `[x, y]` per sample, closed; empty hides it. */
   setBlockOutline(outline: Float32Array, zone: number) {
-    const points = [];
-    for (let i = 0; i < outline.length; i += 2)
-      points.push(new THREE.Vector3(outline[i], 0.5, outline[i + 1]));
-    this.zoneDrag.visible = points.length > 2;
-    this.zoneDrag.geometry.dispose();
-    this.zoneDrag.geometry = new THREE.BufferGeometry().setFromPoints(points);
-    (this.zoneDrag.material as THREE.LineBasicMaterial).color.set(ZONE_OUTLINE[zone] ?? 0xffffff);
+    this.tools.setBlockOutline(outline, zone);
   }
 
   /** Draws lot edges over the zones: `[n, x0, y0, …]` per lot (see `lots` in protocol.ts). */
@@ -371,15 +321,7 @@ export class Renderer {
 
   /** Draw the full centreline selected by the sim, in the destructive-action color. */
   setBulldozePreview(segment: Float32Array) {
-    this.setPreview(null, null, null);
-    const line: THREE.Vector3[] = [];
-    for (let i = 0; i < segment.length; i += 2) {
-      line.push(new THREE.Vector3(segment[i], 0.5, segment[i + 1]));
-    }
-    (this.preview.material as THREE.LineBasicMaterial).color.copy(PREVIEW_REFUSED_COLOR);
-    this.preview.geometry.dispose();
-    this.preview.geometry = new THREE.BufferGeometry().setFromPoints(line);
-    this.preview.visible = line.length > 1;
+    this.tools.setBulldoze(segment);
   }
 
   /** Snapshot time only: paused frames keep the same lighting. */
@@ -389,7 +331,12 @@ export class Renderer {
 
   /** Draws a frame; true if the camera moved. */
   render(): boolean {
-    const moved = this.controls.update(this.clock.getDelta());
+    const delta = this.clock.getDelta();
+    const moved = this.controls.update(delta);
+    const now = seconds();
+    this.buildings.animate(now);
+    this.overlay.animate(now);
+    this.tools.update(delta, !reducedMotion());
     this.scenery.update();
     this.lotScenery.update();
     this.lighting.update(
