@@ -59,6 +59,12 @@ What to build next and why lives in `docs/ROADMAP.md`. Work on the current miles
   at once and after every frame/edit while selected, echoing the selection counter; null after
   demolition. Capacity and occupancy are sim-owned residency/employment counts, not attendance.
   Read-only, not hashed (ADR 0029).
+- Shared cities: a `.city` file is the ADR 0033 save bytes unchanged; a link is `#city=` plus
+  base64url(raw deflate(save bytes)) in the URL fragment, refused above 1,000,000 characters
+  (`web/src/city-share.ts`, ADR 0035). Opening one replaces the local city as an independent copy.
+- Command logs: versioned text owned by `sim::replay` (ADR 0034); fixtures live in
+  `crates/sim/tests/replays/*.cmdlog`. Refresh `expect` lines only for intended gameplay changes
+  with `BLESS_REPLAYS=1 cargo test -p sim --test replay`.
 Change both sides (Rust writer, `protocol.ts` doc, `renderer.ts` reader) together.
 
 ## Checks before finishing a change

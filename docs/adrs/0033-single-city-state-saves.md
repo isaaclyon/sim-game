@@ -4,6 +4,8 @@
 - Date: 2026-11-03
 - Extends: [0003](0003-sim-and-rendering-are-separate.md) and
   [0004](0004-deterministic-fixed-timestep-sim.md)
+- Extended by: [0034](0034-command-log-replay-tests.md) (replay tests) and
+  [0035](0035-share-cities-as-forked-copies.md) (sharing)
 
 ## Context
 

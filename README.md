@@ -99,9 +99,20 @@ the game reports the error rather than silently starting over or overwriting it.
 tab saves first, an outdated tab cannot overwrite it; reload that tab before saving again.
 
 This is not a backup: clearing site data or browser eviction can remove the city. Another
-browser, profile or site address has a separate save. There is no save history, file export
-or conversion of incompatible save formats yet. Save before closing if you need the latest
-changes; tab-close saving is not guaranteed. See [ADR 0033](docs/adrs/0033-single-city-state-saves.md).
+browser, profile or site address has a separate save. **Download** keeps a copy as a `.city`
+file. There is no save history or conversion of incompatible save formats yet. Save before
+closing if you need the latest changes; tab-close saving is not guaranteed. See
+[ADR 0033](docs/adrs/0033-single-city-state-saves.md).
+
+## Sharing
+
+**Copy link** copies a link that contains the whole city; nothing is uploaded. **Download**
+saves the city as a `.city` file to send instead, which also works for cities too big for a link.
+A friend opens the link, or uses **Open file…**, and gets their own copy, paused where you
+left off. Their edits stay in their browser and never change yours. Opening a shared city
+replaces the city in that browser, so the game asks first whenever a city would be lost. A
+damaged link or file changes nothing. Both people need a build that reads the same save version.
+See [ADR 0035](docs/adrs/0035-share-cities-as-forked-copies.md).
 
 ## Inspection
 
@@ -166,7 +177,12 @@ wide, main roads twelve. Press M (or the main road button) to build main roads w
 tool. Main roads are faster, and long trips ride them in the middle (ADR 0017).
 The view preserves the simulation's right-hand traffic.
 
-Run `scripts/check.sh` for the full checks, including road geometry tests. To run just those
+Run `scripts/check.sh` for the full checks, including road geometry tests and replay
+regression tests: each `crates/sim/tests/replays/*.cmdlog` session must rebuild the same city
+([ADR 0034](docs/adrs/0034-command-log-replay-tests.md)). Record a new session in `npm run dev`
+with the city panel's **Command log** button, put it in that folder and run
+`BLESS_REPLAYS=1 cargo test -p sim --test replay` to add its expected result. Rerun the same
+command after an intended gameplay change, and review the changed `expect` lines. To run just those
 frontend tests, use `cd web && npm test`.
 
 ## Layout

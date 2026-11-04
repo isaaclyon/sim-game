@@ -15,6 +15,7 @@ pub mod junction;
 pub mod lot;
 pub mod path;
 mod poly;
+pub mod replay;
 pub mod rng;
 pub mod road;
 pub mod snap;
@@ -22,5 +23,6 @@ pub mod traffic;
 pub mod world;
 pub mod zone;
 
+pub use replay::CommandLog;
 pub use world::{Command, Config, SaveError, Stats, World};
 pub use zone::Zone;

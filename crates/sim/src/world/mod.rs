@@ -73,8 +73,8 @@ impl Default for Config {
 }
 
 /// Player actions. Everything that changes the world from outside goes through `World::apply`,
-/// so the seed plus a command log is enough to replay a session.
-#[derive(Clone, Debug)]
+/// so the seed plus a command log is enough to replay a session (`crate::replay`, ADR 0034).
+#[derive(Clone, Debug, PartialEq)]
 pub enum Command {
     SpawnAgents {
         count: u32,

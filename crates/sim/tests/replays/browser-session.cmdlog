@@ -1,0 +1,13 @@
+# Recorded in the browser (dev build, Command log button): zoning, a straight and a curved road across blocks, a bulldozed road.
+sim-game command log 1
+seed 1
+grid 60 60
+50 fill 3542.1035 3539.8206 residential-low
+50 fill 4894.831 3539.8206 commercial-low
+485 road 1630.328 2665.0237 5435.633 2528.9648 street
+486 fill 2285.746 2461.9048 industrial-low
+1300 delete 3542.1035 2596.668
+1300 curve 1658.554 5263.5835 3542.1035 6611.4937 5425.653 5263.5835 street
+1301 fill 3542.1035 5860.0117 residential-low
+end 3800
+expect hash 79297c629d2cd097 population 137 buildings 74 trips 40

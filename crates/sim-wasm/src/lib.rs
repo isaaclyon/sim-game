@@ -1,12 +1,14 @@
 //! Thin wasm-bindgen wrapper. Logic belongs in `sim`; this crate only converts types.
 
 use sim::road::RoadClass;
-use sim::{Command, Config, World, Zone};
+use sim::{Command, CommandLog, World, Zone};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
 pub struct Sim {
     world: World,
+    /// Commands since a fresh start (ADR 0034); a loaded city has no log.
+    log: Option<CommandLog>,
     buf: Vec<f32>,
 }
 
@@ -70,18 +72,32 @@ pub struct BuildingView {
     pub closing: bool,
 }
 
+impl Sim {
+    fn apply(&mut self, cmd: Command) -> bool {
+        match &mut self.log {
+            Some(log) => log.apply(&mut self.world, cmd),
+            None => self.world.apply(cmd),
+        }
+    }
+}
+
 #[wasm_bindgen]
 impl Sim {
     #[wasm_bindgen(constructor)]
     pub fn new(seed: u32, cols: u32, rows: u32) -> Sim {
-        let cfg = Config {
-            seed: seed as u64,
-            ..Config::default()
-        };
+        let log = CommandLog::new(seed as u64, cols, rows);
         Sim {
-            world: World::generate(cfg, cols, rows),
+            world: log.world(),
+            log: Some(log),
             buf: Vec::new(),
         }
+    }
+
+    /// The command log text from the fresh start to now, or undefined for a loaded city.
+    pub fn command_log(&self) -> Option<String> {
+        let mut log = self.log.clone()?;
+        log.end = self.world.tick_count();
+        Some(log.to_string())
     }
 
     /// The complete city as opaque save bytes (ADR 0033). Changes nothing.
@@ -94,6 +110,7 @@ impl Sim {
     pub fn load(bytes: &[u8]) -> Result<Sim, JsValue> {
         Ok(Sim {
             world: World::load(bytes).map_err(save_error)?,
+            log: None,
             buf: Vec::new(),
         })
     }
@@ -110,7 +127,7 @@ impl Sim {
     }
 
     pub fn spawn_agents(&mut self, count: u32) -> bool {
-        self.world.apply(Command::SpawnAgents { count })
+        self.apply(Command::SpawnAgents { count })
     }
 
     /// `class` is 0 = street, 1 = main road, 2 = alley. Unknown values build nothing.
@@ -118,7 +135,7 @@ impl Sim {
         let Some(class) = RoadClass::from_u8(class) else {
             return false;
         };
-        self.world.apply(Command::BuildRoad {
+        self.apply(Command::BuildRoad {
             ax,
             ay,
             bx,
@@ -141,7 +158,7 @@ impl Sim {
         let Some(class) = RoadClass::from_u8(class) else {
             return false;
         };
-        self.world.apply(Command::BuildCurve {
+        self.apply(Command::BuildCurve {
             ax,
             ay,
             cx,
@@ -167,7 +184,7 @@ impl Sim {
     }
 
     pub fn delete_road(&mut self, x: f32, y: f32) -> bool {
-        self.world.apply(Command::DeleteRoad { x, y })
+        self.apply(Command::DeleteRoad { x, y })
     }
 
     /// `zone` is the cell byte (ADR 0014): 0 = none, 1/2 residential, 3/4 commercial,
@@ -176,7 +193,7 @@ impl Sim {
         let Some(zone) = Zone::from_u8(zone) else {
             return false;
         };
-        self.world.apply(Command::PaintZone {
+        self.apply(Command::PaintZone {
             ax,
             ay,
             bx,
@@ -191,7 +208,7 @@ impl Sim {
         let Some(zone) = Zone::from_u8(zone) else {
             return false;
         };
-        self.world.apply(Command::FillBlock { x, y, zone })
+        self.apply(Command::FillBlock { x, y, zone })
     }
 
     /// `[x, y]` per outline sample of the block containing `(x, y)`, or empty outside every block.
