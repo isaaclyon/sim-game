@@ -2,7 +2,11 @@
 // thread only sends commands and draws snapshots.
 
 export type ToWorker =
-  | { type: 'init'; seed: number; cols: number; rows: number; agents: number }
+  /**
+   * `grid` starts on the generated `cols` × `rows` street grid (tests and benchmarks); false
+   * starts on an empty map of that size, as the game does.
+   */
+  | { type: 'init'; seed: number; cols: number; rows: number; agents: number; grid: boolean }
   | { type: 'setSpeed'; speed: number }
   /** Replace the single local save with the current sim state. */
   | { type: 'saveCity' }
@@ -35,13 +39,13 @@ export type ToWorker =
   | { type: 'previewBlock'; x: number; y: number; revision: number }
   | { type: 'previewBulldoze'; x: number; y: number; revision: number }
   /**
-   * Asks how the road being drawn would be guided and built (ADR 0036). `points` is
-   * `[x, y, snap]` per clicked point in drawing order, then the cursor: one point asks where a
-   * road would start, two a straight road, three a curve (start, control, end). `snap` is a
-   * `Snap` bitmask. `plan` false only guides the points (a curve's control point). Changes
-   * nothing; answered with `roadPreview`.
+   * Asks how a road of `class` being drawn would be guided, built and charged (ADR 0036,
+   * ADR 0037). `points` is `[x, y, snap]` per clicked point in drawing order, then the cursor:
+   * one point asks where a road would start, two a straight road, three a curve (start,
+   * control, end). `snap` is a `Snap` bitmask. `plan` false only guides the points (a curve's
+   * control point). Changes nothing; answered with `roadPreview`.
    */
-  | { type: 'previewRoad'; revision: number; points: number[]; plan: boolean }
+  | { type: 'previewRoad'; revision: number; class: RoadClass; points: number[]; plan: boolean }
   /**
    * Selects the resident who owns agent `agent` (a car or walker, an index into the `frame`
    * agents snapshot) for
@@ -63,7 +67,7 @@ export const RoadClass = {
 } as const;
 export type RoadClass = (typeof RoadClass)[keyof typeof RoadClass];
 
-/** Drawing guide flags, matching `sim::guide` (ADR 0036). Joining roads is always on. */
+/** Drawing guide flags, matching `sim::guide` (ADR 0037). Joining roads is always on. */
 export const Snap = {
   Angle: 1,
   Guides: 2,
@@ -176,6 +180,12 @@ export interface Stats {
   despawnedStuck: number;
   /** Cars removed because a road on their remaining route was split or deleted. */
   despawnedByEdit: number;
+  /** The city's money in whole dollars, from the sim (ADR 0036); negative is debt. */
+  balance: number;
+  /** Taxes from residents and filled jobs, dollars per clock hour. */
+  taxes: number;
+  /** Road upkeep, dollars per clock hour. */
+  upkeep: number;
 }
 
 /** Persistence metadata only. A commit acknowledges the captured revision, not later edits. */
@@ -213,6 +223,9 @@ export type FromWorker =
    * when planned, its end) joins a road, the unit direction along the road measured from, and
    * along the new road, both away from the junction.
    * `revision` echoes the construction stage so cancelled or previous-stage previews are discarded.
+   * `cost` is what building the guided road would charge in dollars, null when no road is
+   * planned (one point, a control point, or refused);
+   * `affordable` is false when the city cannot pay it, and building would be refused (ADR 0036).
    */
   | {
       type: 'roadPreview';
@@ -223,6 +236,8 @@ export type FromWorker =
       length: number;
       angle: number;
       revision: number;
+      cost: number | null;
+      affordable: boolean;
     }
   /**
    * The whole zone grid: one `Zone` byte per cell, row-major from the origin. `layout` is

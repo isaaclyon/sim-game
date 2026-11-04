@@ -41,9 +41,10 @@ rewriting history; mark the old one `Superseded by NNNN`.
 | [0033](0033-single-city-state-saves.md) | Save one complete city locally and resume it on return | Accepted; implemented |
 | [0034](0034-command-log-replay-tests.md) | Replay regression tests from saved command logs | Accepted; implemented |
 | [0035](0035-share-cities-as-forked-copies.md) | Share cities as files and links that open as independent copies | Accepted; implemented |
-| [0036](0036-sim-owned-drawing-guides.md) | Drawing guides are planned by the sim and travel as raw points with snap flags | Accepted |
-| [0037](0037-road-edit-history.md) | Road edit history lives in the sim and is saved with the city | Proposed |
-| [0038](0038-straight-joins.md) | Straight roads that meet end to end in a line become one road | Accepted |
+| [0036](0036-money-build-costs-taxes-upkeep.md) | Money: build costs, taxes and upkeep on an empty starting map | Accepted; implemented |
+| [0037](0037-sim-owned-drawing-guides.md) | Drawing guides are planned by the sim and travel as raw points with snap flags | Accepted |
+| [0038](0038-road-edit-history.md) | Road edit history lives in the sim and is saved with the city | Proposed |
+| [0039](0039-straight-joins.md) | Straight roads that meet end to end in a line become one road | Accepted |
 
 ADRs are only for decisions that are hard to reverse. See [AGENTS.md](AGENTS.md) for when to
 write one and how.

@@ -304,7 +304,7 @@ export async function tools({ hash = '', clipboard = true } = {}) {
     },
     { context },
   );
-  await roadTool.link(() => protocol);
+  await roadTool.link((specifier) => (specifier === './hud' ? hud : protocol));
   await module.link((specifier) =>
     specifier === './road-tool'
       ? roadTool

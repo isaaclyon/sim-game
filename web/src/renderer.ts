@@ -282,7 +282,7 @@ export class Renderer {
     this.tools.setRoad(stops, a, b, roadClass);
   }
 
-  /** Dashed drawing guides, `[x0, y0, x1, y1]` per line (ADR 0036); null hides them. */
+  /** Dashed drawing guides, `[x0, y0, x1, y1]` per line (ADR 0037); null hides them. */
   setGuides(lines: Float32Array | null) {
     this.tools.setGuides(lines);
   }

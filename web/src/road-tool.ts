@@ -1,6 +1,7 @@
-// The road and bulldoze tools: clicked points, sim-owned previews and drawing guides (ADR 0036).
+// The road and bulldoze tools: clicked points, sim-owned previews and drawing guides (ADR 0037).
 // The sim guides and plans every point; this module only keeps the clicks, asks one question at
 // a time about the latest cursor position, and draws the answers.
+import { type Quote, roadHelpText } from './hud';
 import { type FromWorker, RoadClass, Snap, type ToWorker } from './protocol';
 
 export type RoadMode = 'straight' | 'curve' | 'bulldoze' | null;
@@ -35,6 +36,9 @@ export class RoadTool {
   private refused = false;
   private nextBuildId = 0;
   private pendingBuild: number | null = null;
+  /** The sim's price for the previewed road, and for the build in flight (ADR 0036). */
+  private quote: Quote = null;
+  private pendingQuote: Quote = null;
   private snap = SNAP_ALL;
   private shift = false;
   // One sim-owned preview in flight, using only the latest cursor position.
@@ -86,6 +90,9 @@ export class RoadTool {
 
   setRoadClass(cls: RoadClass) {
     this.roadClass = cls;
+    // The price depends on the class: ask again for the same cursor.
+    this.quote = null;
+    this.roadsChanged();
     this.updateHelp();
   }
 
@@ -119,6 +126,7 @@ export class RoadTool {
     else {
       const id = ++this.nextBuildId;
       this.pendingBuild = id;
+      this.pendingQuote = this.quote;
       this.send({ type: 'buildRoad', id, points: this.points(p), class: this.roadClass });
     }
     this.refused = false;
@@ -146,9 +154,13 @@ export class RoadTool {
       if (this.pendingBuild !== msg.id) return;
       // The guided end is already on the network, so it keeps its place without snapping.
       if (msg.end) this.clicked = [{ x: msg.end[0], z: msg.end[1], snap: 0 }];
+      // A road the city could not pay for was refused for money, not for its shape.
+      const q = this.pendingQuote;
+      const unpaid = !msg.end && q?.affordable === false ? q : null;
       this.pendingBuild = null;
-      this.refused = !msg.end;
+      this.refused = !msg.end && !unpaid;
       this.invalidate();
+      this.quote = unpaid;
       this.updateHelp();
     }
   }
@@ -164,6 +176,10 @@ export class RoadTool {
     this.draw.setGuides(msg.guides);
     this.draw.setAngles(msg.angles);
     this.refused = this.planAsked && n > 1 && msg.stops.length === 0;
+    this.quote =
+      this.planAsked && n > 1 && !this.refused
+        ? { cost: msg.cost, affordable: msg.affordable }
+        : null;
     const show = this.planAsked && n > 1 && this.screen !== null;
     this.el.readout.hidden = !show;
     if (show && this.screen) {
@@ -207,13 +223,20 @@ export class RoadTool {
       return;
     }
     this.planAsked = !(this.mode === 'curve' && this.clicked.length === 1);
-    this.send({ type: 'previewRoad', revision, points: this.points(b), plan: this.planAsked });
+    this.send({
+      type: 'previewRoad',
+      revision,
+      class: this.roadClass,
+      points: this.points(b),
+      plan: this.planAsked,
+    });
   }
 
   private invalidate() {
     this.revision++;
     this.cursor = null;
     this.wanted = false;
+    this.quote = null;
     this.draw.setPreview(null, null, null);
     this.draw.setGuides(null);
     this.draw.setAngles(null);
@@ -222,17 +245,19 @@ export class RoadTool {
 
   private updateHelp() {
     const stage = !this.clicked.length
-      ? 'Click the road start.'
+      ? 'start'
       : this.mode === 'curve' && this.clicked.length === 1
-        ? 'Click the bend control point, then the road end.'
-        : 'Click the road end.';
-    this.el.help.textContent =
-      this.mode === 'bulldoze'
-        ? 'Click a highlighted road to remove it. Esc or right-click cancels.'
-        : !this.mode
-          ? ''
-          : this.pendingBuild !== null
-            ? 'Building road…'
-            : `${this.roadClass === RoadClass.Main ? 'Main road. ' : ''}${this.refused ? 'Cannot build here. Move the end away from overlaps or short joins. ' : ''}${stage} Hold Shift to place freely. Esc or right-click cancels.`;
+        ? 'control'
+        : 'end';
+    const main = this.roadClass === RoadClass.Main;
+    const building = this.pendingBuild !== null;
+    this.el.help.textContent = roadHelpText(
+      this.mode,
+      stage,
+      building,
+      main,
+      this.refused,
+      this.quote,
+    );
   }
 }

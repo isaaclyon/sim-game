@@ -23,6 +23,13 @@ Ambient sound follows the camera: quiet, brief engine sounds near moving cars an
 open land by day. Sparse traffic stays quiet; no moving cars means no traffic sound. Buildings
 never produce a static noise loop. Zooming out makes sound quieter, not louder. Sound starts
 on the first click or key press; `N` or the sound button toggles it, and the choice is remembered.
+A new city starts on an empty map with $50,000. Roads cost money to build: $10 per metre for a
+street and $25 for a main road. The road tool shows what the previewed road costs, and refuses
+a road the city cannot pay for. Every road also costs upkeep each in-game hour, and residents
+and filled jobs pay taxes. The HUD shows the balance and the hourly taxes and upkeep. Upkeep
+can push the balance into debt, which stops new roads until taxes bring it back. Bulldozing
+and zoning are free ([ADR 0036](docs/adrs/0036-money-build-costs-taxes-upkeep.md)). Saves
+from before money was added no longer open; start a New city.
 The HUD shows the sim's day clock and speed (`Day 1   06:00   1×`). The game starts on Day 1 at
 06:00, and each sim second advances the clock six seconds, so a day lasts 4 real hours at 1× and 24
 minutes at 10×. Speed changes how many sim seconds pass per real second; pausing stops the clock.

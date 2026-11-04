@@ -262,7 +262,7 @@ already plans roads: answers stay deterministic and testable, and M6 councilors 
 same builders through ordinary commands. Slices ship in this order; each is judged in the
 browser before the next starts.
 
-1. **Angle snapping and guide lines** ([ADR 0036](adrs/0036-sim-owned-drawing-guides.md)).
+1. **Angle snapping and guide lines** ([ADR 0037](adrs/0037-sim-owned-drawing-guides.md)).
    New roads snap to 15° steps (90° and 45° pull hardest) measured from the road they start
    on, or the map axes on empty land. Dashed guide lines line new ends up with nearby road
    ends, along their extensions and perpendiculars. Lengths snap to whole 8 m zone cells.
@@ -271,7 +271,7 @@ browser before the next starts.
    toggle separately; holding Shift turns all three off. Joining existing junctions and roads
    always stays on.
    Straight roads that meet end to end in a line become one road, so no hidden junction pulls
-   new roads off their angle ([ADR 0038](adrs/0038-straight-joins.md)).
+   new roads off their angle ([ADR 0039](adrs/0039-straight-joins.md)).
    Done when: a player can draw a square block and a T-junction exactly at 90° without
    zooming in, and can draw a free-angle road by holding Shift.
 2. **Continuous curves.** Each click adds a curved piece that leaves the previous piece
@@ -287,7 +287,7 @@ browser before the next starts.
 5. **Undo and redo** for road edits only, many steps, Ctrl+Z and Ctrl+Shift+Z. Undo removes the
    roads an edit added and rejoins roads it split, as a new edit with new IDs; buildings it
    cleared stay gone. History lives in the sim and is saved with the city
-   ([ADR 0037](adrs/0037-road-edit-history.md), proposed).
+   ([ADR 0038](adrs/0038-road-edit-history.md), proposed).
    Done when: building, upgrading and bulldozing can each be undone and redone, also after a
    reload, and replay tests stay exact.
 
@@ -297,7 +297,12 @@ Done when: someone used to Cities: Skylines lays out a town's roads without figh
 
 Goals and consequences, kept light so they don't crowd out building.
 
-- Money: build costs, taxes, upkeep.
+- Money: build costs, taxes, upkeep (implemented, [ADR 0036](adrs/0036-money-build-costs-taxes-upkeep.md)).
+  A fresh city starts on an empty map with $50,000. Roads cost money to build by length and
+  class and refuse to build when the city cannot pay; the road tool quotes the cost. Every road
+  costs upkeep, and residents and filled jobs pay taxes, per clock hour. Upkeep can push the
+  balance into debt, which only stops new roads. The HUD shows balance, taxes and upkeep.
+  Bulldozing, zoning and sim-built alleys are free. Tax rates are fixed for now.
 - Services with coverage areas: power, water, roads maintenance, then fire, police, health and
   schools.
 - Citizen happiness from services, traffic and pollution, feeding back into demand and growth.

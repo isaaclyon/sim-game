@@ -123,7 +123,7 @@ worker.onmessage = (e: MessageEvent<FromWorker>) => {
   }
 };
 
-send({ type: 'init', seed: 1, cols: 60, rows: 60, agents: 0 });
+send({ type: 'init', seed: 1, cols: 60, rows: 60, agents: 0, grid: false });
 
 let speed = 1;
 const speedButtons = [...document.querySelectorAll<HTMLButtonElement>('[data-speed]')];

@@ -38,6 +38,10 @@ pub struct SimStats {
     pub paths_failed: f64,
     pub despawned_stuck: f64,
     pub despawned_by_edit: f64,
+    /// Money in whole dollars (ADR 0036); taxes and upkeep are per clock hour.
+    pub balance: f64,
+    pub taxes: f64,
+    pub upkeep: f64,
 }
 
 /// One citizen's details for the inspector (ADR 0022); see `World::citizen_info`. Places are
@@ -83,9 +87,18 @@ impl Sim {
 
 #[wasm_bindgen]
 impl Sim {
+    /// A city on the generated `cols` × `rows` street grid, for tests and benchmarks.
     #[wasm_bindgen(constructor)]
     pub fn new(seed: u32, cols: u32, rows: u32) -> Sim {
-        let log = CommandLog::new(seed as u64, cols, rows);
+        Self::start(CommandLog::new(seed as u64, cols, rows))
+    }
+
+    /// A fresh city as the game starts one: no roads, on a map the size of that grid.
+    pub fn empty(seed: u32, cols: u32, rows: u32) -> Sim {
+        Self::start(CommandLog::empty(seed as u64, cols, rows))
+    }
+
+    fn start(log: CommandLog) -> Sim {
         Sim {
             world: log.world(),
             log: Some(log),
@@ -131,7 +144,7 @@ impl Sim {
     }
 
     /// Guides raw `[x, y, snap]` points and, if `plan`, previews the road through them; see
-    /// `World::write_road_draft` (ADR 0036).
+    /// `World::write_road_draft` (ADR 0037).
     pub fn road_draft(&mut self, points: &[f32], plan: bool) -> Vec<f32> {
         self.world.write_road_draft(points, plan, &mut self.buf);
         self.buf.clone()
@@ -152,6 +165,18 @@ impl Sim {
             _ => Vec::new(),
         };
         if self.apply(cmd) { end } else { Vec::new() }
+    }
+
+    /// What `build_draft` would charge in dollars (ADR 0036), or undefined if it would be
+    /// refused for its shape. Unknown classes cost nothing to quote and build nothing.
+    pub fn draft_cost(&self, points: &[f32], class: u8) -> Option<f64> {
+        let class = RoadClass::from_u8(class)?;
+        Some(self.world.draft_cost(points, class)? as f64)
+    }
+
+    /// Whether the city can pay `cost` dollars now; a city in debt can afford nothing.
+    pub fn can_afford(&self, cost: f64) -> bool {
+        self.world.can_afford(cost as i64)
     }
 
     pub fn delete_road(&mut self, x: f32, y: f32) -> bool {
@@ -302,9 +327,9 @@ impl Sim {
         self.buf.clone()
     }
 
-    /// `[min_x, min_y, max_x, max_y]`.
+    /// `[min_x, min_y, max_x, max_y]` of the map.
     pub fn bounds(&self) -> Vec<f32> {
-        self.world.roads.bounds().to_vec()
+        self.world.bounds().to_vec()
     }
 
     pub fn stats(&self) -> SimStats {
@@ -331,6 +356,9 @@ impl Sim {
             paths_failed: s.paths_failed as f64,
             despawned_stuck: s.despawned_stuck as f64,
             despawned_by_edit: s.despawned_by_edit as f64,
+            balance: s.money.balance as f64,
+            taxes: s.money.taxes as f64,
+            upkeep: s.money.upkeep as f64,
         }
     }
 }

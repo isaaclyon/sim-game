@@ -119,7 +119,7 @@ impl World {
         );
     }
 
-    /// Guides raw `[x, y, snap]` points (ADR 0036) and writes `[n, m, length, angle, k]`, then
+    /// Guides raw `[x, y, snap]` points (ADR 0037) and writes `[n, m, length, angle, k]`, then
     /// `[x, y]` per guided point, `[x0, y0, x1, y1]` per guide line, `[x, y, rx, ry, dx, dy]` per
     /// angle mark (`guide::Mark`; the start's, then, if `plan`, the end's), then, if `plan`, the
     /// road preview of the guided points: one stop for one point (where a road would start), as
@@ -234,6 +234,8 @@ impl World {
         self.hash_residents(&mut mix);
         self.hash_closures(&mut mix);
         mix(self.rng.state());
+        mix(self.treasury.balance as u64);
+        mix(self.treasury.carry as u64);
         for entry in self.wake.clone().into_sorted_vec() {
             mix(entry.0.0);
             mix(entry.0.1 as u64);

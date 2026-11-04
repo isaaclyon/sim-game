@@ -223,7 +223,7 @@ impl Junctions {
         }
     }
 
-    /// Keep reservations on a road joined into another (ADR 0038) attached to the lanes that
+    /// Keep reservations on a road joined into another (ADR 0039) attached to the lanes that
     /// now run where its lanes did.
     pub(crate) fn remap_lanes(&mut self, map: &[(LaneId, LaneId)]) {
         let to = |l: LaneId| map.iter().find(|m| m.0 == l).map_or(l, |m| m.1);

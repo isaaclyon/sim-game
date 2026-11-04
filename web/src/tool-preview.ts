@@ -16,7 +16,7 @@ const ZONE_OUTLINE = [0xe5484d, 0x7bd88f, 0x2e9e4f, 0x6fb3ff, 0x2f6fd0, 0xf2c94c
 /** Markers close this share of the remaining distance in 1/`GLIDE_RATE` seconds (about 63 %). */
 const GLIDE_RATE = 30;
 const GUIDE_COLOR = 0xc9d4df;
-/** Angle marks (ADR 0036): an arc this far from the junction, or a square this wide at 90°. */
+/** Angle marks (ADR 0037): an arc this far from the junction, or a square this wide at 90°. */
 const ARC_M = 14;
 const SQUARE_M = 9;
 const ARC_STEPS = 24;

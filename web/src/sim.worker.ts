@@ -121,6 +121,9 @@ function readStats(s: Sim): Stats {
     pathsFailed: st.paths_failed,
     despawnedStuck: st.despawned_stuck,
     despawnedByEdit: st.despawned_by_edit,
+    balance: st.balance,
+    taxes: st.taxes,
+    upkeep: st.upkeep,
   };
   st.free();
   return out;
@@ -293,7 +296,7 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
     }
     case 'previewRoad': {
       // `[n, m, length, angle, k]`, guided points, guide lines, angle marks, then stops
-      // (ADR 0036).
+      // (ADR 0037).
       const d = sim?.road_draft(new Float32Array(msg.points), msg.plan) ?? new Float32Array(5);
       const [n, m, length, angle, k] = d;
       const at = 5 + 2 * n;
@@ -301,16 +304,15 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
       const guides = d.slice(at, at + 4 * m);
       const angles = d.slice(at + 4 * m, at + 4 * m + 6 * k);
       const stops = d.slice(at + 4 * m + 6 * k);
+      // What the guided road would charge (ADR 0036); nothing when no road is planned.
+      const raw = new Float32Array(msg.points);
+      const cost = msg.plan && stops.length > 0 ? (sim?.draft_cost(raw, msg.class) ?? null) : null;
+      const affordable = cost !== null && !!sim?.can_afford(cost);
       post(
         {
           type: 'roadPreview',
-          revision: msg.revision,
-          stops,
-          points,
-          guides,
-          angles,
-          length,
-          angle,
+          ...{ revision: msg.revision, stops, points, guides, angles, length, angle },
+          ...{ cost, affordable },
         },
         [stops.buffer, points.buffer, guides.buffer, angles.buffer],
       );

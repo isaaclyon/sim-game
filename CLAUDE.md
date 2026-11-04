@@ -31,14 +31,16 @@ What to build next and why lives in `docs/ROADMAP.md`. Work on the current miles
   1 = green, 2 = protected-left green.
 - Road drafts: `previewRoad` and `buildRoad` send raw `[x, y, snap]` points (start, a curve's
   control, end); snap bits 1 = angle, 2 = guide lines, 4 = length. The sim guides them
-  (ADR 0036) and builds with the guided coordinates, so command logs record final positions.
+  (ADR 0037) and builds with the guided coordinates, so command logs record final positions.
   The preview answer has `points` (`[x, y]` per guided point), `guides` (`[x0, y0, x1, y1]` per
   guide line), `length`, `angle` (NaN = none), `angles` (`[x, y, rx, ry, dx, dy]` per junction
   the road joins: the point, then unit directions along the road measured from and the new
   road; the end's only when planned) and `stops`: `[x, y, join]` per sample of the road
   it would build, join -1 = interior curve sample (no marker), 0 = new end, 1 = existing node,
   2 = splits a road; empty = refused or not planned. One point previews where a road would
-  start. Echoes the request revision so outdated previews can be discarded. Changes nothing.
+  start. Echoes the request revision so outdated previews can be discarded. Also carries `cost`
+  (dollars the guided road would charge, null when nothing is planned) and `affordable`
+  (false = the build would be refused for money; ADR 0036). Changes nothing.
   `buildResult` carries the guided `end`, null if refused.
 - Zones: one byte per zone cell, row-major, plus layout `[origin_x, origin_y, cell_size, cols,
   rows]`; byte 0 = none, 1/2 = residential low/high, 3/4 commercial, 5/6 industrial (ADR 0014).
@@ -68,7 +70,11 @@ What to build next and why lives in `docs/ROADMAP.md`. Work on the current miles
 - Shared cities: a `.city` file is the ADR 0033 save bytes unchanged; a link is `#city=` plus
   base64url(raw deflate(save bytes)) in the URL fragment, refused above 1,000,000 characters
   (`web/src/city-share.ts`, ADR 0035). Opening one replaces the local city as an independent copy.
-- Command logs: versioned text owned by `sim::replay` (ADR 0034); fixtures live in
+- Money: the sim owns the balance, build costs, taxes and upkeep (ADR 0036); frames carry
+  `balance`, `taxes` and `upkeep` (dollars, rates per clock hour). A fresh game city is an
+  empty map (`World::empty`); the generated grid is for tests and benchmarks.
+- Command logs: versioned text owned by `sim::replay` (ADR 0034); the third line is `map` (empty
+  map, as the game starts) or `grid` (generated streets); fixtures live in
   `crates/sim/tests/replays/*.cmdlog`. Refresh `expect` lines only for intended gameplay changes
   with `BLESS_REPLAYS=1 cargo test -p sim --test replay`.
 Change both sides (Rust writer, `protocol.ts` doc, `renderer.ts` reader) together.
