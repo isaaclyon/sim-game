@@ -9,7 +9,7 @@ import type { Style } from './style.ts';
 
 const TILE = 256;
 /** How long a new building takes to rise, in seconds. */
-export const RISE_SECONDS = 4.8;
+export const RISE_SECONDS = 9.6;
 /** Fresh concrete and render, blended out as the building tops out. */
 const UNFINISHED = new THREE.Color(0xe6dccb);
 

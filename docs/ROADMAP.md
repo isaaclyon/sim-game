@@ -129,7 +129,7 @@ The point where the toy starts to look like a place.
 - Ambient sound (implemented): soft engine pass-bys near moving cars and daytime birds.
   No continuous traffic or building-noise loops. Sparse traffic stays quiet, stopped/hidden
   cars are silent, and zooming out only reduces volume rather than collecting more sources.
-- Juice (implemented): new buildings take 4.8 seconds to build: scaffolding (steel
+- Juice (implemented): new buildings take 9.6 seconds to build: scaffolding (steel
   standards, timber decks, rails and a brace) goes up, the building climbs inside it in pale,
   unfinished materials with dark windows, then the scaffolding comes down; freshly painted zone cells flash a lighter shade and fade;
   road and bulldoze previews are translucent road-wide ribbons and snap markers glide between
