@@ -57,6 +57,9 @@ let frameGap = 100;
 let stats: Stats | undefined;
 let tickMs = 0;
 let roadsSeen = false;
+// A city's first zones and buildings appear at once; later changes flash and rise.
+let zonesSeen = false;
+let buildingsSeen = false;
 
 worker.onmessage = (e: MessageEvent<FromWorker>) => {
   const msg = e.data;
@@ -71,7 +74,7 @@ worker.onmessage = (e: MessageEvent<FromWorker>) => {
     blockInFlight = previewInFlight = false;
     prev = curr = undefined;
     stats = undefined;
-    roadsSeen = false;
+    roadsSeen = zonesSeen = buildingsSeen = false;
     frameGap = 100;
     setSpeed(msg.speed);
   } else if (msg.type === 'roads') {
@@ -92,7 +95,7 @@ worker.onmessage = (e: MessageEvent<FromWorker>) => {
     previewInFlight = false;
     if (msg.revision === previewRevision && previewEnd) {
       if (msg.type === 'roadPreview' && roadTool) {
-        renderer.setPreview(msg.stops, roadStart, previewRequestedEnd);
+        renderer.setPreview(msg.stops, roadStart, previewRequestedEnd, roadClass);
         refused = roadStart !== null && msg.stops.length === 0;
         updateRoadHelp();
       }
@@ -110,11 +113,13 @@ worker.onmessage = (e: MessageEvent<FromWorker>) => {
     invalidatePreview();
     updateRoadHelp();
   } else if (msg.type === 'zones') {
-    renderer.setZones(msg.cells, msg.layout);
+    renderer.setZones(msg.cells, msg.layout, zonesSeen);
+    zonesSeen = true;
   } else if (msg.type === 'lots') {
     renderer.setLots(msg.rings);
   } else if (msg.type === 'buildings') {
-    renderer.setBuildings(msg.data, msg.ids);
+    renderer.setBuildings(msg.data, msg.ids, buildingsSeen);
+    buildingsSeen = true;
     sound.setBuildings(msg.data);
   } else if (msg.type === 'citizen') {
     inspector.receive(msg.selection, msg.citizen);

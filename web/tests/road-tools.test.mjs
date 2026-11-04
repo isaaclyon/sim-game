@@ -258,3 +258,13 @@ test('M builds main roads with either road tool until switched off', async () =>
   t.click(100, 0);
   assert.equal(t.messages.at(-1).class, RoadClass.Street);
 });
+
+test('road previews are drawn at the width of the chosen road class', async () => {
+  const t = await tools();
+  t.key('m');
+  t.move(10, 20);
+  const ask = t.messages.at(-1);
+  assert.equal(ask.type, 'previewSnap');
+  t.reply({ type: 'roadPreview', revision: ask.revision, stops: new Float32Array([10, 20, 0]) });
+  assert.equal(t.previews.at(-1).roadClass, RoadClass.Main);
+});
