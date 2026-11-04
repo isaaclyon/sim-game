@@ -10,7 +10,8 @@ use crate::road::RoadId;
 use crate::zone::{Zone, ZoneGrid};
 use serde::{Deserialize, Serialize};
 
-/// A recut lot whose outline points all lie this close to an old lot's keeps its id, metres.
+/// A recut lot whose front and outline points all lie this close to an old lot's keeps its id,
+/// metres.
 const SAME_OUTLINE: f32 = 0.01;
 
 pub type LotId = u32;
@@ -101,19 +102,21 @@ impl Lots {
         self.block[lot as usize] = block;
     }
 
-    /// The active lot identical to `plan`, if any: same road, front point and cells, and an
+    /// The active lot identical to `plan`, if any: same road and cells, and a front point and
     /// outline the same to within `SAME_OUTLINE`.
     pub(crate) fn matching(&self, plan: &LotPlan) -> Option<LotId> {
         let lot = self.owner(*plan.cells.first()?)?;
         let l = lot as usize;
         let old = self.outline(lot);
+        let same = |a: Point, b: Point| {
+            (a.0 - b.0).abs() <= SAME_OUTLINE && (a.1 - b.1).abs() <= SAME_OUTLINE
+        };
+        // The front is measured along the road, so a joined road (ADR 0038) moves it by rounding.
         (self.road[l] == plan.road
-            && (self.front_x[l], self.front_y[l]) == plan.front
+            && same((self.front_x[l], self.front_y[l]), plan.front)
             && self.cells(lot) == plan.cells
             && old.len() == plan.outline.len()
-            && old.iter().zip(&plan.outline).all(|(a, b)| {
-                (a.0 - b.0).abs() <= SAME_OUTLINE && (a.1 - b.1).abs() <= SAME_OUTLINE
-            }))
+            && old.iter().zip(&plan.outline).all(|(&a, &b)| same(a, b)))
         .then_some(lot)
     }
 

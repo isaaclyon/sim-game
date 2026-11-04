@@ -254,6 +254,45 @@ confirmed New city.
   in-flight old save; the new city saves immediately, or clearly reports a storage failure.
   Repeated replacement leaves one clock loop and no stale geometry or inspector selection.
 
+## M4.5 – A great road tool
+
+Building is the core fantasy, and M5's build costs will reward precise tools, so the road tool
+gets a Cities: Skylines 2–level pass first. The sim plans every snap, grid and undo, as it
+already plans roads: answers stay deterministic and testable, and M6 councilors can reuse the
+same builders through ordinary commands. Slices ship in this order; each is judged in the
+browser before the next starts.
+
+1. **Angle snapping and guide lines** ([ADR 0036](adrs/0036-sim-owned-drawing-guides.md)).
+   New roads snap to 15° steps (90° and 45° pull hardest) measured from the road they start
+   on, or the map axes on empty land. Dashed guide lines line new ends up with nearby road
+   ends, along their extensions and perpendiculars. Lengths snap to whole 8 m zone cells.
+   Length and angle show beside the cursor while drawing. Where the road joins a road, the
+   map shows the angle as an arc, or a square at 90°. Angle, guide and length snapping
+   toggle separately; holding Shift turns all three off. Joining existing junctions and roads
+   always stays on.
+   Straight roads that meet end to end in a line become one road, so no hidden junction pulls
+   new roads off their angle ([ADR 0038](adrs/0038-straight-joins.md)).
+   Done when: a player can draw a square block and a T-junction exactly at 90° without
+   zooming in, and can draw a free-angle road by holding Shift.
+2. **Continuous curves.** Each click adds a curved piece that leaves the previous piece
+   tangentially, so a long winding road is a chain of clicks. Freehand drag is not planned.
+   Done when: a winding road of five pieces has no visible kinks.
+3. **Grid tool.** Pick a cell size (60, 80 or 100 m), drag the first edge to set the angle,
+   then drag out the area in whole blocks. Each grid line is planned like a hand-drawn road:
+   it joins and splits existing roads, and lines that would overlap are left out. The preview
+   shows exactly what will be built. **ADR** for the grid command.
+   Done when: a grid dragged across the edge of a town connects into it with no slivers.
+4. **Upgrade.** Click a road or drag along connected roads to switch between street and main
+   road; alleys can become streets. Cars reroute rather than despawn.
+5. **Undo and redo** for road edits only, many steps, Ctrl+Z and Ctrl+Shift+Z. Undo removes the
+   roads an edit added and rejoins roads it split, as a new edit with new IDs; buildings it
+   cleared stay gone. History lives in the sim and is saved with the city
+   ([ADR 0037](adrs/0037-road-edit-history.md), proposed).
+   Done when: building, upgrading and bulldozing can each be undone and redone, also after a
+   reload, and replay tests stay exact.
+
+Done when: someone used to Cities: Skylines lays out a town's roads without fighting the tool.
+
 ## M5 – A game loop
 
 Goals and consequences, kept light so they don't crowd out building.

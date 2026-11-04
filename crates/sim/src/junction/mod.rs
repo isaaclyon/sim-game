@@ -223,6 +223,18 @@ impl Junctions {
         }
     }
 
+    /// Keep reservations on a road joined into another (ADR 0038) attached to the lanes that
+    /// now run where its lanes did.
+    pub(crate) fn remap_lanes(&mut self, map: &[(LaneId, LaneId)]) {
+        let to = |l: LaneId| map.iter().find(|m| m.0 == l).map_or(l, |m| m.1);
+        for crossings in &mut self.crossings {
+            for c in crossings {
+                c.from = to(c.from);
+                c.to = to(c.to);
+            }
+        }
+    }
+
     /// Angle around the node at which `lane` arrives (pointing back along its road).
     fn arrive_angle(&self, lane: LaneId) -> f32 {
         self.arrive[lane as usize]

@@ -99,7 +99,7 @@ test('worker publishes growing buildings and paused road edits, but no unchanged
   advance(1000);
   assert.equal(buildings().length, count);
   await send({ type: 'setSpeed', speed: 0 });
-  await send({ type: 'buildRoad', ax: 0, ay: 60, bx: 120, by: 60, class: 0, id: 1 });
+  await send({ type: 'buildRoad', points: [0, 60, 0, 120, 60, 0], class: 0, id: 1 });
   assert.notDeepEqual(
     buildings().at(-1).data,
     grown.data,

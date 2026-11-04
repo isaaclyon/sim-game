@@ -252,19 +252,15 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
     case 'spawn':
       if (cities.ready && sim?.spawn_agents(msg.count)) cities.changed();
       break;
-    case 'buildRoad':
-    case 'buildCurve': {
-      const success =
-        sim && cities.ready
-          ? msg.type === 'buildCurve'
-            ? sim.build_curve(msg.ax, msg.ay, msg.cx, msg.cy, msg.bx, msg.by, msg.class)
-            : sim.build_road(msg.ax, msg.ay, msg.bx, msg.by, msg.class)
-          : false;
-      if (success && sim) {
+    case 'buildRoad': {
+      const built =
+        sim && cities.ready ? sim.build_draft(new Float32Array(msg.points), msg.class) : null;
+      const end: [number, number] | null = built?.length === 2 ? [built[0], built[1]] : null;
+      if (end && sim) {
         cities.changed();
         sendEdits(sim);
       }
-      post({ type: 'buildResult', id: msg.id, success });
+      post({ type: 'buildResult', id: msg.id, success: end !== null, end });
       break;
     }
     case 'deleteRoad':
@@ -295,14 +291,29 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
       post({ type: 'bulldozePreview', segment, revision: msg.revision }, [segment.buffer]);
       break;
     }
-    case 'previewRoad':
-    case 'previewCurve': {
-      const stops = sim
-        ? msg.type === 'previewCurve'
-          ? sim.curve_preview(msg.ax, msg.ay, msg.cx, msg.cy, msg.bx, msg.by)
-          : sim.road_preview(msg.ax, msg.ay, msg.bx, msg.by)
-        : new Float32Array();
-      post({ type: 'roadPreview', revision: msg.revision, stops }, [stops.buffer]);
+    case 'previewRoad': {
+      // `[n, m, length, angle, k]`, guided points, guide lines, angle marks, then stops
+      // (ADR 0036).
+      const d = sim?.road_draft(new Float32Array(msg.points), msg.plan) ?? new Float32Array(5);
+      const [n, m, length, angle, k] = d;
+      const at = 5 + 2 * n;
+      const points = d.slice(5, at);
+      const guides = d.slice(at, at + 4 * m);
+      const angles = d.slice(at + 4 * m, at + 4 * m + 6 * k);
+      const stops = d.slice(at + 4 * m + 6 * k);
+      post(
+        {
+          type: 'roadPreview',
+          revision: msg.revision,
+          stops,
+          points,
+          guides,
+          angles,
+          length,
+          angle,
+        },
+        [stops.buffer, points.buffer, guides.buffer, angles.buffer],
+      );
       break;
     }
     case 'inspect': {
@@ -326,11 +337,6 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
               id: msg.building,
             };
       if (sim) sendBuilding(sim);
-      break;
-    }
-    case 'previewSnap': {
-      const stops = sim?.snap_preview(msg.x, msg.y) ?? new Float32Array();
-      post({ type: 'roadPreview', stops, revision: msg.revision }, [stops.buffer]);
       break;
     }
   }

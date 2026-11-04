@@ -44,14 +44,18 @@ fn deep_blocks_get_an_alley_that_cars_can_use_and_players_can_bulldoze() {
 
     // Bulldozing the alley sticks; zoning the interior again brings one back.
     assert!(w.apply(Command::DeleteRoad { x: 200.0, y: 100.0 }));
-    assert_eq!(w.roads.road_count(), roads + 2);
+    assert_eq!(
+        w.roads.road_count(),
+        roads,
+        "the short sides it split join again (ADR 0038)"
+    );
     check_lots(&w);
     assert!(
         !fill(&mut w, 200.0, 100.0, Zone::ResidentialLow),
         "already zoned"
     );
     assert!(fill(&mut w, 200.0, 100.0, Zone::ResidentialHigh));
-    assert!(w.roads.road_count() > roads + 2, "an alley came back");
+    assert!(w.roads.road_count() > roads, "an alley came back");
     check_lots(&w);
 }
 

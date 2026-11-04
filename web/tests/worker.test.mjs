@@ -19,6 +19,11 @@ test('normal worker frames report residents separately from cars', async () => {
   assert.ok(frame().stats.demand.residential < residential, 'residents fill housing demand');
 });
 
+// Snap flags 0 keep the drawn points exactly where they are (ADR 0036).
+const BUILDS = {
+  buildRoad: [-100, 50, 0, 350, 50, 0],
+  buildCurve: [-100, 50, 0, 125, 80, 0, 350, 50, 0],
+};
 for (const type of ['buildRoad', 'buildCurve', 'deleteRoad']) {
   test(`${type} publishes reduced population and unemployment immediately when occupied homes are cut while paused`, async () => {
     const w = await worker(0);
@@ -31,19 +36,11 @@ for (const type of ['buildRoad', 'buildCurve', 'deleteRoad']) {
     assert.ok(before.stats.population > 0);
     const frames = w.messages.filter((msg) => msg.type === 'frame').length;
     const roads = w.messages.findLast((msg) => msg.type === 'roads').segments;
-    await w.send({
-      type,
-      x: (roads[0] + roads[2]) / 2,
-      y: (roads[1] + roads[3]) / 2,
-      ax: -100,
-      ay: 50,
-      cx: 125,
-      cy: 80,
-      bx: 350,
-      by: 50,
-      class: 0,
-      id: 99,
-    });
+    await w.send(
+      type === 'deleteRoad'
+        ? { type, x: (roads[0] + roads[2]) / 2, y: (roads[1] + roads[3]) / 2 }
+        : { type: 'buildRoad', points: BUILDS[type], class: 0, id: 99 },
+    );
     if (type !== 'deleteRoad')
       assert.equal(w.messages.findLast((m) => m.type === 'buildResult').success, true);
     assert.equal(w.messages.filter((msg) => msg.type === 'frame').length, frames + 1);
@@ -68,16 +65,19 @@ test('curve preview, build and bulldoze agree across the worker boundary while p
   await w.init;
   await w.send({ type: 'setSpeed', speed: 0 });
   const before = w.messages.find((msg) => msg.type === 'roads').segments;
-  const coords = { ax: -1000, ay: -1000, cx: -900, cy: -900, bx: -800, by: -1000 };
-  await w.send({ type: 'previewCurve', ...coords, revision: 10 });
+  const points = [-1000, -1000, 0, -900, -900, 0, -800, -1000, 0];
+  await w.send({ type: 'previewRoad', points, plan: true, revision: 10 });
   const preview = w.messages.at(-1);
   assert.equal(preview.revision, 10);
   assert.ok(preview.stops.length > 6);
-  await w.send({ type: 'buildCurve', ...coords, class: 0, id: 20 });
+  assert.deepEqual([...preview.points], [-1000, -1000, -900, -900, -800, -1000]);
+  assert.equal(preview.guides.length, 0, 'no snapping asked for');
+  await w.send({ type: 'buildRoad', points, class: 0, id: 20 });
   const result = w.messages.at(-1);
   assert.equal(result.type, 'buildResult');
   assert.equal(result.id, 20);
   assert.equal(result.success, true);
+  assert.deepEqual([...result.end], [-800, -1000]);
   const added = w.messages.findLast((msg) => msg.type === 'roads').segments.slice(before.length);
   assert.equal(added.length / 5, preview.stops.length / 3 - 1);
   await w.send({ type: 'previewBulldoze', x: -900, y: -950, revision: 11 });
@@ -94,23 +94,57 @@ test('curve preview, build and bulldoze agree across the worker boundary while p
   assert.deepEqual(w.messages.at(-2).segments, before);
   assert.equal(w.messages.at(-1).type, 'frame');
   assert.equal(w.messages.at(-1).stats.tick, 0);
-  await w.send({ type: 'buildCurve', ...coords, class: 0, id: 21 });
+  await w.send({ type: 'buildRoad', points, class: 0, id: 21 });
   assert.equal(w.messages.at(-1).success, true, 'a deleted curve does not block rebuilding');
   assert.deepEqual(
     w.messages.findLast((msg) => msg.type === 'roads').segments.slice(before.length),
     added,
   );
   const count = w.messages.length;
-  await w.send({ type: 'buildCurve', ...coords, class: 0, id: 22 });
+  await w.send({ type: 'buildRoad', points, class: 0, id: 22 });
   assert.equal(w.messages.length, count + 1, 'refused builds do not publish a changed network');
   assert.equal(w.messages.at(-1).id, 22);
   assert.equal(w.messages.at(-1).success, false);
+  assert.equal(w.messages.at(-1).end, null);
+});
+
+test('previews and builds guide points the same way across the worker boundary', async () => {
+  const w = await worker(0);
+  w.ready();
+  await w.init;
+  await w.send({ type: 'setSpeed', speed: 0 });
+  // Leaving a road's end nearly square to it, all snapping on: 90° and a whole 8 m cell.
+  const all = 7;
+  await w.send({ type: 'buildRoad', points: [-1000, -1000, 0, -900, -1000, 0], class: 0, id: 1 });
+  const points = [-900, -1000, all, -897, -939, all];
+  await w.send({ type: 'previewRoad', points, plan: true, revision: 3 });
+  const preview = w.messages.at(-1);
+  assert.deepEqual([...preview.points], [-900, -1000, -900, -936]);
+  assert.equal(preview.guides.length, 4, 'one guide line');
+  assert.equal(preview.length, 64);
+  assert.equal(Math.round(preview.angle), 90);
+  // One angle mark, at the start: the end joins nothing. Square to the road it leaves.
+  assert.deepEqual(
+    [...preview.angles].map((v) => Math.round(v) + 0),
+    [-900, -1000, -1, 0, 0, 1],
+  );
+  assert.deepEqual([...preview.stops.slice(-3, -1)], [-900, -936]);
+  await w.send({ type: 'buildRoad', points, class: 0, id: 2 });
+  assert.deepEqual([...w.messages.at(-1).end], [-900, -936]);
+  // A curve's control point is only guided, not planned.
+  await w.send({ type: 'previewRoad', points, plan: false, revision: 4 });
+  assert.equal(w.messages.at(-1).stops.length, 0);
+  assert.equal(w.messages.at(-1).angles.length, 6, 'the start mark, but none at the control point');
 });
 
 test('every preview request gets a reply even during WASM initialization', async () => {
   const w = await worker();
-  for (const type of ['previewBulldoze', 'previewSnap', 'previewRoad', 'previewCurve']) {
-    await w.send({ type, x: 0, y: 0, ax: 0, ay: 0, bx: 100, by: 0, revision: 7 });
+  for (const points of [null, [0, 0, 7], [0, 0, 7, 100, 0, 7], [0, 0, 7, 50, 50, 7, 100, 0, 7]]) {
+    await w.send(
+      points
+        ? { type: 'previewRoad', points, plan: true, revision: 7 }
+        : { type: 'previewBulldoze', x: 0, y: 0, revision: 7 },
+    );
     assert.equal(w.messages.at(-1)?.revision, 7);
     const reply = w.messages.pop();
     assert.equal((reply.segment ?? reply.stops).length, 0);

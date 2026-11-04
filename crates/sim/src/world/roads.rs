@@ -1,13 +1,49 @@
 //! Road editing: building, splitting and bulldozing roads.
 
-use super::World;
 use super::zoning::Scope;
+use super::{Command, World};
 use crate::block::{self, Rect};
 use crate::geometry::Shape;
+use crate::guide;
 use crate::road::{NodeId, RoadClass, RoadId};
 use crate::snap::{self, Join};
 
 impl World {
+    /// Guides raw `[x, y, snap]` points (ADR 0036). Extra trailing floats are ignored.
+    pub(super) fn draft(&self, raw: &[f32]) -> guide::Draft {
+        let points: Vec<_> = raw
+            .as_chunks::<3>()
+            .0
+            .iter()
+            .map(|p| (p[0], p[1], p[2] as u8))
+            .collect();
+        guide::draft(&self.roads, &points)
+    }
+
+    /// The command that builds the road through guided raw points: two for a straight road,
+    /// three for a curve (start, control, end). None for any other count.
+    pub fn draft_command(&self, raw: &[f32], class: RoadClass) -> Option<Command> {
+        match self.draft(raw).points[..] {
+            [(ax, ay), (bx, by)] => Some(Command::BuildRoad {
+                ax,
+                ay,
+                bx,
+                by,
+                class,
+            }),
+            [(ax, ay), (cx, cy), (bx, by)] => Some(Command::BuildCurve {
+                ax,
+                ay,
+                cx,
+                cy,
+                bx,
+                by,
+                class,
+            }),
+            _ => None,
+        }
+    }
+
     /// Builds a road of `class` along `snap::plan`: joining nodes near its ends, and splitting
     /// the roads it crosses or ends beside so they meet at a junction.
     pub(super) fn build_road(&mut self, shape: Shape, class: RoadClass) -> bool {
@@ -15,6 +51,7 @@ impl World {
         let Some(rect) = self.add_road(shape, class, &mut split) else {
             return false;
         };
+        split.extend(self.join_straight_roads());
         self.sync_roads();
         self.remove_cars_using(&split);
         self.update_lots(Scope::Near(rect), true);
@@ -60,9 +97,30 @@ impl World {
             return false;
         };
         self.roads.remove_road(road);
-        self.remove_cars_using(&[road]);
+        let mut changed = self.join_straight_roads();
+        changed.push(road);
+        self.remove_cars_using(&changed);
         self.sync_roads();
         self.update_lots(Scope::Near(block::shape_rect(self.roads.shape(road))), true);
         true
+    }
+
+    /// Joins every pair of straight roads meeting end to end in a line (ADR 0038). Their lots
+    /// move to the kept road. Returns the roads changed, whose cars the caller removes.
+    fn join_straight_roads(&mut self) -> Vec<RoadId> {
+        let mut changed = Vec::new();
+        for n in self.roads.two_road_nodes() {
+            let Some(j) = self.roads.join_straight(n) else {
+                continue;
+            };
+            self.junctions.remap_lanes(&j.lanes);
+            for road in &mut self.lots.road {
+                if *road == j.removed {
+                    *road = j.kept;
+                }
+            }
+            changed.extend([j.kept, j.removed]);
+        }
+        changed
     }
 }

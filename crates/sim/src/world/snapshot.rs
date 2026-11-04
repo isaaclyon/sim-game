@@ -119,6 +119,43 @@ impl World {
         );
     }
 
+    /// Guides raw `[x, y, snap]` points (ADR 0036) and writes `[n, m, length, angle, k]`, then
+    /// `[x, y]` per guided point, `[x0, y0, x1, y1]` per guide line, `[x, y, rx, ry, dx, dy]` per
+    /// angle mark (`guide::Mark`; the start's, then, if `plan`, the end's), then, if `plan`, the
+    /// road preview of the guided points: one stop for one point (where a road would start), as
+    /// `write_road_preview` for two, `write_curve_preview` for three. Changes nothing.
+    pub fn write_road_draft(&self, raw: &[f32], plan: bool, out: &mut Vec<f32>) {
+        out.clear();
+        let d = self.draft(raw);
+        // Without `plan` the last point is a curve's control point, which joins nothing.
+        let marks: Vec<_> = d
+            .start_mark
+            .into_iter()
+            .chain(d.end_mark.filter(|_| plan))
+            .collect();
+        out.extend([
+            d.points.len() as f32,
+            d.lines.len() as f32,
+            d.length,
+            d.angle,
+            marks.len() as f32,
+        ]);
+        out.extend(d.points.iter().flat_map(|p| [p.0, p.1]));
+        out.extend(d.lines.iter().flatten());
+        out.extend(marks.iter().flatten());
+        if !plan {
+            return;
+        }
+        let mut stops = Vec::new();
+        match d.points[..] {
+            [p] => self.write_snap_preview(p.0, p.1, &mut stops),
+            [a, b] => self.write_road_preview(a.0, a.1, b.0, b.1, &mut stops),
+            [a, c, b] => self.write_curve_preview(a.0, a.1, c.0, c.1, b.0, b.1, &mut stops),
+            _ => {}
+        }
+        out.extend(stops);
+    }
+
     fn write_build_preview(&self, shape: Shape, out: &mut Vec<f32>) {
         out.clear();
         let Some(plan) = snap::plan(&self.roads, shape) else {

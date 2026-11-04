@@ -11,6 +11,7 @@ mod check;
 pub mod citizen;
 pub mod clock;
 mod geometry;
+pub mod guide;
 pub mod junction;
 pub mod lot;
 pub mod path;

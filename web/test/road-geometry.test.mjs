@@ -82,16 +82,16 @@ test('bends, T-junctions and crossings get a gap-free pad only at the shared end
   }
 });
 
+/** Builds through unsnapped `[x, y]` points; the guided end's length, 0 if refused. */
+const build = (sim, xy, cls = 0) =>
+  sim.build_draft(new Float32Array(xy.flatMap((v, i) => (i % 2 ? [v, 0] : [v]))), cls).length;
+
 test('sampled roads preserve exact shared endpoints for asphalt pads', () => {
   for (const curved of [false, true]) {
     const sim = new Sim(1, 0, 0);
-    assert.ok(
-      curved
-        ? sim.build_curve(-100, -100, -50, -20, 0.1, 0.1, 0)
-        : sim.build_road(-100, -100, 0.1, 0.1, 0),
-    );
+    assert.equal(build(sim, curved ? [-100, -100, -50, -20, 0.1, 0.1] : [-100, -100, 0.1, 0.1]), 2);
     const first = sim.road_segments();
-    assert.ok(sim.build_road(0.1, 0.1, 100, -100, 0));
+    assert.equal(build(sim, [0.1, 0.1, 100, -100]), 2);
     const segments = sim.road_segments();
     assert.deepEqual(
       [...segments.slice(first.length - 3, first.length - 1)],
@@ -124,8 +124,8 @@ test('main roads are wider, and junction pads fit the widest road', () => {
 
 test('the sim rejects unknown road classes', () => {
   const sim = new Sim(1, 0, 0);
-  assert.equal(sim.build_road(0, 0, 100, 0, 3), false);
-  assert.ok(sim.build_road(0, 0, 100, 0, 1));
+  assert.equal(build(sim, [0, 0, 100, 0], 3), 0);
+  assert.equal(build(sim, [0, 0, 100, 0], 1), 2);
   assert.equal(sim.road_segments()[4], 1, 'snapshot carries the class');
   sim.free();
 });

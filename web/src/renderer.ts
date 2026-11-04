@@ -32,7 +32,7 @@ import { buildRoadMarkings } from './road-markings.ts';
 import { createSimScene } from './scene';
 import { Scenery } from './scenery/index.ts';
 import { SignalLayer } from './signal-layer.ts';
-import { ToolPreview } from './tool-preview.ts';
+import { type Ground, ToolPreview } from './tool-preview.ts';
 import { ZoneOverlay } from './zone-overlay';
 
 CameraControls.install({ THREE });
@@ -278,13 +278,18 @@ export class Renderer {
    * refused: a red straight line. A single stop is where a road would start, drawn as a marker
    * even for a new end. `null` hides the preview.
    */
-  setPreview(
-    stops: Float32Array | null,
-    a: THREE.Vector3 | null,
-    b: THREE.Vector3 | null,
-    roadClass = 0,
-  ) {
+  setPreview(stops: Float32Array | null, a: Ground | null, b: Ground | null, roadClass = 0) {
     this.tools.setRoad(stops, a, b, roadClass);
+  }
+
+  /** Dashed drawing guides, `[x0, y0, x1, y1]` per line (ADR 0036); null hides them. */
+  setGuides(lines: Float32Array | null) {
+    this.tools.setGuides(lines);
+  }
+
+  /** Angle marks where a drawn road joins roads, `[x, y, rx, ry, dx, dy]` each; null hides. */
+  setAngles(marks: Float32Array | null) {
+    this.tools.setAngles(marks);
   }
 
   /**
