@@ -21,7 +21,7 @@ interface Views {
   setPollutionView(view: PollutionView): void;
 }
 
-/** Wires both buttons; returns their actions for the keyboard shortcuts (T, P). */
+/** Wires both buttons; returns their actions and the keyboard shortcuts (T, P). */
 export function bindViewButtons(byId: (id: string) => HTMLElement, renderer: Views) {
   const trafficButton = byId('traffic');
   const pollutionButton = byId('pollution');
@@ -36,5 +36,11 @@ export function bindViewButtons(byId: (id: string) => HTMLElement, renderer: Vie
   };
   trafficButton.onclick = traffic;
   pollutionButton.onclick = pollution;
-  return { traffic, pollution };
+  /** Runs the view a T or P key press names; false for any other key. */
+  const key = (k: string): boolean => {
+    const action = { t: traffic, p: pollution }[k.toLowerCase()];
+    action?.();
+    return action !== undefined;
+  };
+  return { traffic, pollution, key };
 }

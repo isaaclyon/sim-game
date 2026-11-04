@@ -76,11 +76,37 @@ there are people. A zoned lot builds only while its use has positive demand; oth
 waits (ADR 0025).
 _Avoid_: need, desirability
 
+## Money
+
+**Balance**:
+The city's money in whole dollars. Building roads spends it; taxes and upkeep change it every
+clock minute. It can fall below zero (ADR 0036).
+_Avoid_: funds (except the starting funds), cash
+
+**Build cost**:
+What a new road costs, by length and road class, paid from the balance when it is built. A
+road that costs more than the balance is refused. Bulldozing, zoning and sim-built alleys are
+free.
+_Avoid_: price
+
+**Upkeep**:
+What every road costs per clock hour to keep, by length and class.
+_Avoid_: maintenance (a later service), running cost
+
+**Taxes**:
+What residents and filled jobs pay per clock hour, at fixed rates.
+_Avoid_: income (taxes minus upkeep is the net change)
+
+**Debt**:
+A balance below zero. Upkeep keeps charging; no new roads can be built until taxes bring the
+balance back.
+_Avoid_: bankruptcy (scenarios may define it later)
+
 ## Pollution and land value
 
 **Pollution**:
 Harm that industry and traffic do to the land around them, in three kinds: air pollution,
-ground pollution and noise. It lowers land value (ADR 0036).
+ground pollution and noise. It lowers land value (ADR 0037).
 _Avoid_: smog (when you mean all kinds), dirt
 
 **Air pollution**:
@@ -107,7 +133,7 @@ _Avoid_: traffic (when you mean the cars on the road now), congestion
 How good a place is to build on. Pollution lowers it; later, services and parks raise it. Homes
 care most, shops a little and industry not at all. Low land value delays growth but never
 empties a standing building.
-_Avoid_: desirability, price (there is no money yet), happiness
+_Avoid_: desirability, price (land is not bought or sold), happiness
 
 ## Saving and sharing
 
@@ -121,7 +147,7 @@ independent copy that replaces their local city, and later edits never reach the
 _Avoid_: sync, multiplayer, import (when you mean opening a friend's city)
 
 **Command log**:
-The seed, grid size and every player command with its tick, from a fresh start. Replaying it
+The seed, map size (an empty map, or the generated street grid) and every player command with its tick, from a fresh start. Replaying it
 rebuilds the same city on the same build and target; saved logs are replay regression tests
 (ADR 0034).
 _Avoid_: save, history, undo log

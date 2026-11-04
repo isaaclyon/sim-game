@@ -1,4 +1,4 @@
-//! Pollution and land value on a coarse grid aligned to the zone grid (ADR 0036).
+//! Pollution and land value on a coarse grid aligned to the zone grid (ADR 0037).
 //!
 //! Air pollution and noise come from industrial buildings and traffic flow and follow their
 //! current sources. Ground pollution builds up under and beside industrial buildings and fades

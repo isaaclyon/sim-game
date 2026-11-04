@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 mod closure;
 mod demand;
 mod inspect;
+mod money;
 mod persist;
 mod pollution;
 mod residents;
@@ -31,6 +32,7 @@ use crate::zone::{Zone, ZoneGrid};
 
 pub use demand::Demand;
 pub use inspect::{BuildingInfo, CitizenInfo, Place};
+pub use money::{JOB_TAX, Money, RESIDENT_TAX, START_FUNDS};
 pub use persist::{SAVE_VERSION, SaveError};
 
 /// Floats per agent in `write_agent_snapshot`.
@@ -133,6 +135,8 @@ pub struct Stats {
     pub unemployment_percent: f32,
     /// What the town wants built next (ADR 0025).
     pub demand: Demand,
+    /// Balance, taxes and upkeep (ADR 0036).
+    pub money: Money,
     /// Synthetic vehicles waiting between random trips; dormant citizen slots are excluded.
     pub parked: u32,
     pub awaiting_path: u32,
@@ -168,6 +172,7 @@ pub struct World {
     residents: residents::Residents,
     closures: closure::Closures,
     supply: demand::Supply,
+    treasury: money::Treasury,
     /// Faces of the road network, traced again when `blocks_version` falls behind the roads.
     #[serde(skip)]
     blocks: Blocks,
@@ -193,9 +198,7 @@ pub struct World {
     wake: BinaryHeap<Reverse<(u64, AgentId)>>,
     rng: Rng,
     totals: Stats,
-    /// Saved after the rest of the world, so saves from before pollution still decode
-    /// (ADR 0036); see `persist`.
-    #[serde(skip)]
+    /// Air, ground, noise, traffic flow and land value (ADR 0037).
     pub pollution: Pollution,
 }
 
@@ -205,6 +208,7 @@ impl World {
             residents: residents::Residents::new(cfg.seed),
             closures: Default::default(),
             supply: Default::default(),
+            treasury: Default::default(),
             citizens: Default::default(),
             households: Default::default(),
             homes: Default::default(),
@@ -232,7 +236,25 @@ impl World {
         };
         world.pollution = Pollution::covering(&world.zones);
         world.sync_roads();
+        world.refresh_upkeep();
         world
+    }
+
+    /// A fresh city: no roads, on a map the size of a `cols` × `rows` street grid.
+    pub fn empty(cfg: Config, cols: u32, rows: u32) -> Self {
+        let size = |n: u32| n.saturating_sub(1) as f32 * cfg.grid_spacing;
+        let zones = ZoneGrid::covering([0.0, 0.0, size(cols), size(rows)]);
+        let rng = Rng::new(cfg.seed);
+        let mut world = Self::new(cfg, RoadNetwork::default(), rng);
+        world.pollution = Pollution::covering(&zones);
+        world.zones = zones;
+        world
+    }
+
+    /// `[min_x, min_y, max_x, max_y]` of the map: the land the zone grid covers.
+    pub fn bounds(&self) -> [f32; 4] {
+        let [x0, y0, cell, cols, rows] = self.zones.layout();
+        [x0, y0, x0 + cell * cols, y0 + cell * rows]
     }
 
     /// A world on a generated `cols` × `rows` street grid.
@@ -248,6 +270,7 @@ impl World {
 
     pub fn apply(&mut self, cmd: Command) -> bool {
         let versions = (self.lots.version, self.zones.version);
+        let roads = self.roads.version;
         let changed = match cmd {
             Command::SpawnAgents { count } => self.spawn_agents(count),
             Command::BuildRoad {
@@ -308,6 +331,9 @@ impl World {
             self.reconcile_closures();
             self.reconcile_residents();
         }
+        if roads != self.roads.version {
+            self.refresh_upkeep();
+        }
         changed
     }
 
@@ -338,6 +364,7 @@ impl World {
         self.traffic.recycle_exits(exits);
         self.totals.tick += 1;
         self.tick_pollution();
+        self.settle_money();
         self.grow_buildings();
     }
 
@@ -347,6 +374,7 @@ impl World {
         s.population = self.residents.population;
         s.unemployed = self.residents.population - self.residents.employed;
         s.demand = self.demand();
+        s.money = self.money();
         if s.population > 0 {
             s.unemployment_percent = s.unemployed as f32 * 100.0 / s.population as f32;
         }

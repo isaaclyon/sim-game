@@ -1,4 +1,4 @@
-// Pollution and land value over the ground (ADR 0036). The plain view shows faint haze where
+// Pollution and land value over the ground (ADR 0037). The plain view shows faint haze where
 // the air is dirty and stained ground where industry left its mark; the pollution views tint
 // each cell by one kind, or by land value. Display only: the sim owns every number.
 import * as THREE from 'three';

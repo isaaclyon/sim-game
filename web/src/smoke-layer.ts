@@ -1,5 +1,5 @@
 // Smoke from factory chimneys: low-poly puffs that leave the stack top, grow, drift downwind and
-// shrink away. Display only, like the haze (ADR 0036): no sim state, timed by the clock alone.
+// shrink away. Display only, like the haze (ADR 0037): no sim state, timed by the clock alone.
 // Each puff's place is a pure function of time, so there is nothing to step or save.
 import * as THREE from 'three';
 import { smokestack } from './building-kit/kit.ts';

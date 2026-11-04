@@ -57,8 +57,9 @@ fn flipped_bytes_are_detected() {
 #[test]
 fn other_schema_versions_are_unsupported() {
     let save = bytes();
-    // The schema version follows the 8-byte format tag, little-endian.
-    for version in [0u32, 3, 99, u32::MAX] {
+    // The schema version follows the 8-byte format tag, little-endian. Version 1 predates money
+    // and version 2 predates pollution.
+    for version in [0u32, 1, 2, 4, 99, u32::MAX] {
         let mut other = save.clone();
         other[8..12].copy_from_slice(&version.to_le_bytes());
         assert!(

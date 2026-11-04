@@ -138,6 +138,9 @@ function readStats(s: Sim): Stats {
     pathsFailed: st.paths_failed,
     despawnedStuck: st.despawned_stuck,
     despawnedByEdit: st.despawned_by_edit,
+    balance: st.balance,
+    taxes: st.taxes,
+    upkeep: st.upkeep,
   };
   st.free();
   return out;
@@ -323,7 +326,14 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
           ? sim.curve_preview(msg.ax, msg.ay, msg.cx, msg.cy, msg.bx, msg.by)
           : sim.road_preview(msg.ax, msg.ay, msg.bx, msg.by)
         : new Float32Array();
-      post({ type: 'roadPreview', revision: msg.revision, stops }, [stops.buffer]);
+      const cost =
+        (msg.type === 'previewCurve'
+          ? sim?.curve_cost(msg.ax, msg.ay, msg.cx, msg.cy, msg.bx, msg.by, msg.class)
+          : sim?.road_cost(msg.ax, msg.ay, msg.bx, msg.by, msg.class)) ?? null;
+      const affordable = cost !== null && !!sim?.can_afford(cost);
+      post({ type: 'roadPreview', revision: msg.revision, stops, cost, affordable }, [
+        stops.buffer,
+      ]);
       break;
     }
     case 'inspect': {
@@ -351,7 +361,9 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
     }
     case 'previewSnap': {
       const stops = sim?.snap_preview(msg.x, msg.y) ?? new Float32Array();
-      post({ type: 'roadPreview', stops, revision: msg.revision }, [stops.buffer]);
+      post({ type: 'roadPreview', stops, revision: msg.revision, cost: null, affordable: true }, [
+        stops.buffer,
+      ]);
       break;
     }
   }

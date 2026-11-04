@@ -22,6 +22,7 @@ impl World {
             c.stuck_limit_s.is_finite() && c.stuck_limit_s >= 0.0 && c.grid_spacing.is_finite(),
             "config values",
         )?;
+        ensure((0..60).contains(&self.treasury.carry), "money carry")?;
         let z = &self.zones;
         finite([&z.x0, &z.y0], "zone origin")?;
         self.roads.check()?;

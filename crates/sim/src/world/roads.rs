@@ -1,7 +1,7 @@
 //! Road editing: building, splitting and bulldozing roads.
 
-use super::World;
 use super::zoning::Scope;
+use super::{World, money};
 use crate::block::{self, Rect};
 use crate::geometry::Shape;
 use crate::road::{NodeId, RoadClass, RoadId};
@@ -10,11 +10,18 @@ use crate::snap::{self, Join};
 impl World {
     /// Builds a road of `class` along `snap::plan`: joining nodes near its ends, and splitting
     /// the roads it crosses or ends beside so they meet at a junction.
+    /// Refused when the city cannot afford the new length (ADR 0036).
     pub(super) fn build_road(&mut self, shape: Shape, class: RoadClass) -> bool {
-        let mut split = Vec::new();
-        let Some(rect) = self.add_road(shape, class, &mut split) else {
+        let Some(plan) = snap::plan(&self.roads, shape) else {
             return false;
         };
+        let cost = money::plan_cost(&self.roads, &plan, class);
+        if !self.can_afford(cost) {
+            return false;
+        }
+        self.treasury.balance -= cost;
+        let mut split = Vec::new();
+        let rect = self.add_plan(plan, class, &mut split);
         self.sync_roads();
         self.remove_cars_using(&split);
         self.update_lots(Scope::Near(rect), true);
@@ -30,6 +37,10 @@ impl World {
         split: &mut Vec<RoadId>,
     ) -> Option<Rect> {
         let plan = snap::plan(&self.roads, shape)?;
+        Some(self.add_plan(plan, class, split))
+    }
+
+    fn add_plan(&mut self, plan: snap::Plan, class: RoadClass, split: &mut Vec<RoadId>) -> Rect {
         let nodes: Vec<NodeId> = plan
             .stops
             .iter()
@@ -52,7 +63,7 @@ impl World {
             // False where the plan follows an existing road, which is kept as it is.
             self.roads.add_shape(leg[0], leg[1], shape.control, class);
         }
-        Some(rect)
+        rect
     }
 
     pub(super) fn delete_road(&mut self, x: f32, y: f32) -> bool {

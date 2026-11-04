@@ -56,7 +56,7 @@ export const ZONE_OVERLAY = [null, 0x7be08f, 0x2fae4b, 0x7fb0ff, 0x2f6ae0, 0xf6c
 export const ZONE_OVERLAY_ALPHA = 0.38;
 
 /**
- * Pollution views (ADR 0036): each kind ramps from clear to its colour; land value ramps from
+ * Pollution views (ADR 0037): each kind ramps from clear to its colour; land value ramps from
  * low (red) to high (green). Haze and stain tint the plain view, faintly, where it is dirty.
  */
 export const POLLUTION = {

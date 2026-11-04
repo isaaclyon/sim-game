@@ -1,6 +1,6 @@
 # 0025. R/C/I demand gates growth
 
-- Status: Accepted; land value threshold added by [0036](0036-pollution-and-land-value-steer-growth.md)
+- Status: Accepted; land value threshold added by [0037](0037-pollution-and-land-value-steer-growth.md)
 - Date: 2026-11-03
 
 ## Context

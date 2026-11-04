@@ -1,6 +1,6 @@
 # 0033. Save one complete city locally and resume it on return
 
-- Status: Accepted; implemented; pre-pollution saves convert per [0036](0036-pollution-and-land-value-steer-growth.md)
+- Status: Accepted; implemented
 - Date: 2026-11-03
 - Extends: [0003](0003-sim-and-rendering-are-separate.md) and
   [0004](0004-deterministic-fixed-timestep-sim.md)

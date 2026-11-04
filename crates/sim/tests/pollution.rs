@@ -1,4 +1,4 @@
-//! Pollution lowers land value, and land value steers growth (ADR 0036).
+//! Pollution lowers land value, and land value steers growth (ADR 0037).
 use sim::rng::Rng;
 use sim::road::RoadNetwork;
 use sim::{Command, Config, World, Zone};

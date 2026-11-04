@@ -223,7 +223,7 @@ export class Renderer {
     return this.agents.trafficView;
   }
 
-  /** `cells` and `layout` as in the `pollution` message (ADR 0036). */
+  /** `cells` and `layout` as in the `pollution` message (ADR 0037). */
   setPollution(cells: Uint8Array, layout: [number, number, number, number, number]) {
     this.pollution.setCells(cells, layout);
   }

@@ -288,35 +288,6 @@ fn counters_that_would_underflow_are_refused() {
     assert_eq!(refused(&w), SaveError::Invalid("job supply"));
 }
 
-/// Saves written before pollution (ADR 0036) hold only the world and load clean.
-#[test]
-fn saves_from_before_pollution_load_clean() {
-    let mut w = zoned_town();
-    for _ in 0..200 {
-        w.tick();
-    }
-    let payload = postcard::to_allocvec(&w).unwrap();
-    let mut old = signed(&payload);
-    old[8..12].copy_from_slice(&PRE_POLLUTION_VERSION.to_le_bytes());
-    let mut loaded = World::load(&old).expect("a version 1 save loads");
-    assert_eq!(loaded.buildings.version, w.buildings.version);
-    let (s, before) = (
-        loaded.pollution_at(290.0, 50.0).unwrap(),
-        w.pollution_at(290.0, 50.0),
-    );
-    assert_eq!(s.ground, 0.0, "no ground pollution");
-    assert!(loaded.pollution.flow.is_empty(), "no traffic flow");
-    assert!(s.air > 0.0, "standing factories pollute at once");
-    for _ in 0..1000 {
-        loaded.tick();
-    }
-    assert!(
-        loaded.pollution_at(290.0, 50.0).unwrap().ground > 0.0,
-        "ground fills in"
-    );
-    assert!(before.unwrap().ground > 0.0);
-}
-
 #[test]
 fn a_mismatched_pollution_grid_is_refused() {
     let mut w = zoned_town();

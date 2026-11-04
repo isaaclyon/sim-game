@@ -1,9 +1,9 @@
-# 0036. Pollution lowers land value, and land value steers growth
+# 0037. Pollution lowers land value, and land value steers growth
 
 - Status: Accepted
 - Date: 2026-11-04
-- Extends: [0025](0025-rci-demand-gates-growth.md); relaxes the no-conversion rule of
-  [0033](0033-single-city-state-saves.md) for one case
+- Extends: [0025](0025-rci-demand-gates-growth.md) and
+  [0033](0033-single-city-state-saves.md) (save version 3)
 
 ## Context
 
@@ -51,10 +51,10 @@ Alternatives considered:
   growth reads the last update's land value; rebuilding it on load would let a loaded city
   diverge. Ground pollution, traffic flow and land value are part of `state_hash`; air and
   noise only feed land value and the display.
-- **Older saves.** Saves from before this change load with no ground pollution and zero
-  traffic flow; air, noise and land value are computed at once from the standing buildings,
-  and flow fills in as cars drive. This is the one conversion allowed; other
-  incompatible versions still fail as ADR 0033 says.
+- **Older saves.** Saves carry the pollution grid, so the save version becomes 3. Version 1
+  and 2 saves and links are refused, as ADR 0033 says. An earlier draft converted saves from
+  before pollution; money (ADR 0036) took version 2 at the same time, so the conversion was
+  dropped rather than written for both.
 - **Display.** Overlays for air, ground, noise and land value, plus display-only haze and
   stained ground. The snapshot format is fixed in CLAUDE.md when it lands.
   Chimneys on factories that draw one also puff smoke. It is timed by the display clock
@@ -66,5 +66,5 @@ Industry and main roads push housing away without any way to fail, and old facto
 tainted for a while after rezoning. Every growth check reads land value, so pollution must be
 current enough at that point; recomputing it on a fixed sim-time cadence keeps the per-tick
 cost small. Growth changes, so replay `expect` lines need blessing once, and the save version
-bumps. Old cities and links still open, as clean ones. Happiness, health effects, wind,
+bumps. Old cities and links no longer open. Happiness, health effects, wind,
 clean-up tools and offices as clean jobs (M6) are later decisions that build on land value.

@@ -1,5 +1,5 @@
 //! Feeds the pollution grid from industry and traffic, and lets land value hold back growth
-//! (ADR 0036).
+//! (ADR 0037).
 
 use super::World;
 use crate::building::BuildingId;
@@ -51,14 +51,6 @@ impl World {
         }
         let src = self.pollution_sources();
         self.pollution.update(&src);
-    }
-
-    /// Builds air, noise and land value from the standing buildings, for a save from before
-    /// pollution (ADR 0036). Ground pollution and traffic flow stay as they are.
-    pub(super) fn refresh_pollution(&mut self) {
-        let src = self.pollution_sources();
-        self.pollution.derive(&src);
-        self.pollution.version = self.pollution.version.wrapping_add(1);
     }
 
     fn pollution_sources(&self) -> Sources {
@@ -141,7 +133,7 @@ impl World {
     }
 
     /// Demand a due lot's use needs before it builds: 0 on clean land, more as land value
-    /// falls (ADR 0036). Mean land value over the lot's zone cells.
+    /// falls (ADR 0037). Mean land value over the lot's zone cells.
     pub(super) fn land_threshold(&self, lot: LotId, zone: Zone) -> i32 {
         let people = match zone {
             Zone::ResidentialLow | Zone::ResidentialHigh => RESIDENTIAL_LAND_PEOPLE,

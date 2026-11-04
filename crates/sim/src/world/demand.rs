@@ -93,7 +93,7 @@ impl World {
     }
 
     /// Due lots build while their use has more demand than their land value asks for
-    /// (ADR 0036); the rest wait and check again. Each new
+    /// (ADR 0037); the rest wait and check again. Each new
     /// building is registered at once, so the next lot due this tick sees its homes and jobs.
     pub(super) fn grow_buildings(&mut self) {
         let tick = self.totals.tick;

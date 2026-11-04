@@ -258,17 +258,23 @@ confirmed New city.
 
 Goals and consequences, kept light so they don't crowd out building.
 
-- **First slice: pollution and land value — implemented** ([ADR 0036](adrs/0036-pollution-and-land-value-steer-growth.md)).
+- Money: build costs, taxes, upkeep (implemented, [ADR 0036](adrs/0036-money-build-costs-taxes-upkeep.md)).
+  A fresh city starts on an empty map with $50,000. Roads cost money to build by length and
+  class and refuse to build when the city cannot pay; the road tool quotes the cost. Every road
+  costs upkeep, and residents and filled jobs pay taxes, per clock hour. Upkeep can push the
+  balance into debt, which only stops new roads. The HUD shows balance, taxes and upkeep.
+  Bulldozing, zoning and sim-built alleys are free. Tax rates are fixed for now.
+- **First slice: pollution and land value — implemented** ([ADR 0037](adrs/0037-pollution-and-land-value-steer-growth.md)).
   Industry and traffic make air pollution, ground pollution and noise, which lower land value.
   Homes, and shops a little, grow first on high land value; industry ignores it. Nothing
   standing is closed or emptied. It needs only buildings and traffic, so it comes before
-  money and services.
+  services.
   - Sim: a pollution grid aligned to the zone grid (4×4 zone cells per cell). Smoothed
     traffic flow per road and ground pollution per cell build up over time. Air, noise and
-    land value are rebuilt on a fixed sim-time cadence, not every tick. All are saved. The ADR 0025 growth
-    check gains a land value threshold for residential (strong) and commercial (mild).
-  - Saves: bump the version; saves from before pollution load clean (no ground pollution,
-    zero flow). Bless replay `expect` lines once.
+    land value are rebuilt on a fixed sim-time cadence, not every tick. All are saved. The
+    ADR 0025 growth check gains a land value threshold for residential (strong) and commercial (mild).
+  - Saves: version 3 holds money and pollution. Older saves and links are refused, like other
+    version changes (ADR 0033). Bless replay `expect` lines once.
   - Display: overlays for air, ground, noise and land value; display-only haze and stained
     ground. Add the snapshot format to CLAUDE.md with the Rust writer and renderer reader.
   - Perf: compare `traffic_bench` ms/tick at the default size and `--scale la`.
@@ -277,14 +283,13 @@ Goals and consequences, kept light so they don't crowd out building.
     600,000 cells) an update costs about 10 ms once every 100 ticks, about 0.1 ms a tick on
     average; the default bench is unchanged. In a test town, the strip beside a factory
     district (and a main road) grew 5 homes against 11 to 19 in strips farther away.
-    Not yet checked by hand: the full browser save, reload and old-save flow.
+    Not yet checked by hand: the full browser save and reload flow.
 
   Done when: in a town with a factory district and a busy main road, new homes visibly fill
   the quiet, clean blocks first and the dirty ones only when housing demand is high; an
   old factory site stays tainted for a few sim days after rezoning; the overlays explain
-  why; and a save from before the change still opens.
+  why.
 
-- Money: build costs, taxes, upkeep.
 - Services with coverage areas: power, water, roads maintenance, then fire, police, health and
   schools.
 - Citizen happiness from services, traffic and pollution, feeding back into demand and growth.
