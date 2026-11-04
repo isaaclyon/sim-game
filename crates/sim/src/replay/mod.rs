@@ -7,7 +7,7 @@
 //! ```text
 //! sim-game command log 1
 //! seed 1
-//! grid 12 12
+//! map 12 12
 //! 0 spawn 100
 //! 120 road 10.5 20 300 20 street
 //! 130 curve 0 0 50 50 100 0 main
@@ -18,6 +18,8 @@
 //! expect hash 0123456789abcdef population 12 buildings 30 trips 40
 //! ```
 //!
+//! The third line is `map cols rows` for an empty map the size of a `cols` × `rows` street
+//! grid, which is how the game starts, or `grid cols rows` for the generated street grid.
 //! Command lines start with their tick, which never decreases and never passes `end`.
 //! Coordinates are `f32` written in their shortest exact form, so they read back bit for bit.
 //! `expect` is optional: what the replay must reach at `end`.
@@ -47,10 +49,20 @@ const ZONES: [(Zone, &str); 7] = [
     (Zone::IndustrialHigh, "industrial-high"),
 ];
 
-/// A session from a fresh generated world, as replayable commands.
+/// How a log's fresh world starts.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Start {
+    /// `World::generate`: a jittered street grid. Tests and benchmarks.
+    Grid,
+    /// `World::empty`: no roads. The game.
+    Map,
+}
+
+/// A session from a fresh world, as replayable commands.
 #[derive(Clone, Debug, PartialEq)]
 pub struct CommandLog {
     pub seed: u64,
+    pub start: Start,
     pub cols: u32,
     pub rows: u32,
     /// Every command in the order it was applied, with the tick count at that moment.
@@ -98,14 +110,24 @@ impl fmt::Display for LogError {
 impl std::error::Error for LogError {}
 
 impl CommandLog {
+    /// A log starting from the generated street grid.
     pub fn new(seed: u64, cols: u32, rows: u32) -> Self {
         Self {
             seed,
+            start: Start::Grid,
             cols,
             rows,
             commands: Vec::new(),
             end: 0,
             expect: None,
+        }
+    }
+
+    /// A log starting from an empty map, as the game does.
+    pub fn empty(seed: u64, cols: u32, rows: u32) -> Self {
+        Self {
+            start: Start::Map,
+            ..Self::new(seed, cols, rows)
         }
     }
 
@@ -115,7 +137,10 @@ impl CommandLog {
             seed: self.seed,
             ..Config::default()
         };
-        World::generate(cfg, self.cols, self.rows)
+        match self.start {
+            Start::Grid => World::generate(cfg, self.cols, self.rows),
+            Start::Map => World::empty(cfg, self.cols, self.rows),
+        }
     }
 
     /// Applies `cmd` to `world` and records it at the world's current tick.
@@ -161,7 +186,11 @@ impl fmt::Display for CommandLog {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "{TITLE} {LOG_VERSION}")?;
         writeln!(f, "seed {}", self.seed)?;
-        writeln!(f, "grid {} {}", self.cols, self.rows)?;
+        let start = match self.start {
+            Start::Grid => "grid",
+            Start::Map => "map",
+        };
+        writeln!(f, "{start} {} {}", self.cols, self.rows)?;
         for (tick, cmd) in &self.commands {
             writeln!(f, "{tick} {}", command_text(cmd))?;
         }

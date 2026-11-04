@@ -258,7 +258,12 @@ confirmed New city.
 
 Goals and consequences, kept light so they don't crowd out building.
 
-- Money: build costs, taxes, upkeep.
+- Money: build costs, taxes, upkeep (implemented, [ADR 0036](adrs/0036-money-build-costs-taxes-upkeep.md)).
+  A fresh city starts on an empty map with $50,000. Roads cost money to build by length and
+  class and refuse to build when the city cannot pay; the road tool quotes the cost. Every road
+  costs upkeep, and residents and filled jobs pay taxes, per clock hour. Upkeep can push the
+  balance into debt, which only stops new roads. The HUD shows balance, taxes and upkeep.
+  Bulldozing, zoning and sim-built alleys are free. Tax rates are fixed for now.
 - Services with coverage areas: power, water, roads maintenance, then fire, police, health and
   schools.
 - Citizen happiness from services, traffic and pollution, feeding back into demand and growth.

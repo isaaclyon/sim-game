@@ -2,7 +2,7 @@ import type * as THREE from 'three';
 import { AmbientSound } from './ambient-sound';
 import { CityControls } from './city-controls';
 import { drawDemand } from './demand-meter';
-import { hudText } from './hud';
+import { hudText, type Quote, roadHelpText } from './hud';
 import { Inspector } from './inspector';
 import { type FromWorker, RoadClass, type Stats, type ToWorker, Zone } from './protocol';
 import { Renderer } from './renderer';
@@ -94,6 +94,7 @@ worker.onmessage = (e: MessageEvent<FromWorker>) => {
       if (msg.type === 'roadPreview' && roadTool) {
         renderer.setPreview(msg.stops, roadStart, previewRequestedEnd, roadClass);
         refused = roadStart !== null && msg.stops.length === 0;
+        quote = roadStart && !refused ? { cost: msg.cost, affordable: msg.affordable } : null;
         updateRoadHelp();
       }
       if (msg.type === 'bulldozePreview' && bulldozeTool) renderer.setBulldozePreview(msg.segment);
@@ -105,9 +106,13 @@ worker.onmessage = (e: MessageEvent<FromWorker>) => {
       roadStart = pendingBuild.end;
       roadControl = null;
     }
+    // A road the city could not pay for was refused for money, not for its shape.
+    const q = pendingBuild.quote;
+    const unpaid = !msg.success && q?.affordable === false ? q : null;
     pendingBuild = null;
-    refused = !msg.success;
+    refused = !msg.success && !unpaid;
     invalidatePreview();
+    quote = unpaid;
     updateRoadHelp();
   } else if (msg.type === 'zones') {
     renderer.setZones(msg.cells, msg.layout, zonesSeen);
@@ -140,7 +145,7 @@ worker.onmessage = (e: MessageEvent<FromWorker>) => {
   }
 };
 
-send({ type: 'init', seed: 1, cols: 60, rows: 60, agents: 0 });
+send({ type: 'init', seed: 1, cols: 60, rows: 60, agents: 0, grid: false });
 
 let speed = 1;
 const speedButtons = [...document.querySelectorAll<HTMLButtonElement>('[data-speed]')];
@@ -184,8 +189,9 @@ function hideBlockOutline() {
 let roadStart: THREE.Vector3 | null = null;
 let roadControl: THREE.Vector3 | null = null;
 let refused = false;
+let quote: Quote = null;
 let nextBuildId = 0;
-let pendingBuild: { id: number; end: THREE.Vector3 } | null = null;
+let pendingBuild: { id: number; end: THREE.Vector3; quote: Quote } | null = null;
 let previewRevision = 0;
 // One sim-owned snapping preview in flight, using only the latest cursor position.
 let previewEnd: THREE.Vector3 | null = null;
@@ -193,20 +199,13 @@ let previewWanted = false;
 let previewInFlight = false;
 let previewRequestedEnd: THREE.Vector3 | null = null;
 function updateRoadHelp() {
-  const stage = !roadStart
-    ? 'Click the road start.'
-    : roadTool === 'curve' && !roadControl
-      ? 'Click the bend control point, then the road end.'
-      : 'Click the road end.';
-  roadHelp.textContent = bulldozeTool
-    ? 'Click a highlighted road to remove it. Esc or right-click cancels.'
-    : !roadTool
-      ? ''
-      : pendingBuild
-        ? 'Building road…'
-        : `${roadClass === RoadClass.Main ? 'Main road. ' : ''}${refused ? 'Cannot build here. Move the end away from overlaps or short joins. ' : ''}${stage} Esc or right-click cancels.`;
+  const tool = bulldozeTool ? 'bulldoze' : roadTool;
+  const stage = !roadStart ? 'start' : roadTool === 'curve' && !roadControl ? 'control' : 'end';
+  const main = roadClass === RoadClass.Main;
+  roadHelp.textContent = roadHelpText(tool, stage, !!pendingBuild, main, refused, quote);
 }
 function invalidatePreview() {
+  quote = null;
   previewRevision++;
   previewEnd = null;
   previewWanted = false;
@@ -231,8 +230,13 @@ function sendPreview() {
       ? { type: 'previewBulldoze', revision, x: b.x, y: b.z }
       : a
         ? c
-          ? { type: 'previewCurve', revision, ax: a.x, ay: a.z, cx: c.x, cy: c.z, bx: b.x, by: b.z }
-          : { type: 'previewRoad', revision, ax: a.x, ay: a.z, bx: b.x, by: b.z }
+          ? {
+              type: 'previewCurve',
+              revision,
+              class: roadClass,
+              ...{ ax: a.x, ay: a.z, cx: c.x, cy: c.z, bx: b.x, by: b.z },
+            }
+          : { type: 'previewRoad', revision, class: roadClass, ax: a.x, ay: a.z, bx: b.x, by: b.z }
         : { type: 'previewSnap', revision, x: b.x, y: b.z },
   );
 }
@@ -271,8 +275,11 @@ function toggleMainRoad() {
   const on = roadClass === RoadClass.Main;
   mainRoadButton.classList.toggle('active', on);
   mainRoadButton.setAttribute('aria-pressed', String(on));
-  if (!roadTool) setTool('straight');
-  else updateRoadHelp();
+  if (!roadTool) return setTool('straight');
+  // The quote depends on the class: ask again for the same end.
+  [previewRevision, quote, previewWanted] = [previewRevision + 1, null, previewEnd !== null];
+  sendPreview();
+  updateRoadHelp();
 }
 function setZone(z: Zone) {
   setTool(null, zone === z ? null : z);
@@ -341,10 +348,9 @@ canvas.addEventListener('pointerup', (e) => {
   else if (roadTool === 'curve' && !roadControl) roadControl = p;
   else {
     const id = ++nextBuildId;
-    pendingBuild = { id, end: p };
+    pendingBuild = { id, end: p, quote };
     const a = roadStart;
     const c = roadControl;
-    const cls = roadClass;
     send(
       c
         ? {
@@ -356,9 +362,9 @@ canvas.addEventListener('pointerup', (e) => {
             cy: c.z,
             bx: p.x,
             by: p.z,
-            class: cls,
+            class: roadClass,
           }
-        : { type: 'buildRoad', id, ax: a.x, ay: a.z, bx: p.x, by: p.z, class: cls },
+        : { type: 'buildRoad', id, ax: a.x, ay: a.z, bx: p.x, by: p.z, class: roadClass },
     );
   }
   refused = false;
@@ -389,10 +395,7 @@ canvas.addEventListener('pointermove', hover);
 canvas.addEventListener('pointerleave', () => {
   pointer = null;
   if (!zoneStart) hideBlockOutline();
-  previewRevision++;
-  previewEnd = null;
-  previewWanted = false;
-  renderer.setPreview(null, null, null);
+  invalidatePreview();
 });
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 

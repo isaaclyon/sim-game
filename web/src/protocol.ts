@@ -2,7 +2,11 @@
 // thread only sends commands and draws snapshots.
 
 export type ToWorker =
-  | { type: 'init'; seed: number; cols: number; rows: number; agents: number }
+  /**
+   * `grid` starts on the generated `cols` × `rows` street grid (tests and benchmarks); false
+   * starts on an empty map of that size, as the game does.
+   */
+  | { type: 'init'; seed: number; cols: number; rows: number; agents: number; grid: boolean }
   | { type: 'setSpeed'; speed: number }
   /** Replace the single local save with the current sim state. */
   | { type: 'saveCity' }
@@ -51,11 +55,21 @@ export type ToWorker =
   /** Asks for the outline of the block containing the point. Answered with `blockPreview`. */
   | { type: 'previewBlock'; x: number; y: number; revision: number }
   | { type: 'previewBulldoze'; x: number; y: number; revision: number }
-  /** Asks where a road would snap. Changes nothing; answered with `roadPreview`. */
-  | { type: 'previewRoad'; revision: number; ax: number; ay: number; bx: number; by: number }
+  /** Asks where a road of `class` would snap and what it costs. Changes nothing; answered with
+   * `roadPreview`. */
+  | {
+      type: 'previewRoad';
+      revision: number;
+      class: RoadClass;
+      ax: number;
+      ay: number;
+      bx: number;
+      by: number;
+    }
   | {
       type: 'previewCurve';
       revision: number;
+      class: RoadClass;
       ax: number;
       ay: number;
       cx: number;
@@ -192,6 +206,12 @@ export interface Stats {
   despawnedStuck: number;
   /** Cars removed because a road on their remaining route was split or deleted. */
   despawnedByEdit: number;
+  /** The city's money in whole dollars, from the sim (ADR 0036); negative is debt. */
+  balance: number;
+  /** Taxes from residents and filled jobs, dollars per clock hour. */
+  taxes: number;
+  /** Road upkeep, dollars per clock hour. */
+  upkeep: number;
 }
 
 /** Persistence metadata only. A commit acknowledges the captured revision, not later edits. */
@@ -223,8 +243,16 @@ export type FromWorker =
    * 1 = existing node, 2 = splits an existing road, -1 = interior curve sample (no marker).
    * Empty means refused. Answers `previewRoad` / `previewCurve`, or `previewSnap` with one stop.
    * `revision` echoes the construction stage so cancelled or previous-stage previews are discarded.
+   * `cost` is what building it would charge in dollars, null for snaps and refused shapes;
+   * `affordable` is false when the city cannot pay it, and building would be refused (ADR 0036).
    */
-  | { type: 'roadPreview'; stops: Float32Array; revision: number }
+  | {
+      type: 'roadPreview';
+      stops: Float32Array;
+      revision: number;
+      cost: number | null;
+      affordable: boolean;
+    }
   /**
    * The whole zone grid: one `Zone` byte per cell, row-major from the origin. `layout` is
    * `[originX, originY, cellSize, cols, rows]`; cell (c, r) spans x from originX + c * cellSize.
