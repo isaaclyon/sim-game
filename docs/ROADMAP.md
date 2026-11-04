@@ -146,12 +146,15 @@ Done when: a screenshot or short clip is something you'd post.
 Done when: a city survives a reload, and a friend can open a city you sent them and keep
 building it.
 
-### First slice: one city with autosave — implemented
+### First slice: one city with autosave — implemented and verified
 
 Simulation, worker, storage and UI checks pass, including identical continued evolution after
-restoring a developed town. `scripts/check.sh` and the production build pass. The browser
-save/reload/new-city smoke test remains unverified: terminal-browser requires Ghostty to be
-running, and it is unavailable in this session. Sharing and backups remain later work.
+restoring a developed town. `scripts/check.sh` and the production build pass. A scripted
+browser smoke test (headless Chrome against `vite preview`) also passes: a zoned town of about
+900 residents with moving cars saves, reloads paused with identical HUD statistics and
+buildings, survives a cancelled New city unchanged, is replaced by a confirmed New city that
+saves at once, and a damaged slot shows an error, stays unoverwritten and recovers only through
+confirmed New city. Sharing and backups remain later work.
 
 **Player flow**
 
@@ -191,8 +194,7 @@ running, and it is unavailable in this session. Sharing and backups remain later
    one slot. Add Save city, New city, confirmation and accessible status/error text in
    `web/index.html`; put UI coordination in a focused module rather than growing `main.ts`
    past the line limit. Clear interpolation, previews and inspector state on replacement.
-4. **Integration checks and documentation — automated checks complete; browser smoke test
-   blocked as noted above.** Extend the existing Rust, WASM-worker and frontend
+4. **Integration checks and documentation — complete.** Extend the existing Rust, WASM-worker and frontend
    test harnesses. Update the root README only once saving is implemented; mark this plan's
    completed steps and ADR 0033's implementation status accurately. Run `scripts/check.sh`,
    the production build and a browser save/reload/new-city smoke test.
@@ -230,7 +232,9 @@ Goals and consequences, kept light so they don't crowd out building.
   - **Sandbox:** never fails. Problems slow growth or make people move away, but there is no game
     over.
   - **Scenarios:** a set start and goal ("reach 5,000 with no gridlock", "rescue a bankrupt
-    town") that you can fail. Built on M4 save files.
+    town") that you can fail. Built on M4 save files: a scenario file pairs an unchanged
+    ADR 0033 save payload (the start state) with a separate goals section, so goals never
+    enter the sim's save schema. The scenario file format needs its own ADR.
 
 Done when: there is a reason to plan and a way to struggle in scenarios, and sandbox still feels
 relaxed.
