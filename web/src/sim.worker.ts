@@ -227,6 +227,23 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
     case 'newCity':
       await cities.newCity();
       break;
+    case 'openCity':
+      await cities.open(msg.bytes);
+      break;
+    case 'exportCity': {
+      let bytes: Uint8Array | null = null;
+      let error: string | null = null;
+      try {
+        bytes = cities.bytes();
+      } catch (e) {
+        error = `Could not export the city: ${e instanceof Error ? e.message : String(e)}`;
+      }
+      post({ type: 'cityFile', bytes, error }, bytes ? [bytes.buffer] : []);
+      break;
+    }
+    case 'commandLog':
+      post({ type: 'commandLog', text: cities.commandLog() });
+      break;
     case 'setSpeed':
       if (!cities.ready) break;
       speed = msg.speed;

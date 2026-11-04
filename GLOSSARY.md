@@ -75,3 +75,20 @@ How many more people the town wants housed (residential), or wants as shop or in
 there are people. A zoned lot builds only while its use has positive demand; otherwise it
 waits (ADR 0025).
 _Avoid_: need, desirability
+
+## Saving and sharing
+
+**Save**:
+The complete state of one city as validated bytes, kept in one local slot per browser (ADR 0033).
+_Avoid_: snapshot (that is what the renderer draws), replay
+
+**Shared city**:
+A save sent as a `.city` file or a `#city=` link. Opening one forks it: the receiver gets an
+independent copy that replaces their local city, and later edits never reach the sender (ADR 0035).
+_Avoid_: sync, multiplayer, import (when you mean opening a friend's city)
+
+**Command log**:
+The seed, grid size and every player command with its tick, from a fresh start. Replaying it
+rebuilds the same city on the same build and target; saved logs are replay regression tests
+(ADR 0034).
+_Avoid_: save, history, undo log

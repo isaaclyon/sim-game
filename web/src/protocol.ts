@@ -8,6 +8,16 @@ export type ToWorker =
   | { type: 'saveCity' }
   /** The UI must confirm before requesting a fresh city and replacing the save. */
   | { type: 'newCity' }
+  /** Asks for the current city's save bytes to share; answered with `cityFile`. */
+  | { type: 'exportCity' }
+  /**
+   * Replaces the current city with a shared copy (ADR 0035), opened paused and saved to the
+   * local slot. The UI must confirm first when it would discard a city. Invalid bytes change
+   * nothing.
+   */
+  | { type: 'openCity'; bytes: Uint8Array }
+  /** Asks for the command log since a fresh start (ADR 0034); answered with `commandLog`. */
+  | { type: 'commandLog' }
   /** Explicit synthetic benchmark traffic, not normal play. */
   | { type: 'spawn'; count: number }
   | {
@@ -196,6 +206,10 @@ export interface CityStatus {
 
 export type FromWorker =
   | CityStatus
+  /** The current city's opaque save bytes, or null with a readable error. */
+  | { type: 'cityFile'; bytes: Uint8Array | null; error: string | null }
+  /** Command log text (ADR 0034), or null for a city that was loaded, not started fresh. */
+  | { type: 'commandLog'; text: string | null }
   /** Sent before all geometry and the first frame of a newly installed world. Clears
    * interpolation and transient selections/previews. Restored cities always resume paused. */
   | { type: 'cityReset'; speed: number }

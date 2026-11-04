@@ -140,16 +140,47 @@ Done when: a screenshot or short clip is something you'd post.
 
 ## M4 – Save, load, share
 
-- Save and load. The first slice is implemented: one local full-state save with autosave
-  and versioning ([ADR 0033](adrs/0033-single-city-state-saves.md)). This slice is pulled
-  forward at the player's request; the rest of M4 remains later work. Scenarios (M5) can
-  later use the state payload as their start state, with goals kept separate.
-- Share a city as a link or file. Opening one forks it: the friend keeps building their own copy
-  from where you left off.
-- Replay-based regression tests built from saved command logs.
+**Status: complete.** All three items are implemented and the done-when checks pass in a
+browser (see "Second slice" below).
+
+- Save and load (implemented): one local full-state save with autosave and versioning
+  ([ADR 0033](adrs/0033-single-city-state-saves.md)). Scenarios (M5) can later use the state
+  payload as their start state, with goals kept separate.
+- Share a city as a link or file (implemented). Opening one forks it: the friend keeps building
+  their own copy from where you left off ([ADR 0035](adrs/0035-share-cities-as-forked-copies.md)).
+- Replay-based regression tests built from saved command logs (implemented,
+  [ADR 0034](adrs/0034-command-log-replay-tests.md)).
 
 Done when: a city survives a reload, and a friend can open a city you sent them and keep
 building it.
+
+### Second slice: sharing and replay tests — implemented
+
+- **Sharing.** Download writes the save bytes as a `.city` file; Open file reads one back.
+  Copy link puts the compressed save in a `#city=` URL fragment, shown in a field as well as
+  copied, and refuses links over 1,000,000 characters. Opening either replaces the local city
+  with an independent copy, paused, and saves it at once. The game asks first whenever a city
+  could be lost, and only skips the question for a link that starts the game in a browser
+  with no saved city.
+  Links pasted into a running game also open. Damaged links and files change nothing. The page
+  drops the fragment after reading it, so a reload resumes the local copy.
+- **Replay tests.** `sim::replay` reads and writes versioned text command logs; fresh cities
+  record every command in the WASM wrapper, and development builds download them with the
+  Command log button. `crates/sim/tests/replays/` holds a browser-recorded session and a
+  scripted one covering every command kind. The test replays each, compares hash, population,
+  buildings and trips with its `expect` line, and checks that a save and load halfway through
+  ends the same. `BLESS_REPLAYS=1` refreshes expectations after an intended change.
+- **Verification.** Rust, WASM-worker and frontend tests cover export, forked opening, refused
+  files, opening over an unreadable save, link encoding, confirmation rules, clipboard refusal
+  and command logs. `scripts/check.sh` and the production build pass. A scripted Chrome session
+  (Playwright, against both the dev server and the production build) checked: a developed town
+  survives a reload with the same population; a friend opens the link on a first visit without
+  a question, gets the same city paused, keeps running and editing it, and keeps it after a
+  reload while the sender's city is unchanged; opening a file over an existing city asks first
+  and Cancel keeps it; a pasted link asks first; damaged files and links change nothing; New
+  city asks, saves at once and survives a reload; the Command log button appears only in
+  development. A real 60×60 town with about 140 residents is a 6.8 MB save and a 0.6-million-
+  character link.
 
 ### First slice: one city with autosave — implemented and verified
 
@@ -159,7 +190,7 @@ browser smoke test (headless Chrome against `vite preview`) also passes: a zoned
 900 residents with moving cars saves, reloads paused with identical HUD statistics and
 buildings, survives a cancelled New city unchanged, is replaced by a confirmed New city that
 saves at once, and a damaged slot shows an error, stays unoverwritten and recovers only through
-confirmed New city. Sharing and backups remain later work.
+confirmed New city.
 
 **Player flow**
 
@@ -202,7 +233,7 @@ confirmed New city. Sharing and backups remain later work.
 4. **Integration checks and documentation — complete.** Extend the existing Rust, WASM-worker and frontend
    test harnesses. Update the root README only once saving is implemented; mark this plan's
    completed steps and ADR 0033's implementation status accurately. Run `scripts/check.sh`,
-   the production build and a browser save/reload/new-city smoke test.
+   the production build and a browser save/reload/new-city smoke test (passed).
 
 **Acceptance checks**
 

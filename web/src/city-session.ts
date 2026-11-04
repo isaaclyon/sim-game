@@ -109,20 +109,56 @@ export class CitySession {
     return this.run(() => this.persist(sim), 'Could not save your city. Try Save city again');
   }
 
+  /** The current city's save bytes, for sharing. Changes nothing. */
+  bytes(): Uint8Array {
+    if (!this.ready || !this.sim) throw new Error('The city is still opening. Try again.');
+    return this.sim.save();
+  }
+
+  /** The current city's command log, or null when it was not started fresh here. */
+  commandLog(): string | null {
+    return (this.ready && this.sim?.command_log()) || null;
+  }
+
+  /** A shared city replaces this one as an independent copy (ADR 0035), opened paused. The UI
+   * confirms first. Bytes the sim rejects leave the current city and its save untouched. */
+  open(bytes: Uint8Array) {
+    if (!this.options) return this.queue;
+    const wasReady = this.ready;
+    this.ready = false;
+    return this.run(async () => {
+      let next: Sim;
+      try {
+        next = Sim.load(bytes);
+      } catch (error) {
+        this.ready = wasReady;
+        const reason = error instanceof Error ? error.message : String(error);
+        this.error = `Could not open that city (${reason}). Your current city is unchanged.`;
+        return;
+      }
+      this.replace(next, 0);
+      await this.persist(next, true);
+    }, 'Opened the city but could not save it. Your previous stored city is unchanged; try Save city again');
+  }
+
+  private replace(next: Sim, speed: number) {
+    this.sim?.free();
+    this.sim = next;
+    this.revision = 1;
+    this.savedRevision = 0;
+    this.savedAt = null;
+    this.error = null;
+    this.ready = true;
+    this.install(next, speed);
+  }
+
   /** The UI obtains confirmation before sending this request. */
   newCity() {
     if (!this.options) return this.queue;
     this.ready = false;
     return this.run(async () => {
       const next = this.create();
-      this.sim?.free();
-      this.sim = next;
-      this.revision = 1;
-      this.savedRevision = 0;
-      this.savedAt = null;
-      this.error = null;
-      this.ready = true;
-      this.install(next, 1);
+      this.replace(next, 1);
       await this.persist(next, true);
     }, 'Could not save the new city. Your previous stored city is unchanged; try Save city again');
   }

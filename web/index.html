@@ -47,8 +47,11 @@
       #toolbar button:disabled, #inspector button:disabled, #city-controls button:disabled { opacity: 0.5; cursor: default; }
       #city-controls { align-self: flex-end; max-width: 440px; padding: 10px 12px; border-radius: 8px; background: rgba(15, 20, 25, 0.85); color: #c9d4df; font: 12px/1.5 ui-monospace, Menlo, monospace; pointer-events: auto; }
       #city-controls .actions { display: flex; gap: 6px; margin-bottom: 6px; }
-      #save-status { overflow-wrap: anywhere; }
-      #save-status[data-error="true"] { color: #ffb4ab; }
+      #save-status, #share-status { overflow-wrap: anywhere; }
+      #save-status[data-error="true"], #share-status[data-error="true"] { color: #ffb4ab; }
+      #share-status:empty { display: none; }
+      #share-url { width: 100%; box-sizing: border-box; margin-top: 4px; background: #0f1419; color: #c9d4df; border: 1px solid #2e3a47; border-radius: 4px; font: 11px ui-monospace, Menlo, monospace; }
+      #share-url[hidden] { display: none; }
       #save-note { margin-top: 4px; }
       #road-help { color: #c9d4df; background: #0f1419; padding: 6px 10px; font: 12px/1.5 ui-monospace, monospace; text-align: center; }
       #road-help:empty { display: none; }
@@ -70,13 +73,22 @@
       </div>
     </section>
     <div id="controls">
-    <section id="city-controls" aria-label="City saving">
+    <section id="city-controls" aria-label="City saving and sharing">
       <div class="actions">
         <button type="button" id="save-city" disabled>Save city</button>
         <button type="button" id="new-city" disabled>New city</button>
       </div>
+      <div class="actions">
+        <button type="button" id="download-city" disabled title="save this city as a file to send or keep">Download</button>
+        <button type="button" id="copy-link" disabled title="copy a link that opens a copy of this city">Copy link</button>
+        <button type="button" id="open-city" disabled title="open a city file someone sent you">Open file…</button>
+        <button type="button" id="command-log" hidden title="download the commands since this city started, for replay tests">Command log</button>
+        <input type="file" id="open-city-file" accept=".city,application/octet-stream" hidden />
+      </div>
       <div id="save-status" role="status" aria-live="polite" aria-atomic="true">Opening city…</div>
-      <div id="save-note">Autosaves every minute in this browser.<br />Clearing browser data removes your city.</div>
+      <div id="share-status" role="status" aria-live="polite" aria-atomic="true"></div>
+      <input type="text" id="share-url" readonly hidden aria-label="Share link" />
+      <div id="save-note">Autosaves every minute in this browser.<br />Clearing browser data removes your city.<br />Shared links and files give friends their own copy.</div>
     </section>
     <div id="road-help" role="status" aria-live="polite"></div>
     <div id="toolbar">

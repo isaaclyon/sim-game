@@ -39,6 +39,8 @@ rewriting history; mark the old one `Superseded by NNNN`.
 | [0031](0031-small-low-density-shops.md) | Low-density commerce grows small shops, not full-lot blocks | Accepted |
 | [0032](0032-compact-shop-staffing.md) | Compact shops support small teams | Accepted |
 | [0033](0033-single-city-state-saves.md) | Save one complete city locally and resume it on return | Accepted; implemented |
+| [0034](0034-command-log-replay-tests.md) | Replay regression tests from saved command logs | Accepted; implemented |
+| [0035](0035-share-cities-as-forked-copies.md) | Share cities as files and links that open as independent copies | Accepted; implemented |
 
 ADRs are only for decisions that are hard to reverse. See [AGENTS.md](AGENTS.md) for when to
 write one and how.

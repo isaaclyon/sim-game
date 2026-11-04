@@ -20,12 +20,7 @@ const demand = byId('demand');
 const demandFills = ['residential', 'commercial', 'industrial'].map((u) => byId(`demand-${u}`));
 const worker = new Worker(new URL('./sim.worker.ts', import.meta.url), { type: 'module' });
 const send = (msg: ToWorker) => worker.postMessage(msg);
-const cityControls = new CityControls(
-  send,
-  byId('save-city') as HTMLButtonElement,
-  byId('new-city') as HTMLButtonElement,
-  byId('save-status'),
-);
+const cityControls = new CityControls(send, byId, import.meta.env.DEV);
 // Pan keys held when follow starts are ignored until released, so they cannot fight it.
 const ignoredCameraKeys = new Set<string>();
 const inspector = new Inspector(
@@ -66,6 +61,8 @@ worker.onmessage = (e: MessageEvent<FromWorker>) => {
   if (msg.type === 'cityStatus') {
     cityControls.receive(msg);
     hud.hidden = !msg.ready;
+  } else if (msg.type === 'cityFile' || msg.type === 'commandLog') {
+    void cityControls.receiveFile(msg);
   } else if (msg.type === 'cityReset') {
     setTool(null);
     inspector.select(null);

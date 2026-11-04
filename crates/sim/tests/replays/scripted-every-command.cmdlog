@@ -1,0 +1,14 @@
+# Scripted through the WASM build: every command kind, a rezoning and a deleted road.
+sim-game command log 1
+seed 1
+grid 4 4
+0 spawn 40
+50 fill 50 50 residential-low
+50 fill 170 50 commercial-low
+350 paint 250 10 350 110 industrial-low
+550 curve 0 380 180 300 360 380 main
+950 road -60 60 0 60 street
+950 delete 60 120
+1950 fill 170 50 residential-high
+end 4950
+expect hash 2db15b482039ae58 population 171 buildings 32 trips 200
