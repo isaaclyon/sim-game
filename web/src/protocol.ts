@@ -40,7 +40,7 @@ export type ToWorker =
   | { type: 'previewBulldoze'; x: number; y: number; revision: number }
   /**
    * Asks how a road of `class` being drawn would be guided, built and charged (ADR 0036,
-   * ADR 0037). `points` is `[x, y, snap]` per clicked point in drawing order, then the cursor:
+   * ADR 0038). `points` is `[x, y, snap]` per clicked point in drawing order, then the cursor:
    * one point asks where a road would start, two a straight road, three a curve (start,
    * control, end). `snap` is a `Snap` bitmask. `plan` false only guides the points (a curve's
    * control point). Changes nothing; answered with `roadPreview`.
@@ -67,7 +67,7 @@ export const RoadClass = {
 } as const;
 export type RoadClass = (typeof RoadClass)[keyof typeof RoadClass];
 
-/** Drawing guide flags, matching `sim::guide` (ADR 0037). Joining roads is always on. */
+/** Drawing guide flags, matching `sim::guide` (ADR 0038). Joining roads is always on. */
 export const Snap = {
   Angle: 1,
   Guides: 2,
@@ -245,6 +245,13 @@ export type FromWorker =
    * Sent at start and whenever a paint changes a cell.
    */
   | { type: 'zones'; cells: Uint8Array; layout: [number, number, number, number, number] }
+  /**
+   * The whole pollution grid (ADR 0037): `[air, ground, noise, landValue]` bytes per cell,
+   * row-major from the origin, 0 = none (for land value: worthless) to 255 = full. `layout` is
+   * as for `zones`; cells are 4×4 zone cells. Sent at start, after edits and pauses, and at
+   * most once a real second while it changes.
+   */
+  | { type: 'pollution'; cells: Uint8Array; layout: [number, number, number, number, number] }
   /**
    * `rings` is `[n, x0, y0, …, x(n-1), y(n-1)]` per lot: its outline's point count, then its
    * points (ADR 0018). Sent at start and whenever lots change.

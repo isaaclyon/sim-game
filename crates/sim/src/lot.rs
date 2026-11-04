@@ -111,7 +111,7 @@ impl Lots {
         let same = |a: Point, b: Point| {
             (a.0 - b.0).abs() <= SAME_OUTLINE && (a.1 - b.1).abs() <= SAME_OUTLINE
         };
-        // The front is measured along the road, so a joined road (ADR 0039) moves it by rounding.
+        // The front is measured along the road, so a joined road (ADR 0040) moves it by rounding.
         (self.road[l] == plan.road
             && same((self.front_x[l], self.front_y[l]), plan.front)
             && self.cells(lot) == plan.cells

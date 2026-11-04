@@ -1,4 +1,4 @@
-//! Straight joins (ADR 0039): two straight roads of one class meeting end to end in a line, with
+//! Straight joins (ADR 0040): two straight roads of one class meeting end to end in a line, with
 //! no other road at that node, become one road. Otherwise the node would be a junction nobody
 //! can see, and it would pull new roads off the line they were drawn on.
 

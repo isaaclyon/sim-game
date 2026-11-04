@@ -114,7 +114,7 @@ impl World {
         cost <= self.treasury.balance
     }
 
-    /// What building the road through guided raw `[x, y, snap]` points (ADR 0037) would cost,
+    /// What building the road through guided raw `[x, y, snap]` points (ADR 0038) would cost,
     /// or None if it would be refused for its shape or the points are not a road.
     pub fn draft_cost(&self, raw: &[f32], class: RoadClass) -> Option<i64> {
         match self.draft_command(raw, class)? {

@@ -6,6 +6,7 @@ mod demand;
 mod inspect;
 mod money;
 mod persist;
+mod pollution;
 mod residents;
 mod roads;
 mod snapshot;
@@ -23,6 +24,7 @@ use crate::geometry::Shape;
 use crate::junction::Junctions;
 use crate::lot::Lots;
 use crate::path::Pathfinder;
+use crate::pollution::Pollution;
 use crate::rng::Rng;
 use crate::road::{LaneId, RoadClass, RoadNetwork};
 use crate::traffic::Traffic;
@@ -196,6 +198,8 @@ pub struct World {
     wake: BinaryHeap<Reverse<(u64, AgentId)>>,
     rng: Rng,
     totals: Stats,
+    /// Air, ground, noise, traffic flow and land value (ADR 0037).
+    pub pollution: Pollution,
 }
 
 impl World {
@@ -210,6 +214,7 @@ impl World {
             homes: Default::default(),
             cfg,
             zones: ZoneGrid::covering(roads.bounds()),
+            pollution: Pollution::default(),
             roads,
             lots: Lots::default(),
             buildings: Buildings::default(),
@@ -229,6 +234,7 @@ impl World {
             rng,
             totals: Stats::default(),
         };
+        world.pollution = Pollution::covering(&world.zones);
         world.sync_roads();
         world.refresh_upkeep();
         world
@@ -240,6 +246,7 @@ impl World {
         let zones = ZoneGrid::covering([0.0, 0.0, size(cols), size(rows)]);
         let rng = Rng::new(cfg.seed);
         let mut world = Self::new(cfg, RoadNetwork::default(), rng);
+        world.pollution = Pollution::covering(&zones);
         world.zones = zones;
         world
     }
@@ -356,6 +363,7 @@ impl World {
         self.resolve_exits(&exits);
         self.traffic.recycle_exits(exits);
         self.totals.tick += 1;
+        self.tick_pollution();
         self.settle_money();
         self.grow_buildings();
     }

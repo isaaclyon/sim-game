@@ -1,4 +1,4 @@
-//! Drawing guides (ADR 0037): angle, guide-line and length snapping of clicked points.
+//! Drawing guides (ADR 0038): angle, guide-line and length snapping of clicked points.
 
 use sim::guide::{ALL, ANGLE, GUIDES, LENGTH, angle_of, draft};
 use sim::rng::Rng;

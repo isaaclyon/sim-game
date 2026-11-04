@@ -1,4 +1,4 @@
-//! Drawing guides (ADR 0037): where a clicked point lands once angle, guide-line and length
+//! Drawing guides (ADR 0038): where a clicked point lands once angle, guide-line and length
 //! snapping apply. Read-only, like `snap::plan`, which still joins junctions and roads after.
 //! Angle steps are fixed unit vectors, so guided points need no trigonometry.
 

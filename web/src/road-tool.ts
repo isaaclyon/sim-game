@@ -1,4 +1,4 @@
-// The road and bulldoze tools: clicked points, sim-owned previews and drawing guides (ADR 0037).
+// The road and bulldoze tools: clicked points, sim-owned previews and drawing guides (ADR 0038).
 // The sim guides and plans every point; this module only keeps the clicks, asks one question at
 // a time about the latest cursor position, and draws the answers.
 import { type Quote, roadHelpText } from './hud';

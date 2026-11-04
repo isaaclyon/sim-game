@@ -1,4 +1,4 @@
-# 0039. Straight roads that meet end to end in a line become one road
+# 0040. Straight roads that meet end to end in a line become one road
 
 - Status: Accepted
 - Date: 2026-11-04
@@ -8,7 +8,7 @@
 A street drawn in several clicks, or a through road left behind when its side street is
 bulldozed, used to keep a node where the pieces met. Nothing marks such a node on screen, yet
 road ends within 15 m snap to it (`snap::SNAP_RADIUS`). That beats angle and guide snapping
-(ADR 0037): a road aimed square at such a street bends to meet the hidden node instead. Deleting
+(ADR 0038): a road aimed square at such a street bends to meet the hidden node instead. Deleting
 roads also left nodes no road uses, and those pulled new roads too.
 
 ## Decision

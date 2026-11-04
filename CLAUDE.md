@@ -31,7 +31,7 @@ What to build next and why lives in `docs/ROADMAP.md`. Work on the current miles
   1 = green, 2 = protected-left green.
 - Road drafts: `previewRoad` and `buildRoad` send raw `[x, y, snap]` points (start, a curve's
   control, end); snap bits 1 = angle, 2 = guide lines, 4 = length. The sim guides them
-  (ADR 0037) and builds with the guided coordinates, so command logs record final positions.
+  (ADR 0038) and builds with the guided coordinates, so command logs record final positions.
   The preview answer has `points` (`[x, y]` per guided point), `guides` (`[x0, y0, x1, y1]` per
   guide line), `length`, `angle` (NaN = none), `angles` (`[x, y, rx, ry, dx, dy]` per junction
   the road joins: the point, then unit directions along the road measured from and the new
@@ -45,6 +45,10 @@ What to build next and why lives in `docs/ROADMAP.md`. Work on the current miles
 - Zones: one byte per zone cell, row-major, plus layout `[origin_x, origin_y, cell_size, cols,
   rows]`; byte 0 = none, 1/2 = residential low/high, 3/4 commercial, 5/6 industrial (ADR 0014).
   Sent whole when the zone grid's version changes.
+- Pollution: four bytes per pollution cell, row-major, `[air, ground, noise, land_value]`,
+  0 = none (land value: worthless) to 255 = full, plus a layout like the zones'; cells are
+  4×4 zone cells sharing the zone origin (ADR 0037). Sent whole when its version changes,
+  at most once a real second while running; start, edits and pause flush immediately.
 - Lots: `[n, x0, y0, …]` per lot, its outline's point count then its points, sent whole when
   the lots version changes (ADR 0018). Block preview: `[x, y]` per outline sample of the block
   under the cursor, closed; empty = no block. Read-only.

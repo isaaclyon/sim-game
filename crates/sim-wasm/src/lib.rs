@@ -144,7 +144,7 @@ impl Sim {
     }
 
     /// Guides raw `[x, y, snap]` points and, if `plan`, previews the road through them; see
-    /// `World::write_road_draft` (ADR 0037).
+    /// `World::write_road_draft` (ADR 0038).
     pub fn road_draft(&mut self, points: &[f32], plan: bool) -> Vec<f32> {
         self.world.write_road_draft(points, plan, &mut self.buf);
         self.buf.clone()
@@ -264,6 +264,23 @@ impl Sim {
     /// `[origin_x, origin_y, cell_size, cols, rows]` of the zone grid.
     pub fn zone_layout(&self) -> Vec<f32> {
         self.world.zones.layout().to_vec()
+    }
+
+    pub fn pollution_version(&self) -> u32 {
+        self.world.pollution.version
+    }
+
+    /// `[air, ground, noise, land_value]` bytes per pollution cell, row-major; see
+    /// `pollution_layout` (ADR 0037).
+    pub fn pollution_cells(&mut self) -> Vec<u8> {
+        let mut out = Vec::new();
+        self.world.pollution.write_snapshot(&mut out);
+        out
+    }
+
+    /// `[origin_x, origin_y, cell_size, cols, rows]` of the pollution grid.
+    pub fn pollution_layout(&self) -> Vec<f32> {
+        self.world.pollution.layout().to_vec()
     }
 
     /// `[x, y]` per centreline sample of the selected road, or empty on a miss.

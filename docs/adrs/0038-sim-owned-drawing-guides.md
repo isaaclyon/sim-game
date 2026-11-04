@@ -1,4 +1,4 @@
-# 0037. Drawing guides are planned by the sim and travel as raw points with snap flags
+# 0038. Drawing guides are planned by the sim and travel as raw points with snap flags
 
 - Status: Accepted
 - Date: 2026-11-04

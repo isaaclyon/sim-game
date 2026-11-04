@@ -30,6 +30,8 @@ impl World {
         self.lots
             .check(self.zones.cells.len(), self.roads.lane_count() / 2)?;
         self.buildings.check(self.lots.len())?;
+        self.pollution
+            .check(&self.zones, self.roads.lane_count() / 2)?;
         self.junctions.check(&self.roads)?;
         self.traffic
             .check(self.roads.lane_count(), self.agents.len())?;

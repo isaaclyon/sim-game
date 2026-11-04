@@ -9,7 +9,7 @@ use crate::road::{NodeId, RoadClass, RoadId};
 use crate::snap::{self, Join};
 
 impl World {
-    /// Guides raw `[x, y, snap]` points (ADR 0037). Extra trailing floats are ignored.
+    /// Guides raw `[x, y, snap]` points (ADR 0038). Extra trailing floats are ignored.
     pub(super) fn draft(&self, raw: &[f32]) -> guide::Draft {
         let points: Vec<_> = raw
             .as_chunks::<3>()
@@ -116,7 +116,7 @@ impl World {
         true
     }
 
-    /// Joins every pair of straight roads meeting end to end in a line (ADR 0039). Their lots
+    /// Joins every pair of straight roads meeting end to end in a line (ADR 0040). Their lots
     /// move to the kept road. Returns the roads changed, whose cars the caller removes.
     fn join_straight_roads(&mut self) -> Vec<RoadId> {
         let mut changed = Vec::new();

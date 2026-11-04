@@ -19,7 +19,7 @@ test('normal worker frames report residents separately from cars', async () => {
   assert.ok(frame().stats.demand.residential < residential, 'residents fill housing demand');
 });
 
-// Snap flags 0 keep the drawn points exactly where they are (ADR 0037).
+// Snap flags 0 keep the drawn points exactly where they are (ADR 0038).
 const BUILDS = {
   buildRoad: [-100, 50, 0, 350, 50, 0],
   buildCurve: [-100, 50, 0, 125, 80, 0, 350, 50, 0],

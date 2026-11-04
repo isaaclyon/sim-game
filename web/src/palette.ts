@@ -54,3 +54,21 @@ export const TRAFFIC = { stuck: 0xe5383b, slow: 0xf2c14e, free: 0x38b26b };
  */
 export const ZONE_OVERLAY = [null, 0x7be08f, 0x2fae4b, 0x7fb0ff, 0x2f6ae0, 0xf6c35a, 0xe08a1e];
 export const ZONE_OVERLAY_ALPHA = 0.38;
+
+/**
+ * Pollution views (ADR 0037): each kind ramps from clear to its colour; land value ramps from
+ * low (red) to high (green). Haze and stain tint the plain view, faintly, where it is dirty.
+ */
+export const POLLUTION = {
+  air: 0x7b4fc0,
+  ground: 0x7a4718,
+  noise: 0xe0407a,
+  landLow: 0xd9483b,
+  landHigh: 0x3fae5a,
+  haze: 0x9a9488,
+  stain: 0x5e4a30,
+};
+export const POLLUTION_ALPHA = 0.75;
+
+/** Chimney smoke: pale grey puffs, slightly see-through. */
+export const SMOKE = { puff: 0xeceae4, glow: 0x5a5854, opacity: 0.55 };

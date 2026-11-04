@@ -47,7 +47,7 @@ fn deep_blocks_get_an_alley_that_cars_can_use_and_players_can_bulldoze() {
     assert_eq!(
         w.roads.road_count(),
         roads,
-        "the short sides it split join again (ADR 0039)"
+        "the short sides it split join again (ADR 0040)"
     );
     check_lots(&w);
     assert!(

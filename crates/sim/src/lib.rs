@@ -15,6 +15,7 @@ pub mod guide;
 pub mod junction;
 pub mod lot;
 pub mod path;
+pub mod pollution;
 mod poly;
 pub mod replay;
 pub mod rng;

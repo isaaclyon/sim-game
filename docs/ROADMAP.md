@@ -262,7 +262,7 @@ already plans roads: answers stay deterministic and testable, and M6 councilors 
 same builders through ordinary commands. Slices ship in this order; each is judged in the
 browser before the next starts.
 
-1. **Angle snapping and guide lines** ([ADR 0037](adrs/0037-sim-owned-drawing-guides.md)).
+1. **Angle snapping and guide lines** ([ADR 0038](adrs/0038-sim-owned-drawing-guides.md)).
    New roads snap to 15° steps (90° and 45° pull hardest) measured from the road they start
    on, or the map axes on empty land. Dashed guide lines line new ends up with nearby road
    ends, along their extensions and perpendiculars. Lengths snap to whole 8 m zone cells.
@@ -271,7 +271,7 @@ browser before the next starts.
    toggle separately; holding Shift turns all three off. Joining existing junctions and roads
    always stays on.
    Straight roads that meet end to end in a line become one road, so no hidden junction pulls
-   new roads off their angle ([ADR 0039](adrs/0039-straight-joins.md)).
+   new roads off their angle ([ADR 0040](adrs/0040-straight-joins.md)).
    Done when: a player can draw a square block and a T-junction exactly at 90° without
    zooming in, and can draw a free-angle road by holding Shift.
 2. **Continuous curves.** Each click adds a curved piece that leaves the previous piece
@@ -287,7 +287,7 @@ browser before the next starts.
 5. **Undo and redo** for road edits only, many steps, Ctrl+Z and Ctrl+Shift+Z. Undo removes the
    roads an edit added and rejoins roads it split, as a new edit with new IDs; buildings it
    cleared stay gone. History lives in the sim and is saved with the city
-   ([ADR 0038](adrs/0038-road-edit-history.md), proposed).
+   ([ADR 0039](adrs/0039-road-edit-history.md), proposed).
    Done when: building, upgrading and bulldozing can each be undone and redone, also after a
    reload, and replay tests stay exact.
 
@@ -303,6 +303,32 @@ Goals and consequences, kept light so they don't crowd out building.
   costs upkeep, and residents and filled jobs pay taxes, per clock hour. Upkeep can push the
   balance into debt, which only stops new roads. The HUD shows balance, taxes and upkeep.
   Bulldozing, zoning and sim-built alleys are free. Tax rates are fixed for now.
+- **First slice: pollution and land value — implemented** ([ADR 0037](adrs/0037-pollution-and-land-value-steer-growth.md)).
+  Industry and traffic make air pollution, ground pollution and noise, which lower land value.
+  Homes, and shops a little, grow first on high land value; industry ignores it. Nothing
+  standing is closed or emptied. It needs only buildings and traffic, so it comes before
+  services.
+  - Sim: a pollution grid aligned to the zone grid (4×4 zone cells per cell). Smoothed
+    traffic flow per road and ground pollution per cell build up over time. Air, noise and
+    land value are rebuilt on a fixed sim-time cadence, not every tick. All are saved. The
+    ADR 0025 growth check gains a land value threshold for residential (strong) and commercial (mild).
+  - Saves: version 3 holds money and pollution. Older saves and links are refused, like other
+    version changes (ADR 0033). Bless replay `expect` lines once.
+  - Display: overlays for air, ground, noise and land value; display-only haze and stained
+    ground. Add the snapshot format to CLAUDE.md with the Rust writer and renderer reader.
+  - Perf: compare `traffic_bench` ms/tick at the default size and `--scale la`.
+  - Built: the P button cycles air, ground, noise and land value; the plain view keeps a faint
+    haze and stain, and factory chimneys puff display-only smoke. At `--scale la` (about
+    600,000 cells) an update costs about 10 ms once every 100 ticks, about 0.1 ms a tick on
+    average; the default bench is unchanged. In a test town, the strip beside a factory
+    district (and a main road) grew 5 homes against 11 to 19 in strips farther away.
+    Not yet checked by hand: the full browser save and reload flow.
+
+  Done when: in a town with a factory district and a busy main road, new homes visibly fill
+  the quiet, clean blocks first and the dirty ones only when housing demand is high; an
+  old factory site stays tainted for a few sim days after rezoning; the overlays explain
+  why.
+
 - Services with coverage areas: power, water, roads maintenance, then fire, police, health and
   schools.
 - Citizen happiness from services, traffic and pollution, feeding back into demand and growth.

@@ -49,6 +49,7 @@ export async function tools({ hash = '', clipboard = true } = {}) {
       'inspector-close',
       'sound',
       'traffic',
+      'pollution',
       'save-city',
       'new-city',
       'save-status',
@@ -200,6 +201,12 @@ export async function tools({ hash = '', clipboard = true } = {}) {
     setLots(rings) {
       previews.push({ type: 'lots', rings });
     }
+    setPollution(cells, layout) {
+      previews.push({ type: 'pollution', cells, layout });
+    }
+    setPollutionView(view) {
+      previews.push({ type: 'pollutionView', view });
+    }
   }
   const context = createContext({
     innerWidth: 1000,
@@ -305,36 +312,42 @@ export async function tools({ hash = '', clipboard = true } = {}) {
     { context },
   );
   await roadTool.link((specifier) => (specifier === './hud' ? hud : protocol));
+  const viewButtons = new SourceTextModule(
+    stripTypeScriptTypes(readFileSync(new URL('../src/view-buttons.ts', import.meta.url), 'utf8')),
+    { context },
+  );
   await module.link((specifier) =>
-    specifier === './road-tool'
-      ? roadTool
-      : specifier === './city-controls'
-        ? cityControls
-        : specifier === './city-share'
-          ? cityShare
-          : specifier === './hud'
-            ? hud
-            : specifier === './inspector'
-              ? inspector
-              : specifier === './ambient-sound'
-                ? new SyntheticModule(
-                    ['AmbientSound'],
-                    function () {
-                      this.setExport('AmbientSound', AmbientSound);
-                    },
-                    { context },
-                  )
-                : specifier === './demand-meter'
-                  ? demandMeter
-                  : specifier === './protocol'
-                    ? protocol
-                    : new SyntheticModule(
-                        ['Renderer'],
-                        function () {
-                          this.setExport('Renderer', Renderer);
-                        },
-                        { context },
-                      ),
+    specifier === './view-buttons'
+      ? viewButtons
+      : specifier === './road-tool'
+        ? roadTool
+        : specifier === './city-controls'
+          ? cityControls
+          : specifier === './city-share'
+            ? cityShare
+            : specifier === './hud'
+              ? hud
+              : specifier === './inspector'
+                ? inspector
+                : specifier === './ambient-sound'
+                  ? new SyntheticModule(
+                      ['AmbientSound'],
+                      function () {
+                        this.setExport('AmbientSound', AmbientSound);
+                      },
+                      { context },
+                    )
+                  : specifier === './demand-meter'
+                    ? demandMeter
+                    : specifier === './protocol'
+                      ? protocol
+                      : new SyntheticModule(
+                          ['Renderer'],
+                          function () {
+                            this.setExport('Renderer', Renderer);
+                          },
+                          { context },
+                        ),
   );
   await module.evaluate();
   const move = (x, y) => canvas.events.pointermove({ clientX: x, clientY: y });

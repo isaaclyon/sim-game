@@ -1,4 +1,4 @@
-//! Straight joins (ADR 0039): two straight roads of one class meeting end to end in a line
+//! Straight joins (ADR 0040): two straight roads of one class meeting end to end in a line
 //! become one road, so no hidden junction is left to pull new roads off their line.
 use sim::rng::Rng;
 use sim::road::{RoadClass, RoadNetwork};

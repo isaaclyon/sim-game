@@ -287,3 +287,13 @@ fn counters_that_would_underflow_are_refused() {
     w.supply.commercial_jobs += 1;
     assert_eq!(refused(&w), SaveError::Invalid("job supply"));
 }
+
+#[test]
+fn a_mismatched_pollution_grid_is_refused() {
+    let mut w = zoned_town();
+    w.pollution.cols += 1;
+    assert_eq!(refused(&w), SaveError::Invalid("pollution grid"));
+    let mut w = zoned_town();
+    w.pollution.flow.push(f32::NAN);
+    assert_eq!(refused(&w), SaveError::Invalid("traffic flow"));
+}

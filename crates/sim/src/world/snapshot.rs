@@ -119,7 +119,7 @@ impl World {
         );
     }
 
-    /// Guides raw `[x, y, snap]` points (ADR 0037) and writes `[n, m, length, angle, k]`, then
+    /// Guides raw `[x, y, snap]` points (ADR 0038) and writes `[n, m, length, angle, k]`, then
     /// `[x, y]` per guided point, `[x0, y0, x1, y1]` per guide line, `[x, y, rx, ry, dx, dy]` per
     /// angle mark (`guide::Mark`; the start's, then, if `plan`, the end's), then, if `plan`, the
     /// road preview of the guided points: one stop for one point (where a road would start), as
@@ -252,6 +252,7 @@ impl World {
         }
         self.junctions.hash_into(&mut mix);
         self.buildings.hash_into(&mut mix);
+        self.pollution.hash_into(&mut mix);
         for chunk in self.zones.cells.chunks(8) {
             let mut word = [0u8; 8];
             word[..chunk.len()].copy_from_slice(chunk);
