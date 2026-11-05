@@ -5,3 +5,9 @@ node_modules/
 .DS_Store
 .env
 .env.*
+
+# Local agent skills and notes
+/.agents/
+/.claude/skills/
+/skills-lock.json
+/.scratch/
