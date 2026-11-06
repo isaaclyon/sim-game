@@ -416,8 +416,20 @@ Goals and consequences, kept light so they don't crowd out building.
   Done when: a player grows a village on starter power, sees why growth stops, adds a plant,
   and connects an off-road wind farm with a line.
 
-- Remaining services with coverage areas: water, roads maintenance, then fire, police, health
-  and schools.
+- **Fire** ([ADR 0053](adrs/0053-fire-stations-send-trucks-through-traffic.md)). Roadside fire
+  stations cover buildings within a driving distance along roads and raise their land value.
+  Above about 1,000 residents, grown buildings occasionally catch fire (industry and dense
+  more often). A station sends a real truck through traffic; one that arrives in time saves
+  the building, otherwise it burns down, its people rehome or leave, and ruins stand for a
+  day before the lot regrows. A city setting turns fires off. Police, health and schools
+  later reuse the same shape.
+
+  Done when: a town nearing 1,000 people sees the warning, builds a station, watches a truck
+  cross town and save a house, loses a building in an uncovered or jammed area, and can turn
+  fires off.
+
+- Remaining services with coverage areas: water (in progress), roads maintenance, then
+  police, health and schools.
 - Citizen happiness from services, traffic and pollution, feeding back into demand and growth.
   The citizen inspector shows each person's mood and complaints.
 - Data overlays: traffic, coverage, land value, happiness.
