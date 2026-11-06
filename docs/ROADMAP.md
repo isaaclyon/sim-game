@@ -286,7 +286,7 @@ grid tool, upgrade and undo land in the new interface.
    browser before moving to the next slice, including near-sideways ends: very tight turns may
    fold the road ribbon despite matching tangents.
    Done when: a winding road of five pieces has no visible kinks.
-3. **Grid tool.** Pick a cell size (60, 80 or 100 m), drag the first edge to set the angle,
+3. **Grid tool.** Pick a cell size (48, 64, 80, 96 or 112 m), drag the first edge to set the angle,
    then drag out the area in whole blocks. Each grid line is planned like a hand-drawn road:
    it joins and splits existing roads, and lines that would overlap are left out. The preview
    shows exactly what will be built ([ADR 0049](adrs/0049-grid-tool.md), proposed).

@@ -1,6 +1,6 @@
 # 0049. The grid tool is one sim command planned edge by edge
 
-- Status: Proposed (M4.5 slice 3)
+- Status: Accepted (M4.5 slice 3); not yet implemented
 - Date: 2026-11-06
 - Extends: [0038](0038-sim-owned-drawing-guides.md), [0034](0034-command-log-replay-tests.md),
   [0036](0036-money-build-costs-taxes-upkeep.md)
@@ -56,7 +56,9 @@ command as one edit. Lots reach 64 m from a road, are about 16 m wide and merge 
   slice 4.
 - **Cell size** is any value from 40 to 200 m; the sim does not require a multiple of the
   8 m zone cell. Lots come from road geometry, not zone cells, and a rotated grid cannot line
-  up with the axis-aligned zone grid anyway. The menu offers 60, 80 and 100 m.
+  up with the axis-aligned zone grid anyway. The menu offers five sizes, all multiples of 8 m so
+  axis-aligned grids fall on whole zone cells and match length snapping: 48, 64, 80 (the
+  default), 96 and 112 m.
 - **Money is all or nothing.** The cost is the sum of every accepted edge's new legs at the
   class rate. If the balance cannot cover it the whole grid is refused, as a road is.
   Partial builds were rejected: the preview could no longer show exactly what is built.
@@ -95,9 +97,3 @@ command as one edit. Lots reach 64 m from a road, are about 16 m wide and merge 
   than 40 m after the build, which is the "no slivers" check for the done-when.
 - The 40 m sliver width, the 20-block limit and the cell size range are tuning values, but
   changing them changes what recorded `roadgrid` commands build, so fixtures need blessing.
-
-## Open questions
-
-- Should the cell presets be 64, 80 and 96 m, so axis-aligned grids fall on whole zone cells
-  and match the 8 m length snapping, instead of the roadmap's 60, 80 and 100 m? The sim
-  accepts either; this is a menu choice.
