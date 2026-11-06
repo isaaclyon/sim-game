@@ -54,6 +54,7 @@ rewriting history; mark the old one `Superseded by NNNN`.
 | [0046](0046-continuous-curves.md) | Continuous curves use sim-guided continuation drafts | Accepted |
 | [0047](0047-move-ins-follow-daily-schedules.md) | Move-ins follow daily schedules | Accepted |
 | [0048](0048-drawing-over-roads-changes-their-class.md) | Drawing a road over existing roads changes their class | Accepted; implemented |
+| [0052](0052-water-follows-roads-and-supplies-dense-buildings.md) | Water follows roads and supplies dense buildings | Accepted |
 
 ADRs are only for decisions that are hard to reverse. See [AGENTS.md](AGENTS.md) for when to
 write one and how.

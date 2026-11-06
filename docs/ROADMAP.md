@@ -416,8 +416,19 @@ Goals and consequences, kept light so they don't crowd out building.
   Done when: a player grows a village on starter power, sees why growth stops, adds a plant,
   and connects an off-road wind farm with a line.
 
-- Remaining services with coverage areas: water, roads maintenance, then fire, police, health
-  and schools.
+- **Water — next** ([ADR 0052](adrs/0052-water-follows-roads-and-supplies-dense-buildings.md)).
+  Pipes follow roads. Roadside pumps give less water on polluted ground; water towers store
+  spare water for shortfalls. Only dense buildings need water: low density is on wells. Dry
+  dense lots don't build, and dry dense buildings slowly empty after a day's grace, then
+  refill when water returns. Pumps, towers and power plants get build costs and upkeep.
+  Later slice: sewage outlets that add ground pollution.
+
+  Done when: a village grows with no pumps, dense zones wait for water with a clear reason, a
+  pump beside a factory district visibly gives less, a tower carries a network through a
+  dip, and a cut-off dense block empties slowly and refills once reconnected.
+
+- Remaining services with coverage areas: roads maintenance, then fire, police, health and
+  schools.
 - Citizen happiness from services, traffic and pollution, feeding back into demand and growth.
   The citizen inspector shows each person's mood and complaints.
 - Data overlays: traffic, coverage, land value, happiness.
