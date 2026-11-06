@@ -29,6 +29,11 @@ What to build next and why lives in `docs/ROADMAP.md`. Work on the current miles
   over roads.
   Read-only. Road/lane IDs are never reused after deletion (ADR 0013). Lane counts include
   tombstone slots.
+- Road class clicks (ADR 0050): `setRoadClass` gives the road nearest `[x, y]` in bulldoze
+  reach a class in place, as drawing over it would (ADR 0048); command logs write it as
+  `class x y main`. `previewRoadClass` answers `roadClassPreview`: `segment` is `[x, y]` per
+  centreline sample of the road that would change, empty = nothing would change (no road, or
+  already that class), plus `cost` (null when empty), `affordable` and the echoed revision.
 - Signals: `[x, y, heading, state]` per signalised approach (`SIGNAL_STRIDE`), state 0 = red,
   1 = green, 2 = protected-left green.
 - Road drafts: `previewRoad` and `buildRoad` send raw `[x, y, snap]` points (start, a curve's
@@ -49,6 +54,14 @@ What to build next and why lives in `docs/ROADMAP.md`. Work on the current miles
   of the same class plans nothing (ADR 0048).
   `buildResult` carries the guided `end`, null if refused, and the guided `control` for a
   successful curve when the request sets `chain`.
+- Grid drafts (ADR 0049): `previewGrid`/`buildGrid` send the first edge's two raw
+  `[x, y, snap]` records, `cell` metres and an optional area `cursor` `[x, y]`; the sim guides
+  the edge and rounds the area to whole blocks. `gridPreview` carries the road draft's
+  `points`, `guides`, `length`, `angle`, `angles`, plus signed `cols`/`rows`, `roads`
+  (`[ax, ay, a_join, bx, by, b_join]` per new leg, joins as `stops`), `dropped`
+  (`[ax, ay, bx, by]` per left-out lattice edge), `cost` and `affordable`. One `buildGrid` is
+  one all-or-nothing `BuildGrid` command (`roadgrid` in command logs); it answers `buildResult`
+  with `end` null.
 - Zones: one byte per zone cell, row-major, plus layout `[origin_x, origin_y, cell_size, cols,
   rows]`; byte 0 = none, 1/2 = residential low/high, 3/4 commercial, 5/6 industrial (ADR 0014).
   Sent whole when the zone grid's version changes.

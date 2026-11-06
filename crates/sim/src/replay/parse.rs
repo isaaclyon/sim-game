@@ -93,6 +93,27 @@ impl<'a> Line<'a> {
                     class,
                 }
             }
+            "roadgrid" => {
+                let [ox, oy, ux, uy, cell] = self.coords()?;
+                let cols = self.number("column count")?;
+                let rows = self.number("row count")?;
+                let class = self.named(&CLASSES, "road class")?;
+                Command::BuildGrid {
+                    ox,
+                    oy,
+                    ux,
+                    uy,
+                    cell,
+                    cols,
+                    rows,
+                    class,
+                }
+            }
+            "class" => {
+                let [x, y] = self.coords()?;
+                let class = self.named(&CLASSES, "road class")?;
+                Command::SetRoadClass { x, y, class }
+            }
             "delete" => {
                 let [x, y] = self.coords()?;
                 Command::DeleteRoad { x, y }

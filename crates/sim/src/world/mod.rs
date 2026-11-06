@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 mod closure;
 mod demand;
 mod demolish;
+mod grid;
 mod inspect;
 mod money;
 mod persist;
@@ -34,6 +35,7 @@ use crate::traffic::Traffic;
 use crate::zone::{Zone, ZoneGrid};
 
 pub use demand::Demand;
+pub use grid::{GridPreview, MAX_BLOCKS, MAX_CELL, MIN_CELL};
 pub use inspect::{BuildingInfo, CitizenInfo, Place};
 pub use money::{GRANT, JOB_TAX, Money, RESIDENT_TAX, START_FUNDS};
 pub use persist::{SAVE_VERSION, SaveError};
@@ -102,6 +104,29 @@ pub enum Command {
         cy: f32,
         bx: f32,
         by: f32,
+        class: RoadClass,
+    },
+    /// Lays a lattice of `cols` × `rows` blocks of `cell` metres from the origin along the unit
+    /// axis `(ux, uy)`; negative counts go the other way, and rows run to the axis's left
+    /// (counter-clockwise). Each edge is planned like a hand-drawn road, edges an existing
+    /// road runs alongside are left out, and existing roads keep their class. All or nothing
+    /// on money; `Alley`, more than `MAX_BLOCKS` either way and cells outside `MIN_CELL` to
+    /// `MAX_CELL` are refused (ADR 0049).
+    BuildGrid {
+        ox: f32,
+        oy: f32,
+        ux: f32,
+        uy: f32,
+        cell: f32,
+        cols: i32,
+        rows: i32,
+        class: RoadClass,
+    },
+    /// Gives the road nearest the point, in bulldoze reach, `class` in place, as drawing over
+    /// the whole road would (ADR 0048, 0050). Refused for a road already of `class`.
+    SetRoadClass {
+        x: f32,
+        y: f32,
         class: RoadClass,
     },
     /// Removes the plant under the point, else the nearest line in reach, else the building
@@ -338,6 +363,8 @@ impl World {
                 },
                 class,
             ),
+            Command::BuildGrid { .. } => self.build_grid(&cmd),
+            Command::SetRoadClass { x, y, class } => self.set_road_class(x, y, class),
             Command::DeleteRoad { x, y } => {
                 self.bulldoze_power(x, y) || self.demolish(x, y) || self.delete_road(x, y)
             }

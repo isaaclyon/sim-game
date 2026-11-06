@@ -158,6 +158,12 @@ export async function tools({ hash = '', clipboard = true, catalog } = {}) {
     setBulldozePreview(segment) {
       previews.push({ type: 'bulldoze', segment });
     }
+    setUpgradePreview(segment, ok, roadClass) {
+      previews.push({ type: 'upgrade', segment, ok, roadClass });
+    }
+    setGridPreview(roads, dropped, edge, ok, roadClass) {
+      previews.push({ type: 'grid', roads, dropped, edge, ok, roadClass });
+    }
     setBlockOutline(outline, zone) {
       previews.push({ type: 'block', outline, zone });
     }

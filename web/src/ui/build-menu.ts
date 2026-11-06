@@ -20,6 +20,8 @@ export interface Selection {
   roadMode: RoadMode | null;
   /** The `Snap` flags that are on. */
   snap: number;
+  /** The grid's block size in metres. */
+  gridCell: number;
 }
 
 export interface MenuActions {
@@ -37,9 +39,10 @@ export function sameTool(a: Tool | null, b: Tool | null): boolean {
 }
 
 function optionOn(o: Option, s: Selection) {
-  return o.action.kind === 'roadMode'
-    ? s.roadMode === o.action.mode
-    : (s.snap & o.action.flag) !== 0;
+  const a = o.action;
+  if (a.kind === 'roadMode') return s.roadMode === a.mode;
+  if (a.kind === 'gridCell') return s.gridCell === a.cell;
+  return (s.snap & a.flag) !== 0;
 }
 
 /** A single letter shortcut, for `aria-keyshortcuts`; "Z twice" has none. */
@@ -50,7 +53,7 @@ export class BuildMenu {
   readonly hint: HTMLElement;
   readonly viewsButton: HTMLElement;
   private open: string | null = null;
-  private selection: Selection = { tool: null, roadMode: null, snap: 0 };
+  private selection: Selection = { tool: null, roadMode: null, snap: 0, gridCell: 0 };
   private readonly categories: Category[];
   private readonly actions: MenuActions;
   private readonly items: [Item, HTMLElement][] = [];

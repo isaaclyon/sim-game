@@ -54,6 +54,8 @@ rewriting history; mark the old one `Superseded by NNNN`.
 | [0046](0046-continuous-curves.md) | Continuous curves use sim-guided continuation drafts | Accepted |
 | [0047](0047-move-ins-follow-daily-schedules.md) | Move-ins follow daily schedules | Accepted |
 | [0048](0048-drawing-over-roads-changes-their-class.md) | Drawing a road over existing roads changes their class | Accepted; implemented |
+| [0049](0049-grid-tool.md) | The grid tool is one sim command planned edge by edge | Accepted; implemented |
+| [0050](0050-click-to-change-road-class.md) | Clicking a road changes its class | Accepted; implemented |
 
 ADRs are only for decisions that are hard to reverse. See [AGENTS.md](AGENTS.md) for when to
 write one and how.

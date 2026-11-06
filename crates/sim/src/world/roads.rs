@@ -5,8 +5,8 @@ use super::{Command, World, money};
 use crate::block::{self, Rect};
 use crate::geometry::Shape;
 use crate::guide;
-use crate::road::{NodeId, RoadClass, RoadId};
-use crate::snap::{self, Join};
+use crate::road::{RoadClass, RoadId};
+use crate::snap;
 
 impl World {
     /// Guides raw `[x, y, snap]` points (ADR 0038). Extra trailing floats are ignored.
@@ -51,13 +51,51 @@ impl World {
         let Some(plan) = snap::plan(&self.roads, shape, Some(class)) else {
             return false;
         };
+        self.build_plan(plan, class)
+    }
+
+    /// Gives the road nearest `(x, y)` in bulldoze reach `class`, in place (ADR 0050). Plans
+    /// it as drawing over that whole road would, so cost, lanes, junctions and joins follow
+    /// ADR 0048. Refused off roads, for a road already of `class`, or when unaffordable.
+    pub(super) fn set_road_class(&mut self, x: f32, y: f32, class: RoadClass) -> bool {
+        match self.class_plan(x, y, class) {
+            Some(plan) => self.build_plan(plan, class),
+            None => false,
+        }
+    }
+
+    /// The plan `set_road_class` would build, or None if it would change nothing.
+    pub(super) fn class_plan(&self, x: f32, y: f32, class: RoadClass) -> Option<snap::Plan> {
+        let road = snap::bulldoze_target(&self.roads, x, y)?;
+        snap::reclass_plan(&self.roads, road, class)
+    }
+
+    /// Charges for and builds a plan of `class`; refused when the city cannot afford it.
+    fn build_plan(&mut self, plan: snap::Plan, class: RoadClass) -> bool {
         let cost = money::plan_cost(&self.roads, &plan, class);
-        if !self.can_afford(cost) {
+        self.build_plans(vec![plan], cost, class)
+    }
+
+    /// Charges `cost` for `plans` of `class` and builds them in order, all or nothing; each
+    /// was planned against the network with the ones before it built. Refused when empty or
+    /// unaffordable.
+    pub(super) fn build_plans(
+        &mut self,
+        plans: Vec<snap::Plan>,
+        cost: i64,
+        class: RoadClass,
+    ) -> bool {
+        if plans.is_empty() || !self.can_afford(cost) {
             return false;
         }
         self.treasury.balance -= cost;
         let mut split = Vec::new();
-        let rect = self.add_plan(plan, class, &mut split);
+        let mut rect: Option<Rect> = None;
+        for plan in plans {
+            let r = self.add_plan(plan, class, &mut split);
+            rect = Some(rect.map_or(r, |q| block::union(q, r)));
+        }
+        let rect = rect.expect("at least one plan");
         split.extend(self.join_straight_roads());
         self.sync_roads();
         self.remove_cars_using(&split);
@@ -79,27 +117,14 @@ impl World {
     }
 
     fn add_plan(&mut self, plan: snap::Plan, class: RoadClass, split: &mut Vec<RoadId>) -> Rect {
-        let nodes: Vec<NodeId> = plan
-            .stops
-            .iter()
-            .map(|s| match s.join {
-                Join::Node(n) => n,
-                Join::New => self.roads.add_node(s.x, s.y),
-                Join::Split(road) => {
-                    // The plan splits each road at most once, so `road` still has its old ends.
-                    let n = self.roads.add_node(s.x, s.y);
-                    let rest = self.roads.split_road(road, n);
-                    self.junctions.remap_split(road, rest);
-                    split.push(road);
-                    n
-                }
-            })
-            .collect();
+        let junctions = &mut self.junctions;
+        snap::apply(&mut self.roads, &plan, class, |road, rest| {
+            junctions.remap_split(road, rest);
+            split.push(road);
+        });
         let mut rect = block::shape_rect(plan.legs[0]);
-        for (leg, shape) in nodes.windows(2).zip(plan.legs) {
+        for &shape in &plan.legs {
             rect = block::union(rect, block::shape_rect(shape));
-            // False where the plan follows an existing road, which is kept in place.
-            self.roads.add_shape(leg[0], leg[1], shape.control, class);
         }
         // Lanes and shapes stay, so cars on these roads keep their routes.
         for road in plan.reclass {

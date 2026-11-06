@@ -3,7 +3,7 @@
 use super::{SNAPSHOT_STRIDE, World};
 use crate::agents::AgentState;
 use crate::geometry::Shape;
-use crate::road::RoadClass;
+use crate::road::{RoadClass, RoadId};
 use crate::snap::{self, Join};
 
 /// Distance from the road centreline to the middle of each lane, metres.
@@ -76,11 +76,25 @@ impl World {
             return;
         }
         if let Some(road) = snap::bulldoze_target(&self.roads, x, y) {
-            let shape = self.roads.shape(road);
-            out.extend([shape.a.0, shape.a.1]);
-            for (_, _, _, p) in shape.segments() {
-                out.extend([p.0, p.1]);
-            }
+            self.write_centreline(road, out);
+        }
+    }
+
+    /// Writes `[x, y]` per centreline sample of the road `SetRoadClass` at this point would
+    /// change, as the bulldoze preview does; nothing if it would change nothing (ADR 0050).
+    /// Only roads are targets. Changes nothing.
+    pub fn write_class_preview(&self, x: f32, y: f32, class: RoadClass, out: &mut Vec<f32>) {
+        out.clear();
+        if let Some(plan) = self.class_plan(x, y, class) {
+            self.write_centreline(plan.reclass[0], out);
+        }
+    }
+
+    fn write_centreline(&self, road: RoadId, out: &mut Vec<f32>) {
+        let shape = self.roads.shape(road);
+        out.extend([shape.a.0, shape.a.1]);
+        for (_, _, _, p) in shape.segments() {
+            out.extend([p.0, p.1]);
         }
     }
 
