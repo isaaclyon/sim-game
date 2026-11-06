@@ -181,6 +181,13 @@ impl World {
         )
     }
 
+    /// What `SetRoadClass` at this point would cost (ADR 0050), or None if it would change
+    /// nothing. Changes nothing.
+    pub fn class_cost(&self, x: f32, y: f32, class: RoadClass) -> Option<i64> {
+        self.class_plan(x, y, class)
+            .map(|p| plan_cost(&self.roads, &p, class))
+    }
+
     fn shape_cost(&self, shape: Shape, class: RoadClass) -> Option<i64> {
         crate::snap::plan(&self.roads, shape, Some(class))
             .map(|p| plan_cost(&self.roads, &p, class))

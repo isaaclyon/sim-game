@@ -4,7 +4,8 @@
 import { ZONE_OVERLAY } from '../palette';
 import { PlantKind, RoadClass, Snap, Zone } from '../protocol';
 
-export type RoadMode = 'straight' | 'curve' | 'continuous';
+/** How the road tool works: draw a road of a shape, or click roads to change their class. */
+export type RoadMode = 'straight' | 'curve' | 'continuous' | 'upgrade';
 
 /** What an item switches on. */
 export type Tool =
@@ -126,6 +127,12 @@ export const CATEGORIES: Category[] = [
         label: 'Continuous',
         tip: 'A chain of smoothly joined curves.',
         action: { kind: 'roadMode', mode: 'continuous' },
+      },
+      {
+        id: 'upgrade-road',
+        label: 'Upgrade',
+        tip: 'Click a road to give it the chosen class; alleys become streets.',
+        action: { kind: 'roadMode', mode: 'upgrade' },
       },
       {
         id: 'snap-angle',

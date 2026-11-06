@@ -114,6 +114,7 @@ worker.onmessage = (e: MessageEvent<FromWorker>) => {
   } else if (
     msg.type === 'roadPreview' ||
     msg.type === 'bulldozePreview' ||
+    msg.type === 'roadClassPreview' ||
     msg.type === 'buildResult'
   ) {
     roads.receive(msg);

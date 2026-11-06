@@ -20,7 +20,7 @@ const STAGES = {
 
 /** Help for the road and bulldoze tools; empty when neither is active. */
 export function roadHelpText(
-  tool: 'straight' | 'curve' | 'continuous' | 'bulldoze' | null,
+  tool: 'straight' | 'curve' | 'continuous' | 'upgrade' | 'bulldoze' | null,
   stage: keyof typeof STAGES,
   building: boolean,
   main: boolean,
@@ -30,6 +30,8 @@ export function roadHelpText(
   if (tool === 'bulldoze')
     return 'Click a highlighted road, building or power piece to remove it. Esc or right-click cancels.';
   if (!tool) return '';
+  if (tool === 'upgrade')
+    return `${costText(quote)}Click a road to make it a ${main ? 'main road' : 'street'}. Esc or right-click cancels.`;
   if (building) return 'Building road…';
   const problem = refused
     ? tool === 'continuous'

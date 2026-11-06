@@ -362,6 +362,11 @@ export class Renderer {
     this.tools.setBulldoze(segment);
   }
 
+  /** The road an upgrade click would change, at its new class's width (ADR 0050). */
+  setUpgradePreview(segment: Float32Array, ok: boolean, roadClass: number) {
+    this.tools.setUpgrade(segment, ok, roadClass);
+  }
+
   /** Draws plants, lines and power markers; see `power` in protocol.ts. */
   setPower(plants: Float32Array, lines: Float32Array, buildings: Float32Array) {
     this.power.set(plants, lines, buildings);

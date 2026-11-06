@@ -1,11 +1,12 @@
-// The road and bulldoze tools: clicked points, sim-owned previews and drawing guides (ADR 0038).
+// The road, upgrade and bulldoze tools: clicked points, sim-owned previews and drawing guides
+// (ADR 0038). Upgrade clicks a road to give it the chosen class (ADR 0050).
 // The sim guides and plans every point; this module only keeps the clicks, asks one question at
 // a time about the latest cursor position, and draws the answers.
 
 import { type FromWorker, RoadClass, Snap, type ToWorker } from './protocol';
 import { type Quote, roadHelpText } from './ui/hints';
 
-export type RoadMode = 'straight' | 'curve' | 'continuous' | 'bulldoze' | null;
+export type RoadMode = 'straight' | 'curve' | 'continuous' | 'upgrade' | 'bulldoze' | null;
 /** A ground position: x and z in world space, sim x and y. */
 type Ground = { x: number; z: number };
 /** A clicked point with the snap flags it was clicked with. */
@@ -16,6 +17,7 @@ interface Drawing {
   setGuides(lines: Float32Array | null): void;
   setAngles(marks: Float32Array | null): void;
   setBulldozePreview(segment: Float32Array): void;
+  setUpgradePreview(segment: Float32Array, ok: boolean, cls: number): void;
 }
 
 interface Elements {
@@ -72,8 +74,9 @@ export class RoadTool {
     return this.snap;
   }
 
+  /** A tool that uses the road class: drawing roads, or upgrading them. */
   get roadMode() {
-    return this.mode === 'straight' || this.mode === 'curve' || this.mode === 'continuous';
+    return this.mode !== null && this.mode !== 'bulldoze';
   }
 
   /** Switches tool, dropping any road being drawn. */
@@ -129,6 +132,8 @@ export class RoadTool {
     if (this.pendingBuild !== null || !this.mode) return;
     this.shift = shift;
     if (this.mode === 'bulldoze') this.send({ type: 'deleteRoad', x: p.x, y: p.z });
+    else if (this.mode === 'upgrade')
+      this.send({ type: 'setRoadClass', x: p.x, y: p.z, class: this.roadClass });
     else if (this.clicked.length < (this.needsControl() ? 2 : 1))
       this.clicked.push({ ...p, snap: this.flags() });
     else {
@@ -156,12 +161,17 @@ export class RoadTool {
   }
 
   receive(msg: FromWorker) {
-    if (msg.type === 'roadPreview' || msg.type === 'bulldozePreview') {
+    if (
+      msg.type === 'roadPreview' ||
+      msg.type === 'bulldozePreview' ||
+      msg.type === 'roadClassPreview'
+    ) {
       this.inFlight = false;
       if (msg.revision === this.revision && this.cursor) {
-        if (msg.type === 'roadPreview' && this.roadMode) this.showRoad(msg);
+        if (msg.type === 'roadPreview' && this.drawing) this.showRoad(msg);
         if (msg.type === 'bulldozePreview' && this.mode === 'bulldoze')
           this.draw.setBulldozePreview(msg.segment);
+        if (msg.type === 'roadClassPreview' && this.mode === 'upgrade') this.showUpgrade(msg);
       }
       this.sendPreview();
     } else if (msg.type === 'buildResult') {
@@ -189,6 +199,18 @@ export class RoadTool {
       this.quote = unpaid;
       this.updateHelp();
     }
+  }
+
+  /** The road a click would change, at its new class's width, and its price. */
+  private showUpgrade(msg: Extract<FromWorker, { type: 'roadClassPreview' }>) {
+    this.draw.setUpgradePreview(msg.segment, msg.affordable, this.roadClass);
+    this.quote = msg.segment.length > 0 ? { cost: msg.cost, affordable: msg.affordable } : null;
+    this.updateHelp();
+  }
+
+  /** A tool that draws roads from clicked points. */
+  private get drawing() {
+    return this.roadMode && this.mode !== 'upgrade';
   }
 
   private showRoad(msg: Extract<FromWorker, { type: 'roadPreview' }>) {
@@ -270,6 +292,10 @@ export class RoadTool {
     const b = this.cursor;
     if (this.mode === 'bulldoze') {
       this.send({ type: 'previewBulldoze', revision, x: b.x, y: b.z });
+      return;
+    }
+    if (this.mode === 'upgrade') {
+      this.send({ type: 'previewRoadClass', revision, x: b.x, y: b.z, class: this.roadClass });
       return;
     }
     this.planAsked = !(this.needsControl() && this.clicked.length === 1);

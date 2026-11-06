@@ -93,6 +93,11 @@ impl<'a> Line<'a> {
                     class,
                 }
             }
+            "class" => {
+                let [x, y] = self.coords()?;
+                let class = self.named(&CLASSES, "road class")?;
+                Command::SetRoadClass { x, y, class }
+            }
             "delete" => {
                 let [x, y] = self.coords()?;
                 Command::DeleteRoad { x, y }

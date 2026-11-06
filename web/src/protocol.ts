@@ -27,6 +27,13 @@ export type ToWorker =
   /** Builds the road through guided `points`, as in `previewRoad`. `chain` requests the
    * sim-guided control of a successful curve in `buildResult`, for its next continuation. */
   | { type: 'buildRoad'; id: number; points: number[]; class: RoadClass; chain?: boolean }
+  /** Gives the road nearest the point, in bulldoze reach, `class` in place, as drawing over
+   * the whole road would (ADR 0048, 0050). Refused for a road already of `class` or when the
+   * city cannot pay. */
+  | { type: 'setRoadClass'; x: number; y: number; class: RoadClass }
+  /** Asks which road `setRoadClass` would change and for what. Answered with
+   * `roadClassPreview`. Changes nothing. */
+  | { type: 'previewRoadClass'; x: number; y: number; class: RoadClass; revision: number }
   /** Removes the plant under the point, else the nearest line, else the building under the
    * point (ADR 0045), else the nearest road. */
   | { type: 'deleteRoad'; x: number; y: number }
@@ -349,6 +356,17 @@ export type FromWorker =
   /** Selected road's `[x, y]` centreline samples, or empty on a miss. Sim-owned hit testing.
    * A plant's or building's target is its closed outline and a line's its two ends. */
   | { type: 'bulldozePreview'; segment: Float32Array; revision: number }
+  /** `[x, y]` centreline samples of the road `setRoadClass` would change, as for
+   * `bulldozePreview`; empty when it would change nothing (no road in reach, or already that
+   * class). `cost` is dollars, null when empty; `affordable` false means it would be refused
+   * for money (ADR 0050). */
+  | {
+      type: 'roadClassPreview';
+      segment: Float32Array;
+      cost: number | null;
+      affordable: boolean;
+      revision: number;
+    }
   /** The inspected citizen, or null if the selected agent has no resident. Answers `inspect`. */
   | { type: 'citizen'; selection: number; citizen: Citizen | null }
   /** Selected building, or null on a miss or after demolition. Answers inspectBuilding. */

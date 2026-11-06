@@ -195,6 +195,30 @@ impl Sim {
         self.world.can_afford(cost as i64)
     }
 
+    /// Gives the road nearest the point `class` in place (ADR 0050). Unknown classes change
+    /// nothing.
+    pub fn set_road_class(&mut self, x: f32, y: f32, class: u8) -> bool {
+        let Some(class) = RoadClass::from_u8(class) else {
+            return false;
+        };
+        self.apply(Command::SetRoadClass { x, y, class })
+    }
+
+    /// `[x, y]` per centreline sample of the road `set_road_class` would change, or empty.
+    pub fn class_preview(&mut self, x: f32, y: f32, class: u8) -> Vec<f32> {
+        match RoadClass::from_u8(class) {
+            Some(class) => self.world.write_class_preview(x, y, class, &mut self.buf),
+            None => self.buf.clear(),
+        }
+        self.buf.clone()
+    }
+
+    /// What `set_road_class` would charge in dollars, or undefined if it would change nothing.
+    pub fn class_cost(&self, x: f32, y: f32, class: u8) -> Option<f64> {
+        let class = RoadClass::from_u8(class)?;
+        Some(self.world.class_cost(x, y, class)? as f64)
+    }
+
     pub fn delete_road(&mut self, x: f32, y: f32) -> bool {
         self.apply(Command::DeleteRoad { x, y })
     }

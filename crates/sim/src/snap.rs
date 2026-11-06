@@ -178,6 +178,21 @@ pub(crate) fn plan(net: &RoadNetwork, mut shape: Shape, class: Option<RoadClass>
     })
 }
 
+/// A plan that only follows `road` from end to end, giving it `class` in place (ADR 0050):
+/// what drawing a road of that class exactly over it plans under ADR 0048. None if the road
+/// already has that class.
+pub(crate) fn reclass_plan(net: &RoadNetwork, road: RoadId, class: RoadClass) -> Option<Plan> {
+    if net.road_class(road) == class {
+        return None;
+    }
+    let (a, b) = net.road_ends(road);
+    Some(Plan {
+        stops: vec![node_stop(net, a), node_stop(net, b)],
+        legs: vec![net.shape(road)],
+        reclass: vec![road],
+    })
+}
+
 /// Nearest node in reach, otherwise nearest point on a road, otherwise a new node.
 pub fn snap_end(net: &RoadNetwork, x: f32, y: f32) -> Stop {
     if let Some(n) = net.nearest_junction(x, y, SNAP_RADIUS) {

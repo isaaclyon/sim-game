@@ -195,6 +195,13 @@ export class ToolPreview {
     this.setPath([...segment], PREVIEW_REFUSED_COLOR, 0);
   }
 
+  /** The road a click would change to `roadClass`, `[x, y]` per centreline sample, at that
+   * class's width: blue when the city can pay, red when not (ADR 0050). */
+  setUpgrade(segment: Float32Array, ok: boolean, roadClass: number) {
+    this.setMarkers([], []);
+    this.setPath([...segment], ok ? PREVIEW_COLOR : PREVIEW_REFUSED_COLOR, roadClass);
+  }
+
   /** A plant's footprint, closed `[x, y]`, blue where it fits and red where it does not. */
   setPlant(outline: Float32Array, ok: boolean) {
     this.setMarkers([], []);

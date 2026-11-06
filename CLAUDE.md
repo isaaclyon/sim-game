@@ -29,6 +29,11 @@ What to build next and why lives in `docs/ROADMAP.md`. Work on the current miles
   over roads.
   Read-only. Road/lane IDs are never reused after deletion (ADR 0013). Lane counts include
   tombstone slots.
+- Road class clicks (ADR 0050): `setRoadClass` gives the road nearest `[x, y]` in bulldoze
+  reach a class in place, as drawing over it would (ADR 0048); command logs write it as
+  `class x y main`. `previewRoadClass` answers `roadClassPreview`: `segment` is `[x, y]` per
+  centreline sample of the road that would change, empty = nothing would change (no road, or
+  already that class), plus `cost` (null when empty), `affordable` and the echoed revision.
 - Signals: `[x, y, heading, state]` per signalised approach (`SIGNAL_STRIDE`), state 0 = red,
   1 = green, 2 = protected-left green.
 - Road drafts: `previewRoad` and `buildRoad` send raw `[x, y, snap]` points (start, a curve's

@@ -294,8 +294,10 @@ grid tool, upgrade and undo land in the new interface.
 4. **Upgrade.** Click a road or drag along connected roads to switch between street and main
    road; alleys can become streets. Cars reroute rather than despawn. Dragging is
    implemented: drawing a road over whole roads gives them its class, in place, for the
-   difference in build cost ([ADR 0048](adrs/0048-drawing-over-roads-changes-their-class.md));
-   clicking a single road is not.
+   difference in build cost ([ADR 0048](adrs/0048-drawing-over-roads-changes-their-class.md)).
+   Clicking is implemented, browser check pending: the Upgrade option of the road items gives
+   the clicked road the selected class, on the same terms
+   ([ADR 0050](adrs/0050-click-to-change-road-class.md)).
 5. **Undo and redo** for road edits only, many steps, Ctrl+Z and Ctrl+Shift+Z. Undo removes the
    roads an edit added and rejoins roads it split, as a new edit with new IDs; buildings it
    cleared stay gone. History lives in the sim and is saved with the city

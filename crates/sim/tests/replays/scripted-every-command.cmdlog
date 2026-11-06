@@ -1,6 +1,7 @@
 # Scripted through the WASM build: every command kind, a rezoning and a deleted road.
 # Power lines added by hand (ADR 0041): a wind plant joined by a line, a coal plant, a
 # bulldozed plant.
+# Road class clicks (ADR 0050) came later and are covered by scripted-road-class.cmdlog.
 sim-game command log 1
 seed 1
 grid 4 4

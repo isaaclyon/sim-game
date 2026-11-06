@@ -104,6 +104,13 @@ pub enum Command {
         by: f32,
         class: RoadClass,
     },
+    /// Gives the road nearest the point, in bulldoze reach, `class` in place, as drawing over
+    /// the whole road would (ADR 0048, 0050). Refused for a road already of `class`.
+    SetRoadClass {
+        x: f32,
+        y: f32,
+        class: RoadClass,
+    },
     /// Removes the plant under the point, else the nearest line in reach, else the building
     /// under the point (ADR 0045), else the nearest road.
     DeleteRoad {
@@ -338,6 +345,7 @@ impl World {
                 },
                 class,
             ),
+            Command::SetRoadClass { x, y, class } => self.set_road_class(x, y, class),
             Command::DeleteRoad { x, y } => {
                 self.bulldoze_power(x, y) || self.demolish(x, y) || self.delete_road(x, y)
             }

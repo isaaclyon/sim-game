@@ -339,8 +339,15 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
       });
       break;
     }
+    case 'setRoadClass':
     case 'deleteRoad':
-      if (cities.ready && sim?.delete_road(msg.x, msg.y)) {
+      if (
+        cities.ready &&
+        sim &&
+        (msg.type === 'setRoadClass'
+          ? sim.set_road_class(msg.x, msg.y, msg.class)
+          : sim.delete_road(msg.x, msg.y))
+      ) {
         cities.changed();
         sendEdits(sim);
       }
@@ -391,6 +398,15 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
     case 'previewBulldoze': {
       const segment = sim?.bulldoze_preview(msg.x, msg.y) ?? new Float32Array();
       post({ type: 'bulldozePreview', segment, revision: msg.revision }, [segment.buffer]);
+      break;
+    }
+    case 'previewRoadClass': {
+      const segment = sim?.class_preview(msg.x, msg.y, msg.class) ?? new Float32Array();
+      const cost = segment.length > 0 ? (sim?.class_cost(msg.x, msg.y, msg.class) ?? null) : null;
+      const affordable = cost !== null && !!sim?.can_afford(cost);
+      post({ type: 'roadClassPreview', segment, cost, affordable, revision: msg.revision }, [
+        segment.buffer,
+      ]);
       break;
     }
     case 'previewRoad': {

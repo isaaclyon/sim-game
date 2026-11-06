@@ -51,6 +51,27 @@ impl World {
         let Some(plan) = snap::plan(&self.roads, shape, Some(class)) else {
             return false;
         };
+        self.build_plan(plan, class)
+    }
+
+    /// Gives the road nearest `(x, y)` in bulldoze reach `class`, in place (ADR 0050). Plans
+    /// it as drawing over that whole road would, so cost, lanes, junctions and joins follow
+    /// ADR 0048. Refused off roads, for a road already of `class`, or when unaffordable.
+    pub(super) fn set_road_class(&mut self, x: f32, y: f32, class: RoadClass) -> bool {
+        match self.class_plan(x, y, class) {
+            Some(plan) => self.build_plan(plan, class),
+            None => false,
+        }
+    }
+
+    /// The plan `set_road_class` would build, or None if it would change nothing.
+    pub(super) fn class_plan(&self, x: f32, y: f32, class: RoadClass) -> Option<snap::Plan> {
+        let road = snap::bulldoze_target(&self.roads, x, y)?;
+        snap::reclass_plan(&self.roads, road, class)
+    }
+
+    /// Charges for and builds a plan of `class`; refused when the city cannot afford it.
+    fn build_plan(&mut self, plan: snap::Plan, class: RoadClass) -> bool {
         let cost = money::plan_cost(&self.roads, &plan, class);
         if !self.can_afford(cost) {
             return false;

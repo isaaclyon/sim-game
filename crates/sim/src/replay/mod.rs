@@ -11,6 +11,7 @@
 //! 0 spawn 100
 //! 120 road 10.5 20 300 20 street
 //! 130 curve 0 0 50 50 100 0 main
+//! 135 class 60 20 main
 //! 140 delete 60 20
 //! 150 paint 0 0 100 100 residential-low
 //! 160 fill 50 50 industrial-high
@@ -34,7 +35,8 @@ use crate::power::PlantKind;
 use crate::road::RoadClass;
 use crate::{Command, Config, World, Zone};
 
-/// Bump when a log of the previous version would read differently.
+/// Bump when a log of the previous version would read differently. Adding a command word
+/// (`class`, ADR 0050) does not: older logs read the same.
 pub const LOG_VERSION: u32 = 1;
 const TITLE: &str = "sim-game command log";
 const CLASSES: [(RoadClass, &str); 3] = [
@@ -252,6 +254,10 @@ fn command_text(cmd: &Command) -> String {
             class,
         } => {
             nums("curve", &[ax, ay, cx, cy, bx, by]);
+            s + " " + name(&CLASSES, class)
+        }
+        Command::SetRoadClass { x, y, class } => {
+            nums("class", &[x, y]);
             s + " " + name(&CLASSES, class)
         }
         Command::DeleteRoad { x, y } => {
