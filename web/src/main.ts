@@ -113,6 +113,7 @@ worker.onmessage = (e: MessageEvent<FromWorker>) => {
     roads.roadsChanged();
   } else if (
     msg.type === 'roadPreview' ||
+    msg.type === 'gridPreview' ||
     msg.type === 'bulldozePreview' ||
     msg.type === 'roadClassPreview' ||
     msg.type === 'buildResult'

@@ -1,6 +1,6 @@
 # 0049. The grid tool is one sim command planned edge by edge
 
-- Status: Accepted (M4.5 slice 3); not yet implemented
+- Status: Accepted (M4.5 slice 3); implemented, browser check pending
 - Date: 2026-11-06
 - Extends: [0038](0038-sim-owned-drawing-guides.md), [0034](0034-command-log-replay-tests.md),
   [0036](0036-money-build-costs-taxes-upkeep.md)
@@ -37,9 +37,12 @@ command as one edit. Lots reach 64 m from a road, are about 16 m wide and merge 
 - **Planning, in order.** Each lattice edge (one cell long) is a candidate straight road.
   1. *Sliver clearance.* A **sliver** is a strip narrower than 40 m (5 zone cells) between
      two roughly parallel roads, centreline to centreline: its lots would be shallower than
-     16 m, less deep than one lot is wide. A candidate edge is left out if an existing active
-     road runs alongside it (within the overlap test's 11.5°) closer than 40 m over at least
-     half its length. The existing road takes its place.
+     16 m, less deep than one lot is wide. Where existing active roads run alongside a
+     candidate edge (within about 23.5°, since planning can still turn a leg by about 12° when
+     joining its ends) closer than 40 m for at least 16 m, one lot's width, the edge gives
+     way: it is left out if they run beside all of it, its middle, or an end and then turn
+     away, and the existing roads take its place; it is cut back to where they stop if they
+     end beside it.
   2. *Meet the road that replaced an edge.* A candidate ending on a left-out edge's lattice
      point is extended or cut along its own line to that edge's existing road, so it ends in
      a junction instead of a dead end or a short spur past the road.
@@ -48,6 +51,8 @@ command as one edit. Lots reach 64 m from a road, are about 16 m wide and merge 
      against the network plus the grid edges already accepted. An edge the planner refuses
      (overlap, short leg, double crossing) is left out; the others still build. Crossings
      split existing roads, and ends near junctions join them, as usual.
+  4. *No slivers, ever.* An edge is also left out if any new leg its plan adds would run
+     alongside a road (within 11.5°) closer than 40 m for at least 16 m.
   Straight joins (ADR 0040) then merge collinear edges into one road between junctions.
   Planning runs on a scratch copy of the road network and changes no world state.
 - **Class.** `Street` or `Main`; `Alley` is refused, since alleys are laid by the sim. The

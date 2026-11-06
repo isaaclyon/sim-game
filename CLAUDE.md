@@ -54,6 +54,14 @@ What to build next and why lives in `docs/ROADMAP.md`. Work on the current miles
   of the same class plans nothing (ADR 0048).
   `buildResult` carries the guided `end`, null if refused, and the guided `control` for a
   successful curve when the request sets `chain`.
+- Grid drafts (ADR 0049): `previewGrid`/`buildGrid` send the first edge's two raw
+  `[x, y, snap]` records, `cell` metres and an optional area `cursor` `[x, y]`; the sim guides
+  the edge and rounds the area to whole blocks. `gridPreview` carries the road draft's
+  `points`, `guides`, `length`, `angle`, `angles`, plus signed `cols`/`rows`, `roads`
+  (`[ax, ay, a_join, bx, by, b_join]` per new leg, joins as `stops`), `dropped`
+  (`[ax, ay, bx, by]` per left-out lattice edge), `cost` and `affordable`. One `buildGrid` is
+  one all-or-nothing `BuildGrid` command (`roadgrid` in command logs); it answers `buildResult`
+  with `end` null.
 - Zones: one byte per zone cell, row-major, plus layout `[origin_x, origin_y, cell_size, cols,
   rows]`; byte 0 = none, 1/2 = residential low/high, 3/4 commercial, 5/6 industrial (ADR 0014).
   Sent whole when the zone grid's version changes.

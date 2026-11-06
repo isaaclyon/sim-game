@@ -1,12 +1,13 @@
-// The road, upgrade and bulldoze tools: clicked points, sim-owned previews and drawing guides
-// (ADR 0038). Upgrade clicks a road to give it the chosen class (ADR 0050).
+// The road, grid, upgrade and bulldoze tools: clicked points, sim-owned previews and drawing
+// guides (ADR 0038). Grid lays whole blocks from a first edge and an area (ADR 0049); upgrade
+// clicks a road to give it the chosen class (ADR 0050).
 // The sim guides and plans every point; this module only keeps the clicks, asks one question at
 // a time about the latest cursor position, and draws the answers.
 
 import { type FromWorker, RoadClass, Snap, type ToWorker } from './protocol';
 import { type Quote, roadHelpText } from './ui/hints';
 
-export type RoadMode = 'straight' | 'curve' | 'continuous' | 'upgrade' | 'bulldoze' | null;
+export type RoadMode = 'straight' | 'curve' | 'continuous' | 'grid' | 'upgrade' | 'bulldoze' | null;
 /** A ground position: x and z in world space, sim x and y. */
 type Ground = { x: number; z: number };
 /** A clicked point with the snap flags it was clicked with. */
@@ -18,6 +19,13 @@ interface Drawing {
   setAngles(marks: Float32Array | null): void;
   setBulldozePreview(segment: Float32Array): void;
   setUpgradePreview(segment: Float32Array, ok: boolean, cls: number): void;
+  setGridPreview(
+    roads: Float32Array,
+    dropped: Float32Array,
+    edge: Float32Array,
+    ok: boolean,
+    cls: number,
+  ): void;
 }
 
 interface Elements {
@@ -27,6 +35,8 @@ interface Elements {
 }
 
 const SNAP_ALL = Snap.Angle | Snap.Guides | Snap.Length;
+/** The grid's starting block size in metres, one of the menu's (ADR 0049). */
+const GRID_CELL = 80;
 const READOUT_OFFSET_PX = 16;
 /** Closer than this to the right or bottom edge, the readout flips to the cursor's other side. */
 const READOUT_EDGE_PX = 120;
@@ -34,6 +44,8 @@ const READOUT_EDGE_PX = 120;
 export class RoadTool {
   mode: RoadMode = null;
   roadClass: RoadClass = RoadClass.Street;
+  /** The grid's block size in metres. */
+  cell = GRID_CELL;
   private clicked: Clicked[] = [];
   private previousControl: Ground | null = null;
   private refused = false;
@@ -107,6 +119,12 @@ export class RoadTool {
     this.updateHelp();
   }
 
+  /** The grid's block size; the preview follows at once. */
+  setCell(cell: number) {
+    this.cell = cell;
+    this.roadsChanged();
+  }
+
   /** Holding Shift places points freely; the preview follows at once. */
   setShift(on: boolean) {
     if (on === this.shift) return;
@@ -134,9 +152,14 @@ export class RoadTool {
     if (this.mode === 'bulldoze') this.send({ type: 'deleteRoad', x: p.x, y: p.z });
     else if (this.mode === 'upgrade')
       this.send({ type: 'setRoadClass', x: p.x, y: p.z, class: this.roadClass });
-    else if (this.clicked.length < (this.needsControl() ? 2 : 1))
+    else if (this.clicked.length < (this.needsControl() || this.mode === 'grid' ? 2 : 1))
       this.clicked.push({ ...p, snap: this.flags() });
-    else {
+    else if (this.mode === 'grid') {
+      const id = ++this.nextBuildId;
+      this.pendingBuild = id;
+      this.pendingQuote = this.quote;
+      this.send({ type: 'buildGrid', id, ...this.gridQuestion(p) });
+    } else {
       const id = ++this.nextBuildId;
       this.pendingBuild = id;
       this.pendingQuote = this.quote;
@@ -164,7 +187,8 @@ export class RoadTool {
     if (
       msg.type === 'roadPreview' ||
       msg.type === 'bulldozePreview' ||
-      msg.type === 'roadClassPreview'
+      msg.type === 'roadClassPreview' ||
+      msg.type === 'gridPreview'
     ) {
       this.inFlight = false;
       if (msg.revision === this.revision && this.cursor) {
@@ -172,12 +196,14 @@ export class RoadTool {
         if (msg.type === 'bulldozePreview' && this.mode === 'bulldoze')
           this.draw.setBulldozePreview(msg.segment);
         if (msg.type === 'roadClassPreview' && this.mode === 'upgrade') this.showUpgrade(msg);
+        if (msg.type === 'gridPreview' && this.mode === 'grid') this.showGrid(msg);
       }
       this.sendPreview();
     } else if (msg.type === 'buildResult') {
       if (this.pendingBuild !== msg.id) return;
+      if (this.mode === 'grid' && msg.success) this.clicked = [];
       // The guided end is already on the network, so it keeps its place without snapping.
-      if (msg.end) {
+      else if (msg.end) {
         this.previousControl = msg.control ? { x: msg.control[0], z: msg.control[1] } : null;
         this.clicked =
           this.mode === 'continuous' && !this.previousControl
@@ -192,9 +218,9 @@ export class RoadTool {
       }
       // A road the city could not pay for was refused for money, not for its shape.
       const q = this.pendingQuote;
-      const unpaid = !msg.end && q?.affordable === false ? q : null;
+      const unpaid = !msg.success && q?.affordable === false ? q : null;
       this.pendingBuild = null;
-      this.refused = !msg.end && !unpaid;
+      this.refused = !msg.success && !unpaid;
       this.invalidate();
       this.quote = unpaid;
       this.updateHelp();
@@ -238,11 +264,31 @@ export class RoadTool {
       this.planAsked && n > 1 && !this.refused
         ? { cost: msg.cost, affordable: msg.affordable }
         : null;
-    const show = this.planAsked && n > 1 && this.screen !== null;
+    this.showReadout(this.planAsked && n > 1 ? '' : null, msg.length, msg.angle);
+    this.updateHelp();
+  }
+
+  /** The grid the sim would build: its new legs, the edges it leaves out, guides and price. */
+  private showGrid(msg: Extract<FromWorker, { type: 'gridPreview' }>) {
+    const edge = msg.points;
+    const planned = msg.roads.length > 0;
+    this.draw.setGridPreview(msg.roads, msg.dropped, edge, msg.affordable, this.roadClass);
+    this.draw.setGuides(msg.guides);
+    this.draw.setAngles(msg.angles);
+    this.refused = !planned;
+    this.quote = planned ? { cost: msg.cost, affordable: msg.affordable } : null;
+    const blocks = `${Math.abs(msg.cols)} × ${Math.abs(msg.rows)} blocks · `;
+    this.showReadout(edge.length === 4 ? (msg.cols ? blocks : '') : null, msg.length, msg.angle);
+    this.updateHelp();
+  }
+
+  /** The length and angle by the cursor after `prefix`; a null prefix hides it. */
+  private showReadout(prefix: string | null, length: number, angle: number) {
+    const show = prefix !== null && this.screen !== null;
     this.el.readout.hidden = !show;
     if (show && this.screen) {
-      const angle = Number.isNaN(msg.angle) ? '' : ` · ${Math.round(msg.angle)}°`;
-      this.el.readout.textContent = `${Math.round(msg.length)} m${angle}`;
+      const degrees = Number.isNaN(angle) ? '' : ` · ${Math.round(angle)}°`;
+      this.el.readout.textContent = `${prefix}${Math.round(length)} m${degrees}`;
       const { clientX: x, clientY: y } = this.screen;
       // Near the right or bottom edge, the label goes on the other side of the cursor.
       const flipX = x > innerWidth - READOUT_EDGE_PX;
@@ -252,7 +298,6 @@ export class RoadTool {
       r.top = `${y + (flipY ? -READOUT_OFFSET_PX : READOUT_OFFSET_PX)}px`;
       r.transform = `translate(${flipX ? '-100%' : '0'}, ${flipY ? '-100%' : '0'})`;
     }
-    this.updateHelp();
   }
 
   private needsControl() {
@@ -278,6 +323,18 @@ export class RoadTool {
     return points;
   }
 
+  /** The grid question for the cursor `b`: the first edge's two raw records, then the area
+   * cursor once the edge is clicked. */
+  private gridQuestion(b: Ground) {
+    const edge = this.clicked.length === 2;
+    return {
+      class: this.roadClass,
+      cell: this.cell,
+      points: edge ? this.clicked.flatMap((p) => [p.x, p.z, p.snap]) : this.points(b),
+      ...(edge ? { cursor: [b.x, b.z] as [number, number] } : {}),
+    };
+  }
+
   private ask() {
     this.wanted = true;
     this.sendPreview();
@@ -296,6 +353,10 @@ export class RoadTool {
     }
     if (this.mode === 'upgrade') {
       this.send({ type: 'previewRoadClass', revision, x: b.x, y: b.z, class: this.roadClass });
+      return;
+    }
+    if (this.mode === 'grid' && this.clicked.length > 0) {
+      this.send({ type: 'previewGrid', revision, ...this.gridQuestion(b) });
       return;
     }
     this.planAsked = !(this.needsControl() && this.clicked.length === 1);
@@ -321,11 +382,15 @@ export class RoadTool {
 
   private updateHelp() {
     if (!this.mode) return;
-    const stage = !this.clicked.length
-      ? 'start'
-      : this.needsControl() && this.clicked.length === 1
-        ? 'control'
-        : 'end';
+    const n = this.clicked.length;
+    const stage =
+      this.mode === 'grid'
+        ? (['gridStart', 'edge', 'area'] as const)[n]
+        : !n
+          ? 'start'
+          : this.needsControl() && n === 1
+            ? 'control'
+            : 'end';
     const main = this.roadClass === RoadClass.Main;
     const building = this.pendingBuild !== null;
     this.el.help.textContent = roadHelpText(

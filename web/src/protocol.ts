@@ -69,6 +69,30 @@ export type ToWorker =
    */
   | { type: 'previewRoad'; revision: number; class: RoadClass; points: number[]; plan: boolean }
   /**
+   * Asks what a grid of `class` roads would build (ADR 0049). `points` is the first edge's two
+   * raw `[x, y, snap]` records, guided as a road's; `cursor` is `[x, y]` where the area is
+   * dragged to, rounded by the sim to whole blocks of `cell` metres (40 to 200), or absent
+   * while the first edge is drawn. Changes nothing; answered with `gridPreview`.
+   */
+  | {
+      type: 'previewGrid';
+      revision: number;
+      class: RoadClass;
+      cell: number;
+      points: number[];
+      cursor?: [number, number];
+    }
+  /** Builds the grid `previewGrid` with the same fields shows, all or nothing; answered with
+   * `buildResult` (`end` null). */
+  | {
+      type: 'buildGrid';
+      id: number;
+      class: RoadClass;
+      cell: number;
+      points: number[];
+      cursor?: [number, number];
+    }
+  /**
    * Selects the resident who owns agent `agent` (a car or walker, an index into the `frame`
    * agents snapshot) for
    * the citizen inspector, or clears the selection with null (ADR 0022). The worker keeps the
@@ -293,6 +317,29 @@ export type FromWorker =
       length: number;
       angle: number;
       revision: number;
+      cost: number | null;
+      affordable: boolean;
+    }
+  /**
+   * What a grid would build (ADR 0049). `points`, `guides`, `length`, `angle` and `angles`
+   * describe the guided first edge as in `roadPreview`. `cols` and `rows` are the signed block
+   * counts (0 when nothing is planned); `roads` is `[ax, ay, aJoin, bx, by, bJoin]` per new
+   * leg, joins as in `roadPreview`'s stops; `dropped` is `[ax, ay, bx, by]` per lattice edge
+   * left out. `cost` is dollars, null when nothing would be built; `affordable` false means the
+   * build would be refused for money.
+   */
+  | {
+      type: 'gridPreview';
+      revision: number;
+      points: Float32Array;
+      guides: Float32Array;
+      angles: Float32Array;
+      length: number;
+      angle: number;
+      cols: number;
+      rows: number;
+      roads: Float32Array;
+      dropped: Float32Array;
       cost: number | null;
       affordable: boolean;
     }

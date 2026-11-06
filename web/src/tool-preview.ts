@@ -29,6 +29,8 @@ const MARK_OPACITY = 0.3;
 const LINE_Y = 0.5;
 const RIBBON_Y = 0.3;
 const RIBBON_OPACITY = 0.35;
+/** Grid edges left out (ADR 0049): faint dashes, so what is built stands out. */
+const DROPPED_OPACITY = 0.45;
 
 /** A ground position: x and z in world space, sim x and y. */
 export type Ground = { x: number; z: number };
@@ -41,6 +43,8 @@ export class ToolPreview {
   readonly zoneDrag: THREE.LineLoop;
   /** Dashed guide lines a drawn point snapped to, from each line's origin to the point. */
   readonly guides: THREE.LineSegments<THREE.BufferGeometry, THREE.LineDashedMaterial>;
+  /** Lattice edges a grid leaves out. */
+  readonly dropped: THREE.LineSegments<THREE.BufferGeometry, THREE.LineDashedMaterial>;
   /** Angles where the road joins roads: translucent wedges or squares, and their outlines. */
   readonly angleFill: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
   readonly angleEdge: THREE.LineSegments<THREE.BufferGeometry, THREE.LineBasicMaterial>;
@@ -78,6 +82,17 @@ export class ToolPreview {
       new THREE.LineDashedMaterial({ color: GUIDE_COLOR, dashSize: 4, gapSize: 3 }),
     );
     this.guides.visible = false;
+    this.dropped = new THREE.LineSegments(
+      new THREE.BufferGeometry(),
+      new THREE.LineDashedMaterial({
+        color: GUIDE_COLOR,
+        dashSize: 3,
+        gapSize: 4,
+        transparent: true,
+        opacity: DROPPED_OPACITY,
+      }),
+    );
+    this.dropped.visible = false;
     this.angleFill = new THREE.Mesh(
       new THREE.BufferGeometry(),
       new THREE.MeshBasicMaterial({
@@ -93,7 +108,7 @@ export class ToolPreview {
       new THREE.BufferGeometry(),
       new THREE.LineBasicMaterial({ vertexColors: true }),
     );
-    const parts = [this.line, this.ribbon, this.markers, this.zoneDrag, this.guides];
+    const parts = [this.line, this.ribbon, this.markers, this.zoneDrag, this.guides, this.dropped];
     for (const o of [...parts, this.angleFill, this.angleEdge]) {
       o.frustumCulled = false;
       this.group.add(o);
@@ -126,16 +141,38 @@ export class ToolPreview {
 
   /** `[x0, y0, x1, y1]` per guide line; null or empty hides them. */
   setGuides(lines: Float32Array | null) {
-    const points: THREE.Vector3[] = [];
-    for (let i = 0; lines && i + 3 < lines.length; i += 4)
-      points.push(
-        new THREE.Vector3(lines[i], LINE_Y, lines[i + 1]),
-        new THREE.Vector3(lines[i + 2], LINE_Y, lines[i + 3]),
-      );
-    this.guides.geometry.dispose();
-    this.guides.geometry = new THREE.BufferGeometry().setFromPoints(points);
-    this.guides.computeLineDistances();
-    this.guides.visible = points.length > 0;
+    setDashes(this.guides, lines);
+  }
+
+  /**
+   * A grid the sim would build (ADR 0049): `roads` is `[ax, ay, aJoin, bx, by, bJoin]` per new
+   * leg, drawn at `roadClass`'s width, blue when the city can pay (`ok`) and red when not, with
+   * markers where legs join roads; `dropped` is `[ax, ay, bx, by]` per edge left out, dashed.
+   * With no legs, the guided first edge `[ax, ay, bx, by]` is drawn as a refused red line.
+   */
+  setGrid(
+    roads: Float32Array,
+    dropped: Float32Array,
+    edge: Float32Array,
+    ok: boolean,
+    roadClass: number,
+  ) {
+    const segments: number[] = [];
+    const markers: number[] = [];
+    const colors: number[] = [];
+    for (let i = 0; i + 5 < roads.length; i += 6) {
+      segments.push(roads[i], roads[i + 1], roads[i + 3], roads[i + 4], roadClass);
+      for (const at of [i, i + 3]) {
+        const c = JOIN_COLORS[roads[at + 2]];
+        if (!c) continue;
+        markers.push(roads[at], 1, roads[at + 1]);
+        colors.push(c.r, c.g, c.b);
+      }
+    }
+    this.setPath(segments.length ? [] : [...edge], PREVIEW_REFUSED_COLOR, null);
+    this.setRibbon(segments, ok ? PREVIEW_COLOR : PREVIEW_REFUSED_COLOR);
+    this.setMarkers(markers, colors);
+    setDashes(this.dropped, dropped);
   }
 
   /**
@@ -261,7 +298,8 @@ export class ToolPreview {
     if (moving) position.needsUpdate = true;
   }
 
-  /** `xy` is `[x, y]` per centreline point; `roadClass` null draws no ribbon. */
+  /** `xy` is `[x, y]` per centreline point; `roadClass` null draws no ribbon. Hides a grid's
+   * left-out edges, which only `setGrid` draws. */
   private setPath(xy: number[], color: THREE.Color, roadClass: number | null) {
     const points: THREE.Vector3[] = [];
     const segments: number[] = [];
@@ -274,6 +312,12 @@ export class ToolPreview {
     this.line.visible = points.length > 1;
     this.line.geometry.dispose();
     this.line.geometry = new THREE.BufferGeometry().setFromPoints(points);
+    this.setRibbon(segments, color);
+    this.dropped.visible = false;
+  }
+
+  /** `[ax, ay, bx, by, class]` per road-wide piece. */
+  private setRibbon(segments: number[], color: THREE.Color) {
     this.ribbon.material.color.copy(color);
     this.ribbon.visible = segments.length > 0;
     this.ribbon.geometry.dispose();
@@ -301,4 +345,21 @@ export class ToolPreview {
     this.zoneDrag.geometry = new THREE.BufferGeometry().setFromPoints(points);
     (this.zoneDrag.material as THREE.LineBasicMaterial).color.set(ZONE_OUTLINE[zone] ?? 0xffffff);
   }
+}
+
+/** Dashed lines, `[x0, y0, x1, y1]` each; null or empty hides them. */
+function setDashes(
+  lines: THREE.LineSegments<THREE.BufferGeometry, THREE.LineDashedMaterial>,
+  xy: Float32Array | null,
+) {
+  const points: THREE.Vector3[] = [];
+  for (let i = 0; xy && i + 3 < xy.length; i += 4)
+    points.push(
+      new THREE.Vector3(xy[i], LINE_Y, xy[i + 1]),
+      new THREE.Vector3(xy[i + 2], LINE_Y, xy[i + 3]),
+    );
+  lines.geometry.dispose();
+  lines.geometry = new THREE.BufferGeometry().setFromPoints(points);
+  lines.computeLineDistances();
+  lines.visible = points.length > 0;
 }

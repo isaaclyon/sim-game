@@ -4,8 +4,9 @@
 import { ZONE_OVERLAY } from '../palette';
 import { PlantKind, RoadClass, Snap, Zone } from '../protocol';
 
-/** How the road tool works: draw a road of a shape, or click roads to change their class. */
-export type RoadMode = 'straight' | 'curve' | 'continuous' | 'upgrade';
+/** How the road tool works: draw a road of a shape, lay a grid of blocks, or click roads to
+ * change their class. */
+export type RoadMode = 'straight' | 'curve' | 'continuous' | 'grid' | 'upgrade';
 
 /** What an item switches on. */
 export type Tool =
@@ -16,7 +17,10 @@ export type Tool =
   | { kind: 'bulldoze' };
 
 /** What an option changes on the tool in use. */
-export type OptionAction = { kind: 'roadMode'; mode: RoadMode } | { kind: 'snap'; flag: number };
+export type OptionAction =
+  | { kind: 'roadMode'; mode: RoadMode }
+  | { kind: 'snap'; flag: number }
+  | { kind: 'gridCell'; cell: number };
 
 /** A model drawn as an item's picture or a category's icon (`pictures.ts`). */
 export type Picture =
@@ -75,6 +79,15 @@ const zone = (id: string, label: string, z: Zone, key: string, tip: string): Ite
   tool: { kind: 'zone', zone: z },
   stripe: css(ZONE_OVERLAY[z] ?? 0x9aa6b4),
 });
+/** The grid's block sizes in metres (ADR 0049): multiples of the 8 m zone cell. */
+const GRID_CELLS = [48, 64, 80, 96, 112];
+const gridCell = (cell: number): Option => ({
+  id: `grid-${cell}`,
+  label: `${cell} m`,
+  tip: `Lay the grid in ${cell} m blocks.`,
+  group: 'Block size',
+  action: { kind: 'gridCell', cell },
+});
 const plant = (id: string, label: string, kind: PlantKind, key: string, tip: string): Item => ({
   id,
   label,
@@ -129,6 +142,12 @@ export const CATEGORIES: Category[] = [
         action: { kind: 'roadMode', mode: 'continuous' },
       },
       {
+        id: 'grid-road',
+        label: 'Grid',
+        tip: 'Click the start and the end of the first edge, then click to fill whole blocks.',
+        action: { kind: 'roadMode', mode: 'grid' },
+      },
+      {
         id: 'upgrade-road',
         label: 'Upgrade',
         tip: 'Click a road to give it the chosen class; alleys become streets.',
@@ -155,6 +174,7 @@ export const CATEGORIES: Category[] = [
         group: 'Snaps',
         action: { kind: 'snap', flag: Snap.Length },
       },
+      ...GRID_CELLS.map(gridCell),
     ],
   },
   {

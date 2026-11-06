@@ -161,6 +161,9 @@ export async function tools({ hash = '', clipboard = true, catalog } = {}) {
     setUpgradePreview(segment, ok, roadClass) {
       previews.push({ type: 'upgrade', segment, ok, roadClass });
     }
+    setGridPreview(roads, dropped, edge, ok, roadClass) {
+      previews.push({ type: 'grid', roads, dropped, edge, ok, roadClass });
+    }
     setBlockOutline(outline, zone) {
       previews.push({ type: 'block', outline, zone });
     }

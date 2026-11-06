@@ -1,6 +1,7 @@
 // Runs the WASM sim on a fixed-timestep clock, off the main thread.
 
 import { CitySession } from './city-session';
+import { gridPreview, roadPreview } from './drafts';
 import init, { type Sim } from './pkg/sim_wasm';
 import type {
   Activity,
@@ -409,29 +410,22 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
       ]);
       break;
     }
-    case 'previewRoad': {
-      // `[n, m, length, angle, k]`, guided points, guide lines, angle marks, then stops
-      // (ADR 0038).
-      const d =
-        sim?.road_draft(new Float32Array(msg.points), msg.plan, msg.class) ?? new Float32Array(5);
-      const [n, m, length, angle, k] = d;
-      const at = 5 + 2 * n;
-      const points = d.slice(5, at);
-      const guides = d.slice(at, at + 4 * m);
-      const angles = d.slice(at + 4 * m, at + 4 * m + 6 * k);
-      const stops = d.slice(at + 4 * m + 6 * k);
-      // What the guided road would charge (ADR 0036); nothing when no road is planned.
-      const raw = new Float32Array(msg.points);
-      const cost = msg.plan && stops.length > 0 ? (sim?.draft_cost(raw, msg.class) ?? null) : null;
-      const affordable = cost !== null && !!sim?.can_afford(cost);
-      post(
-        {
-          type: 'roadPreview',
-          ...{ revision: msg.revision, stops, points, guides, angles, length, angle },
-          ...{ cost, affordable },
-        },
-        [stops.buffer, points.buffer, guides.buffer, angles.buffer],
-      );
+    case 'previewRoad':
+    case 'previewGrid': {
+      const answer = msg.type === 'previewRoad' ? roadPreview(sim, msg) : gridPreview(sim, msg);
+      post(answer.msg, answer.transfer);
+      break;
+    }
+    case 'buildGrid': {
+      const cursor = new Float32Array(msg.cursor ?? []);
+      const points = new Float32Array(msg.points);
+      const success =
+        !!sim && cities.ready && sim.build_grid_draft(points, cursor, msg.cell, msg.class);
+      if (success && sim) {
+        cities.changed();
+        sendEdits(sim);
+      }
+      post({ type: 'buildResult', id: msg.id, success, end: null });
       break;
     }
     case 'inspect': {

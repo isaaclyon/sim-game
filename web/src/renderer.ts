@@ -367,6 +367,17 @@ export class Renderer {
     this.tools.setUpgrade(segment, ok, roadClass);
   }
 
+  /** The grid a click would build; see `ToolPreview.setGrid` (ADR 0049). */
+  setGridPreview(
+    roads: Float32Array,
+    dropped: Float32Array,
+    edge: Float32Array,
+    ok: boolean,
+    roadClass: number,
+  ) {
+    this.tools.setGrid(roads, dropped, edge, ok, roadClass);
+  }
+
   /** Draws plants, lines and power markers; see `power` in protocol.ts. */
   setPower(plants: Float32Array, lines: Float32Array, buildings: Float32Array) {
     this.power.set(plants, lines, buildings);

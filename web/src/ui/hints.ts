@@ -16,11 +16,14 @@ const STAGES = {
   start: 'Click the road start.',
   control: 'Click the bend control point, then the road end.',
   end: 'Click the road end.',
+  gridStart: 'Click where the grid starts.',
+  edge: 'Click the end of the first edge to set the angle.',
+  area: 'Move to stretch the grid in whole blocks, then click to build.',
 };
 
 /** Help for the road and bulldoze tools; empty when neither is active. */
 export function roadHelpText(
-  tool: 'straight' | 'curve' | 'continuous' | 'upgrade' | 'bulldoze' | null,
+  tool: 'straight' | 'curve' | 'continuous' | 'grid' | 'upgrade' | 'bulldoze' | null,
   stage: keyof typeof STAGES,
   building: boolean,
   main: boolean,
@@ -32,11 +35,13 @@ export function roadHelpText(
   if (!tool) return '';
   if (tool === 'upgrade')
     return `${costText(quote)}Click a road to make it a ${main ? 'main road' : 'street'}. Esc or right-click cancels.`;
-  if (building) return 'Building road…';
+  if (building) return tool === 'grid' ? 'Building grid…' : 'Building road…';
   const problem = refused
     ? tool === 'continuous'
       ? 'Cannot build here. Move the end ahead, away from overlaps or short joins. '
-      : 'Cannot build here. Move the end away from overlaps or short joins. '
+      : tool === 'grid'
+        ? 'Nothing to build here. Move the grid off the roads in its way. '
+        : 'Cannot build here. Move the end away from overlaps or short joins. '
     : costText(quote);
   return `${main ? 'Main road. ' : ''}${problem}${STAGES[stage]} Hold Shift to place freely. Esc or right-click cancels.`;
 }
