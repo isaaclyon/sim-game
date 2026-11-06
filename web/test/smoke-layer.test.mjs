@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import * as THREE from 'three';
 import { buildBuildingGeometry } from '../src/building-kit/index.ts';
 import { RISE_SECONDS } from '../src/building-kit/layer.ts';
+import { COAL_CHIMNEY, createCoalPlant } from '../src/coal-plant.ts';
 import { MAX_STACKS, PUFF_LIFE, puffAt, SmokeLayer } from '../src/smoke-layer.ts';
 
 const rect = (x, z, w, d) => [x, z, x + w, z, x + w, z + d, x, z + d];
@@ -81,4 +83,74 @@ test('smoke stops glowing at night', () => {
   night.value = 1;
   layer.animate(100, [0, 0]);
   assert.equal(puffs(layer).material.emissive.r, 0);
+});
+
+// [kind, x, y, half, front_x, front_y, terminal_x, terminal_y, output, grid] per plant.
+const plantRecord = (kind, x, y, fx, fy) => [kind, x, y, 22, fx, fy, 0, 0, 3000, 0];
+
+test('coal plants smoke from their chimney; solar and wind do not', () => {
+  const layer = new SmokeLayer();
+  layer.setPlants(
+    new Float32Array([...plantRecord(1, 0, 0, 0, 1), ...plantRecord(2, 50, 0, 0, 1)]),
+  );
+  layer.animate(100, [0, 0]);
+  assert.equal(puffs(layer).count, 0);
+
+  layer.setPlants(new Float32Array(plantRecord(0, 100, 200, 0, 1)));
+  layer.animate(100, [0, 0]);
+  const [stack] = layer.shown;
+  assert.ok(puffs(layer).count > 16, 'a coal plant puffs more than any factory');
+  assert.deepEqual(
+    [stack.x, stack.z].map((v) => Math.round(v * 10) / 10),
+    [113.4, 191.5],
+  );
+  assert.ok(stack.top > 42 && stack.top < 43, 'smoke leaves the drawn stack top');
+});
+
+test('coal smoke follows the plant turned to face its road', () => {
+  for (const [fx, fy, half] of [
+    [1, 0, 22],
+    [0.6, -0.8, 22],
+    [-0.28, 0.96, 30],
+  ]) {
+    const layer = new SmokeLayer();
+    layer.setPlants(new Float32Array([0, 100, 200, half, fx, fy, 0, 0, 3000, 0]));
+    const [stack] = layer.plantStacks;
+    // Placed as power-layer.ts places the model.
+    const plant = new THREE.Group();
+    plant.position.set(100, 0, 200);
+    plant.rotation.y = Math.atan2(fx, fy);
+    const model = createCoalPlant(half);
+    plant.add(model);
+    plant.updateMatrixWorld(true);
+    const mouth = model.localToWorld(new THREE.Vector3(COAL_CHIMNEY.x, 0, COAL_CHIMNEY.z));
+    assert.ok(Math.hypot(stack.x - mouth.x, stack.z - mouth.z) < 1e-3, `${fx}, ${fy}`);
+  }
+});
+
+test('factory and coal smoke draw together', () => {
+  const layer = new SmokeLayer();
+  layer.update(snapshot(record(5, 3, 0)), new Uint32Array([1]));
+  layer.setPlants(new Float32Array(plantRecord(0, 100, 200, 0, 1)));
+  layer.animate(100, [0, 0]);
+  assert.equal(layer.shown.length, 2);
+});
+
+test('smoke draws after the roads beneath it', () => {
+  const layer = new SmokeLayer();
+  layer.update(snapshot(record(5, 3, 0)), new Uint32Array([1]));
+  layer.animate(100, [0, 0]);
+  // Lane paint, the last flat ground layer, draws at 5 (renderer.ts).
+  assert.ok(puffs(layer).renderOrder > 5);
+});
+
+test('coal plumes fan out toward the top; factory plumes keep their shape', () => {
+  const base = { x: 0, z: 0, top: 20, size: 1, puffs: 6, phase: 0, from: 0 };
+  const at = (stack, age) => puffAt(stack, 0, 10 * PUFF_LIFE + age);
+  const coal = { ...base, spread: 2.5 };
+  const young = PUFF_LIFE * 0.05;
+  assert.ok(at(coal, young)[3] / at(base, young)[3] < 1.1, 'the base stays narrow');
+  const old = PUFF_LIFE * 0.7;
+  assert.ok(at(coal, old)[3] > at(base, old)[3] * 1.4, 'the top is wider');
+  assert.deepEqual(at({ ...base, spread: 1 }, old), at(base, old));
 });

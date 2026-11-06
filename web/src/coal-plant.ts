@@ -19,6 +19,10 @@ const asphalt = new THREE.Color(0x777973);
 const material = new THREE.MeshLambertMaterial({ vertexColors: true });
 let geometry: THREE.BufferGeometry | undefined;
 
+/** Where the chimney mouth is in the model's local frame (+z = front) at half size 22, so
+ * smoke leaves it. Height is metres and does not scale with the footprint. */
+export const COAL_CHIMNEY = { x: 13.4, z: -8.5, top: 42.3 };
+
 /** One shared mesh, not a draw call per window. Snapshot refreshes reuse its GPU buffers. */
 export function createCoalPlant(half: number): THREE.Mesh {
   geometry ??= buildGeometry();
@@ -117,7 +121,7 @@ function boiler(mb: MeshBuilder) {
 
 /** Tapered, banded chimney with a dark recessed mouth and a service ladder. */
 function chimney(mb: MeshBuilder) {
-  const c: [number, number] = [13.4, -8.5];
+  const c: [number, number] = [COAL_CHIMNEY.x, COAL_CHIMNEY.z];
   mb.cylinder(c, 0.22, 4, 1.2, 12, concrete);
   const radius = (y: number) => 2.8 - ((y - 1.42) / 40.58) * 0.85;
   const levels = [1.42, 26, 30, 34, 38, 42];
@@ -126,8 +130,8 @@ function chimney(mb: MeshBuilder) {
     const [lo, hi] = [levels[i], levels[i + 1]];
     mb.cylinder(c, lo, radius(lo), hi - lo, 16, colors[i], radius(hi));
   }
-  mb.cylinder(c, 42, 2.12, 0.3, 16, dark);
-  mb.cylinder(c, 42.31, 1.65, 0.015, 16, coal);
+  mb.cylinder(c, 42, 2.12, COAL_CHIMNEY.top - 42, 16, dark);
+  mb.cylinder(c, COAL_CHIMNEY.top + 0.01, 1.65, 0.015, 16, coal);
   // Inspection landing and ladder on the outside of the stack, not floating above its taper.
   mb.box([16.3, -8.5], 25.4, 2.1, 0.3, 2.6, 0, dark);
   for (const z of [-9.6, -7.4]) {

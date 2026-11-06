@@ -48,6 +48,7 @@ rewriting history; mark the old one `Superseded by NNNN`.
 | [0040](0040-straight-joins.md) | Straight roads that meet end to end in a line become one road | Accepted |
 | [0041](0041-power-grids-follow-roads.md) | Power grids follow roads and gate growth | Accepted |
 | [0042](0042-roadside-pieces-snap-to-roads.md) | Roadside pieces snap to the road and face it | Accepted |
+| [0044](0044-coal-plants-pollute.md) | Coal plants pollute | Accepted |
 
 ADRs are only for decisions that are hard to reverse. See [AGENTS.md](AGENTS.md) for when to
 write one and how.

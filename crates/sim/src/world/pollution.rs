@@ -1,10 +1,11 @@
-//! Feeds the pollution grid from industry and traffic, and lets land value hold back growth
-//! (ADR 0037).
+//! Feeds the pollution grid from industry, coal plants (ADR 0044) and traffic, and lets land
+//! value hold back growth (ADR 0037).
 
 use super::World;
 use crate::building::BuildingId;
 use crate::lot::LotId;
 use crate::pollution::{GroundSource, PollutionSample, Sources, UPDATE_S};
+use crate::power::PlantKind;
 use crate::zone::Zone;
 
 /// Traffic flow follows the cars on a road with this time constant, sim seconds.
@@ -18,6 +19,9 @@ const CAR_NOISE: f32 = 0.5;
 const FACTORY_AIR: f32 = 1.0;
 const FACTORY_NOISE: f32 = 0.5;
 const HIGH_DENSITY: f32 = 1.5;
+/// Emission of one coal plant: more smoke than the biggest factory, less noise.
+const COAL_AIR: f32 = 4.0;
+const COAL_NOISE: f32 = 1.0;
 /// Demand, in people, a lot with no land value needs before it builds; scaled down linearly
 /// to 0 for clean land. Industry ignores land value.
 const RESIDENTIAL_LAND_PEOPLE: i32 = 150;
@@ -59,6 +63,12 @@ impl World {
         for b in self.buildings.active_buildings() {
             self.factory_sources(b, &mut src);
         }
+        for p in self.power.active_plants() {
+            if self.power.plant_kind[p as usize] == PlantKind::Coal {
+                let at = self.power.footprint(p).bounds();
+                self.area_sources(at, COAL_AIR, COAL_NOISE, &mut src);
+            }
+        }
         src
     }
 
@@ -83,11 +93,9 @@ impl World {
         }
     }
 
-    /// An industrial building's emission, spread over the cells under its footprint's bounds;
-    /// ground pollution under them and in the ring of cells around.
+    /// An industrial building's emission, by its footprint's area.
     fn factory_sources(&self, b: BuildingId, src: &mut Sources) {
-        let zone = self.buildings.zone[b as usize];
-        let scale = match zone {
+        let scale = match self.buildings.zone[b as usize] {
             Zone::IndustrialLow => 1.0,
             Zone::IndustrialHigh => HIGH_DENSITY,
             _ => return,
@@ -106,6 +114,17 @@ impl World {
             ];
         }
         let emission = (area / 2.0).abs() / 1000.0 * scale;
+        self.area_sources(
+            bounds,
+            emission * FACTORY_AIR,
+            emission * FACTORY_NOISE,
+            src,
+        );
+    }
+
+    /// Air and noise spread over the cells under `bounds` (`[min_x, min_y, max_x, max_y]`);
+    /// ground pollution under them and in the ring of cells around.
+    fn area_sources(&self, bounds: [f32; 4], air: f32, noise: f32, src: &mut Sources) {
         let p = &self.pollution;
         let (Some(lo), Some(hi)) = (
             p.cell_at(bounds[0], bounds[1]),
@@ -115,14 +134,14 @@ impl World {
         };
         let cols = p.cols as usize;
         let (c0, r0, c1, r1) = (lo % cols, lo / cols, hi % cols, hi / cols);
-        let share = emission / ((c1 - c0 + 1) * (r1 - r0 + 1)) as f32;
+        let cells = ((c1 - c0 + 1) * (r1 - r0 + 1)) as f32;
         for r in r0.saturating_sub(1)..=(r1 + 1).min(p.rows as usize - 1) {
             for c in c0.saturating_sub(1)..=(c1 + 1).min(cols - 1) {
                 let i = r * cols + c;
                 let under = (r0..=r1).contains(&r) && (c0..=c1).contains(&c);
                 let ground = if under {
-                    src.air[i] += share * FACTORY_AIR;
-                    src.noise[i] += share * FACTORY_NOISE;
+                    src.air[i] += air / cells;
+                    src.noise[i] += noise / cells;
                     GroundSource::Under
                 } else {
                     GroundSource::Beside

@@ -1,8 +1,8 @@
 //! Pollution and land value on a coarse grid aligned to the zone grid (ADR 0037).
 //!
-//! Air pollution and noise come from industrial buildings and traffic flow and follow their
-//! current sources. Ground pollution builds up under and beside industrial buildings and fades
-//! slowly once they go. Land value falls as pollution rises. Everything here is recomputed on a
+//! Air pollution and noise come from industrial buildings, coal plants (ADR 0044) and traffic
+//! flow and follow their current sources. Ground pollution builds up under and beside
+//! industrial buildings and coal plants and fades slowly once they go. Land value falls as pollution rises. Everything here is recomputed on a
 //! fixed sim-time cadence and saved. Traffic flow, ground pollution and land value are hashed;
 //! air and noise only feed land value and the display.
 

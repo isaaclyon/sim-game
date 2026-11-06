@@ -414,15 +414,31 @@ fn an_empty_map_has_starter_power_before_the_first_tick() {
 }
 
 #[test]
-fn power_plants_do_not_add_pollution_sources() {
+fn coal_plants_pollute_and_solar_and_wind_do_not() {
+    let mut clean = lattice();
+    assert!(plant(&mut clean, PlantKind::Wind, 500.0, 60.0));
+    assert!(plant(&mut clean, PlantKind::Solar, 500.0, 180.0));
+    let mut before = Vec::new();
+    clean.pollution.write_snapshot(&mut before);
+    advance(&mut clean, 120);
+    let mut after = Vec::new();
+    clean.pollution.write_snapshot(&mut after);
+    assert_eq!(before, after, "solar and wind emit nothing");
+
     let mut w = lattice();
     assert!(plant(&mut w, PlantKind::Coal, COAL.0, COAL.1));
-    assert!(plant(&mut w, PlantKind::Wind, 500.0, 60.0));
-    assert!(plant(&mut w, PlantKind::Solar, 500.0, 180.0));
-    let mut before = Vec::new();
-    w.pollution.write_snapshot(&mut before);
-    advance(&mut w, 120);
-    let mut after = Vec::new();
-    w.pollution.write_snapshot(&mut after);
-    assert_eq!(before, after, "only factories and traffic emit pollution");
+    let at = w.power.footprint(0).centre;
+    let fresh = w.pollution_at(at.0, at.1).unwrap();
+    assert_eq!(fresh.land_value, 1.0);
+    advance(&mut w, 600);
+    let s = w.pollution_at(at.0, at.1).unwrap();
+    assert!(s.air > 0.5 && s.noise > 0.0 && s.ground > 0.0, "{s:?}");
+    assert!(s.land_value < 0.5, "{s:?}");
+
+    // Bulldozing the plant stops air and noise at once; ground pollution lingers.
+    assert!(w.apply(Command::DeleteRoad { x: at.0, y: at.1 }));
+    advance(&mut w, 20);
+    let gone = w.pollution_at(at.0, at.1).unwrap();
+    assert_eq!((gone.air, gone.noise), (0.0, 0.0), "{gone:?}");
+    assert!(gone.ground > 0.0, "{gone:?}");
 }

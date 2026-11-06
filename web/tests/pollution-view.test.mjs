@@ -38,6 +38,23 @@ test('the overlay draws one texel per cell and redraws on a view change', () => 
   assert.ok(texture().image.data[3] > 0);
 });
 
+test('plain haze darkens with the ground at night; the pollution views stay readable', () => {
+  const overlay = new PollutionOverlay();
+  overlay.setCells(new Uint8Array([255, 255, 0, 0]), [0, 0, 32, 1, 1]);
+  const material = () => overlay.group.children[0].material;
+  assert.equal(material().type, 'MeshLambertMaterial', 'lit like the ground');
+  assert.equal(material().fog, true);
+  const normal = overlay.group.children[0].geometry.getAttribute('normal');
+  assert.equal(Math.abs(normal.getY(0)), 1, 'flat, so the light falls on it as on the ground');
+  const plainMap = material().map;
+  overlay.setView('air');
+  assert.equal(material().type, 'MeshBasicMaterial', 'map views ignore the time of day');
+  assert.equal(material().fog, false);
+  assert.notEqual(material().map, plainMap, 'redrawn for the view');
+  overlay.setView('plain');
+  assert.equal(material().type, 'MeshLambertMaterial');
+});
+
 test('P cycles air, ground, noise and land value, then back to the plain view', async () => {
   const t = await tools();
   const views = [];

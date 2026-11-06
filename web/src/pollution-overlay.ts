@@ -49,9 +49,15 @@ export function pollutionColor(
   return [out.r * 255, out.g * 255, out.b * 255, alpha * 255];
 }
 
+const SHARED = { transparent: true, depthWrite: false, side: THREE.DoubleSide };
+
 export class PollutionOverlay {
   readonly group = new THREE.Group();
-  private mesh?: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
+  private mesh?: THREE.Mesh<THREE.BufferGeometry, THREE.Material>;
+  /** Haze and stain are part of the scene: lit and fogged like the ground, so they darken at
+   * night. The pollution views are read like a map, the same at any hour and distance. */
+  private readonly lit = new THREE.MeshLambertMaterial(SHARED);
+  private readonly flat = new THREE.MeshBasicMaterial({ ...SHARED, fog: false });
   private cells?: Uint8Array;
   private layout?: [number, number, number, number, number];
   private view: PollutionView = 'plain';
@@ -81,14 +87,7 @@ export class PollutionOverlay {
     texture.minFilter = THREE.LinearFilter;
     texture.needsUpdate = true;
     if (!this.mesh) {
-      // No fog: an overlay is read like a map and should not fade with distance.
-      const material = new THREE.MeshBasicMaterial({
-        fog: false,
-        transparent: true,
-        depthWrite: false,
-        side: THREE.DoubleSide,
-      });
-      this.mesh = new THREE.Mesh(new THREE.BufferGeometry(), material);
+      this.mesh = new THREE.Mesh(new THREE.BufferGeometry(), this.lit);
       // Over the zone tint, under lot lines and roads.
       this.mesh.renderOrder = 1.2;
       this.mesh.frustumCulled = false;
@@ -102,8 +101,13 @@ export class PollutionOverlay {
     );
     geom.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, 1, 0, 1, 1, 0, 1], 2));
     geom.setIndex([0, 1, 2, 0, 2, 3]);
-    this.mesh.material.map?.dispose();
-    this.mesh.material.map = texture;
-    this.mesh.material.needsUpdate = true;
+    // The lit material needs normals; both sides draw, and each faces its viewer.
+    geom.computeVertexNormals();
+    this.lit.map?.dispose();
+    for (const m of [this.lit, this.flat]) {
+      m.map = texture;
+      m.needsUpdate = true;
+    }
+    this.mesh.material = this.view === 'plain' ? this.lit : this.flat;
   }
 }

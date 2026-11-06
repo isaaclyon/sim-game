@@ -12,6 +12,7 @@
 // - Ground, water, fields and trees are decoration from `scenery/`, never sim state.
 // - Flat layers share y = 0 without depth writes. Ground draws first; the zone overlay, pollution, lots,
 //   sidewalks, roads and lane paint draw in the transparent pass, after buildings and cars, in that order.
+//   Chimney smoke draws after them (`SMOKE_ORDER`), so roads never show through it.
 // - Curve sampling belongs to the sim. Tool previews (`tool-preview.ts`) draw the sim's answers.
 // - Rising buildings, zone paint flashes and gliding markers are display-only motion, skipped
 //   when the system asks for reduced motion.
@@ -355,6 +356,7 @@ export class Renderer {
   /** Draws plants, lines and power markers; see `power` in protocol.ts. */
   setPower(plants: Float32Array, lines: Float32Array, buildings: Float32Array) {
     this.power.set(plants, lines, buildings);
+    this.smoke.setPlants(plants);
   }
 
   /** The power view marks every building with its grid's colour, not only unpowered ones. */

@@ -304,7 +304,8 @@ Goals and consequences, kept light so they don't crowd out building.
   balance into debt, which only stops new roads. The HUD shows balance, taxes and upkeep.
   Bulldozing, zoning and sim-built alleys are free. Tax rates are fixed for now.
 - **First slice: pollution and land value — implemented** ([ADR 0037](adrs/0037-pollution-and-land-value-steer-growth.md)).
-  Industry and traffic make air pollution, ground pollution and noise, which lower land value.
+  Industry, traffic and (since ADR 0044) coal plants make air pollution, ground pollution and
+  noise, which lower land value.
   Homes, and shops a little, grow first on high land value; industry ignores it. Nothing
   standing is closed or emptied. It needs only buildings and traffic, so it comes before
   services.
@@ -342,7 +343,10 @@ Goals and consequences, kept light so they don't crowd out building.
   - The HUD reports supply, use and waiting lots. Unpowered buildings have markers; the power
     view colours grids. Detailed low-poly models show each plant type without changing state.
   - Save version 4 combines money, pollution and power. Older saves and links are refused.
-    Display-only coal smoke remains a follow-up; plants do not yet add pollution or costs.
+    Coal plants puff display-only smoke from their chimney; plants do not yet add costs.
+  - Coal plants pollute like a large factory: air, noise and ground pollution lower land
+    value around them; solar and wind stay clean
+    ([ADR 0044](adrs/0044-coal-plants-pollute.md)).
 
   Done when: a player grows a village on starter power, sees why growth stops, adds a plant,
   and connects an off-road wind farm with a line.
