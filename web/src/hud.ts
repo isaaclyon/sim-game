@@ -30,7 +30,7 @@ export function roadHelpText(
   quote: Quote,
 ) {
   if (tool === 'bulldoze')
-    return 'Click a highlighted road to remove it. Esc or right-click cancels.';
+    return 'Click a highlighted road, building or power piece to remove it. Esc or right-click cancels.';
   if (!tool) return '';
   if (building) return 'Building road…';
   const problem = refused

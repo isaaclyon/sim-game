@@ -1,6 +1,6 @@
 # 0018. Lots are shapes cut along roads; buildings take their shape from lots
 
-- Status: Industrial frontage and building rules superseded by [0019](0019-industrial-lot-variety.md); low-density commercial footprints by [0031](0031-small-low-density-shops.md); otherwise accepted
+- Status: Industrial frontage and building rules superseded by [0019](0019-industrial-lot-variety.md); low-density commercial footprints by [0031](0031-small-low-density-shops.md); residential frontage by [0043](0043-residential-lot-variety.md); otherwise accepted
 - Date: 2026-11-03
 
 ## Context

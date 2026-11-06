@@ -1,7 +1,8 @@
 //! Buildings on lots (ADR 0016/0018). A zoned lot builds after a seeded delay, and only
 //! while its use has demand; otherwise it waits and checks again (ADR 0025).
 //! Lot geometry is read only at construction; rezoning never changes an existing building,
-//! it only starts the building's gradual closure (ADR 0023).
+//! it only starts the building's gradual closure (ADR 0023). The bulldozer demolishes a building
+//! at once; a lot's replacement building gets a fresh design (ADR 0045).
 use serde::{Deserialize, Serialize};
 mod footprint;
 
@@ -30,7 +31,8 @@ pub struct Buildings {
     pub active: Vec<bool>,
     outline_start: Vec<u32>,
     outline: Vec<Point>,
-    /// Building occupying each lot, including retired slots.
+    /// Last building put up on each lot; it stands only while active. A lot's next building
+    /// draws its design from this one, so a replacement differs from what stood before.
     owner: Vec<Option<BuildingId>>,
     /// Scheduled construction per lot: (tick, zone, last deferred for power).
     /// The waiting reason survives saves and disappears with the schedule on unzoning.
@@ -67,14 +69,14 @@ impl Buildings {
         let mut changed = false;
         for l in 0..lots.len() {
             if !lots.active[l] {
-                if let Some(b) = self.owner[l].take() {
+                if let Some(b) = self.owner[l].take().filter(|&b| self.active[b as usize]) {
                     self.active[b as usize] = false;
                     changed = true;
                 }
                 self.due[l] = None;
                 continue;
             }
-            if self.owner[l].is_some() {
+            if self.owner[l].is_some_and(|b| self.active[b as usize]) {
                 continue;
             }
             let zone = lots.zone(l as LotId, zones);
@@ -105,7 +107,7 @@ impl Buildings {
         self.pending.push(Reverse((at, l as LotId)));
     }
 
-    /// Removes a closed building and schedules its lot for the lot's current zone. Only the
+    /// Removes a closed or demolished building and schedules its lot for the lot's current zone. Only the
     /// lot's active owner can be removed, so a stale id never frees a replacement's lot.
     /// Occupancy cleanup is the caller's job.
     pub(crate) fn remove(
@@ -123,7 +125,6 @@ impl Buildings {
             return false;
         }
         self.active[b] = false;
-        self.owner[l] = None;
         self.version = self.version.wrapping_add(1);
         let zone = lots.zone(l as LotId, zones);
         if lots.active[l] && zone != Zone::None {
@@ -179,6 +180,7 @@ impl Buildings {
     /// The building a lot that `next_due` returned would get; `None` if nothing fits.
     /// Changes nothing, so the caller can check power first (ADR 0041).
     pub(crate) fn plan(
+        &self,
         lot: LotId,
         zone: Zone,
         lots: &Lots,
@@ -186,7 +188,12 @@ impl Buildings {
         seed: u64,
     ) -> Option<Plan> {
         let l = lot as usize;
-        let mut rng = Rng::new(seed.wrapping_add(lot as u64));
+        // A lot's first building keeps the original per-lot stream; a replacement mixes in the
+        // building it replaces (ADR 0045).
+        let previous = self.owner[l].map_or(0, |b| {
+            (u64::from(b) + 1).wrapping_mul(0x9E37_79B9_7F4A_7C15)
+        });
+        let mut rng = Rng::new(seed.wrapping_add(lot as u64) ^ previous);
         // The first draw sets growth time; use the next so height is independent.
         rng.next_u64();
         let height = match zone {

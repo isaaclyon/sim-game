@@ -188,7 +188,8 @@ export class ToolPreview {
     this.angleFill.visible = this.angleEdge.visible = edge.length > 0;
   }
 
-  /** The full centreline the bulldozer would remove, `[x, y]` per sample, in the refusal red. */
+  /** What the bulldozer would remove, `[x, y]` per sample (a road's centreline, or a plant's or
+   * building's closed outline), in the refusal red. */
   setBulldoze(segment: Float32Array) {
     this.setMarkers([], []);
     this.setPath([...segment], PREVIEW_REFUSED_COLOR, 0);

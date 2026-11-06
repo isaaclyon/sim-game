@@ -62,10 +62,16 @@ impl World {
     }
 
     /// Writes `[x, y]` per centreline sample of the bulldoze target, or nothing on a miss. A
-    /// plant's target is its closed outline, a line's its two ends; they win over roads.
+    /// plant's or building's target is its closed outline, a line's its two ends; plants,
+    /// lines and then buildings win over roads (ADR 0045).
     pub fn write_bulldoze_preview(&self, x: f32, y: f32, out: &mut Vec<f32>) {
         out.clear();
         if self.write_power_bulldoze(x, y, out) {
+            return;
+        }
+        if let Some(b) = self.building_at(x, y) {
+            let ring = self.buildings.footprint(b);
+            out.extend(ring.iter().chain(&ring[..1]).flat_map(|p| [p.0, p.1]));
             return;
         }
         if let Some(road) = snap::bulldoze_target(&self.roads, x, y) {

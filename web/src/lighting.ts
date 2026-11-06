@@ -16,8 +16,12 @@ export function daylight(secondOfDay: number): number {
 }
 
 /** Per-face emission shared by tiled buildings and instanced vehicle lamps. */
-export function nightMaterial(night: { value: number }): THREE.MeshLambertMaterial {
+export function nightMaterial(
+  night: { value: number },
+  lightHour?: { value: number },
+): THREE.MeshLambertMaterial {
   const material = new THREE.MeshLambertMaterial({ vertexColors: true });
+  material.customProgramCacheKey = () => (lightHour ? 'scheduled-night' : 'night');
   material.onBeforeCompile = (shader) => {
     shader.uniforms.night = night;
     shader.vertexShader =
@@ -25,6 +29,18 @@ export function nightMaterial(night: { value: number }): THREE.MeshLambertMateri
         '#include <begin_vertex>',
         '#include <begin_vertex>\nvNightEmission = nightEmission;',
       );
+    if (lightHour) {
+      shader.uniforms.lightHour = lightHour;
+      shader.vertexShader =
+        `attribute vec2 lightSchedule;\nuniform float lightHour;\n${shader.vertexShader}`.replace(
+          'vNightEmission = nightEmission;',
+          `float elapsed = mod(lightHour - lightSchedule.x + 24.0, 24.0);
+        float duration = lightSchedule.y - lightSchedule.x;
+        float lit = step(0.3, duration) * smoothstep(0.0, 0.15, elapsed)
+          * (1.0 - smoothstep(max(0.0, duration - 0.15), max(0.15, duration), elapsed));
+        vNightEmission = nightEmission * lit;`,
+        );
+    }
     shader.fragmentShader =
       `uniform float night;\nvarying vec3 vNightEmission;\n${shader.fragmentShader}`.replace(
         'vec3 totalEmissiveRadiance = emissive;',
@@ -36,6 +52,7 @@ export function nightMaterial(night: { value: number }): THREE.MeshLambertMateri
 
 export class Lighting {
   readonly night = { value: 0 };
+  readonly lightHour = { value: 6 };
   readonly sky = new THREE.Color(SKY);
   readonly sun = new THREE.DirectionalLight(LIGHT.sun, LIGHT.sunIntensity);
   readonly ambient = new THREE.HemisphereLight(LIGHT.sky, LIGHT.groundBounce, LIGHT.hemisphere);
@@ -53,6 +70,7 @@ export class Lighting {
 
   setTime(secondOfDay: number) {
     this.secondOfDay = secondOfDay;
+    this.lightHour.value = (((secondOfDay % 86400) + 86400) % 86400) / 3600;
   }
 
   /** A bounded shadow map follows the camera focus instead of covering the whole city. */

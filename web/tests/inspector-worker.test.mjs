@@ -81,7 +81,7 @@ test('a paused sim still answers selections and edits', async () => {
   await w.send({ type: 'setSpeed', speed: 0 });
   const agent = visibleCar(w);
   await w.send({ type: 'inspect', agent, selection: 1 });
-  assert.equal(w.messages.at(-1).citizen.agent, agent);
+  assert.equal(replies(w).at(-1).citizen.agent, agent);
   const roads = w.messages.findLast((msg) => msg.type === 'roads').segments;
   await w.send({
     type: 'deleteRoad',

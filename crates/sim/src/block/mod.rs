@@ -5,7 +5,7 @@
 
 mod alleys;
 mod faces;
-mod industrial;
+mod grouping;
 mod lots;
 mod offsets;
 mod query;

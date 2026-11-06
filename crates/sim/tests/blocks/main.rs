@@ -4,6 +4,7 @@ mod alleys;
 mod fill;
 mod industrial;
 mod lots;
+mod residential;
 
 use std::collections::BTreeSet;
 

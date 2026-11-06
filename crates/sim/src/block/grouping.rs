@@ -1,4 +1,4 @@
-//! Combine new industrial strips, or reconstruct an existing lot during a recut (ADR 0019).
+//! Combine residential/industrial strips or reconstruct existing lots (ADR 0019, ADR 0043).
 use super::lots::Piece;
 use crate::lot::{LotId, Lots};
 use crate::poly;
@@ -8,7 +8,7 @@ use crate::zone::{Zone, ZoneGrid};
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Group {
     Existing(LotId),
-    Industrial(Zone),
+    Vacant(Zone),
     Separate,
 }
 
@@ -24,12 +24,15 @@ fn group(p: &Piece, grid: &ZoneGrid, lots: &Lots) -> Group {
         };
     }
     let zone = grid.zone(first);
-    if matches!(zone, Zone::IndustrialLow | Zone::IndustrialHigh)
-        && p.cells
-            .iter()
-            .all(|&c| lots.owner(c).is_none() && grid.zone(c) == zone)
+    if matches!(
+        zone,
+        Zone::ResidentialLow | Zone::ResidentialHigh | Zone::IndustrialLow | Zone::IndustrialHigh
+    ) && p
+        .cells
+        .iter()
+        .all(|&c| lots.owner(c).is_none() && grid.zone(c) == zone)
     {
-        Group::Industrial(zone)
+        Group::Vacant(zone)
     } else {
         Group::Separate
     }
@@ -42,14 +45,20 @@ pub(super) fn coalesce(pieces: Vec<Piece>, grid: &ZoneGrid, lots: &Lots, seed: u
         let key = group(&p, grid, lots);
         let count = match key {
             Group::Existing(_) => usize::MAX,
-            Group::Industrial(_) => {
+            Group::Vacant(zone) => {
                 // Local to this road side and start, independent of traffic and command order.
                 let lane = u64::from(p.road) * 2 + u64::from(!p.left);
                 let mut rng = Rng::new(seed ^ (lane << 32) ^ u64::from(p.span.0.to_bits()));
-                match rng.below(10) {
-                    0..=3 => 1,
-                    4..=7 => 2,
-                    _ => 4,
+                let roll = rng.below(10);
+                if matches!(zone, Zone::ResidentialLow | Zone::ResidentialHigh) {
+                    // Standard frontages remain common; wider homes get real side yards.
+                    if roll < 6 { 1 } else { 2 }
+                } else {
+                    match roll {
+                        0..=3 => 1,
+                        4..=7 => 2,
+                        _ => 4,
+                    }
                 }
             }
             Group::Separate => 1,

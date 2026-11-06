@@ -2,7 +2,7 @@
 
 use std::collections::BTreeSet;
 
-use super::industrial;
+use super::grouping;
 use super::{
     Blocks, LOT_REACH, LotPlan, MAX_GAP_AREA, MIN_LOT_AREA, ROAD_HALF_WIDTH, Rect, contains_rect,
     cross, intersects, left_of, sub, unit,
@@ -204,7 +204,7 @@ impl Blocks {
             p.cells.sort_unstable();
             p.ring = poly::ring(outline);
         }
-        industrial::coalesce(lots, grid, existing, seed)
+        grouping::coalesce(lots, grid, existing, seed)
             .into_iter()
             .map(|p| {
                 let outline = p.ring.into_iter().map(poly::to_point).collect();

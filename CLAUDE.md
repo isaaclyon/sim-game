@@ -24,7 +24,9 @@ What to build next and why lives in `docs/ROADMAP.md`. Work on the current miles
 - Roads: `[ax, ay, bx, by, class]` per active rendered segment, class 0 = street, 1 = main road,
   2 = alley; curves emit multiple segments. Packed in road ID order, not indexed by road ID
   (ADR 0015, 0017).
-- Bulldoze preview: `[x, y]` per centreline sample of the selected road; empty = no target.
+- Bulldoze preview: `[x, y]` per centreline sample of the selected road, or a closed outline
+  for a plant or building (ADR 0045); empty = no target. Plants, lines, then buildings win
+  over roads.
   Read-only. Road/lane IDs are never reused after deletion (ADR 0013). Lane counts include
   tombstone slots.
 - Signals: `[x, y, heading, state]` per signalised approach (`SIGNAL_STRIDE`), state 0 = red,
@@ -70,7 +72,7 @@ What to build next and why lives in `docs/ROADMAP.md`. Work on the current miles
   none. Grid numbers are stable within one message only. Sent whole when plants, lines, grids
   or who is powered change; growth is capped like buildings. Plant preview: closed `[x, y]`
   footprint where the plant would stand (coal snapped beside a road) plus `ok`. Line preview: `[ax, ay, a_join, bx, by, b_join]`, join 1 = meets a line,
-  plant or road; empty = refused. Bulldoze removes a plant, else a line, else a road.
+  plant or road; empty = refused. Bulldoze removes a plant, else a line, else a building, else a road.
 - Citizen inspection: `inspect` names a car or walker by its agent snapshot index; the worker maps it once
   to a citizen and answers `citizen` for that one citizen only, at once and after every frame
   and edit while selected (ADR 0022). Read-only, not hashed; names are derived from the seed and

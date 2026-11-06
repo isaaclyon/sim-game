@@ -98,6 +98,8 @@ thousand people without instructions, follows a citizen home, and wants to keep 
 
 The point where the toy starts to look like a place.
 
+- Low-density houses now choose a seeded 8–14 m setback from the road centreline, even
+  on roomy lots, so front yards vary. Existing buildings keep their footprints.
 - Low-poly art pass: building variety by zone and density, trees, terrain color, water. Build
   the building kit so it can carry an era style (village cottages vs. town blocks) later.
   Low-density commerce now grows small, shallow shops, mostly one storey, with individual

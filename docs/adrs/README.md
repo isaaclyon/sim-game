@@ -23,7 +23,7 @@ rewriting history; mark the old one `Superseded by NNNN`.
 | [0015](0015-curved-road-snapshots.md) | Curved roads use simulation-sampled segment snapshots | Accepted; road speed field superseded by 0017 |
 | [0016](0016-blocks-lots-and-alleys.md) | Blocks are derived road faces; lots are zone-cell sets; the sim adds alleys | Accepted; lots superseded by 0018 |
 | [0017](0017-road-classes-and-main-road-routing.md) | Road classes and main-road routing | Accepted |
-| [0018](0018-lots-cut-along-roads.md) | Lots are shapes cut along roads; buildings take their shape from lots | Industrial frontage and buildings superseded by 0019; low-density commercial footprints by 0031; otherwise accepted |
+| [0018](0018-lots-cut-along-roads.md) | Lots are shapes cut along roads; buildings take their shape from lots | Industrial frontage and buildings superseded by 0019; low-density commercial footprints by 0031; residential frontage by 0043; otherwise accepted |
 | [0019](0019-industrial-lot-variety.md) | Industrial lots combine neighbouring frontage strips | Industrial footprint fallback superseded by 0020; snapshot extended with `front` by 0027; otherwise accepted |
 | [0020](0020-rectangular-industrial-halls.md) | Industrial halls stay rectangular | Accepted |
 | [0021](0021-citizens-households-and-trips.md) | Citizens, households, homes, jobs and trips | Accepted; residents of repainted buildings superseded by 0023; walking and travel slots by 0026; industrial job-capacity tuning by 0028; low-density commercial capacity by 0030 |
@@ -48,7 +48,9 @@ rewriting history; mark the old one `Superseded by NNNN`.
 | [0040](0040-straight-joins.md) | Straight roads that meet end to end in a line become one road | Accepted |
 | [0041](0041-power-grids-follow-roads.md) | Power grids follow roads and gate growth | Accepted |
 | [0042](0042-roadside-pieces-snap-to-roads.md) | Roadside pieces snap to the road and face it | Accepted |
+| [0043](0043-residential-lot-variety.md) | Residential lots mix standard and wider frontages | Accepted |
 | [0044](0044-coal-plants-pollute.md) | Coal plants pollute | Accepted |
+| [0045](0045-bulldozer-demolishes-buildings.md) | The bulldozer demolishes buildings | Accepted |
 
 ADRs are only for decisions that are hard to reverse. See [AGENTS.md](AGENTS.md) for when to
 write one and how.

@@ -3,6 +3,7 @@
 use serde::{Deserialize, Serialize};
 mod closure;
 mod demand;
+mod demolish;
 mod inspect;
 mod money;
 mod persist;
@@ -103,7 +104,8 @@ pub enum Command {
         by: f32,
         class: RoadClass,
     },
-    /// Removes the plant under the point, else the nearest line in reach, else the nearest road.
+    /// Removes the plant under the point, else the nearest line in reach, else the building
+    /// under the point (ADR 0045), else the nearest road.
     DeleteRoad {
         x: f32,
         y: f32,
@@ -297,7 +299,12 @@ impl World {
     }
 
     pub fn apply(&mut self, cmd: Command) -> bool {
-        let versions = (self.lots.version, self.zones.version, self.power.version);
+        let versions = (
+            self.lots.version,
+            self.zones.version,
+            self.power.version,
+            self.buildings.version,
+        );
         let roads = self.roads.version;
         let changed = match cmd {
             Command::SpawnAgents { count } => self.spawn_agents(count),
@@ -331,7 +338,9 @@ impl World {
                 },
                 class,
             ),
-            Command::DeleteRoad { x, y } => self.bulldoze_power(x, y) || self.delete_road(x, y),
+            Command::DeleteRoad { x, y } => {
+                self.bulldoze_power(x, y) || self.demolish(x, y) || self.delete_road(x, y)
+            }
             Command::PlacePlant { kind, x, y } => self.place_plant(kind, x, y),
             Command::BuildLine { ax, ay, bx, by } => self.build_line(ax, ay, bx, by),
             Command::PaintZone {
@@ -350,7 +359,13 @@ impl World {
             }
             Command::FillBlock { x, y, zone } => self.fill_block(x, y, zone),
         };
-        if versions != (self.lots.version, self.zones.version, self.power.version) {
+        let now = (
+            self.lots.version,
+            self.zones.version,
+            self.power.version,
+            self.buildings.version,
+        );
+        if versions != now {
             self.buildings.reconcile(
                 &self.lots,
                 &self.zones,

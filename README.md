@@ -34,8 +34,13 @@ The HUD shows the sim's day clock and speed (`Day 1   06:00   1×`). The game st
 06:00, and each sim second advances the clock 18 seconds, so a day lasts 80 real minutes at 1× and 8
 minutes at 10×. Speed changes how many sim seconds pass per real second; pausing stops the clock.
 Lighting follows that same clock: warm dawn and dusk fade into daylight and a blue night.
-Building windows, shopfronts and vehicle head/tail lamps glow after dark; pausing holds the
-lighting too. Buildings and trees cast sun shadows onto the ground and roads. Shadows cover
+Building windows and shopfronts follow stable, varied daily schedules: about 70% of residential,
+45% of commercial and 15% of industrial buildings light up in the evening. They switch on
+between 17:00 and 19:00; most homes switch off between 23:00 and 01:00, shops between 21:00
+and 23:00, and factories between 20:30 and 22:30. One in ten participating buildings stays lit
+until 05:00–06:00. Switches fade over nine game minutes, and lit buildings keep a mix of bright
+and dark windows. This is visual only, not business hours or electricity demand. Vehicle
+head/tail lamps still glow throughout the night; pausing holds all clock-driven lighting. Buildings and trees cast sun shadows onto the ground and roads. Shadows cover
 a bounded area around the camera focus so they stay detailed when viewing a large city;
 vehicle lamps use emissive faces rather than individual light sources.
 Cars whose remaining route uses a deleted road park and retry; other traffic continues.
@@ -68,7 +73,10 @@ through rezoning and disappear with it. Vacant zoned land stays grassy; painting
 wild trees and fields.
 
 Buildings start appearing after a few simulation seconds and fill suitable zoned lots within
-about a minute at normal speed. Low-density homes have yards. Low-density commerce grows
+about a minute at normal speed. Low-density homes have yards. New residential blocks mix
+standard and wider lots (roughly 16 m and 32 m frontages) where neighbouring land has the same
+zone. Wider house lots gain side-yard space; existing properties stay unchanged
+([ADR 0043](docs/adrs/0043-residential-lot-variety.md)). Low-density commerce grows
 small, shallow shops, mostly one storey, with individual doors and awnings, mixed flat and
 pitched roofs, and occasional attached pairs. Most shops keep side gaps and rear space.
 Apartments and high-density commerce follow lot shapes and share side walls

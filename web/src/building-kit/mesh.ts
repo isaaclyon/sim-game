@@ -11,6 +11,9 @@ export class MeshBuilder {
   /** Emission colour for subsequently added faces; black means unlit. */
   readonly glow = new THREE.Color(0x000000);
   private readonly emissions: number[] = [];
+  /** Daily on/off hours for subsequently added faces; zero duration stays dark. */
+  lightSchedule: [number, number] = [0, 0];
+  private readonly schedules: number[] = [];
 
   get vertexCount(): number {
     return this.size / 9;
@@ -35,6 +38,7 @@ export class MeshBuilder {
     const d = this.data;
     for (const p of [a, b, c]) {
       this.emissions.push(this.glow.r, this.glow.g, this.glow.b);
+      this.schedules.push(...this.lightSchedule);
       const o = this.size;
       d[o] = p[0];
       d[o + 1] = p[1];
@@ -158,6 +162,7 @@ export class MeshBuilder {
     g.setAttribute('normal', new THREE.InterleavedBufferAttribute(buffer, 3, 3));
     g.setAttribute('color', new THREE.InterleavedBufferAttribute(buffer, 3, 6));
     g.setAttribute('nightEmission', new THREE.Float32BufferAttribute(this.emissions, 3));
+    g.setAttribute('lightSchedule', new THREE.Float32BufferAttribute(this.schedules, 2));
     g.computeBoundingSphere();
     return g;
   }

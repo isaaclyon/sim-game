@@ -27,7 +27,8 @@ export type ToWorker =
   /** Builds the road through guided `points`, as in `previewRoad` with two points, or three for
    * a curve. Answered with `buildResult`. */
   | { type: 'buildRoad'; id: number; points: number[]; class: RoadClass }
-  /** Removes the plant under the point, else the nearest line, else the nearest road. */
+  /** Removes the plant under the point, else the nearest line, else the building under the
+   * point (ADR 0045), else the nearest road. */
   | { type: 'deleteRoad'; x: number; y: number }
   /** Places a power plant at the point: coal snaps beside the nearest road and faces it, others
    * centre on the point (ADR 0041, 0042). Refusals change nothing. */
@@ -333,7 +334,7 @@ export type FromWorker =
   /** `end` is the built road's guided end, where a chained road starts; null when refused. */
   | { type: 'buildResult'; id: number; success: boolean; end: [number, number] | null }
   /** Selected road's `[x, y]` centreline samples, or empty on a miss. Sim-owned hit testing.
-   * A plant's target is its closed outline and a line's its two ends. */
+   * A plant's or building's target is its closed outline and a line's its two ends. */
   | { type: 'bulldozePreview'; segment: Float32Array; revision: number }
   /** The inspected citizen, or null if the selected agent has no resident. Answers `inspect`. */
   | { type: 'citizen'; selection: number; citizen: Citizen | null }

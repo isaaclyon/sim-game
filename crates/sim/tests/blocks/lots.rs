@@ -32,7 +32,13 @@ fn lots_fill_a_zoned_block_and_face_their_road() {
     }
     let mut outlines = Vec::new();
     w.write_lot_outlines(&mut outlines);
-    assert!(!outlines.is_empty() && outlines.len() % 4 == 0);
+    let mut cursor = 0;
+    for &lot in &lots {
+        let count = w.lots.outline(lot).len();
+        assert_eq!(outlines[cursor], count as f32);
+        cursor += 1 + 2 * count;
+    }
+    assert_eq!(cursor, outlines.len());
 
     // Unzoning keeps the lots and their ids (buildings empty out instead, #17).
     let version = w.lots.version;
@@ -165,10 +171,10 @@ fn lots_from_facing_roads_meet_on_one_line_without_slivers() {
     assert_eq!(unlotted(&w), 0, "every zoned cell has a lot");
 }
 
-/// A perfect lattice zoned whole: every block is cut the same way, into rectangles facing
+/// A perfect commercial lattice: every block is cut the same way, into rectangles facing
 /// two of its sides, with no alleys.
 #[test]
-fn a_perfect_grid_cuts_every_block_the_same_way() {
+fn a_perfect_commercial_grid_cuts_every_block_the_same_way() {
     let cfg = Config::default();
     let spacing = cfg.grid_spacing;
     let n = 5;
@@ -184,7 +190,7 @@ fn a_perfect_grid_cuts_every_block_the_same_way() {
         ay: 0.0,
         bx: e,
         by: e,
-        zone: Zone::ResidentialLow,
+        zone: Zone::CommercialLow,
     }));
     let lots = check_lots(&w);
     assert_eq!(unlotted(&w), 0);

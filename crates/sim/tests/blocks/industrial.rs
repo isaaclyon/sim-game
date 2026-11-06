@@ -72,7 +72,7 @@ fn road_edits_give_replacement_lots_the_current_zones_sizes() {
         assert!(!replacements.is_empty());
         if zone == Zone::ResidentialLow {
             assert!(
-                replacements.iter().all(|&v| v < 24.0),
+                replacements.iter().all(|&v| v < 40.0),
                 "retired factory plots must not become oversized house plots: {replacements:?}"
             );
         } else {
@@ -85,7 +85,7 @@ fn road_edits_give_replacement_lots_the_current_zones_sizes() {
 }
 
 #[test]
-fn industrial_lot_layout_is_seeded_but_residential_layout_is_unchanged() {
+fn industrial_lot_layout_is_seeded_but_commercial_layout_is_unchanged() {
     let layout = |seed, zone| {
         let mut w = empty();
         w.cfg.seed = seed;
@@ -104,8 +104,8 @@ fn industrial_lot_layout_is_seeded_but_residential_layout_is_unchanged() {
         layout(2, Zone::IndustrialHigh)
     );
     assert_eq!(
-        layout(1, Zone::ResidentialLow),
-        layout(2, Zone::ResidentialLow)
+        layout(1, Zone::CommercialLow),
+        layout(2, Zone::CommercialLow)
     );
 }
 
@@ -125,12 +125,8 @@ fn industrial_lot_sizes_do_not_swallow_other_zones_or_change_on_repaint() {
     let ids = check_lots(&w);
     for &l in &ids {
         if w.lots.frontage[l as usize] > 24.0 {
-            assert!(
-                w.lots
-                    .cells(l)
-                    .iter()
-                    .all(|&c| w.zones.zone(c) == Zone::IndustrialHigh)
-            );
+            let zone = w.lots.zone(l, &w.zones);
+            assert!(w.lots.cells(l).iter().all(|&c| w.zones.zone(c) == zone));
         }
     }
     let mut before = Vec::new();

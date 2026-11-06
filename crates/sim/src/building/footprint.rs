@@ -54,7 +54,8 @@ pub(super) fn make(
             front,
             facing,
             ((lots.frontage[l] - 4.0).clamp(5.0, 14.0), 14.0),
-            8.0,
+            // Vary front yards even when every house fits at the minimum setback.
+            8.0 + rng.below(7) as f32,
         ),
         Zone::CommercialLow => {
             // Keep the trading floor small even when the lot reaches deep into a block.
@@ -281,6 +282,31 @@ mod tests {
                 assert!(poly::area(&inside) >= MIN_FOOTPRINT);
             }
         }
+    }
+
+    #[test]
+    fn house_setbacks_vary_even_when_full_size_houses_fit() {
+        let (lots, roads) = lot(vec![(10.0, 4.0), (26.0, 4.0), (26.0, 60.0), (10.0, 60.0)]);
+        let make_seed =
+            |seed| make(&lots, 0, &roads, Zone::ResidentialLow, &mut Rng::new(seed)).unwrap();
+        let first = make_seed(1);
+        assert_eq!(first, make_seed(1));
+        let mut setbacks = BTreeSet::new();
+        for seed in 1..32 {
+            let ring = poly::ring(make_seed(seed));
+            let bounds = poly::bounds(&ring);
+            assert_eq!(bounds[2] - bounds[0], 12.0);
+            assert_eq!(bounds[3] - bounds[1], 14.0);
+            assert!((8.0..=14.0).contains(&bounds[1]));
+            setbacks.insert((bounds[1] * 256.0) as i32);
+            assert!(
+                poly::subtract(&[ring], &[poly::ring(lots.outline(0).iter().copied())]).is_empty()
+            );
+        }
+        assert!(
+            setbacks.len() >= 4,
+            "roomy lots must not all use the minimum setback"
+        );
     }
 
     #[test]

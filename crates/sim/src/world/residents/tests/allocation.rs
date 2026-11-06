@@ -44,6 +44,7 @@ fn apartments_have_independent_homes_and_halls_have_only_one_job_floor() {
 fn reachable_vacancy_is_not_starved_by_many_nearby_disconnected_employers() {
     let mut w = town();
     isolate(&mut w);
+    driver(&mut w, 0); // The distant vacancy requires a car, independent of seeded ownership.
     let home_node = w.building_node(w.home_building(0)).unwrap();
     let near_a = w.roads.add_node(10.0, 10.0);
     let near_b = w.roads.add_node(20.0, 10.0);

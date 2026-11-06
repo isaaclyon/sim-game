@@ -62,7 +62,9 @@ export class Renderer {
   private sidewalks?: THREE.Mesh;
   private markings?: THREE.Mesh;
   private readonly lighting = new Lighting(this.scene);
-  private readonly buildings = new BuildingLayer(nightMaterial(this.lighting.night));
+  private readonly buildings = new BuildingLayer(
+    nightMaterial(this.lighting.night, this.lighting.lightHour),
+  );
   private readonly scenery = new Scenery();
   private readonly lotScenery = new LotLayer();
   private readonly overlay = new ZoneOverlay();

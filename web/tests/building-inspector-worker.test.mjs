@@ -56,7 +56,8 @@ test('building queries cross WASM and worker with live counts, and replace citiz
   assert.equal(closing.capacity, before.capacity);
   assert.equal(closing.occupied, before.occupied);
   await w.send({ type: 'setSpeed', speed: 10 });
-  for (let i = 0; i < 1000 && replies(w).at(-1).building !== null; i++) w.advance(101);
+  // Wide residential lots hold more households, which leave gradually during closure.
+  for (let i = 0; i < 2000 && replies(w).at(-1).building !== null; i++) w.advance(101);
   assert.equal(replies(w).at(-1).building, null, 'closure removal clears the selected ID');
   const count = replies(w).length;
   w.advance(101);

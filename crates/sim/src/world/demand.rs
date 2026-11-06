@@ -8,7 +8,7 @@
 
 use super::World;
 use super::power::power_demand;
-use crate::building::{BuildingId, Buildings};
+use crate::building::BuildingId;
 use crate::zone::Zone;
 use serde::{Deserialize, Serialize};
 
@@ -115,7 +115,10 @@ impl World {
                 self.buildings.defer(lot, zone, tick, dt, seed, false);
                 continue;
             }
-            let Some(plan) = Buildings::plan(lot, zone, &self.lots, &self.roads, seed) else {
+            let Some(plan) = self
+                .buildings
+                .plan(lot, zone, &self.lots, &self.roads, seed)
+            else {
                 continue;
             };
             let demand = power_demand(plan.zone, &plan.ring, plan.height);

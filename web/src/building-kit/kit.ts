@@ -2,6 +2,7 @@
 // Visual-only variety comes from a hash of the footprint, never from sim randomness.
 import * as THREE from 'three';
 import { balconies, door, loadingDoors, rooftop, shopfront, windows } from './facade.ts';
+import { LIGHT_SEED, lightSchedule } from './lights.ts';
 import type { MeshBuilder } from './mesh.ts';
 import { along, at, type Box, clip, convex, edge, obb, type Pt } from './polygon.ts';
 import { flatRoofed, roofed, roofPlanes } from './roof.ts';
@@ -22,8 +23,8 @@ export interface Building {
 }
 
 /** A small seeded generator (mulberry32) for one building's visual choices. */
-export function seeded(ring: Pt[]): () => number {
-  let a = 0x9e3779b9;
+export function seeded(ring: Pt[], salt = 0): () => number {
+  let a = 0x9e3779b9 ^ salt;
   for (const [x, z] of ring.slice(0, 2))
     a = Math.imul(a ^ Math.round(x * 16), 0x85ebca6b) ^ Math.imul(Math.round(z * 16), 0xc2b2ae35);
   return () => {
@@ -48,12 +49,14 @@ function trimFor(wall: THREE.Color, style: Style): THREE.Color {
 }
 
 export function building(mb: MeshBuilder, b: Building, style: Style) {
+  mb.lightSchedule = lightSchedule(b.zone, seeded(b.ring, LIGHT_SEED));
   const rand = seeded(b.ring);
   const box = obb(b.ring);
   const glass = new THREE.Color(style.glass);
   if (b.zone <= 2) (b.zone === 1 ? house : flats)(mb, b, box, style, rand, glass);
   else if (b.zone <= 4) shop(mb, b, box, style, rand, glass);
   else industry(mb, b, box, style, rand, glass);
+  mb.lightSchedule = [0, 0];
 }
 
 type Part = (
