@@ -277,14 +277,12 @@ grid tool, upgrade and undo land in the new interface.
    new roads off their angle ([ADR 0040](adrs/0040-straight-joins.md)).
    Done when: a player can draw a square block and a T-junction exactly at 90° without
    zooming in, and can draw a free-angle road by holding Shift.
-2. **Continuous curves — implemented, browser check pending** ([ADR 0046](adrs/0046-continuous-curves.md)).
+2. **Continuous curves — implemented and approved in the browser** ([ADR 0046](adrs/0046-continuous-curves.md)).
    A separate mode starts with start, bend and end clicks; each later click adds a piece that
    leaves the previous one tangentially. The sim derives the bend for preview and build, and
    refuses an end behind the previous piece's outgoing direction. Existing build commands and
    the save format stay unchanged; freehand drag is not planned. Automated tests cover smooth
-   joins, refused pieces, preview/build agreement and cancellation. Check the result in the
-   browser before moving to the next slice, including near-sideways ends: very tight turns may
-   fold the road ribbon despite matching tangents.
+   joins, refused pieces, preview/build agreement and cancellation. The browser check passed.
    Done when: a winding road of five pieces has no visible kinks.
 3. **Grid tool.** Pick a cell size (60, 80 or 100 m), drag the first edge to set the angle,
    then drag out the area in whole blocks. Each grid line is planned like a hand-drawn road:
