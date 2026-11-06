@@ -193,6 +193,37 @@ pub(crate) fn reclass_plan(net: &RoadNetwork, road: RoadId, class: RoadClass) ->
     })
 }
 
+/// Adds `plan`'s stops and legs to `net` as `class` and returns its nodes in stop order.
+/// Followed legs add nothing and keep their class; `reclass` is the caller's. `split` hears of
+/// each road split, with the road continuing it. The caller rebuilds the adjacency.
+pub(crate) fn apply(
+    net: &mut RoadNetwork,
+    plan: &Plan,
+    class: RoadClass,
+    mut split: impl FnMut(RoadId, RoadId),
+) -> Vec<NodeId> {
+    let nodes: Vec<NodeId> = plan
+        .stops
+        .iter()
+        .map(|s| match s.join {
+            Join::Node(n) => n,
+            Join::New => net.add_node(s.x, s.y),
+            Join::Split(road) => {
+                // The plan splits each road at most once, so `road` still has its old ends.
+                let n = net.add_node(s.x, s.y);
+                let rest = net.split_road(road, n);
+                split(road, rest);
+                n
+            }
+        })
+        .collect();
+    for (leg, shape) in nodes.windows(2).zip(&plan.legs) {
+        // False where the plan follows an existing road, which is kept in place.
+        net.add_shape(leg[0], leg[1], shape.control, class);
+    }
+    nodes
+}
+
 /// Nearest node in reach, otherwise nearest point on a road, otherwise a new node.
 pub fn snap_end(net: &RoadNetwork, x: f32, y: f32) -> Stop {
     if let Some(n) = net.nearest_junction(x, y, SNAP_RADIUS) {
