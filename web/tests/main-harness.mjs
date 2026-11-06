@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
+import { extname } from 'node:path';
 import { createContext, SourceTextModule, SyntheticModule } from 'node:vm';
 
 import { PlantKind, RoadClass, Snap, Zone } from '../src/protocol.ts';
@@ -161,6 +162,9 @@ export async function tools({ hash = '', clipboard = true } = {}) {
       cars.drawnSelected.push(selected);
     }
     drawSignals() {}
+    setRoads(segments, bounds, fitCamera) {
+      previews.push({ type: 'roads', segments, bounds, fitCamera });
+    }
     trafficView = false;
     toggleTrafficView() {
       this.trafficView = !this.trafficView;
@@ -285,94 +289,49 @@ export async function tools({ hash = '', clipboard = true } = {}) {
       events[key] = fn;
     },
   });
-  const module = new SourceTextModule(
-    stripTypeScriptTypes(readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8')),
-    {
+  const mainUrl = new URL('../src/main.ts', import.meta.url);
+  const modules = new Map();
+  for (const [name, exports] of [
+    ['renderer', { Renderer }],
+    ['ambient-sound', { AmbientSound }],
+    ['protocol', { PlantKind, RoadClass, Snap, Zone }],
+  ]) {
+    const identifier = new URL(`./${name}.ts`, mainUrl).href;
+    modules.set(
+      identifier,
+      new SyntheticModule(
+        Object.keys(exports),
+        function () {
+          for (const [name, value] of Object.entries(exports)) this.setExport(name, value);
+        },
+        { context, identifier },
+      ),
+    );
+  }
+  function source(url) {
+    if (modules.has(url.href)) return modules.get(url.href);
+    const module = new SourceTextModule(stripTypeScriptTypes(readFileSync(url, 'utf8')), {
       context,
+      identifier: url.href,
       initializeImportMeta(meta) {
-        meta.url = import.meta.url;
-        meta.env = { DEV: false };
+        if (url.href === mainUrl.href) {
+          meta.url = import.meta.url;
+          meta.env = { DEV: false };
+        }
       },
-    },
-  );
-  const inspector = new SourceTextModule(
-    stripTypeScriptTypes(readFileSync(new URL('../src/inspector.ts', import.meta.url), 'utf8')),
-    { context },
-  );
-  const cityControls = new SourceTextModule(
-    stripTypeScriptTypes(readFileSync(new URL('../src/city-controls.ts', import.meta.url), 'utf8')),
-    { context },
-  );
-  const cityShare = new SourceTextModule(
-    stripTypeScriptTypes(readFileSync(new URL('../src/city-share.ts', import.meta.url), 'utf8')),
-    { context },
-  );
-  const hud = new SourceTextModule(
-    stripTypeScriptTypes(readFileSync(new URL('../src/hud.ts', import.meta.url), 'utf8')),
-    { context },
-  );
-  const powerTools = new SourceTextModule(
-    stripTypeScriptTypes(readFileSync(new URL('../src/power-tools.ts', import.meta.url), 'utf8')),
-    { context },
-  );
-  const roadTool = new SourceTextModule(
-    stripTypeScriptTypes(readFileSync(new URL('../src/road-tool.ts', import.meta.url), 'utf8')),
-    { context },
-  );
-  const demandMeter = new SourceTextModule(
-    stripTypeScriptTypes(readFileSync(new URL('../src/demand-meter.ts', import.meta.url), 'utf8')),
-    { context },
-  );
-  const protocol = new SyntheticModule(
-    ['PlantKind', 'RoadClass', 'Snap', 'Zone'],
-    function () {
-      this.setExport('PlantKind', PlantKind);
-      this.setExport('RoadClass', RoadClass);
-      this.setExport('Snap', Snap);
-      this.setExport('Zone', Zone);
-    },
-    { context },
-  );
-  await roadTool.link((specifier) => (specifier === './hud' ? hud : protocol));
-  const viewButtons = new SourceTextModule(
-    stripTypeScriptTypes(readFileSync(new URL('../src/view-buttons.ts', import.meta.url), 'utf8')),
-    { context },
-  );
-  await module.link((specifier) =>
-    specifier === './power-tools'
-      ? powerTools
-      : specifier === './view-buttons'
-        ? viewButtons
-        : specifier === './road-tool'
-          ? roadTool
-          : specifier === './city-controls'
-            ? cityControls
-            : specifier === './city-share'
-              ? cityShare
-              : specifier === './hud'
-                ? hud
-                : specifier === './inspector'
-                  ? inspector
-                  : specifier === './ambient-sound'
-                    ? new SyntheticModule(
-                        ['AmbientSound'],
-                        function () {
-                          this.setExport('AmbientSound', AmbientSound);
-                        },
-                        { context },
-                      )
-                    : specifier === './demand-meter'
-                      ? demandMeter
-                      : specifier === './protocol'
-                        ? protocol
-                        : new SyntheticModule(
-                            ['Renderer'],
-                            function () {
-                              this.setExport('Renderer', Renderer);
-                            },
-                            { context },
-                          ),
-  );
+    });
+    modules.set(url.href, module);
+    return module;
+  }
+  const module = source(mainUrl);
+  await module.link((specifier, referencingModule) => {
+    if (!specifier.startsWith('./') && !specifier.startsWith('../')) {
+      throw new Error(`Unsupported import "${specifier}" from ${referencingModule.identifier}`);
+    }
+    const url = new URL(specifier, referencingModule.identifier);
+    if (!extname(url.pathname)) url.pathname += '.ts';
+    return source(url);
+  });
   await module.evaluate();
   const move = (x, y) => canvas.events.pointermove({ clientX: x, clientY: y });
   const click = (x, y, button = 0, shiftKey = false) => {

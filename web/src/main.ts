@@ -1,4 +1,3 @@
-import type * as THREE from 'three';
 import { AmbientSound } from './ambient-sound';
 import { CityControls } from './city-controls';
 import { drawDemand } from './demand-meter';
@@ -9,6 +8,7 @@ import { type FromWorker, RoadClass, Snap, type Stats, type ToWorker, Zone } fro
 import { Renderer } from './renderer';
 import { type RoadMode, RoadTool } from './road-tool';
 import { bindViewButtons } from './view-buttons';
+import { ZoneTool } from './zone-tool';
 
 const byId = (id: string): HTMLElement => {
   const el = document.getElementById(id);
@@ -70,7 +70,7 @@ worker.onmessage = (e: MessageEvent<FromWorker>) => {
     inspector.select(null);
     stopKeyCamera();
     pointer = null;
-    blockInFlight = false;
+    zoning.reset();
     roads.reset();
     prev = curr = undefined;
     stats = undefined;
@@ -80,11 +80,7 @@ worker.onmessage = (e: MessageEvent<FromWorker>) => {
   } else if (msg.type === 'roads') {
     renderer.setRoads(msg.segments, msg.bounds, !roadsSeen);
     roadsSeen = true;
-    // Blocks change with roads, including alleys the sim adds after zoning.
-    if (blockHover) {
-      blockWanted = true;
-      sendBlockPreview();
-    }
+    zoning.roadsChanged();
     // Retry a hover sent before WASM was ready, or after the topology changed.
     roads.roadsChanged();
   } else if (
@@ -109,10 +105,7 @@ worker.onmessage = (e: MessageEvent<FromWorker>) => {
   } else if (msg.type === 'building') {
     inspector.receiveBuilding(msg.selection, msg.building);
   } else if (msg.type === 'blockPreview') {
-    blockInFlight = false;
-    if (msg.revision === blockRevision && zone !== null && !zoneStart && blockHover)
-      renderer.setBlockOutline(msg.outline, zone);
-    sendBlockPreview();
+    zoning.receive(msg);
   } else {
     const now = performance.now();
     if (curr) frameGap = frameGap * 0.8 + (now - currAt) * 0.2;
@@ -153,38 +146,10 @@ const roads = new RoadTool(send, renderer, {
   ],
 });
 const zoneButtons = [...document.querySelectorAll<HTMLButtonElement>('[data-zone]')];
-let zone: Zone | null = null;
-let zoneStart: THREE.Vector3 | null = null;
-// The block under the cursor while the zone brush hovers, asked of the sim like road previews:
-// one question in flight, about the latest position only.
-let blockHover: THREE.Vector3 | null = null;
-let blockWanted = false;
-let blockInFlight = false;
-let blockRevision = 0;
-function sendBlockPreview() {
-  if (!blockWanted || blockInFlight || !blockHover || zone === null || zoneStart) return;
-  blockWanted = false;
-  blockInFlight = true;
-  send({ type: 'previewBlock', x: blockHover.x, y: blockHover.z, revision: blockRevision });
-}
-function hideBlockOutline() {
-  blockRevision++;
-  blockHover = null;
-  blockWanted = false;
-  renderer.setZoneDrag(null, null, 0);
-}
+const zoning = new ZoneTool(send, renderer, zoneButtons);
 function setTool(tool: RoadMode, brush: Zone | null = null) {
   power.set(null);
-  zone = tool ? null : brush;
-  zoneStart = null;
-  hideBlockOutline();
-  renderer.setLeftDragPans(zone === null);
-  renderer.setZoningVisible(zone !== null);
-  for (const b of zoneButtons) {
-    const on = Number(b.dataset.zone) === zone;
-    b.classList.toggle('active', on);
-    b.setAttribute('aria-pressed', String(on));
-  }
+  zoning.set(tool ? null : brush);
   roads.setMode(tool);
   for (const [button, mode] of [
     [roadButton, 'straight'],
@@ -194,7 +159,7 @@ function setTool(tool: RoadMode, brush: Zone | null = null) {
     button.classList.toggle('active', tool === mode);
     button.setAttribute('aria-pressed', String(tool === mode));
   }
-  renderer.renderer.domElement.style.cursor = tool || zone !== null ? 'crosshair' : '';
+  renderer.renderer.domElement.style.cursor = tool || zoning.zone !== null ? 'crosshair' : '';
 }
 /** Toggles main road for the road tools, picking the straight road tool if none is active. */
 function toggleMainRoad() {
@@ -205,12 +170,12 @@ function toggleMainRoad() {
   if (!roads.roadMode) setTool('straight');
 }
 function setZone(z: Zone) {
-  setTool(null, zone === z ? null : z);
+  setTool(null, zoning.zone === z ? null : z);
 }
 for (const b of zoneButtons) b.onclick = () => setZone(Number(b.dataset.zone) as Zone);
 /** Z, X and C pick residential, commercial and industrial; pressing again switches density. */
 function zoneKey(low: Zone, high: Zone) {
-  setTool(null, zone === low ? high : low);
+  setTool(null, zoning.zone === low ? high : low);
 }
 /** Picks a tool, or switches it off if it is already on. */
 const toggleTool = (mode: RoadMode) => setTool(roads.mode === mode ? null : mode);
@@ -222,38 +187,21 @@ mainRoadButton.onclick = toggleMainRoad;
 const canvas = renderer.renderer.domElement;
 let downX = 0;
 let downY = 0;
-// Keyboard camera motion during a zone press moves the ground under the cursor: a drag.
-let zoneKeyPanned = false;
 canvas.addEventListener('pointerdown', (e) => {
   downX = e.clientX;
   downY = e.clientY;
-  if (zone === null || e.button !== 0) return;
-  zoneStart = renderer.pick(e.clientX, e.clientY);
-  zoneKeyPanned = false;
-  blockRevision++;
+  if (zoning.zone === null || e.button !== 0) return;
+  zoning.press(renderer.pick(e.clientX, e.clientY));
   // Keep getting moves and the release even if the drag leaves the canvas.
   canvas.setPointerCapture(e.pointerId);
 });
 canvas.addEventListener('pointerup', (e) => {
-  if (zone !== null) {
-    if (e.button === 2) return setTool(null);
-    const end = renderer.pick(e.clientX, e.clientY);
-    if (e.button === 0 && zoneStart && end) {
-      const [a, b] = [zoneStart, end];
-      // A click fills the block under it; a drag paints the rectangle.
-      if (!zoneKeyPanned && Math.hypot(e.clientX - downX, e.clientY - downY) <= 4)
-        send({ type: 'fillBlock', x: b.x, y: b.z, zone });
-      else send({ type: 'paintZone', ax: a.x, ay: a.z, bx: b.x, by: b.z, zone });
-    }
-    zoneStart = null;
-    renderer.setZoneDrag(null, null, 0);
-    // The outline comes back on the next move, or when the edit's roads arrive.
-    blockHover = end;
-    blockWanted = true;
-    return;
-  }
   // Treat it as a click only if the pointer barely moved, so panning still works.
   const still = Math.hypot(e.clientX - downX, e.clientY - downY) <= 4;
+  if (zoning.zone !== null) {
+    if (e.button === 2) return setTool(null);
+    return zoning.release(e.button, still, renderer.pick(e.clientX, e.clientY));
+  }
   if (power.active) return power.release(e.button, still, renderer.pick(e.clientX, e.clientY));
   if (!roads.mode) {
     if (e.button === 0 && still) {
@@ -273,15 +221,7 @@ canvas.addEventListener('pointerup', (e) => {
 let pointer: { clientX: number; clientY: number } | null = null;
 function hover(e: { clientX: number; clientY: number }) {
   pointer = e;
-  if (zone !== null) {
-    if (zoneStart) renderer.setZoneDrag(zoneStart, renderer.pick(e.clientX, e.clientY), zone);
-    else {
-      blockHover = renderer.pick(e.clientX, e.clientY);
-      blockWanted = true;
-      sendBlockPreview();
-    }
-    return;
-  }
+  if (zoning.zone !== null) return zoning.hover(renderer.pick(e.clientX, e.clientY));
   if (power.active) return power.hover(renderer.pick(e.clientX, e.clientY));
   if (roads.mode) roads.hover(renderer.pick(e.clientX, e.clientY), e);
 }
@@ -289,7 +229,7 @@ canvas.addEventListener('pointermove', hover);
 canvas.addEventListener('pointerleave', () => {
   pointer = null;
   power.hover(null);
-  if (!zoneStart) hideBlockOutline();
+  zoning.leave();
   roads.leave();
 });
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -311,8 +251,7 @@ function moveWithKeys(seconds: number) {
   for (const key of heldCameraKeys) for (let i = 0; i < 3; i++) input[i] += CAMERA_KEYS[key][i];
   // Panning takes the camera back from follow; turning orbits the followed car.
   if (input[0] !== 0 || input[1] !== 0) inspector.setFollow(false);
-  if (renderer.keyCamera.update(input[0], input[1], input[2], seconds) && zoneStart)
-    zoneKeyPanned = true;
+  if (renderer.keyCamera.update(input[0], input[1], input[2], seconds)) zoning.cameraMoved();
 }
 function stopKeyCamera() {
   heldCameraKeys.clear();
@@ -368,7 +307,7 @@ addEventListener('keydown', (e) => {
   else if (e.key === 'n' || e.key === 'N') sound.toggle();
   // Esc cancels a tool first, then closes the inspector.
   else if (e.key === 'Escape')
-    roads.mode || zone !== null || power.active ? setTool(null) : inspector.select(null);
+    roads.mode || zoning.zone !== null || power.active ? setTool(null) : inspector.select(null);
   else if (e.key === ' ') setSpeed(speed === 0 ? 1 : 0);
   else if (e.key === '1') setSpeed(1);
   else if (e.key === '2') setSpeed(3);
@@ -394,7 +333,7 @@ function frame() {
   sound.update(now / 1000, curr, stats?.secondOfDay ?? 43200, renderer.listener());
   if (stats) {
     drawDemand(demand, demandFills, stats.demand);
-    hud.textContent = hudText(stats, fps, tickMs, speed, zone);
+    hud.textContent = hudText(stats, fps, tickMs, speed, zoning.zone);
   }
   requestAnimationFrame(frame);
 }
