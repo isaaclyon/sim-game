@@ -126,6 +126,40 @@ fn upkeep_beyond_the_grant_runs_into_debt_and_stops_new_roads() {
 }
 
 #[test]
+fn a_city_in_debt_can_still_make_free_edits() {
+    let mut w = World::generate(Config::default(), 20, 20);
+    let per_hour = money(&w).upkeep - GRANT;
+    advance(&mut w, (START_FUNDS / per_hour + 1) as u32 * HOUR);
+    let balance = money(&w).balance;
+    assert!(balance < 0, "{balance}");
+    assert!(w.can_afford(0) && !w.can_afford(1));
+
+    // Drawing a street over a main road is a free downgrade (ADR 0048).
+    let main = w
+        .roads
+        .active_roads()
+        .find(|&r| w.roads.road_class(r) == RoadClass::Main)
+        .expect("the grid has main roads");
+    let (a, b) = w.roads.road_ends(main);
+    let n = &w.roads;
+    let (ax, ay, bx, by) = (
+        n.node_x[a as usize],
+        n.node_y[a as usize],
+        n.node_x[b as usize],
+        n.node_y[b as usize],
+    );
+    let ends = [ax, ay, 0.0, bx, by, 0.0];
+    assert_eq!(w.draft_cost(&ends, RoadClass::Street), Some(0));
+    assert!(road(&mut w, ax, ay, bx, by, RoadClass::Street));
+    assert_eq!(w.roads.road_class(main), RoadClass::Street);
+    assert_eq!(money(&w).balance, balance);
+
+    // Upgrading it back costs money, so debt still refuses it.
+    assert!(!road(&mut w, ax, ay, bx, by, RoadClass::Main));
+    assert_eq!(w.roads.road_class(main), RoadClass::Street);
+}
+
+#[test]
 fn upkeep_accrues_by_the_minute_without_losing_fractions() {
     let mut w = World::empty(Config::default(), 20, 20);
     assert!(road(&mut w, 0.0, 0.0, 300.0, 0.0, RoadClass::Street));

@@ -190,7 +190,7 @@ impl Sim {
         Some(self.world.draft_cost(points, class)? as f64)
     }
 
-    /// Whether the city can pay `cost` dollars now; a city in debt can afford nothing.
+    /// Whether the city can pay `cost` dollars now; see `World::can_afford`.
     pub fn can_afford(&self, cost: f64) -> bool {
         self.world.can_afford(cost as i64)
     }
