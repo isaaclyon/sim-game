@@ -50,7 +50,7 @@ test('a line starts on click, follows the sim preview, and chains from the snapp
   const t = await tools();
   t.key('l');
   t.click(0, 0);
-  assert.match(t.elements['road-help'].textContent, /line end/);
+  assert.match(t.elements['build-hint'].textContent, /line end/);
   // The click asked about its own point; the move waits for that answer.
   const first = last(t, 'previewLine');
   t.move(100, 0);
@@ -85,7 +85,7 @@ test('a line starts on click, follows the sim preview, and chains from the snapp
     0,
     'a refused line is not sent',
   );
-  assert.match(t.elements['road-help'].textContent, /Cannot build a line there/);
+  assert.match(t.elements['build-hint'].textContent, /Cannot build a line there/);
   t.click(200, 0, 2);
   assert.ok(!pressed(t, 'power-line'), 'right-click stops');
 });
@@ -98,6 +98,30 @@ test('power snapshots reach the renderer and O toggles the power view', async ()
   t.key('o');
   assert.equal(t.previews.findLast((p) => p.type === 'powerView').on, true);
   assert.ok(pressed(t, 'power-view'));
+  assert.ok(t.elements.views.classList.contains('on'), 'the Views button shows a view is on');
+});
+
+test('a power tool shows the power view and puts back what showed before', async () => {
+  const t = await tools();
+  const view = () => t.previews.findLast((p) => p.type === 'powerView')?.on ?? false;
+  t.pressId('category-power');
+  assert.equal(view(), false, 'opening the category starts nothing');
+  t.pressId('plant-solar');
+  assert.ok(pressed(t, 'plant-solar'));
+  assert.equal(view(), true);
+  t.pressId('power-line');
+  assert.equal(view(), true, 'switching power tools keeps it');
+  t.key('Escape');
+  assert.equal(view(), false, 'putting the tool away hides it again');
+  t.key('o');
+  t.key('l');
+  t.key('Escape');
+  assert.equal(view(), true, 'it was already on, so it stays');
+  t.key('o');
+  t.key('g');
+  t.key('o');
+  t.key('Escape');
+  assert.equal(view(), false, "the player's own choice while placing stands");
 });
 
 test('the worker places plants and lines, answers previews and reports power', async () => {

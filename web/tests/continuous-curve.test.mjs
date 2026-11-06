@@ -1,0 +1,40 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { Snap } from '../src/protocol.ts';
+import { tools } from './main-harness.mjs';
+
+const all = Snap.Angle | Snap.Guides | Snap.Length;
+
+test('continuous curves start with a bend then continue with one click per piece', async () => {
+  const t = await tools();
+  t.elements['continuous-curve'].onclick();
+  assert.equal(t.elements['continuous-curve'].attributes['aria-pressed'], 'true');
+  t.click(0, 0);
+  t.click(40, 0);
+  t.click(80, 40);
+  let build = t.messages.at(-1);
+  assert.equal(build.type, 'buildRoad');
+  assert.deepEqual(Array.from(build.points), [0, 0, all, 40, 0, all, 80, 40, all]);
+  t.reply({ type: 'buildResult', id: build.id, end: [80, 40], control: [40, 0] });
+  t.move(120, 80);
+  const preview = t.messages.at(-1);
+  assert.equal(preview.type, 'previewRoad');
+  assert.equal(preview.plan, true);
+  assert.deepEqual(Array.from(preview.points), [80, 40, 8, 120, 80, all, 40, 0, 0]);
+  t.click(120, 80);
+  build = t.messages.at(-1);
+  assert.equal(build.type, 'buildRoad');
+  assert.deepEqual(Array.from(build.points), [80, 40, 8, 120, 80, all, 40, 0, 0]);
+  t.reply({ type: 'buildResult', id: build.id, end: null });
+  t.click(140, 100, 0, true);
+  assert.deepEqual(Array.from(t.messages.at(-1).points), [80, 40, 8, 140, 100, 0, 40, 0, 0]);
+  const pending = t.messages.at(-1);
+  t.key('Escape');
+  assert.equal(t.elements['continuous-curve'].attributes['aria-pressed'], 'false');
+  t.reply({ type: 'buildResult', id: pending.id, end: [140, 100] });
+  t.elements['continuous-curve'].onclick();
+  t.click(0, 0);
+  t.click(40, 0);
+  t.click(80, 40);
+  assert.equal(t.messages.at(-1).points.length, 9, 'late replies cannot restart the old chain');
+});

@@ -3,6 +3,7 @@
 use super::{SNAPSHOT_STRIDE, World};
 use crate::agents::AgentState;
 use crate::geometry::Shape;
+use crate::road::RoadClass;
 use crate::snap::{self, Join};
 
 /// Distance from the road centreline to the middle of each lane, metres.
@@ -27,7 +28,7 @@ impl World {
             let (side, limit, kind) = match a.state[i] {
                 AgentState::Driving => (LANE_OFFSET, self.roads.lane_speed[lane as usize], 0.0),
                 AgentState::Walking => {
-                    let main = self.roads.lane_class(lane) == crate::road::RoadClass::Main;
+                    let main = self.roads.lane_class(lane) == RoadClass::Main;
                     let side = if main {
                         MAIN_SIDEWALK_OFFSET
                     } else {
@@ -91,11 +92,19 @@ impl World {
         out.extend([s.x, s.y, join_code(s.join)]);
     }
 
-    /// Writes `[x, y, join]` per stop of the road `BuildRoad` would build between these points,
-    /// in order; nothing if it would be refused. Join is 0 = new end, 1 = existing node,
-    /// 2 = splits an existing road, -1 = interior sample when following an existing curve.
-    /// Changes nothing, so the frontend can call it every frame.
-    pub fn write_road_preview(&self, ax: f32, ay: f32, bx: f32, by: f32, out: &mut Vec<f32>) {
+    /// Writes `[x, y, join]` per stop of the road `BuildRoad` of `class` would build between
+    /// these points, in order; nothing if it would be refused. Join is 0 = new end,
+    /// 1 = existing node, 2 = splits an existing road, -1 = interior sample when following an
+    /// existing curve. Changes nothing, so the frontend can call it every frame.
+    pub fn write_road_preview(
+        &self,
+        ax: f32,
+        ay: f32,
+        bx: f32,
+        by: f32,
+        class: RoadClass,
+        out: &mut Vec<f32>,
+    ) {
         out.clear();
         self.write_build_preview(
             Shape {
@@ -103,6 +112,7 @@ impl World {
                 b: (bx, by),
                 control: None,
             },
+            class,
             out,
         );
     }
@@ -117,6 +127,7 @@ impl World {
         cy: f32,
         bx: f32,
         by: f32,
+        class: RoadClass,
         out: &mut Vec<f32>,
     ) {
         self.write_build_preview(
@@ -125,6 +136,7 @@ impl World {
                 b: (bx, by),
                 control: Some((cx, cy)),
             },
+            class,
             out,
         );
     }
@@ -132,9 +144,9 @@ impl World {
     /// Guides raw `[x, y, snap]` points (ADR 0038) and writes `[n, m, length, angle, k]`, then
     /// `[x, y]` per guided point, `[x0, y0, x1, y1]` per guide line, `[x, y, rx, ry, dx, dy]` per
     /// angle mark (`guide::Mark`; the start's, then, if `plan`, the end's), then, if `plan`, the
-    /// road preview of the guided points: one stop for one point (where a road would start), as
-    /// `write_road_preview` for two, `write_curve_preview` for three. Changes nothing.
-    pub fn write_road_draft(&self, raw: &[f32], plan: bool, out: &mut Vec<f32>) {
+    /// road preview of the guided points as `class`: one stop for one point (where a road would
+    /// start), as `write_road_preview` for two, `write_curve_preview` for three. Changes nothing.
+    pub fn write_road_draft(&self, raw: &[f32], plan: bool, class: RoadClass, out: &mut Vec<f32>) {
         out.clear();
         let d = self.draft(raw);
         // Without `plan` the last point is a curve's control point, which joins nothing.
@@ -159,16 +171,16 @@ impl World {
         let mut stops = Vec::new();
         match d.points[..] {
             [p] => self.write_snap_preview(p.0, p.1, &mut stops),
-            [a, b] => self.write_road_preview(a.0, a.1, b.0, b.1, &mut stops),
-            [a, c, b] => self.write_curve_preview(a.0, a.1, c.0, c.1, b.0, b.1, &mut stops),
+            [a, b] => self.write_road_preview(a.0, a.1, b.0, b.1, class, &mut stops),
+            [a, c, b] => self.write_curve_preview(a.0, a.1, c.0, c.1, b.0, b.1, class, &mut stops),
             _ => {}
         }
         out.extend(stops);
     }
 
-    fn write_build_preview(&self, shape: Shape, out: &mut Vec<f32>) {
+    fn write_build_preview(&self, shape: Shape, class: RoadClass, out: &mut Vec<f32>) {
         out.clear();
-        let Some(plan) = snap::plan(&self.roads, shape) else {
+        let Some(plan) = snap::plan(&self.roads, shape, Some(class)) else {
             return;
         };
         let first = plan.stops[0];

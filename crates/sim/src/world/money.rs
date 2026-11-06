@@ -1,5 +1,5 @@
-//! Money (ADR 0036): the city's balance, what roads cost to build and keep, and the taxes
-//! residents and filled jobs pay.
+//! Money (ADR 0036): the city's balance, what roads cost to build and keep, the taxes
+//! residents and filled jobs pay, and a flat grant every city receives.
 //!
 //! Amounts are whole dollars in `i64`. Rates are per clock hour and settle every clock minute;
 //! the fraction of a dollar left over carries to the next minute, so nothing is lost to
@@ -20,6 +20,9 @@ pub const START_FUNDS: i64 = 50_000;
 pub const RESIDENT_TAX: i64 = 2;
 /// Tax each filled job pays per clock hour, on top of its worker's resident tax.
 pub const JOB_TAX: i64 = 1;
+/// Grant every city receives per clock hour, whatever its size. It pays for the
+/// first roads before taxes can, and covers the upkeep of about 10 km of street.
+pub const GRANT: i64 = 1_000;
 
 /// Dollars per metre of new road.
 fn build_rate(class: RoadClass) -> f64 {
@@ -44,6 +47,7 @@ fn upkeep_rate(class: RoadClass) -> f64 {
 pub struct Money {
     pub balance: i64,
     pub taxes: i64,
+    pub grant: i64,
     pub upkeep: i64,
 }
 
@@ -83,8 +87,9 @@ fn shape_len(shape: Shape) -> f32 {
     }
 }
 
-/// What building `plan` as `class` costs: the length of its new legs. Legs that follow an
-/// existing road are kept as they are and cost nothing.
+/// What building `plan` as `class` costs: the length of its new legs, plus the difference in
+/// build rate along followed roads it moves to a dearer class (ADR 0048). Other followed
+/// roads, and moves to a cheaper class, cost nothing.
 pub(super) fn plan_cost(roads: &RoadNetwork, plan: &Plan, class: RoadClass) -> i64 {
     let metres: f64 = plan
         .legs
@@ -96,7 +101,15 @@ pub(super) fn plan_cost(roads: &RoadNetwork, plan: &Plan, class: RoadClass) -> i
         })
         .map(|(&leg, _)| f64::from(shape_len(leg)))
         .sum();
-    (metres * build_rate(class)).round() as i64
+    let upgrades: f64 = plan
+        .reclass
+        .iter()
+        .map(|&r| {
+            let extra = build_rate(class) - build_rate(roads.road_class(r));
+            f64::from(roads.lane_len[2 * r as usize]) * extra.max(0.0)
+        })
+        .sum();
+    (metres * build_rate(class) + upgrades).round() as i64
 }
 
 impl World {
@@ -105,6 +118,7 @@ impl World {
             balance: self.treasury.balance,
             taxes: self.residents.population as i64 * RESIDENT_TAX
                 + self.residents.employed as i64 * JOB_TAX,
+            grant: GRANT,
             upkeep: self.treasury.upkeep,
         }
     }
@@ -168,14 +182,15 @@ impl World {
     }
 
     fn shape_cost(&self, shape: Shape, class: RoadClass) -> Option<i64> {
-        crate::snap::plan(&self.roads, shape).map(|p| plan_cost(&self.roads, &p, class))
+        crate::snap::plan(&self.roads, shape, Some(class))
+            .map(|p| plan_cost(&self.roads, &p, class))
     }
 
     pub(super) fn refresh_upkeep(&mut self) {
         self.treasury.upkeep = road_upkeep(&self.roads);
     }
 
-    /// Pays taxes and upkeep for the clock minutes the last tick finished.
+    /// Pays taxes, the grant and upkeep for the clock minutes the last tick finished.
     pub(super) fn settle_money(&mut self) {
         let tick = self.totals.tick;
         let minute = |t: u64| clock_seconds(t, self.cfg.dt) / 60;
@@ -185,7 +200,7 @@ impl World {
         }
         let m = self.money();
         let t = &mut self.treasury;
-        let owed = (m.taxes - m.upkeep) * minutes + t.carry;
+        let owed = (m.taxes + m.grant - m.upkeep) * minutes + t.carry;
         t.balance += owed.div_euclid(60);
         t.carry = owed.rem_euclid(60);
     }

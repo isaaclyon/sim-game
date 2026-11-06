@@ -175,13 +175,13 @@ fn main_roads_keep_their_class_when_split() {
     world.write_road_segments(&mut segments);
     let snapshot: Vec<f32> = segments.chunks(5).map(|s| s[4]).collect();
     assert_eq!(snapshot, [1.0, 1.0, 0.0, 0.0], "class per segment");
-    // Following an existing road keeps it as it is.
+    // Drawing over a road of the same class adds nothing (other classes: ADR 0048).
     assert!(!world.apply(Command::BuildRoad {
         ax: -100.0,
         ay: 0.0,
         bx: 0.0,
         by: 0.0,
-        class: RoadClass::Street,
+        class: RoadClass::Main,
     }));
     assert_eq!(world.roads.road_class(0), RoadClass::Main);
 }
@@ -233,7 +233,7 @@ fn road_passing_through_a_junction_does_not_run_along_its_roads() {
     net.add_road(c, ne, RoadClass::Street);
     let mut world = World::new(Config::default(), net, Rng::new(1));
     let mut out = Vec::new();
-    world.write_road_preview(0.0, -50.0, 36.0, 100.0, &mut out);
+    world.write_road_preview(0.0, -50.0, 36.0, 100.0, RoadClass::Street, &mut out);
     let joins: Vec<f32> = out.chunks(3).map(|s| s[2]).collect();
     assert_eq!(joins, [0.0, 1.0, 0.0], "through the origin, no split");
     assert!(build(&mut world, 0.0, -50.0, 36.0, 100.0));
@@ -320,15 +320,15 @@ fn hover_shows_where_a_road_would_start() {
 fn preview_shows_what_gets_built() {
     let world = roads(&[(-100.0, 0.0, 100.0, 0.0)]);
     let mut out = Vec::new();
-    world.write_road_preview(0.0, -100.0, 0.0, 100.0, &mut out);
+    world.write_road_preview(0.0, -100.0, 0.0, 100.0, RoadClass::Street, &mut out);
     assert_eq!(
         out,
         [0.0, -100.0, 0.0, 0.0, 0.0, 2.0, 0.0, 100.0, 0.0],
         "[x, y, join] per stop: new end, split, new end"
     );
-    world.write_road_preview(-50.0, 1.0, 50.0, 1.0, &mut out);
+    world.write_road_preview(-50.0, 1.0, 50.0, 1.0, RoadClass::Street, &mut out);
     assert!(out.is_empty(), "refused");
     let before = world.roads.version;
-    world.write_road_preview(0.0, -100.0, 0.0, 100.0, &mut out);
+    world.write_road_preview(0.0, -100.0, 0.0, 100.0, RoadClass::Street, &mut out);
     assert_eq!(world.roads.version, before, "preview changes nothing");
 }

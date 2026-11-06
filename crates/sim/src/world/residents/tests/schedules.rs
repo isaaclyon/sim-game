@@ -2,6 +2,35 @@ use super::*;
 use std::collections::BTreeSet;
 
 #[test]
+fn midnight_move_ins_wait_for_their_morning_departure() {
+    // Tick zero is 06:00; midnight comes 3,600 sim seconds later.
+    let mut w = town_at(36_000);
+    assert!(w.residents.population > 0);
+    assert!(w.residents.employed > 0, "jobs are assigned overnight");
+    assert_eq!(w.totals.trips_completed, 0);
+    for i in 0..w.citizens.active.len() {
+        assert_eq!(w.citizens.activity[i], Activity::Home);
+        assert!(w.citizens.destination[i].is_none());
+        let at = crate::clock::clock_at(w.citizens.due[i], w.cfg.dt);
+        assert_eq!(at.day, 2);
+        if w.citizens.job[i].is_some() {
+            assert!((at.second_of_day as i64 - w.citizens.departure[i] as i64).abs() <= 1);
+        } else {
+            assert!((10 * 3600..=16 * 3600).contains(&at.second_of_day));
+        }
+    }
+    let first = *w.citizens.due.iter().min().unwrap();
+    while w.totals.tick + 1 < first {
+        w.tick();
+    }
+    assert_eq!(w.totals.trips_completed, 0);
+    assert!(w.citizens.destination.iter().all(Option::is_none));
+    w.tick();
+    w.tick();
+    assert!(w.citizens.activity.contains(&Activity::Work));
+}
+
+#[test]
 fn first_departures_are_staggered_and_daily_departure_keeps_clock_rate() {
     let mut w = town();
     isolate(&mut w);

@@ -142,8 +142,7 @@ impl World {
                 let c = self.citizens.push(household, b, &mut self.residents.rng);
                 self.households.members[household as usize].push(c);
                 self.residents.population += 1;
-                let delay = 15 + self.residents.rng.below(106);
-                self.schedule_activity(c, delay as f32);
+                self.schedule_day(c);
                 self.schedule_search(c, 1.0);
             }
         }

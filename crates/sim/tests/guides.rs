@@ -92,7 +92,7 @@ fn the_world_previews_and_builds_the_same_guided_road() {
     let mut w = town(&[(0.0, 0.0, 100.0, 0.0)]);
     let raw = [100.0, 0.0, ALL as f32, 103.0, 61.0, ALL as f32];
     let mut out = Vec::new();
-    w.write_road_draft(&raw, true, &mut out);
+    w.write_road_draft(&raw, true, RoadClass::Street, &mut out);
     let (n, m, k) = (out[0] as usize, out[1] as usize, out[4] as usize);
     assert_eq!(n, 2);
     let end = (out[5 + 2], out[5 + 3]);
@@ -103,7 +103,7 @@ fn the_world_previews_and_builds_the_same_guided_road() {
     assert!(w.apply(cmd));
     assert!(w.roads.nearest_node(100.0, 64.0, 0.05).is_some());
     // Guide-only answers for a curve's control point plan no road.
-    w.write_road_draft(&raw[..6], false, &mut out);
+    w.write_road_draft(&raw[..6], false, RoadClass::Street, &mut out);
     assert_eq!(out.len(), 5 + 4 + 4 * out[1] as usize + 6 * out[4] as usize);
 }
 

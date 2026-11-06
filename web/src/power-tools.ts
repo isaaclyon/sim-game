@@ -1,5 +1,6 @@
-// The plant and transmission line tools and the power view (ADR 0041). Like the road tools,
-// they ask the sim what a click would do and draw its answer; they never decide it themselves.
+// The plant and transmission line tools (ADR 0041). Like the road tools, they ask the sim what
+// a click would do and draw its answer; they never decide it themselves. The build menu owns
+// their buttons and the Views list owns the power view.
 import { type FromWorker, PlantKind, type ToWorker } from './protocol';
 
 const PLANT_NAMES = ['Coal plant', 'Solar farm', 'Wind turbine'];
@@ -19,15 +20,12 @@ export interface Spot {
 export interface PowerView {
   setPlantPreview(outline: Float32Array, ok: boolean): void;
   setLinePreview(ends: Float32Array | null, a: Spot | null, b: Spot | null): void;
-  setPowerView(on: boolean): void;
   setPower(plants: Float32Array, lines: Float32Array, buildings: Float32Array): void;
-  renderer: { domElement: HTMLElement };
 }
 
 export class PowerTools {
   /** The plant being placed, `'line'`, or null when neither tool is on. */
   tool: PlantKind | 'line' | null = null;
-  private view = false;
   private start: Spot | null = null;
   private at: Spot | null = null;
   private wanted = false;
@@ -37,89 +35,48 @@ export class PowerTools {
   private ends: Float32Array | null = null;
   private refused = false;
 
-  private readonly help: HTMLElement;
-  private readonly plantButtons: HTMLElement[];
-  private readonly lineButton: HTMLElement;
-  private readonly viewButton: HTMLElement;
-
-  /** `stopOthers` switches every other tool off before a power tool starts. */
   private readonly send: (msg: ToWorker) => void;
   private readonly draw: PowerView;
-  private readonly stopOthers: () => void;
+  /** The build menu's shared hint line. */
+  private readonly help: HTMLElement;
+  /** Puts every tool away, as a right-click does. */
+  private readonly stop: () => void;
 
-  constructor(
-    send: (msg: ToWorker) => void,
-    draw: PowerView,
-    byId: (id: string) => HTMLElement,
-    stopOthers: () => void,
-  ) {
+  constructor(send: (msg: ToWorker) => void, draw: PowerView, help: HTMLElement, stop: () => void) {
     this.send = send;
     this.draw = draw;
-    this.stopOthers = stopOthers;
-    this.help = byId('road-help');
-    this.plantButtons = ['plant-coal', 'plant-solar', 'plant-wind'].map(byId);
-    this.lineButton = byId('power-line');
-    this.viewButton = byId('power-view');
-    this.plantButtons.forEach((b, kind) => {
-      b.onclick = () => this.choose(this.tool === kind ? null : (kind as PlantKind));
-    });
-    this.lineButton.onclick = () => this.choose(this.tool === 'line' ? null : 'line');
-    this.viewButton.onclick = () => this.toggleView();
+    this.help = help;
+    this.stop = stop;
   }
 
   get active() {
     return this.tool !== null;
   }
 
-  /** Switches tool without touching the others; `choose` switches them off first. */
+  /** Switches tool without touching the others; `Toolbox.use` puts them away first. */
   set(tool: PlantKind | 'line' | null) {
     const was = this.tool;
     this.tool = tool;
     this.start = this.ends = null;
     this.refused = this.inFlight = false;
     this.clearPreview();
-    this.plantButtons.forEach((b, kind) => {
-      press(b, kind === tool);
-    });
-    press(this.lineButton, tool === 'line');
     if (tool !== null || was !== null) this.showHelp();
-    if (tool !== null) this.draw.renderer.domElement.style.cursor = 'crosshair';
   }
 
-  /** Starts a power tool, or stops every tool with null. */
-  choose(tool: PlantKind | 'line' | null) {
-    this.stopOthers();
-    this.set(tool);
-  }
-
-  /** G cycles coal, solar, wind and off; L toggles the line tool; O the power view. */
-  key(key: string): boolean {
-    const k = key.toLowerCase();
+  /** The tool G picks next: coal, solar, wind, then none. */
+  nextPlant(): PlantKind | null {
     const t = this.tool;
-    if (k === 'g')
-      this.choose(
-        typeof t !== 'number'
-          ? PlantKind.Coal
-          : t === PlantKind.Wind
-            ? null
-            : ((t + 1) as PlantKind),
-      );
-    else if (k === 'l') this.choose(t === 'line' ? null : 'line');
-    else if (k === 'o') this.toggleView();
-    else return false;
-    return true;
+    return typeof t !== 'number'
+      ? PlantKind.Coal
+      : t === PlantKind.Wind
+        ? null
+        : ((t + 1) as PlantKind);
   }
 
   /** A pointer release on the canvas while a power tool is on. */
   release(button: number, still: boolean, p: Spot | null) {
-    if (button === 2) this.choose(null);
+    if (button === 2) this.stop();
     else if (button === 0 && still && p) this.click(p);
-  }
-
-  private toggleView() {
-    this.view = !this.view;
-    press(this.viewButton, this.view);
-    this.draw.setPowerView(this.view);
   }
 
   private click(p: Spot) {
@@ -206,12 +163,7 @@ export class PowerTools {
       t === null
         ? ''
         : t === 'line'
-          ? `${no}${this.start ? 'Click the line end.' : 'Click where the power line starts: a plant, road or line.'} Esc or right-click stops.`
-          : `${PLANT_NAMES[t]}: click to place. ${PLANT_HELP[t]} G switches plant, Esc stops.`;
+          ? `${no}${this.start ? 'Click the line end.' : 'Click where the line starts: a plant, road or line.'} Esc stops.`
+          : `${PLANT_NAMES[t]}: click to place. ${PLANT_HELP[t]} Esc stops.`;
   }
-}
-
-function press(b: HTMLElement, on: boolean) {
-  b.classList.toggle('active', on);
-  b.setAttribute('aria-pressed', String(on));
 }

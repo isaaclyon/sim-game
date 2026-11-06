@@ -34,6 +34,7 @@ test('lighting receives sim snapshot time and never advances from animation fram
       power: { supply: 0, starter: 150, used: 0, demand: 0, unpowered: 0, waiting: 0 },
       balance: 100_000,
       taxes: 0,
+      grant: 0,
       upkeep: 0,
     },
   });

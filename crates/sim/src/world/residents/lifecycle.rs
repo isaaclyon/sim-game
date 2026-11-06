@@ -62,7 +62,7 @@ impl World {
                 self.citizens.location[i] = self.homes.building[h];
                 self.citizens.car_out[i] = false;
                 self.citizens.activity[i] = Activity::Home;
-                self.schedule_activity(c, 30.0);
+                self.schedule_day(c);
             } else {
                 self.release_job(c);
                 self.citizens.active[i] = false;
@@ -138,7 +138,11 @@ impl World {
                 } else if self.citizens.location[i] != home {
                     self.citizens.destination[i] = Some(home);
                 }
-                self.schedule_activity(c, 30.0);
+                if self.citizens.destination[i].is_some() {
+                    self.schedule_activity(c, 30.0);
+                } else {
+                    self.schedule_day(c);
+                }
             }
         }
     }

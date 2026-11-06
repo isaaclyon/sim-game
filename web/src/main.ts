@@ -1,14 +1,15 @@
 import { AmbientSound } from './ambient-sound';
 import { CityControls } from './city-controls';
-import { drawDemand } from './demand-meter';
-import { hudText } from './hud';
 import { Inspector } from './inspector';
-import { PowerTools } from './power-tools';
-import { type FromWorker, RoadClass, Snap, type Stats, type ToWorker, Zone } from './protocol';
+import type { FromWorker, Stats, ToWorker } from './protocol';
 import { Renderer } from './renderer';
-import { type RoadMode, RoadTool } from './road-tool';
-import { bindViewButtons } from './view-buttons';
-import { ZoneTool } from './zone-tool';
+import { Toolbox } from './toolbox';
+import { BuildMenu } from './ui/build-menu';
+import { BULLDOZE, CATEGORIES } from './ui/catalog';
+import { DebugPanel } from './ui/debug-panel';
+import { Popovers } from './ui/popover';
+import { TopBar } from './ui/top-bar';
+import { Views } from './ui/views';
 
 const byId = (id: string): HTMLElement => {
   const el = document.getElementById(id);
@@ -18,13 +19,37 @@ const byId = (id: string): HTMLElement => {
 
 const renderer = new Renderer(document.body);
 const sound = new AmbientSound(byId('sound') as HTMLButtonElement);
-const hud = byId('hud');
-const demand = byId('demand');
-const demandFills = ['residential', 'commercial', 'industrial'].map((u) => byId(`demand-${u}`));
 const worker = new Worker(new URL('./sim.worker.ts', import.meta.url), { type: 'module' });
 const send = (msg: ToWorker) => worker.postMessage(msg);
 const cityControls = new CityControls(send, byId, import.meta.env.DEV);
-const power = new PowerTools(send, renderer, byId, () => setTool(null));
+const popovers = new Popovers();
+const debug = new DebugPanel(byId('debug'));
+// The build menu starts tools through the toolbox, which tells the menu what is in use.
+const menu = new BuildMenu(
+  byId('build-menu'),
+  CATEGORIES,
+  BULLDOZE,
+  {
+    pick: (item) => tools.use(item?.tool ?? null),
+    option: (option) => tools.option(option.action),
+  },
+  popovers,
+);
+const views = new Views(menu.viewsButton, renderer, popovers);
+const tools = new Toolbox(
+  send,
+  renderer,
+  { hint: menu.hint, readout: byId('road-readout') },
+  views,
+  () => menu.show(tools.selection),
+);
+const { roads, zoning, power } = tools;
+const topBar = new TopBar(byId, popovers, setSpeed, (focus) => menu.openCategory('power', focus));
+// Each item's picture is drawn once from the game's own models (M4.6); the debug panel shows
+// how long that added to startup.
+const picturesStart = performance.now();
+menu.setPictures(renderer.drawPictures(menu.pictures));
+debug.picturesMs = performance.now() - picturesStart;
 // Pan keys held when follow starts are ignored until released, so they cannot fight it.
 const ignoredCameraKeys = new Set<string>();
 const inspector = new Inspector(
@@ -38,13 +63,15 @@ const inspector = new Inspector(
       for (const key of 'wasd') if (heldCameraKeys.delete(key)) ignoredCameraKeys.add(key);
     },
   },
-  byId('inspector'),
-  byId('inspector-text'),
-  byId('follow') as HTMLButtonElement,
-  byId('inspector-close') as HTMLButtonElement,
+  {
+    panel: byId('inspector'),
+    title: byId('inspector-title'),
+    lines: byId('inspector-lines'),
+    follow: byId('follow') as HTMLButtonElement,
+    close: byId('inspector-close') as HTMLButtonElement,
+  },
 );
 renderer.onUserPan = () => inspector.setFollow(false);
-const views = bindViewButtons(byId, renderer);
 
 let prev: Float32Array | undefined;
 let curr: Float32Array | undefined;
@@ -62,11 +89,12 @@ worker.onmessage = (e: MessageEvent<FromWorker>) => {
   if (power.receive(msg)) return;
   if (msg.type === 'cityStatus') {
     cityControls.receive(msg);
-    hud.hidden = !msg.ready;
+    topBar.setCity(msg);
   } else if (msg.type === 'cityFile' || msg.type === 'commandLog') {
     void cityControls.receiveFile(msg);
   } else if (msg.type === 'cityReset') {
-    setTool(null);
+    tools.use(null);
+    menu.closeCategory();
     inspector.select(null);
     stopKeyCamera();
     pointer = null;
@@ -122,67 +150,11 @@ worker.onmessage = (e: MessageEvent<FromWorker>) => {
 send({ type: 'init', seed: 1, cols: 60, rows: 60, agents: 0, grid: false });
 
 let speed = 1;
-const speedButtons = [...document.querySelectorAll<HTMLButtonElement>('[data-speed]')];
 function setSpeed(s: number) {
   speed = s;
   send({ type: 'setSpeed', speed: s });
-  for (const b of speedButtons) b.classList.toggle('active', Number(b.dataset.speed) === s);
+  topBar.showSpeed(s);
 }
-for (const b of speedButtons) b.onclick = () => setSpeed(Number(b.dataset.speed));
-
-const roadButton = byId('road');
-const curveButton = byId('curve');
-// Main road (M) is a setting of both road tools, kept until switched off.
-const mainRoadButton = byId('main-road');
-const bulldozeButton = byId('bulldoze');
-const roads = new RoadTool(send, renderer, {
-  help: byId('road-help'),
-  readout: byId('road-readout'),
-  snapOptions: byId('snap-options'),
-  snapButtons: [
-    [byId('snap-angle'), Snap.Angle],
-    [byId('snap-guides'), Snap.Guides],
-    [byId('snap-length'), Snap.Length],
-  ],
-});
-const zoneButtons = [...document.querySelectorAll<HTMLButtonElement>('[data-zone]')];
-const zoning = new ZoneTool(send, renderer, zoneButtons);
-function setTool(tool: RoadMode, brush: Zone | null = null) {
-  power.set(null);
-  zoning.set(tool ? null : brush);
-  roads.setMode(tool);
-  for (const [button, mode] of [
-    [roadButton, 'straight'],
-    [curveButton, 'curve'],
-    [bulldozeButton, 'bulldoze'],
-  ] as const) {
-    button.classList.toggle('active', tool === mode);
-    button.setAttribute('aria-pressed', String(tool === mode));
-  }
-  renderer.renderer.domElement.style.cursor = tool || zoning.zone !== null ? 'crosshair' : '';
-}
-/** Toggles main road for the road tools, picking the straight road tool if none is active. */
-function toggleMainRoad() {
-  const on = roads.roadClass !== RoadClass.Main;
-  roads.setRoadClass(on ? RoadClass.Main : RoadClass.Street);
-  mainRoadButton.classList.toggle('active', on);
-  mainRoadButton.setAttribute('aria-pressed', String(on));
-  if (!roads.roadMode) setTool('straight');
-}
-function setZone(z: Zone) {
-  setTool(null, zoning.zone === z ? null : z);
-}
-for (const b of zoneButtons) b.onclick = () => setZone(Number(b.dataset.zone) as Zone);
-/** Z, X and C pick residential, commercial and industrial; pressing again switches density. */
-function zoneKey(low: Zone, high: Zone) {
-  setTool(null, zoning.zone === low ? high : low);
-}
-/** Picks a tool, or switches it off if it is already on. */
-const toggleTool = (mode: RoadMode) => setTool(roads.mode === mode ? null : mode);
-roadButton.onclick = () => toggleTool('straight');
-curveButton.onclick = () => toggleTool('curve');
-bulldozeButton.onclick = () => toggleTool('bulldoze');
-mainRoadButton.onclick = toggleMainRoad;
 
 const canvas = renderer.renderer.domElement;
 let downX = 0;
@@ -199,7 +171,7 @@ canvas.addEventListener('pointerup', (e) => {
   // Treat it as a click only if the pointer barely moved, so panning still works.
   const still = Math.hypot(e.clientX - downX, e.clientY - downY) <= 4;
   if (zoning.zone !== null) {
-    if (e.button === 2) return setTool(null);
+    if (e.button === 2) return tools.use(null);
     return zoning.release(e.button, still, renderer.pick(e.clientX, e.clientY));
   }
   if (power.active) return power.release(e.button, still, renderer.pick(e.clientX, e.clientY));
@@ -212,7 +184,7 @@ canvas.addEventListener('pointerup', (e) => {
     }
     return;
   }
-  if (e.button === 2) return setTool(null);
+  if (e.button === 2) return tools.use(null);
   if (e.button !== 0 || !still) return;
   const p = renderer.pick(e.clientX, e.clientY);
   if (p) roads.click(p, e.shiftKey);
@@ -274,6 +246,13 @@ addEventListener('focusin', (e) => {
   if ((e.target as HTMLElement | null)?.closest?.(TEXT_ENTRY)) stopKeyCamera();
 });
 
+/** Esc closes an open panel first, then puts the tool away, closes the item row, and last
+ * closes the inspector. */
+function cancel() {
+  if (popovers.close() || tools.cancel() || menu.closeCategory()) return;
+  inspector.select(null);
+}
+
 addEventListener('keydown', (e) => {
   // Holding Shift places road points freely (no angle, guide or length snapping).
   if (e.key === 'Shift') roads.setShift(true);
@@ -284,7 +263,11 @@ addEventListener('keydown', (e) => {
   }
   if (e.isComposing) return;
   const target = e.target as HTMLElement | null;
-  if (target?.closest(TEXT_ENTRY)) return;
+  if (target?.closest(TEXT_ENTRY)) {
+    // Esc still closes the panel holding the field, such as the ☰ menu's share link.
+    if (e.key === 'Escape') popovers.close();
+    return;
+  }
   const cameraKey = e.key.toLowerCase();
   if (Object.hasOwn(CAMERA_KEYS, cameraKey)) {
     if (!ignoredCameraKeys.has(cameraKey)) heldCameraKeys.add(cameraKey);
@@ -293,25 +276,15 @@ addEventListener('keydown', (e) => {
   if (e.repeat) return;
   // Space activates a focused button natively; it must not also pause the sim.
   if (e.key === ' ' && target?.closest('button, a[href], [role="button"]')) return;
-  if (power.key(e.key)) return;
-  if (views.key(e.key)) return;
-  if (e.key === 'r' || e.key === 'R') toggleTool('straight');
-  else if (e.key === 'v' || e.key === 'V') toggleTool('curve');
-  else if (e.key === 'b' || e.key === 'B') toggleTool('bulldoze');
-  else if (e.key === 'm' || e.key === 'M') toggleMainRoad();
-  else if (e.key === 'z' || e.key === 'Z') zoneKey(Zone.ResidentialLow, Zone.ResidentialHigh);
-  else if (e.key === 'x' || e.key === 'X') zoneKey(Zone.CommercialLow, Zone.CommercialHigh);
-  else if (e.key === 'c' || e.key === 'C') zoneKey(Zone.IndustrialLow, Zone.IndustrialHigh);
-  else if (e.key === 'u' || e.key === 'U') setZone(Zone.None);
-  else if (e.key === 'f' || e.key === 'F') inspector.toggleFollow();
-  else if (e.key === 'n' || e.key === 'N') sound.toggle();
-  // Esc cancels a tool first, then closes the inspector.
-  else if (e.key === 'Escape')
-    roads.mode || zoning.zone !== null || power.active ? setTool(null) : inspector.select(null);
-  else if (e.key === ' ') setSpeed(speed === 0 ? 1 : 0);
-  else if (e.key === '1') setSpeed(1);
-  else if (e.key === '2') setSpeed(3);
-  else if (e.key === '3') setSpeed(10);
+  if (e.key === 'Escape') return cancel();
+  if (debug.key(e.key) || tools.key(e.key) || views.key(e.key)) return;
+  const key = e.key.toLowerCase();
+  if (key === 'f') inspector.toggleFollow();
+  else if (key === 'n') sound.toggle();
+  else if (key === ' ') setSpeed(speed === 0 ? 1 : 0);
+  else if (key === '1') setSpeed(1);
+  else if (key === '2') setSpeed(3);
+  else if (key === '3') setSpeed(10);
 });
 
 // --- frame loop ---
@@ -331,10 +304,8 @@ function frame() {
   // A camera move slides the ground under a still cursor; ask again what the cursor is over.
   if (renderer.render() && pointer) hover(pointer);
   sound.update(now / 1000, curr, stats?.secondOfDay ?? 43200, renderer.listener());
-  if (stats) {
-    drawDemand(demand, demandFills, stats.demand);
-    hud.textContent = hudText(stats, fps, tickMs, speed, zoning.zone);
-  }
+  topBar.draw(stats, Date.now());
+  debug.draw(stats, fps, tickMs);
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

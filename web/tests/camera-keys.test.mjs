@@ -109,7 +109,7 @@ test('panning works paused and with tools, and keeps tool previews under the cur
   assert.equal(t.messages.at(-1).speed, 0);
   t.key('r');
   t.key('w');
-  assert.equal(t.elements.road.attributes['aria-pressed'], 'true', 'tool keys still work');
+  assert.equal(t.elements.straight.attributes['aria-pressed'], 'true', 'tool keys still work');
   assert.deepEqual(step(t, 16), [0, 1, 0], 'pans while paused with a tool active');
   t.key('b');
   t.key('v');

@@ -1,10 +1,11 @@
 // The road and bulldoze tools: clicked points, sim-owned previews and drawing guides (ADR 0038).
 // The sim guides and plans every point; this module only keeps the clicks, asks one question at
 // a time about the latest cursor position, and draws the answers.
-import { type Quote, roadHelpText } from './hud';
-import { type FromWorker, RoadClass, Snap, type ToWorker } from './protocol';
 
-export type RoadMode = 'straight' | 'curve' | 'bulldoze' | null;
+import { type FromWorker, RoadClass, Snap, type ToWorker } from './protocol';
+import { type Quote, roadHelpText } from './ui/hints';
+
+export type RoadMode = 'straight' | 'curve' | 'continuous' | 'bulldoze' | null;
 /** A ground position: x and z in world space, sim x and y. */
 type Ground = { x: number; z: number };
 /** A clicked point with the snap flags it was clicked with. */
@@ -18,10 +19,9 @@ interface Drawing {
 }
 
 interface Elements {
+  /** The build menu's hint line, shared by every tool. */
   help: HTMLElement;
   readout: HTMLElement;
-  snapOptions: HTMLElement;
-  snapButtons: [HTMLElement, number][];
 }
 
 const SNAP_ALL = Snap.Angle | Snap.Guides | Snap.Length;
@@ -33,6 +33,7 @@ export class RoadTool {
   mode: RoadMode = null;
   roadClass: RoadClass = RoadClass.Street;
   private clicked: Clicked[] = [];
+  private previousControl: Ground | null = null;
   private refused = false;
   private nextBuildId = 0;
   private pendingBuild: number | null = null;
@@ -58,28 +59,35 @@ export class RoadTool {
     this.send = send;
     this.draw = draw;
     this.el = el;
-    el.snapOptions.hidden = true;
-    for (const [button, flag] of el.snapButtons)
-      button.onclick = () => {
-        this.snap ^= flag;
-        button.setAttribute('aria-pressed', String((this.snap & flag) !== 0));
-        this.ask();
-      };
+  }
+
+  /** Turns one drawing guide (`Snap` flag) on or off; the preview follows at once. */
+  toggleSnap(flag: number) {
+    this.snap ^= flag;
+    this.ask();
+  }
+
+  /** The drawing guides that are on, as `Snap` flags. */
+  get snaps() {
+    return this.snap;
   }
 
   get roadMode() {
-    return this.mode === 'straight' || this.mode === 'curve';
+    return this.mode === 'straight' || this.mode === 'curve' || this.mode === 'continuous';
   }
 
   /** Switches tool, dropping any road being drawn. */
   setMode(mode: RoadMode) {
+    const was = this.mode;
     this.mode = mode;
     this.clicked = [];
+    this.previousControl = null;
     this.pendingBuild = null;
     this.refused = false;
-    this.el.snapOptions.hidden = !this.roadMode;
     this.invalidate();
-    this.updateHelp();
+    // The hint line is shared: clear it only if this tool was the one using it.
+    if (mode) this.updateHelp();
+    else if (was) this.el.help.textContent = '';
   }
 
   /** A fresh city: nothing is in flight any more. */
@@ -121,13 +129,19 @@ export class RoadTool {
     if (this.pendingBuild !== null || !this.mode) return;
     this.shift = shift;
     if (this.mode === 'bulldoze') this.send({ type: 'deleteRoad', x: p.x, y: p.z });
-    else if (this.clicked.length < (this.mode === 'curve' ? 2 : 1))
+    else if (this.clicked.length < (this.needsControl() ? 2 : 1))
       this.clicked.push({ ...p, snap: this.flags() });
     else {
       const id = ++this.nextBuildId;
       this.pendingBuild = id;
       this.pendingQuote = this.quote;
-      this.send({ type: 'buildRoad', id, points: this.points(p), class: this.roadClass });
+      this.send({
+        type: 'buildRoad',
+        id,
+        points: this.points(p),
+        class: this.roadClass,
+        ...(this.mode === 'continuous' ? { chain: true } : {}),
+      });
     }
     this.refused = false;
     this.invalidate();
@@ -153,7 +167,19 @@ export class RoadTool {
     } else if (msg.type === 'buildResult') {
       if (this.pendingBuild !== msg.id) return;
       // The guided end is already on the network, so it keeps its place without snapping.
-      if (msg.end) this.clicked = [{ x: msg.end[0], z: msg.end[1], snap: 0 }];
+      if (msg.end) {
+        this.previousControl = msg.control ? { x: msg.control[0], z: msg.control[1] } : null;
+        this.clicked =
+          this.mode === 'continuous' && !this.previousControl
+            ? []
+            : [
+                {
+                  x: msg.end[0],
+                  z: msg.end[1],
+                  snap: this.mode === 'continuous' ? Snap.Continue : 0,
+                },
+              ];
+      }
       // A road the city could not pay for was refused for money, not for its shape.
       const q = this.pendingQuote;
       const unpaid = !msg.end && q?.affordable === false ? q : null;
@@ -169,6 +195,16 @@ export class RoadTool {
     const pts = msg.points;
     const at = (i: number): Ground => ({ x: pts[2 * i], z: pts[2 * i + 1] });
     const n = pts.length / 2;
+    if (n === 0) {
+      this.draw.setPreview(null, null, null);
+      this.draw.setGuides(null);
+      this.draw.setAngles(null);
+      this.refused = true;
+      this.quote = null;
+      this.el.readout.hidden = true;
+      this.updateHelp();
+      return;
+    }
     if (!this.planAsked && n === 2) {
       // A curve's control guide, not a road. Only the sim evaluates the actual Bézier curve.
       this.draw.setPreview(new Float32Array([pts[0], pts[1], 0, pts[2], pts[3], -1]), at(0), at(1));
@@ -197,13 +233,27 @@ export class RoadTool {
     this.updateHelp();
   }
 
+  private needsControl() {
+    return (
+      this.mode === 'curve' ||
+      (this.mode === 'continuous' && this.clicked[0]?.snap !== Snap.Continue)
+    );
+  }
+
   private flags() {
     return this.shift ? 0 : this.snap;
   }
 
   /** `[x, y, snap]` per clicked point, then `end` with the current flags. */
   private points(end: Ground) {
-    return [...this.clicked, { ...end, snap: this.flags() }].flatMap((p) => [p.x, p.z, p.snap]);
+    const points = [...this.clicked, { ...end, snap: this.flags() }].flatMap((p) => [
+      p.x,
+      p.z,
+      p.snap,
+    ]);
+    if (this.mode === 'continuous' && this.previousControl)
+      points.push(this.previousControl.x, this.previousControl.z, 0);
+    return points;
   }
 
   private ask() {
@@ -222,7 +272,7 @@ export class RoadTool {
       this.send({ type: 'previewBulldoze', revision, x: b.x, y: b.z });
       return;
     }
-    this.planAsked = !(this.mode === 'curve' && this.clicked.length === 1);
+    this.planAsked = !(this.needsControl() && this.clicked.length === 1);
     this.send({
       type: 'previewRoad',
       revision,
@@ -244,9 +294,10 @@ export class RoadTool {
   }
 
   private updateHelp() {
+    if (!this.mode) return;
     const stage = !this.clicked.length
       ? 'start'
-      : this.mode === 'curve' && this.clicked.length === 1
+      : this.needsControl() && this.clicked.length === 1
         ? 'control'
         : 'end';
     const main = this.roadClass === RoadClass.Main;

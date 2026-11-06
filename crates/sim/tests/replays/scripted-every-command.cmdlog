@@ -17,4 +17,4 @@ grid 4 4
 1950 fill 170 50 residential-high
 2500 delete 430 200
 end 4950
-expect hash 017927c65409e0f4 population 173 buildings 27 trips 179
+expect hash 0bbf48106b072c8f population 176 buildings 28 trips 149

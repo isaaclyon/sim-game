@@ -1,0 +1,210 @@
+/* Panels that open over the city: figure details, the ☰ menu, the debug numbers and the
+   inspector card. Positions are set from code next to the button that opened them. */
+.panel {
+  position: fixed;
+  z-index: 20;
+  min-width: 260px;
+  max-width: 380px;
+  padding: 16px 18px;
+  box-sizing: border-box;
+  background: var(--glass-strong);
+  font-size: 14px;
+  line-height: 1.45;
+}
+.panel h2,
+.card h2 {
+  margin: 0 0 10px;
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+}
+.panel h2:not(:first-child) {
+  margin-top: 16px;
+  font-size: 13px;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+}
+.panel p {
+  margin: 8px 0 0;
+}
+.rows {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 24px;
+  margin: 0;
+}
+.rows dt {
+  color: var(--text-dim);
+}
+.rows dd {
+  margin: 0;
+  text-align: right;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.panel .warning {
+  padding: 8px 10px;
+  border-radius: var(--radius-small);
+  background: var(--danger-soft);
+  border: 1px solid rgba(239, 68, 68, 0.5);
+}
+.panel .advice {
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text-dim);
+}
+.panel .primary {
+  width: 100%;
+  margin-top: 12px;
+  min-height: 38px;
+}
+
+/* Power: what the town needs against what it has; red past the mark is the shortfall. */
+.meter {
+  position: relative;
+  height: 10px;
+  margin: 4px 0 12px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+.meter-fill,
+.meter-over {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 0;
+}
+.meter-fill {
+  background: #d7dde4;
+}
+.meter-over {
+  background: var(--danger);
+}
+.meter-mark {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: white;
+}
+
+.menu {
+  min-width: 320px;
+}
+.menu-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.menu .status {
+  margin-top: 10px;
+  overflow-wrap: anywhere;
+  color: var(--text-dim);
+}
+.menu .status:empty {
+  display: none;
+}
+.menu .status[data-error="true"] {
+  color: #ffb4ab;
+}
+#share-url {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 6px;
+  padding: 6px 8px;
+  border: 1px solid var(--control-border);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.3);
+  color: var(--text);
+  font: 12px var(--mono);
+}
+.menu .note {
+  font-size: 12.5px;
+  color: var(--text-faint);
+}
+.keys {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 16px;
+  margin: 0;
+  font-size: 13px;
+}
+.keys dt {
+  color: var(--text-dim);
+}
+.keys dd {
+  margin: 0;
+}
+
+.debug {
+  position: fixed;
+  left: 10px;
+  top: 72px;
+  z-index: 15;
+  margin: 0;
+  padding: 10px 12px;
+  font: 12px / 1.5 var(--mono);
+  color: var(--text-dim);
+  pointer-events: none;
+}
+
+/* The inspector card: who or what is selected, one small icon per line. */
+.card {
+  position: fixed;
+  top: 72px;
+  right: 10px;
+  z-index: 12;
+  width: 290px;
+  padding: 16px 18px;
+  box-sizing: border-box;
+  background: var(--glass-strong);
+  font-size: 14px;
+}
+.card-lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 7px;
+}
+.card-lines li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  line-height: 1.35;
+}
+.card-lines svg {
+  margin-top: 0;
+  color: var(--text-dim);
+}
+.card-lines .note {
+  color: var(--text-dim);
+}
+.card .actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+.card .actions button {
+  flex: 1;
+}
+
+#road-readout {
+  position: fixed;
+  z-index: 15;
+  pointer-events: none;
+  padding: 4px 9px;
+  border-radius: 8px;
+  background: var(--glass-strong);
+  border: 1px solid var(--glass-border);
+  color: var(--text);
+  font: 600 13px / 1.4 var(--font);
+  font-variant-numeric: tabular-nums;
+}

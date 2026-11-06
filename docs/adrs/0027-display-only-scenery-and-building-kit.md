@@ -23,6 +23,10 @@ affect play yet, and later eras (village, town) need to restyle buildings withou
   awnings and rooftop details. Visual variety comes from a hash of the footprint, never a sim
   RNG. Colours and proportions live in a `Style`; one present-day style ships, and an era
   switch later picks another `Style` without sim changes.
+- Each use has seven or eight named designs (house roofs, flat blocks, shop fronts, store
+  massing, workshops, factories with silos, tanks or domes), one file per use. A separate
+  footprint hash picks the design. Industry's roof choice still sets roof colour, and 3 still
+  means a chimney, which every industrial design draws and the smoke layer reads.
 - Building meshes are built per 256 m tile and rebuilt only when that tile's records change.
 - Vehicle models (car, hatchback, SUV, van, pickup, box van), paint and walker clothes are
   chosen in the frontend from a hash of the stable agent id (issue #29), so a citizen keeps the

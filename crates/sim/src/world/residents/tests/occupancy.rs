@@ -44,6 +44,7 @@ fn jobs_are_limited_and_industry_is_not_a_shop() {
 fn relocation_reserves_one_home_for_all_members_and_departure_cleans_ownership() {
     let mut w = town();
     isolate(&mut w);
+    w.totals.tick = 36_000; // Relocation at midnight must not trigger a commute.
     let hh = w.citizens.household[0];
     let old = w.households.home[hh as usize];
     let members = w.households.members[hh as usize].clone();
@@ -62,6 +63,9 @@ fn relocation_reserves_one_home_for_all_members_and_departure_cleans_ownership()
         assert!(w.citizens.active[c as usize]);
         assert_eq!(w.home_building(c), w.homes.building[donor]);
         assert_eq!(w.citizens.location[c as usize], w.homes.building[donor]);
+        let at = crate::clock::clock_at(w.citizens.due[c as usize], w.cfg.dt);
+        assert_eq!(at.day, 2);
+        assert!((7 * 3600..=16 * 3600).contains(&at.second_of_day));
     }
     for h in 0..w.homes.building.len() {
         w.buildings.active[w.homes.building[h] as usize] = false;
@@ -83,6 +87,7 @@ fn removed_destination_and_removed_activity_location_never_count_as_arrival() {
     isolate(&mut w);
     let target = distant(&w, 0);
     let home = w.home_building(0);
+    w.totals.tick = 36_000;
     journey(&mut w, 0, target, Activity::Work);
     w.tick();
     let before = w.totals.trips_completed;
@@ -95,4 +100,11 @@ fn removed_destination_and_removed_activity_location_never_count_as_arrival() {
     w.citizens.location[0] = target;
     w.reconcile_residents();
     assert_eq!(w.citizens.location[0], home);
+    let at = crate::clock::clock_at(w.citizens.due[0], w.cfg.dt);
+    assert_eq!(at.day, 2);
+    if w.citizens.job[0].is_some() {
+        assert!((at.second_of_day as i64 - w.citizens.departure[0] as i64).abs() <= 1);
+    } else {
+        assert!((10 * 3600..=16 * 3600).contains(&at.second_of_day));
+    }
 }

@@ -1,0 +1,209 @@
+/* The slim bar across the top: clock, speed, the city's figures, demand and saving. */
+#top-bar {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 52px;
+  padding: 0 8px 0 18px;
+  box-sizing: border-box;
+  font-size: 15px;
+  white-space: nowrap;
+}
+#top-bar .divider {
+  width: 1px;
+  height: 26px;
+  background: rgba(255, 255, 255, 0.14);
+}
+#top-bar .spacer {
+  flex: 1;
+}
+.clock {
+  font-size: 17px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  min-width: 118px;
+}
+
+.speeds {
+  display: flex;
+  min-width: 0;
+  margin: 0;
+  border: 0;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 11px;
+  background: rgba(0, 0, 0, 0.18);
+}
+.speeds button {
+  min-width: 40px;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.speeds button:hover {
+  background: var(--control-hover);
+}
+.speeds button[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent-ring);
+  color: white;
+}
+.speeds svg {
+  fill: currentColor;
+  stroke: none;
+  width: 16px;
+  height: 16px;
+}
+
+/* A figure opens its detail panel; it turns red when something is wrong. */
+.figure {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  font-size: 16px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.figure:hover,
+.figure[aria-expanded="true"] {
+  background: var(--control-hover);
+}
+.figure svg {
+  color: var(--text-dim);
+}
+.figure .rate {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--good);
+}
+.figure .rate.losing {
+  color: var(--text-dim);
+}
+.figure.warning {
+  background: var(--danger);
+  border-color: #ff8a8a;
+  color: white;
+}
+.menu-button svg {
+  width: 22px;
+  height: 22px;
+  stroke-width: 2.2;
+}
+
+.figure.warning svg,
+.figure.warning .rate {
+  color: white;
+}
+
+/* R/C/I demand: a bar grows right from the middle for demand and left, dimmed, for a surplus. */
+.demand {
+  display: grid;
+  grid-template-columns: auto 120px;
+  align-items: center;
+  column-gap: 8px;
+  row-gap: 3px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-dim);
+}
+.demand .use {
+  line-height: 1;
+}
+.demand .track {
+  position: relative;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.12);
+}
+.demand .track::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -2px;
+  bottom: -2px;
+  border-left: 1px solid rgba(255, 255, 255, 0.4);
+}
+.demand .fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 0;
+  border-radius: 3px;
+}
+.demand .fill.residential {
+  background: var(--residential);
+}
+.demand .fill.commercial {
+  background: var(--commercial);
+}
+.demand .fill.industrial {
+  background: var(--industrial);
+}
+.demand .fill.surplus {
+  background: #9aa6b4;
+}
+
+.save-badge {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 14px;
+}
+.save-badge:hover {
+  background: var(--control-hover);
+}
+.save-badge[data-error="true"] {
+  background: var(--danger);
+  border-color: #ff8a8a;
+  color: white;
+}
+.menu-button {
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--control-border);
+  border-radius: 10px;
+  background: var(--control);
+}
+.menu-button:hover,
+.menu-button[aria-expanded="true"] {
+  background: var(--control-hover);
+}
+@media (max-width: 1100px) {
+  #top-bar {
+    gap: 6px;
+    font-size: 13px;
+  }
+  .demand {
+    grid-template-columns: auto 64px;
+  }
+  .clock {
+    min-width: 0;
+  }
+}

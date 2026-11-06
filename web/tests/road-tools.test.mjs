@@ -20,7 +20,7 @@ const answer = (ask, points, stops, extra = {}) => ({
 /** The last road preview drawn, skipping guide lines. */
 const lastRoad = (t) => t.previews.findLast((p) => p.type === 'road');
 
-test('normal startup has no synthetic traffic and HUD displays authoritative population and unemployment', async () => {
+test('normal startup has no synthetic traffic and the top bar shows authoritative population and unemployment', async () => {
   const t = await tools();
   assert.equal(t.messages[0].type, 'init');
   assert.equal(t.messages[0].agents, 0);
@@ -34,6 +34,7 @@ test('normal startup has no synthetic traffic and HUD displays authoritative pop
     power: { supply: 0, starter: 150, used: 0, demand: 0, unpowered: 0, waiting: 0 },
     balance: 100_000,
     taxes: 0,
+    grant: 0,
     upkeep: 0,
     agents: 9,
     parked: 0,
@@ -56,14 +57,12 @@ test('normal startup has no synthetic traffic and HUD displays authoritative pop
     t.frame();
   };
   show({});
-  assert.match(t.elements.hud.textContent, /population 1,234 {3}unemployed 56 \(4\.5%\)/);
+  assert.equal(t.elements['population-value'].textContent, 'Pop 1,234');
+  assert.equal(t.elements['pop-unemployed'].textContent, '56 (4.5%)');
   show({ population: 0, unemployed: 0, unemploymentPercent: 0 });
-  assert.match(t.elements.hud.textContent, /population 0 {3}unemployed 0 \(0\.0%\)/);
-  assert.match(
-    t.elements.hud.textContent,
-    /WASD or drag pans, Q\/E turns/,
-    'camera help is on screen',
-  );
+  assert.equal(t.elements['population-value'].textContent, 'Pop 0');
+  assert.equal(t.elements['pop-unemployed'].textContent, '0 (0.0%)');
+  assert.match(t.elements.menu.textContent, /W A S D or drag/, 'camera help is in the ☰ menu');
 });
 
 test('toolbar shortcuts leave modified, repeated and native control keys alone', async () => {
@@ -76,24 +75,28 @@ test('toolbar shortcuts leave modified, repeated and native control keys alone',
     { isComposing: true },
   ]) {
     t.key('r', options);
-    assert.notEqual(t.elements.road.attributes['aria-pressed'], 'true');
+    assert.notEqual(t.elements.straight.attributes['aria-pressed'], 'true');
   }
   t.key('R');
-  assert.equal(t.elements.road.attributes['aria-pressed'], 'true');
+  assert.equal(t.elements.straight.attributes['aria-pressed'], 'true');
   t.key('r', { repeat: true });
-  assert.equal(t.elements.road.attributes['aria-pressed'], 'true');
+  assert.equal(t.elements.straight.attributes['aria-pressed'], 'true');
   const before = t.messages.length;
   const button = { closest: (selector) => (selector.includes('button') ? button : null) };
   t.key(' ', { target: button });
   assert.equal(t.messages.length, before, 'Space on a button must only activate that button');
   const input = { closest: (selector) => (selector.includes('input') ? input : null) };
   t.key('z', { target: input });
-  assert.equal(t.elements.road.attributes['aria-pressed'], 'true', 'typing must not switch tools');
+  assert.equal(
+    t.elements.straight.attributes['aria-pressed'],
+    'true',
+    'typing must not switch tools',
+  );
   t.key(' ');
   assert.equal(t.messages.at(-1).type, 'setSpeed');
   assert.equal(t.messages.at(-1).speed, 0);
   t.key('Escape');
-  assert.equal(t.elements.road.attributes['aria-pressed'], 'false');
+  assert.equal(t.elements.straight.attributes['aria-pressed'], 'false');
 });
 
 test('zoning shortcuts and drags stay exclusive with curved roads and bulldozing', async () => {
@@ -141,10 +144,15 @@ test('zoning shortcuts and drags stay exclusive with curved roads and bulldozing
   const curve = t.messages.at(-1);
   assert.equal(curve.type, 'buildRoad', 'V still builds a curve after zoning');
   assert.equal(curve.points.length, 9, 'start, control and end');
-  t.zoneButtons.find((b) => Number(b.dataset.zone) === Zone.ResidentialLow).onclick();
+  t.pressId('category-zones');
+  t.pressId('houses');
+  assert.equal(t.elements.houses.attributes['aria-pressed'], 'true');
+  assert.equal(t.pans.at(-1), false, 'the Houses item picks the brush');
   t.key('b');
   assert.equal(t.pans.at(-1), true);
-  assert.ok(t.zoneButtons.every((b) => b.attributes['aria-pressed'] === 'false'));
+  const zoneItems = t.elements['items-zones'].querySelectorAll('button');
+  assert.equal(zoneItems.length, 7);
+  assert.ok(zoneItems.every((b) => b.attributes['aria-pressed'] === 'false'));
   t.click(100, 50);
   assert.equal(t.messages.at(-1).type, 'deleteRoad');
   const cells = new Uint8Array([1]);
@@ -219,20 +227,22 @@ test('switching from curve to bulldoze discards a delayed preview and resets con
   assert.equal(fresh.type, 'previewRoad');
   assert.equal(fresh.points.length, 3, 'switching tools starts a new road');
   t.key('Escape');
-  assert.equal(t.elements.road.attributes['aria-pressed'], 'false');
+  assert.equal(t.elements.straight.attributes['aria-pressed'], 'false');
   assert.equal(lastRoad(t).stops, null);
 });
 
 test('refused curves retain their control, successful curves chain, and late build replies cannot revive a cancelled tool', async () => {
   const t = await tools();
-  t.elements.curve.onclick();
+  t.pressId('category-roads');
+  t.pressId('street');
+  t.pressId('curve');
   t.click(0, 0);
   t.click(100, 100);
   t.click(200, 0);
   const first = t.messages.at(-1);
   assert.equal(first.type, 'buildRoad');
   t.reply({ type: 'buildResult', id: first.id, success: false, end: null });
-  assert.match(t.elements['road-help'].textContent, /Cannot build here/);
+  assert.match(t.elements['build-hint'].textContent, /Cannot build here/);
   t.click(250, 0);
   const retry = t.messages.at(-1);
   assert.deepEqual([...retry.points], [0, 0, ALL, 100, 100, ALL, 250, 0, ALL]);
@@ -244,7 +254,7 @@ test('refused curves retain their control, successful curves chain, and late bui
   assert.deepEqual([...chained.points], [248, 0, 0, 350, 100, ALL, 450, 0, ALL]);
   t.key('b');
   t.reply({ type: 'buildResult', id: chained.id, success: true, end: [450, 0] });
-  assert.match(t.elements['road-help'].textContent, /remove it/);
+  assert.match(t.elements['build-hint'].textContent, /remove it/);
   t.move(350, 50);
   assert.equal(t.messages.at(-1).type, 'previewBulldoze');
   t.click(350, 50, 2);
@@ -255,8 +265,8 @@ test('M builds main roads with either road tool until switched off', async () =>
   const t = await tools();
   t.key('m');
   assert.equal(t.elements['main-road'].attributes['aria-pressed'], 'true');
-  assert.equal(t.elements.road.attributes['aria-pressed'], 'true', 'picks the road tool');
-  assert.match(t.elements['road-help'].textContent, /Main road/);
+  assert.equal(t.elements.straight.attributes['aria-pressed'], 'true', 'picks the road tool');
+  assert.match(t.elements['build-hint'].textContent, /Main road/);
   t.click(0, 0);
   t.click(100, 0);
   const straight = t.messages.at(-1);
@@ -267,8 +277,10 @@ test('M builds main roads with either road tool until switched off', async () =>
   t.click(50, 50);
   t.click(100, 0);
   assert.equal(t.messages.at(-1).class, RoadClass.Main, 'kept across road tools');
-  t.elements['main-road'].onclick();
+  t.pressId('street');
   assert.equal(t.elements['main-road'].attributes['aria-pressed'], 'false');
+  assert.equal(t.elements.street.attributes['aria-pressed'], 'true');
+  assert.equal(t.elements.curve.attributes['aria-pressed'], 'true', 'the shape stays');
   t.key('r');
   t.click(0, 0);
   t.click(100, 0);
@@ -287,9 +299,10 @@ test('road previews are drawn at the width of the chosen road class', async () =
 
 test('snapping can be switched per kind, or held off with Shift, and the readout follows', async () => {
   const t = await tools();
-  assert.equal(t.elements['snap-options'].hidden, true, 'snap options belong to road tools');
+  assert.equal(t.elements['build-options'].hidden, true, 'options belong to a tool in use');
   t.key('r');
-  assert.equal(t.elements['snap-options'].hidden, false);
+  assert.equal(t.elements['build-options'].hidden, false);
+  assert.equal(t.elements['options-roads'].hidden, false);
   t.click(0, 0);
   t.move(100, 3);
   const ask = t.messages.at(-1);
@@ -310,14 +323,18 @@ test('snapping can be switched per kind, or held off with Shift, and the readout
   const free = t.messages.at(-1);
   assert.deepEqual([free.type, ...free.points], ['previewRoad', 0, 0, ALL, 100, 3, 0]);
   t.keyup('Shift');
-  t.elements['snap-length'].onclick();
+  t.pressId('snaps');
+  t.pressId('snap-length');
   assert.equal(t.elements['snap-length'].attributes['aria-pressed'], 'false');
   t.reply(answer(free, [0, 0, 100, 3], [0, 0, 0, 100, 3, 0]));
   const noLength = t.messages.at(-1);
   assert.deepEqual([...noLength.points], [0, 0, ALL, 100, 3, ALL & ~Snap.Length]);
   // A refused plan hides nothing but says why.
   t.reply(answer(noLength, [0, 0, 100, 3], [], { length: 100, angle: 2 }));
-  assert.match(t.elements['road-help'].textContent, /Cannot build here/);
+  assert.match(t.elements['build-hint'].textContent, /Cannot build here/);
+  t.key('Escape');
+  assert.equal(t.elements['snaps-panel'].hidden, true, 'Esc closes the Snaps list first');
+  assert.equal(t.elements['road-readout'].hidden, false);
   t.key('Escape');
   assert.equal(t.elements['road-readout'].hidden, true);
 });
@@ -335,7 +352,7 @@ test('a curve control point is guided but not planned', async () => {
     [0, 0, 0, 48, 48, -1],
     'a straight guide to the control',
   );
-  assert.doesNotMatch(t.elements['road-help'].textContent, /Cannot build/);
+  assert.doesNotMatch(t.elements['build-hint'].textContent, /Cannot build/);
   assert.equal(t.elements['road-readout'].hidden, true);
 });
 

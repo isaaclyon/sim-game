@@ -4,7 +4,7 @@ import { tools } from './main-harness.mjs';
 
 const home = { building: 9, zone: 2, capacity: 84, occupied: 53, closing: false };
 const asks = (t) => t.messages.filter((m) => m.type === 'inspectBuilding');
-const text = (t) => t.elements['inspector-text'].textContent;
+const text = (t) => t.card();
 function select(t, building = home) {
   t.buildings.at = building.building;
   t.click(5, 5);
@@ -19,26 +19,31 @@ test('homes show live resident counts; workplaces show total, filled and unfille
   const t = await tools();
   const ask = select(t);
   assert.equal(t.elements.inspector.hidden, false);
-  assert.match(text(t), /apartments #9/);
-  assert.match(text(t), /high density/);
-  assert.match(text(t), /resident capacity +84/);
-  assert.match(text(t), /residents +53/);
+  assert.match(text(t), /^Apartments #9$/m);
+  assert.match(text(t), /^High density$/m);
+  assert.match(text(t), /^Resident capacity: 84$/m);
+  assert.match(text(t), /^Residents: 53$/m);
+  const lines = t.elements['inspector-lines'].children;
+  assert.ok(
+    lines.every((li) => li.querySelector('svg')?.getAttribute('aria-hidden') === 'true'),
+    'each line has an icon that screen readers skip',
+  );
   assert.equal(t.elements.follow.hidden, true);
   t.key('f');
   assert.notEqual(t.elements.follow.attributes['aria-pressed'], 'true');
   t.reply({ type: 'building', selection: ask.selection, building: { ...home, occupied: 60 } });
-  assert.match(text(t), /residents +60/);
+  assert.match(text(t), /^Residents: 60$/m);
   for (const zone of [3, 4, 5, 6]) {
     const ask = select(t, { ...home, building: zone + 20, zone, capacity: 120, occupied: 71 });
-    assert.match(text(t), /total jobs +120/);
-    assert.match(text(t), /filled jobs +71/);
-    assert.match(text(t), /unfilled jobs +49/);
+    assert.match(text(t), /^Total jobs: 120$/m);
+    assert.match(text(t), /^Filled jobs: 71$/m);
+    assert.match(text(t), /^Unfilled jobs: 49$/m);
     t.reply({
       type: 'building',
       selection: ask.selection,
       building: { ...home, zone, closing: true },
     });
-    assert.match(text(t), /closing/);
+    assert.match(text(t), /^Closing/m);
   }
 });
 
@@ -82,7 +87,7 @@ test('building and citizen selections replace each other; stale replies and remo
   t.reply({ type: 'building', selection: third.selection, building: home });
   assert.equal(t.elements.inspector.hidden, true);
   select(t);
-  t.elements['inspector-close'].onclick();
+  t.pressId('inspector-close');
   assert.equal(t.elements.inspector.hidden, true);
   select(t);
   t.buildings.at = null;

@@ -47,9 +47,10 @@ pub struct SimStats {
     pub paths_failed: f64,
     pub despawned_stuck: f64,
     pub despawned_by_edit: f64,
-    /// Money in whole dollars (ADR 0036); taxes and upkeep are per clock hour.
+    /// Money in whole dollars (ADR 0036); taxes, grant and upkeep are per clock hour.
     pub balance: f64,
     pub taxes: f64,
+    pub grant: f64,
     pub upkeep: f64,
 }
 
@@ -153,10 +154,15 @@ impl Sim {
         self.apply(Command::SpawnAgents { count })
     }
 
-    /// Guides raw `[x, y, snap]` points and, if `plan`, previews the road through them; see
-    /// `World::write_road_draft` (ADR 0038).
-    pub fn road_draft(&mut self, points: &[f32], plan: bool) -> Vec<f32> {
-        self.world.write_road_draft(points, plan, &mut self.buf);
+    /// Guides raw `[x, y, snap]` points and, if `plan`, previews the road of `class` through
+    /// them; see `World::write_road_draft` (ADR 0038, 0048). Unknown classes plan nothing.
+    pub fn road_draft(&mut self, points: &[f32], plan: bool, class: u8) -> Vec<f32> {
+        let (plan, class) = match RoadClass::from_u8(class) {
+            Some(class) => (plan, class),
+            None => (false, RoadClass::Street),
+        };
+        self.world
+            .write_road_draft(points, plan, class, &mut self.buf);
         self.buf.clone()
     }
 
@@ -442,6 +448,7 @@ impl Sim {
             despawned_by_edit: s.despawned_by_edit as f64,
             balance: s.money.balance as f64,
             taxes: s.money.taxes as f64,
+            grant: s.money.grant as f64,
             upkeep: s.money.upkeep as f64,
         }
     }

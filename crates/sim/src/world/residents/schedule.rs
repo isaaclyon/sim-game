@@ -38,6 +38,12 @@ impl World {
                 self.citizens.job[i] = Some(b);
                 self.residents.workers[b as usize] += 1;
                 self.residents.employed += 1;
+                // Employment changes the next departure, not the current activity.
+                if self.citizens.activity[i] == Activity::Home
+                    && self.citizens.destination[i].is_none()
+                {
+                    self.schedule_day(c);
+                }
             } else {
                 self.schedule_search(c, 120.0);
             }

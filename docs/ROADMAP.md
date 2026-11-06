@@ -262,7 +262,8 @@ Building is the core fantasy, and M5's build costs will reward precise tools, so
 gets a Cities: Skylines 2–level pass first. The sim plans every snap, grid and undo, as it
 already plans roads: answers stay deterministic and testable, and M6 councilors can reuse the
 same builders through ordinary commands. Slices ship in this order; each is judged in the
-browser before the next starts.
+browser before the next starts. Slices 3–5 wait for [M4.6](#m46--a-proper-interface), so the
+grid tool, upgrade and undo land in the new interface.
 
 1. **Angle snapping and guide lines** ([ADR 0038](adrs/0038-sim-owned-drawing-guides.md)).
    New roads snap to 15° steps (90° and 45° pull hardest) measured from the road they start
@@ -276,8 +277,14 @@ browser before the next starts.
    new roads off their angle ([ADR 0040](adrs/0040-straight-joins.md)).
    Done when: a player can draw a square block and a T-junction exactly at 90° without
    zooming in, and can draw a free-angle road by holding Shift.
-2. **Continuous curves.** Each click adds a curved piece that leaves the previous piece
-   tangentially, so a long winding road is a chain of clicks. Freehand drag is not planned.
+2. **Continuous curves — implemented, browser check pending** ([ADR 0046](adrs/0046-continuous-curves.md)).
+   A separate mode starts with start, bend and end clicks; each later click adds a piece that
+   leaves the previous one tangentially. The sim derives the bend for preview and build, and
+   refuses an end behind the previous piece's outgoing direction. Existing build commands and
+   the save format stay unchanged; freehand drag is not planned. Automated tests cover smooth
+   joins, refused pieces, preview/build agreement and cancellation. Check the result in the
+   browser before moving to the next slice, including near-sideways ends: very tight turns may
+   fold the road ribbon despite matching tangents.
    Done when: a winding road of five pieces has no visible kinks.
 3. **Grid tool.** Pick a cell size (60, 80 or 100 m), drag the first edge to set the angle,
    then drag out the area in whole blocks. Each grid line is planned like a hand-drawn road:
@@ -285,7 +292,10 @@ browser before the next starts.
    shows exactly what will be built. **ADR** for the grid command.
    Done when: a grid dragged across the edge of a town connects into it with no slivers.
 4. **Upgrade.** Click a road or drag along connected roads to switch between street and main
-   road; alleys can become streets. Cars reroute rather than despawn.
+   road; alleys can become streets. Cars reroute rather than despawn. Dragging is
+   implemented: drawing a road over whole roads gives them its class, in place, for the
+   difference in build cost ([ADR 0048](adrs/0048-drawing-over-roads-changes-their-class.md));
+   clicking a single road is not.
 5. **Undo and redo** for road edits only, many steps, Ctrl+Z and Ctrl+Shift+Z. Undo removes the
    roads an edit added and rejoins roads it split, as a new edit with new IDs; buildings it
    cleared stay gone. History lives in the sim and is saved with the city
@@ -295,6 +305,59 @@ browser before the next starts.
 
 Done when: someone used to Cities: Skylines lays out a town's roads without fighting the tool.
 
+## M4.6 – A proper interface
+
+**Status: implemented.** All four slices are in place and the done-when checks pass, including
+a small town built in the browser with only the new interface. The item pictures add about
+60–280 ms at startup (shown in the debug panel).
+
+The interface was still a developer's: one row of about 25 text buttons, a block of monospace
+text that mixes player figures with frame timings and key help, and a save panel that never
+goes away. The roadmap adds roughly three times as many tools (grid, upgrade, undo, services,
+overlays, transit, councilors), so the screen needs a shape that holds them, and it should look
+like a game. It runs before M4.5's slices 3–5. Layout and style need no ADR
+([adrs/AGENTS.md](adrs/AGENTS.md)); the sim, protocol, saves and replays do not change.
+
+- **Layout.** A slim top bar shows the clock and speed, population, money, power and R/C/I
+  demand. Clicking a figure opens its details, and a figure turns red when something is wrong:
+  power short, the city in debt, a failed save. The bottom build menu has three levels:
+  categories in build order (Roads, Zones, Power; later Services, Transit, Councilors), picture
+  items (street and main road; six zone brushes and unzone; coal, solar, wind and power line)
+  and options (straight, curve, continuous, snaps, a one-line hint). Bulldoze and Views sit
+  apart on the right. Save, share, sound and the development command log move into a ☰ menu;
+  frame and tick timings, stuck cars and failed routes move into a debug panel opened with the
+  backtick key. With no tool selected, only the top bar and the category bar show.
+- **One list.** Categories, items, options, labels, keys, tooltips and picture models come from
+  a single list in the code, and the menu is built from it, so a new tool is one entry and one
+  model. The road, zone and power tools keep their canvas handling and sim commands; the menu
+  owns which button is selected.
+- **Look.** Dark frosted glass panels, a crisp sans-serif, blue for the selection and red only
+  for problems. Item pictures are drawn in the browser from the game's own models; category
+  icons come from small low-poly models in the same style (road piece, zone slabs, lightning
+  bolt, bulldozer, binoculars).
+- **Behaviour.** Every current key keeps its meaning. Views combine as today: one ground overlay
+  at a time (air, ground, noise, land value), with traffic colours and power markers separate.
+  Picking a power tool shows the power view until the tool is put away.
+- **Out of scope:** title screen, settings, notifications, statistics graphs, keybinding
+  editor, first-run hints, locked era items and citizen portraits.
+
+Slices, each checked in the browser against the approved look before the next starts:
+
+1. **Frame and look.** The style, the top bar with detail panels and warnings, the ☰ menu and
+   the debug panel. The old HUD text and city panel go; the old toolbar stays, restyled.
+2. **Build menu.** Categories, items with text labels, the options row and hint, Bulldoze,
+   Views, and the power view with power tools. The old toolbar goes.
+3. **Pictures.** Item pictures and category icons drawn from models.
+4. **Inspector card.** The citizen and building inspector as a card in the same style.
+
+Done when: every action in today's interface is reachable and every key works as before; with
+no tool selected only the top bar and category bar show, and developer numbers appear only in
+the debug panel; a test shows that one list entry adds a working item; power turns red when
+the town needs more than it has and its panel explains why, and money turns red in debt; item
+pictures come from the game's models; every control works from the keyboard and has an
+accessible name; `scripts/check.sh` passes; and a small town can be built in the browser using
+only the new interface.
+
 ## M5 – A game loop
 
 Goals and consequences, kept light so they don't crowd out building.
@@ -302,8 +365,10 @@ Goals and consequences, kept light so they don't crowd out building.
 - Money: build costs, taxes, upkeep (implemented, [ADR 0036](adrs/0036-money-build-costs-taxes-upkeep.md)).
   A fresh city starts on an empty map with $50,000. Roads cost money to build by length and
   class and refuse to build when the city cannot pay; the road tool quotes the cost. Every road
-  costs upkeep, and residents and filled jobs pay taxes, per clock hour. Upkeep can push the
-  balance into debt, which only stops new roads. The HUD shows balance, taxes and upkeep.
+  costs upkeep, and residents and filled jobs pay taxes, per clock hour. A flat $1,000 grant per
+  clock hour pays for early roads before taxes can. Upkeep beyond income can push the
+  balance into debt, which only stops new roads. The top bar shows the balance and net income;
+  its money panel shows taxes, grant and upkeep.
   Bulldozing, zoning and sim-built alleys are free. Tax rates are fixed for now.
 - **First slice: pollution and land value — implemented** ([ADR 0037](adrs/0037-pollution-and-land-value-steer-growth.md)).
   Industry, traffic and (since ADR 0044) coal plants make air pollution, ground pollution and

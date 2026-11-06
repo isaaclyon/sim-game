@@ -3,7 +3,7 @@
 // each cell by one kind, or by land value. Display only: the sim owns every number.
 import * as THREE from 'three';
 import { POLLUTION, POLLUTION_ALPHA } from './palette.ts';
-import type { PollutionView } from './view-buttons.ts';
+import type { PollutionView } from './ui/views.ts';
 
 const color = (hex: number) => new THREE.Color(hex);
 const KIND = {

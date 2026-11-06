@@ -29,7 +29,16 @@ fn curve_queries_use_distance_tangents_and_reverse_lanes() {
 fn preview_matches_built_curve_without_mutating_world() {
     let mut w = empty();
     let mut preview = Vec::new();
-    w.write_curve_preview(0.0, 0.0, 100.0, 100.0, 200.0, 0.0, &mut preview);
+    w.write_curve_preview(
+        0.0,
+        0.0,
+        100.0,
+        100.0,
+        200.0,
+        0.0,
+        RoadClass::Street,
+        &mut preview,
+    );
     assert_eq!(w.roads.road_count(), 0);
     assert!(preview.len() > 6);
     assert!(w.apply(curve()));

@@ -56,17 +56,32 @@ export function windows(
         if (f === 0 && door?.edge === i && Math.abs(s + w / 2 - door.at) < w / 2 + 0.8) continue;
         const [p, q] = [along(e, s, PROUD), along(e, s + w, PROUD)];
         if (top(p) < y1 + HEAD_ROOM || top(q) < y1 + HEAD_ROOM) continue;
-        // Stable variation in which windows are lit, independent of gameplay RNG.
-        if (Math.sin(p[0] * 12.9898 + p[1] * 78.233 + f * 37.7) > -0.25) mb.glow.set(0xffcf83);
-        mb.wall(p, q, y0, y1, glass, e.n);
-        mb.glow.set(0x000000);
+        pane(mb, p, q, y0, y1, glass, e.n, f);
         if (frame) surround(mb, e, s, s + w, y0, y1, frame, true);
       }
     }
   }
 }
 
-/** Ground-floor glazing along the front, with an awning on small shops. */
+/** One window pane from `p` to `q` on floor `f`; some panes light up at night. */
+export function pane(
+  mb: MeshBuilder,
+  p: Pt,
+  q: Pt,
+  y0: number,
+  y1: number,
+  glass: THREE.Color,
+  n: Pt,
+  f: number,
+) {
+  // Stable variation in which windows are lit, independent of gameplay RNG.
+  if (Math.sin(p[0] * 12.9898 + p[1] * 78.233 + f * 37.7) > -0.25) mb.glow.set(0xffcf83);
+  mb.wall(p, q, y0, y1, glass, n);
+  mb.glow.set(0x000000);
+}
+
+/** Ground-floor glazing along the front, with an awning on small shops; with `stripes`, the
+ * awning alternates with that colour every metre or so. */
 export function shopfront(
   mb: MeshBuilder,
   ring: Pt[],
@@ -74,6 +89,7 @@ export function shopfront(
   awning: THREE.Color | null,
   style: Style,
   entrance: number | null = null,
+  stripes: THREE.Color | null = null,
 ) {
   const e = edge(ring, front);
   if (e.L < 3) return;
@@ -98,14 +114,20 @@ export function shopfront(
   }
   mb.glow.set(0x000000);
   if (!awning) return;
-  const [a, b] = [along(e, 0.4, PROUD), along(e, e.L - 0.4, PROUD)];
-  const [c, d] = [along(e, e.L - 0.4, 1.7), along(e, 0.4, 1.7)];
-  mb.quad([a[0], 3.45, a[1]], [b[0], 3.45, b[1]], [c[0], 2.85, c[1]], [d[0], 2.85, d[1]], awning, [
-    e.n[0],
-    1,
-    e.n[1],
-  ]);
-  mb.wall(d, c, 2.5, 2.85, awning.clone().multiplyScalar(0.85), e.n);
+  const n = stripes ? Math.max(1, Math.round((e.L - 0.8) / 1.1)) : 1;
+  const w = (e.L - 0.8) / n;
+  for (let k = 0; k < n; k++) {
+    const col = stripes && k % 2 ? stripes : awning;
+    const [s0, s1] = [0.4 + k * w, 0.4 + (k + 1) * w];
+    const [a, b] = [along(e, s0, PROUD), along(e, s1, PROUD)];
+    const [c, d] = [along(e, s1, 1.7), along(e, s0, 1.7)];
+    mb.quad([a[0], 3.45, a[1]], [b[0], 3.45, b[1]], [c[0], 2.85, c[1]], [d[0], 2.85, d[1]], col, [
+      e.n[0],
+      1,
+      e.n[1],
+    ]);
+    mb.wall(d, c, 2.5, 2.85, col.clone().multiplyScalar(0.85), e.n);
+  }
 }
 
 /** A framed front door `m` metres along the front edge, up a step from the plinth. */
@@ -125,19 +147,20 @@ export function door(
   step(mb, e, m, plinth);
 }
 
-/** Large doors every 7 m along an industrial front. */
+/** Large doors every 7 m along an industrial front; several colours take turns. */
 export function loadingDoors(
   mb: MeshBuilder,
   ring: Pt[],
   front: number,
   h: number,
-  col: THREE.Color,
+  col: THREE.Color | THREE.Color[],
 ) {
   const e = edge(ring, front);
   const top = Math.min(4.6, h - 1.2);
+  const cols = Array.isArray(col) ? col : [col];
   for (let k = 0; k < Math.floor((e.L - 4) / 7); k++) {
     const s = 3 + k * 7;
-    mb.wall(along(e, s, PROUD), along(e, s + 4, PROUD), 0, top, col, e.n);
+    mb.wall(along(e, s, PROUD), along(e, s + 4, PROUD), 0, top, cols[k % cols.length], e.n);
   }
 }
 

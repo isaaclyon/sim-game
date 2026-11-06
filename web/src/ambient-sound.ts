@@ -82,7 +82,7 @@ export class AmbientSound {
   }
 
   private drawButton() {
-    this.button.textContent = `sound ${this.on ? 'on' : 'off'} (N)`;
+    this.button.textContent = `Sound ${this.on ? 'on' : 'off'}`;
     this.button.setAttribute('aria-pressed', String(this.on));
   }
 

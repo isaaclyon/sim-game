@@ -35,7 +35,7 @@ use crate::zone::{Zone, ZoneGrid};
 
 pub use demand::Demand;
 pub use inspect::{BuildingInfo, CitizenInfo, Place};
-pub use money::{JOB_TAX, Money, RESIDENT_TAX, START_FUNDS};
+pub use money::{GRANT, JOB_TAX, Money, RESIDENT_TAX, START_FUNDS};
 pub use persist::{SAVE_VERSION, SaveError};
 pub use power::{PLANT_STRIDE, POWER_BUILDING_STRIDE, PowerStats};
 
@@ -87,7 +87,7 @@ pub enum Command {
     SpawnAgents {
         count: u32,
     },
-    /// Builds a road of `class`. Where it follows an existing road, that road keeps its class.
+    /// Builds a road of `class`. Roads it follows take that class (ADR 0048).
     BuildRoad {
         ax: f32,
         ay: f32,
@@ -157,7 +157,7 @@ pub struct Stats {
     pub demand: Demand,
     /// Supply and use of power (ADR 0041).
     pub power: PowerStats,
-    /// Balance, taxes and upkeep (ADR 0036).
+    /// Balance, taxes, grant and upkeep (ADR 0036).
     pub money: Money,
     /// Synthetic vehicles waiting between random trips; dormant citizen slots are excluded.
     pub parked: u32,

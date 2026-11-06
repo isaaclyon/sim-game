@@ -1,7 +1,7 @@
 //! Construction planning shared by previews and commands. Planning never mutates the graph.
 
 use crate::geometry::{Point, Shape, dist, lerp, project};
-use crate::road::{NodeId, RoadId, RoadNetwork};
+use crate::road::{NodeId, RoadClass, RoadId, RoadNetwork};
 
 /// Clicks near a node or road join it. Splits near an end join that end instead.
 pub const SNAP_RADIUS: f32 = 15.0;
@@ -28,6 +28,9 @@ pub struct Stop {
 pub(crate) struct Plan {
     pub stops: Vec<Stop>,
     pub legs: Vec<Shape>,
+    /// Followed roads whose class differs from the one being drawn; building changes them to
+    /// it (ADR 0048).
+    pub reclass: Vec<RoadId>,
 }
 
 /// Stops of a straight road, or None if it overlaps, loops, crosses one road twice,
@@ -40,11 +43,14 @@ pub fn plan_road(net: &RoadNetwork, ax: f32, ay: f32, bx: f32, by: f32) -> Optio
             b: (bx, by),
             control: None,
         },
+        None,
     )
     .map(|p| p.stops)
 }
 
-pub(crate) fn plan(net: &RoadNetwork, mut shape: Shape) -> Option<Plan> {
+/// Plans `shape`. With `class`, followed roads of another class are listed for a class change
+/// (ADR 0048) and count as something added; without, they are kept as they are.
+pub(crate) fn plan(net: &RoadNetwork, mut shape: Shape, class: Option<RoadClass>) -> Option<Plan> {
     if !shape.valid() {
         return None;
     }
@@ -95,12 +101,33 @@ pub(crate) fn plan(net: &RoadNetwork, mut shape: Shape) -> Option<Plan> {
     }) {
         stops.remove(i);
     }
+    // A straight line can run along a road without crossing it. Its ends become stops, so the
+    // line follows that road (ADR 0048) instead of being refused for overlapping it. Added
+    // after the pass above, so a line starting part-way along a road is still refused.
+    if shape.control.is_none() {
+        for road in net.active_roads() {
+            if !overlaps(shape, net.shape(road)) {
+                continue;
+            }
+            let (ra, rb) = net.road_ends(road);
+            for n in [ra, rb] {
+                let at = (net.node_x[n as usize], net.node_y[n as usize]);
+                let t = shape.nearest(at);
+                if t > 0.0 && t < 1.0 && dist(shape.point(t), at) < OVERLAP_DIST {
+                    stops.push((t, node_stop(net, n)));
+                }
+            }
+        }
+        stops.sort_by(|s, t| s.0.total_cmp(&t.0));
+        stops.dedup_by(|s, t| s.1.join == t.1.join && matches!(s.1.join, Join::Node(_)));
+    }
     for (i, s) in stops.iter().enumerate() {
         if s.1.join != Join::New && stops[..i].iter().any(|t| t.1.join == s.1.join) {
             return None;
         }
     }
     let mut legs = Vec::new();
+    let mut reclass = Vec::new();
     let mut new_legs = 0;
     for pair in stops.windows(2) {
         // After splitting, these stops would already share a road. The graph cannot add a
@@ -127,6 +154,9 @@ pub(crate) fn plan(net: &RoadNetwork, mut shape: Shape) -> Option<Plan> {
                 .flat_map(|r| [r * 2, r * 2 + 1])
                 .find(|&l| net.lane_from[l as usize] == m && net.lane_to[l as usize] == n)?;
             leg = net.shape(lane / 2);
+            if class.is_some_and(|c| c != net.road_class(lane / 2)) {
+                reclass.push(lane / 2);
+            }
             if !lane.is_multiple_of(2) {
                 std::mem::swap(&mut leg.a, &mut leg.b);
             }
@@ -141,9 +171,10 @@ pub(crate) fn plan(net: &RoadNetwork, mut shape: Shape) -> Option<Plan> {
         }
         legs.push(leg);
     }
-    (new_legs > 0).then(|| Plan {
+    (new_legs > 0 || !reclass.is_empty()).then(|| Plan {
         stops: stops.into_iter().map(|s| s.1).collect(),
         legs,
+        reclass,
     })
 }
 
@@ -216,12 +247,13 @@ fn node_stop(net: &RoadNetwork, n: NodeId) -> Stop {
 }
 
 fn overlaps_any(net: &RoadNetwork, shape: Shape) -> bool {
-    net.active_roads().any(|road| {
-        let other = net.shape(road);
-        shape
-            .segments()
-            .any(|(_, p, _, q)| other.segments().any(|(_, r0, _, r1)| overlap(p, q, r0, r1)))
-    })
+    net.active_roads()
+        .any(|road| overlaps(shape, net.shape(road)))
+}
+fn overlaps(shape: Shape, other: Shape) -> bool {
+    shape
+        .segments()
+        .any(|(_, p, _, q)| other.segments().any(|(_, r0, _, r1)| overlap(p, q, r0, r1)))
 }
 fn overlap(p: Point, q: Point, r0: Point, r1: Point) -> bool {
     let len = dist(p, q).max(1e-3);

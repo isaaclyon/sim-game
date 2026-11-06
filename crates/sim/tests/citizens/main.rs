@@ -78,7 +78,8 @@ fn road_demolition_reconciles_population_and_every_normal_car_has_an_owner() {
         y: 170.0,
         zone: Zone::CommercialLow,
     });
-    advance(&mut w, 180);
+    // Wait through the 07:00–09:00 departures, not just the move-in delay.
+    advance(&mut w, 600);
     assert!(w.stats().population > 0);
     assert!(!w.agents.is_empty());
     let roads: Vec<_> = w.roads.active_roads().collect();

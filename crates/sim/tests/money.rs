@@ -1,7 +1,8 @@
 //! Money (ADR 0036): roads cost money to build and keep, residents and filled jobs pay taxes,
-//! and a road the city cannot afford is refused.
+//! a flat grant arrives every hour whatever the city's size, and a road the city cannot afford
+//! is refused.
 use sim::road::RoadClass;
-use sim::world::{JOB_TAX, Money, RESIDENT_TAX, START_FUNDS};
+use sim::world::{GRANT, JOB_TAX, Money, RESIDENT_TAX, START_FUNDS};
 use sim::{Command, Config, World, Zone};
 
 /// Ticks in one clock hour at the default `dt` (`sim::clock`: 18 clock seconds per sim second).
@@ -38,9 +39,19 @@ fn a_fresh_city_is_an_empty_map_with_starting_funds() {
         Money {
             balance: START_FUNDS,
             taxes: 0,
+            grant: GRANT,
             upkeep: 0
         }
     );
+}
+
+#[test]
+fn the_grant_arrives_every_clock_hour_before_anything_is_built() {
+    let mut w = World::empty(Config::default(), 20, 20);
+    advance(&mut w, HOUR / 2);
+    assert_eq!(money(&w).balance, START_FUNDS + GRANT / 2);
+    advance(&mut w, HOUR / 2);
+    assert_eq!(money(&w).balance, START_FUNDS + GRANT);
 }
 
 #[test]
@@ -84,7 +95,7 @@ fn a_road_the_city_cannot_afford_is_refused_and_changes_nothing() {
 }
 
 #[test]
-fn upkeep_is_charged_each_clock_hour_and_can_run_into_debt() {
+fn upkeep_is_charged_each_clock_hour() {
     let mut w = World::empty(Config::default(), 60, 60);
     assert!(road(&mut w, 0.0, 0.0, 1000.0, 0.0, RoadClass::Street));
     assert_eq!(
@@ -93,22 +104,25 @@ fn upkeep_is_charged_each_clock_hour_and_can_run_into_debt() {
         "streets cost 0.10 per metre per hour"
     );
     advance(&mut w, HOUR);
-    assert_eq!(money(&w).balance, START_FUNDS - 10_000 - 100);
+    assert_eq!(money(&w).balance, START_FUNDS - 10_000 - 100 + GRANT);
+}
 
-    // Spend almost everything on main roads, then let upkeep push the balance below zero.
-    for y in [200.0, 400.0, 600.0] {
-        assert!(road(&mut w, 0.0, y, 500.0, y, RoadClass::Main));
-    }
-    let left = money(&w).balance;
-    assert_eq!(left, START_FUNDS - 10_000 - 100 - 37_500);
-    let per_hour = money(&w).upkeep;
-    assert_eq!(per_hour, 100 + 375);
-    let hours = (left / per_hour + 1) as u32;
+#[test]
+fn upkeep_beyond_the_grant_runs_into_debt_and_stops_new_roads() {
+    // A generated grid carries far more road than the grant pays for.
+    let mut w = World::generate(Config::default(), 20, 20);
+    let m = money(&w);
+    assert_eq!(m.balance, START_FUNDS);
+    let per_hour = m.upkeep - GRANT;
+    assert!(per_hour > 0, "upkeep must outrun the grant: {m:?}");
+    let hours = (m.balance / per_hour + 1) as u32;
     advance(&mut w, hours * HOUR);
     let m = money(&w);
-    assert_eq!(m.balance, left - hours as i64 * per_hour);
+    assert_eq!(m.balance, START_FUNDS - hours as i64 * per_hour);
     assert!(m.balance < 0, "upkeep keeps charging in debt: {m:?}");
-    assert!(!road(&mut w, 0.0, 800.0, 20.0, 800.0, RoadClass::Street));
+    let (ax, ay, bx, by) = (40.0, 40.0, 80.0, 80.0);
+    assert!(w.road_cost(ax, ay, bx, by, RoadClass::Street).is_some());
+    assert!(!road(&mut w, ax, ay, bx, by, RoadClass::Street));
 }
 
 #[test]
@@ -118,9 +132,9 @@ fn upkeep_accrues_by_the_minute_without_losing_fractions() {
     let start = money(&w).balance;
     assert_eq!(money(&w).upkeep, 30);
     advance(&mut w, HOUR / 2);
-    assert_eq!(money(&w).balance, start - 15);
+    assert_eq!(money(&w).balance, start + (GRANT - 30) / 2);
     advance(&mut w, HOUR / 2);
-    assert_eq!(money(&w).balance, start - 30);
+    assert_eq!(money(&w).balance, start + GRANT - 30);
 }
 
 #[test]

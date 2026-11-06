@@ -13,6 +13,8 @@ use crate::zone::ZONE_CELL;
 pub const ANGLE: u8 = 1;
 pub const GUIDES: u8 = 2;
 pub const LENGTH: u8 = 4;
+/// Continue a curve using the previous control point in the third raw point.
+pub const CONTINUE: u8 = 8;
 pub const ALL: u8 = ANGLE | GUIDES | LENGTH;
 
 /// Road ends further than this from the cursor offer no guide lines, metres.
@@ -39,7 +41,7 @@ const TOLERANCE: [f32; 3] = [0.139, 0.087, 0.052];
 /// The guided points of a road being drawn, and what guided the last one.
 #[derive(Clone, Debug, Default)]
 pub struct Draft {
-    /// One per input point, in order.
+    /// Guided points in order; continuation replaces its source control with a new control.
     pub points: Vec<(f32, f32)>,
     /// `[x0, y0, x1, y1]` per guide line used for the last point, from its origin to the point.
     pub lines: Vec<[f32; 4]>,
@@ -68,14 +70,66 @@ struct Line {
 }
 
 /// Guides `[x, y, snap]` points in drawing order: start, then a curve's control, then the end.
-/// Each point is guided from the guided points before it.
+/// Each point is guided from the guided points before it. With `CONTINUE` on the first
+/// point, the three inputs are start, end and previous control. The result is start, new
+/// control and end, or no points if the source direction or projection is invalid.
 pub fn draft(net: &RoadNetwork, raw: &[(f32, f32, u8)]) -> Draft {
+    let continuation = raw.first().is_some_and(|p| p.2 & CONTINUE != 0);
+    if continuation && raw.len() != 3 {
+        return Draft::default();
+    }
     let mut points = Vec::with_capacity(raw.len());
     let mut lines = Vec::new();
-    for &(x, y, snap) in raw {
+    let guided = if continuation { &raw[..2] } else { raw };
+    for &(x, y, snap) in guided {
         let (p, l) = guide(net, &points, (x, y), snap);
         points.push(p);
         lines = l;
+    }
+    if continuation {
+        // The planner snaps endpoints again, including guide crossings onto curved roads.
+        let stop = snap::snap_end(net, points[1].0, points[1].1);
+        let end = (stop.x, stop.y);
+        if end != points[1] {
+            points[1] = end;
+            lines.clear();
+        }
+        let start = points[0];
+        let previous = (raw[2].0, raw[2].1);
+        let direction = (start.0 - previous.0, start.1 - previous.1);
+        let length = direction.0.hypot(direction.1);
+        if !length.is_finite() || length < 1e-6 {
+            return Draft::default();
+        }
+        let t = (direction.0 / length, direction.1 / length);
+        let matches = net.active_roads().any(|road| {
+            let shape = net.shape(road);
+            let incoming = if shape.b == start {
+                shape.tangent(1.0)
+            } else if shape.a == start {
+                let t = shape.tangent(0.0);
+                (-t.0, -t.1)
+            } else {
+                return false;
+            };
+            let len = incoming.0.hypot(incoming.1);
+            if !len.is_finite() || len < 1e-6 {
+                return false;
+            }
+            let incoming = (incoming.0 / len, incoming.1 / len);
+            dot(t, incoming) > 0.0 && cross(t, incoming).abs() < 1e-4
+        });
+        let projection = dot((end.0 - start.0, end.1 - start.1), t);
+        if !matches || !projection.is_finite() || projection <= 0.0 {
+            return Draft::default();
+        }
+        points.insert(
+            1,
+            (
+                start.0 + t.0 * projection * 0.5,
+                start.1 + t.1 * projection * 0.5,
+            ),
+        );
     }
     let length = match points[..] {
         [a, b] => dist(a, b),

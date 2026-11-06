@@ -47,7 +47,16 @@ fn curves_cross_each_other_and_preview_marks_only_real_junctions() {
     let mut w = empty();
     assert!(w.apply(curve()));
     let mut preview = Vec::new();
-    w.write_curve_preview(100.0, -100.0, 200.0, 0.0, 100.0, 100.0, &mut preview);
+    w.write_curve_preview(
+        100.0,
+        -100.0,
+        200.0,
+        0.0,
+        100.0,
+        100.0,
+        RoadClass::Street,
+        &mut preview,
+    );
     assert!(!preview.is_empty());
     assert_eq!(
         preview

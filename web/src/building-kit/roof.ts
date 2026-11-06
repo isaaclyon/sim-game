@@ -13,7 +13,19 @@ interface Plane {
   base: number;
 }
 
-export type RoofForm = 'flat' | 'gable' | 'hip' | 'barrel' | 'shed';
+export type RoofForm =
+  | 'flat'
+  | 'gable'
+  | 'hip'
+  | 'barrel'
+  | 'shed'
+  | 'saltbox'
+  | 'gambrel'
+  | 'mansard'
+  | 'jerkinhead'
+  | 'arch';
+
+const tan = (deg: number) => Math.tan((deg * Math.PI) / 180);
 
 const height = (pl: Plane, p: Pt) =>
   pl.base + pl.slope * (pl.reach - ((p[0] - pl.c[0]) * pl.n[0] + (p[1] - pl.c[1]) * pl.n[1]));
@@ -21,7 +33,7 @@ const height = (pl: Plane, p: Pt) =>
 export type Roof = (p: Pt) => number;
 
 export function roofPlanes(form: RoofForm, box: Box, eave: number, pitchDeg = 0): Plane[] {
-  const s = Math.tan((pitchDeg * Math.PI) / 180);
+  const s = tan(pitchDeg);
   const { u, v, L, W, c } = box;
   const plane = (n: Pt, reach: number, slope = s, base = eave): Plane => ({
     n,
@@ -31,6 +43,7 @@ export function roofPlanes(form: RoofForm, box: Box, eave: number, pitchDeg = 0)
     base,
   });
   const back: Pt = [-v[0], -v[1]];
+  const end: Pt = [-u[0], -u[1]];
   switch (form) {
     case 'flat':
       return [plane(u, 0, 0)];
@@ -39,13 +52,41 @@ export function roofPlanes(form: RoofForm, box: Box, eave: number, pitchDeg = 0)
     case 'gable':
       return [plane(v, W), plane(back, W)];
     case 'hip':
-      return [plane(v, W), plane(back, W), plane(u, L), plane([-u[0], -u[1]], L)];
-    case 'barrel': {
-      // Three tangent planes per side approximate a shallow curve.
-      const rise = Math.min(3.2, W * 0.22);
+      return [plane(v, W), plane(back, W), plane(u, L), plane(end, L)];
+    case 'saltbox':
+      // A short steep slope toward +v and a long shallow one behind; the ridge sits 40% of
+      // the half depth toward +v.
+      return [plane(v, W), plane(back, W, (s * 0.6) / 1.4)];
+    case 'gambrel':
+    case 'mansard': {
+      // Each side: a steep lower plane, then the shallow `pitchDeg` one from where it stops.
+      const [steep, m] =
+        form === 'gambrel' ? [tan(62), W * 0.42] : [tan(72), Math.min(1.6, W * 0.35)];
+      const sides: [Pt, number][] = [
+        [v, W],
+        [back, W],
+      ];
+      if (form === 'mansard') sides.push([u, L], [end, L]);
+      return sides.flatMap(([n, r]) => [plane(n, r, steep), plane(n, r - m, s, eave + steep * m)]);
+    }
+    case 'jerkinhead': {
+      // A gable whose ends are clipped near the ridge by small steep hips.
+      const clipped = eave + s * W * 0.6;
+      return [
+        plane(v, W),
+        plane(back, W),
+        plane(u, L, tan(60), clipped),
+        plane(end, L, tan(60), clipped),
+      ];
+    }
+    case 'barrel':
+    case 'arch': {
+      // Tangent planes per side approximate a curve: a shallow barrel or a tall arched hut.
+      const rise = form === 'barrel' ? Math.min(3.2, W * 0.22) : Math.min(W * 0.8, 8);
       const k = rise / (W * W);
+      const at = form === 'barrel' ? [0.18, 0.5, 0.82] : [0.12, 0.35, 0.58, 0.8, 0.95];
       return [v, back].flatMap((n) =>
-        [0.18, 0.5, 0.82].map((f) => {
+        at.map((f) => {
           const d = f * W;
           return { n, c, reach: d, slope: 2 * k * d, base: eave + k * (W * W - d * d) };
         }),

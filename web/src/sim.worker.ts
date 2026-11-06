@@ -175,6 +175,7 @@ function readStats(s: Sim): Stats {
     despawnedByEdit: st.despawned_by_edit,
     balance: st.balance,
     taxes: st.taxes,
+    grant: st.grant,
     upkeep: st.upkeep,
   };
   st.free();
@@ -315,6 +316,13 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
       if (cities.ready && sim?.spawn_agents(msg.count)) cities.changed();
       break;
     case 'buildRoad': {
+      // Capture the sim-guided control before the build changes the network.
+      const draft =
+        msg.chain && sim && cities.ready
+          ? sim.road_draft(new Float32Array(msg.points), false, msg.class)
+          : null;
+      const control: [number, number] | undefined =
+        draft?.[0] === 3 ? [draft[7], draft[8]] : undefined;
       const built =
         sim && cities.ready ? sim.build_draft(new Float32Array(msg.points), msg.class) : null;
       const end: [number, number] | null = built?.length === 2 ? [built[0], built[1]] : null;
@@ -322,7 +330,13 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
         cities.changed();
         sendEdits(sim);
       }
-      post({ type: 'buildResult', id: msg.id, success: end !== null, end });
+      post({
+        type: 'buildResult',
+        id: msg.id,
+        success: end !== null,
+        end,
+        ...(end && control ? { control } : {}),
+      });
       break;
     }
     case 'deleteRoad':
@@ -382,7 +396,8 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
     case 'previewRoad': {
       // `[n, m, length, angle, k]`, guided points, guide lines, angle marks, then stops
       // (ADR 0038).
-      const d = sim?.road_draft(new Float32Array(msg.points), msg.plan) ?? new Float32Array(5);
+      const d =
+        sim?.road_draft(new Float32Array(msg.points), msg.plan, msg.class) ?? new Float32Array(5);
       const [n, m, length, angle, k] = d;
       const at = 5 + 2 * n;
       const points = d.slice(5, at);

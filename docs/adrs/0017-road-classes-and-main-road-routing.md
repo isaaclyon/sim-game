@@ -1,6 +1,6 @@
 # 0017. Road classes and main-road routing
 
-- Status: Accepted
+- Status: Accepted; class kept by followed roads superseded by [0048](0048-drawing-over-roads-changes-their-class.md)
 - Date: 2026-11-02
 
 ## Context

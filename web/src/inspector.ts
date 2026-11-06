@@ -1,61 +1,95 @@
-// Citizen and building inspector: one selected subject, with sim-owned live counts and facts.
+// Citizen and building inspector: one selected subject, with sim-owned live counts and facts,
+// shown as a card with a title and one small icon per line (M4.6).
 
 import type { Building, Citizen, Place, ToWorker } from './protocol';
+import { type IconName, iconSvg } from './ui/icons';
 
 /** Words for a building by its original use, indexed by `Zone`. */
 const BUILDING_WORDS = ['building', 'house', 'apartments', 'shop', 'store', 'factory', 'factory'];
 const label = (p: Place) => `${BUILDING_WORDS[p.zone] ?? 'building'} #${p.building}`;
+const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-/** The panel's text for `c`: name, then home, job and what they are doing now. */
-export function describe(c: Citizen): string {
-  if (!c.resident) return `${c.name}\nnow    left town`;
+export interface CardLine {
+  icon: IconName;
+  text: string;
+}
+/** What the inspector card shows: a title, then one line per fact. */
+export interface Card {
+  title: string;
+  lines: CardLine[];
+}
+
+/** The card for `c`: name, then home, job and what they are doing now. */
+export function describe(c: Citizen): Card {
+  if (!c.resident) return { title: c.name, lines: [{ icon: 'leave', text: 'Left town' }] };
   const there = (p: Place | null) => (p ? ` at ${label(p)}` : '');
   // Indexed by `Activity`: home, work, shop.
   const trip = ['home', `to work${there(c.destination)}`, `to shop${there(c.destination)}`];
-  const stay = [
-    'at home',
-    `at work${c.location ? `, ${label(c.location)}` : ''}`,
-    `shopping${there(c.location)}`,
+  const stay: CardLine[] = [
+    { icon: 'home', text: 'At home' },
+    { icon: 'work', text: `At work${c.location ? `, ${label(c.location)}` : ''}` },
+    { icon: 'shop', text: `Shopping${there(c.location)}` },
   ];
-  const now = !c.destination
+  const how: [IconName, string] = c.onFoot
+    ? ['walk', 'Walking']
+    : c.driving
+      ? ['car', 'Driving']
+      : ['clock', 'Waiting to drive'];
+  const now: CardLine = !c.destination
     ? stay[c.activity]
-    : `${c.onFoot ? 'walking' : c.driving ? 'driving' : 'waiting to drive'} ${trip[c.activity]}`;
-  return [
-    c.name,
-    `home   ${c.home ? label(c.home) : 'none'}`,
-    `job    ${c.job ? label(c.job) : 'unemployed'}`,
-    `now    ${now}`,
-  ].join('\n');
+    : { icon: how[0], text: `${how[1]} ${trip[c.activity]}` };
+  return {
+    title: c.name,
+    lines: [
+      { icon: 'home', text: `Home: ${c.home ? label(c.home) : 'none'}` },
+      { icon: 'work', text: c.job ? `Job: ${label(c.job)}` : 'Job: unemployed' },
+      now,
+    ],
+  };
 }
 
 /** Counts describe residency or assigned jobs, never physical attendance. */
-export function describeBuilding(b: Building): string {
+export function describeBuilding(b: Building): Card {
   const residential = b.zone === 1 || b.zone === 2;
-  return [
-    label(b),
-    `${b.zone % 2 ? 'low' : 'high'} density${b.closing ? ' · closing' : ''}`,
-    ...(residential
-      ? [`resident capacity   ${b.capacity}`, `residents           ${b.occupied}`]
-      : [
-          `total jobs      ${b.capacity}`,
-          `filled jobs     ${b.occupied}`,
-          `unfilled jobs   ${b.capacity - b.occupied}`,
-        ]),
-    ...(b.closing ? ['Not accepting new residents or workers.'] : []),
-  ].join('\n');
+  return {
+    title: capital(label(b)),
+    lines: [
+      { icon: 'layers', text: `${b.zone % 2 ? 'Low' : 'High'} density` },
+      ...(b.closing
+        ? [{ icon: 'warning', text: 'Closing: not accepting new residents or workers' } as const]
+        : []),
+      ...(residential
+        ? ([
+            { icon: 'building', text: `Resident capacity: ${b.capacity}` },
+            { icon: 'people', text: `Residents: ${b.occupied}` },
+          ] as const)
+        : ([
+            { icon: 'work', text: `Total jobs: ${b.capacity}` },
+            { icon: 'people', text: `Filled jobs: ${b.occupied}` },
+            { icon: 'open', text: `Unfilled jobs: ${b.capacity - b.occupied}` },
+          ] as const)),
+    ],
+  };
 }
 
-interface Panel {
-  hidden: boolean | string;
-}
-interface Text {
-  textContent: string | null;
-}
+/** The card as plain text, one fact per line; what a screen reader reads. */
+export const cardText = (card: Card) => [card.title, ...card.lines.map((l) => l.text)].join('\n');
+
 interface Button {
   hidden: boolean | string;
   disabled: boolean;
   setAttribute(key: string, value: string): void;
   onclick: ((event: never) => unknown) | null;
+}
+
+/** The card's parts in index.html. */
+export interface CardElements {
+  panel: HTMLElement;
+  title: HTMLElement;
+  /** A list; each fact becomes one item with its icon. */
+  lines: HTMLElement;
+  follow: Button;
+  close: Button;
 }
 
 /** Hooks into the renderer the inspector needs: highlight, follow and zoom target. */
@@ -74,29 +108,20 @@ export class Inspector {
   private citizen: Citizen | null = null;
   private building: number | null = null;
   private following = false;
+  /** The card's text as last drawn, so an unchanged reply touches nothing. */
+  private drawn = '';
 
   private readonly send: (msg: ToWorker) => void;
   private readonly view: InspectorView;
-  private readonly panel: Panel;
-  private readonly text: Text;
-  private readonly followButton: Button;
+  private readonly el: CardElements;
 
-  constructor(
-    send: (msg: ToWorker) => void,
-    view: InspectorView,
-    panel: Panel,
-    text: Text,
-    followButton: Button,
-    close: Button,
-  ) {
+  constructor(send: (msg: ToWorker) => void, view: InspectorView, el: CardElements) {
     this.send = send;
     this.view = view;
-    this.panel = panel;
-    this.text = text;
-    this.followButton = followButton;
-    panel.hidden = true;
-    followButton.onclick = () => this.toggleFollow();
-    close.onclick = () => this.select(null);
+    this.el = el;
+    el.panel.hidden = true;
+    el.follow.onclick = () => this.toggleFollow();
+    el.close.onclick = () => this.select(null);
   }
 
   /** The car to highlight, or null. */
@@ -113,15 +138,15 @@ export class Inspector {
     if (agent === this.agent && this.building === null) return;
     this.selection++;
     this.building = null;
-    this.followButton.hidden = false;
+    this.el.follow.hidden = false;
     this.agent = agent;
     this.citizen = null;
     this.setFollow(false);
-    this.panel.hidden = true;
+    this.hide();
     this.send({ type: 'inspect', agent, selection: this.selection });
   }
 
-  /** Selects a stable building ID. Citizen and building inspection share one panel. */
+  /** Selects a stable building ID. Citizen and building inspection share one card. */
   selectBuilding(building: number) {
     if (building === this.building) return;
     this.selection++;
@@ -129,17 +154,15 @@ export class Inspector {
     this.agent = null;
     this.citizen = null;
     this.setFollow(false);
-    this.followButton.hidden = true;
-    this.panel.hidden = true;
+    this.el.follow.hidden = true;
+    this.hide();
     this.send({ type: 'inspectBuilding', building, selection: this.selection });
   }
 
   receiveBuilding(selection: number, building: Building | null) {
     if (selection !== this.selection || this.building === null) return;
     if (!building) return this.select(null);
-    const text = describeBuilding(building);
-    if (this.text.textContent !== text) this.text.textContent = text;
-    this.panel.hidden = false;
+    this.draw(describeBuilding(building));
   }
 
   /** A `citizen` reply from the worker. */
@@ -149,15 +172,13 @@ export class Inspector {
       this.agent = null;
       this.citizen = null;
       this.setFollow(false);
-      this.panel.hidden = true;
+      this.hide();
       return;
     }
     this.citizen = citizen;
     if (!citizen.resident) this.setFollow(false);
-    const text = describe(citizen);
-    if (this.text.textContent !== text) this.text.textContent = text;
-    this.followButton.disabled = !citizen.resident;
-    this.panel.hidden = false;
+    this.el.follow.disabled = !citizen.resident;
+    this.draw(describe(citizen));
   }
 
   toggleFollow() {
@@ -168,11 +189,45 @@ export class Inspector {
     if (on === this.following) return;
     this.following = on;
     this.view.setFollowing(on);
-    this.followButton.setAttribute('aria-pressed', String(on));
+    this.el.follow.setAttribute('aria-pressed', String(on));
   }
 
   /** Moves the camera with the followed car; it holds still while the car is hidden. */
   update(seconds: number) {
     if (this.following && this.agent !== null) this.view.follow(this.agent, seconds);
+  }
+
+  /** Hides and empties the card, so the next subject's card is read in full. */
+  private hide() {
+    this.el.panel.hidden = true;
+    this.el.title.textContent = '';
+    this.el.lines.replaceChildren();
+    this.drawn = '';
+  }
+
+  private draw(card: Card) {
+    this.el.panel.hidden = false;
+    const text = cardText(card);
+    if (text === this.drawn) return;
+    this.drawn = text;
+    // Only what changed is rewritten, so a screen reader announces just that.
+    if (this.el.title.textContent !== card.title) this.el.title.textContent = card.title;
+    const list = this.el.lines;
+    card.lines.forEach((line, i) => {
+      let li = list.children[i] as HTMLElement | undefined;
+      if (!li) {
+        li = document.createElement('li');
+        list.append(li);
+      }
+      let span = li.querySelector('span');
+      if (!span || li.dataset.icon !== line.icon) {
+        span ??= document.createElement('span');
+        li.dataset.icon = line.icon;
+        li.innerHTML = iconSvg(line.icon);
+        li.append(span);
+      }
+      if (span.textContent !== line.text) span.textContent = line.text;
+    });
+    while (list.children.length > card.lines.length) list.children[card.lines.length].remove();
   }
 }

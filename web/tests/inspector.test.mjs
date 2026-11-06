@@ -26,7 +26,7 @@ function pickCar(t, agent, citizen = { ...resident, agent }) {
   t.reply({ type: 'citizen', selection: ask.selection, citizen });
   return ask;
 }
-const panel = (t) => t.elements['inspector-text'].textContent;
+const panel = (t) => t.card();
 const showCars = (t) =>
   t.reply({
     type: 'frame',
@@ -43,6 +43,7 @@ const showCars = (t) =>
       power: { supply: 0, starter: 150, used: 0, demand: 0, unpowered: 0, waiting: 0 },
       balance: 100_000,
       taxes: 0,
+      grant: 0,
       upkeep: 0,
       driving: 0,
       parked: 0,
@@ -65,10 +66,15 @@ test('clicking a car in idle mode shows its resident from the sim', async () => 
   const ask = pickCar(t, 3);
   assert.equal(ask.agent, 3);
   assert.equal(t.elements.inspector.hidden, false);
-  assert.match(panel(t), /Ada Moreno/);
-  assert.match(panel(t), /home +house #4/);
-  assert.match(panel(t), /job +factory #40/);
-  assert.match(panel(t), /now +driving to work at factory #40/);
+  assert.match(panel(t), /^Ada Moreno$/m);
+  assert.equal(
+    t.elements.inspector.getAttribute('aria-labelledby'),
+    'inspector-title',
+    'screen readers name the card by its title',
+  );
+  assert.match(panel(t), /^Home: house #4$/m);
+  assert.match(panel(t), /^Job: factory #40$/m);
+  assert.match(panel(t), /^Driving to work at factory #40$/m);
   showCars(t);
   step(t);
   assert.equal(t.cars.drawnSelected.at(-1), 3, 'the selected car is highlighted');
@@ -81,17 +87,14 @@ test('the panel tells the truth about each state', async () => {
     t.reply({ type: 'citizen', selection: ask.selection, citizen: { ...resident, ...changes } });
     return panel(t);
   };
-  assert.match(show({ job: null }), /job +unemployed/);
-  assert.match(show({ driving: false, onFoot: true }), /now +walking to work at factory #40/);
+  assert.match(show({ job: null }), /^Job: unemployed$/m);
+  assert.match(show({ driving: false, onFoot: true }), /^Walking to work at factory #40$/m);
   assert.match(
     show({ driving: false }),
-    /now +waiting to drive to work at factory #40/,
+    /^Waiting to drive to work at factory #40$/m,
     'a trip that has not reached the road yet',
   );
-  assert.match(
-    show({ driving: false, destination: null, activity: Activity.Home }),
-    /now +at home/,
-  );
+  assert.match(show({ driving: false, destination: null, activity: Activity.Home }), /^At home$/m);
   assert.match(
     show({
       driving: false,
@@ -99,7 +102,7 @@ test('the panel tells the truth about each state', async () => {
       activity: Activity.Shop,
       location: { building: 9, zone: Zone.CommercialHigh },
     }),
-    /now +shopping at store #9/,
+    /^Shopping at store #9$/m,
   );
   const gone = show({
     resident: false,
@@ -111,27 +114,33 @@ test('the panel tells the truth about each state', async () => {
     driving: false,
   });
   assert.match(gone, /Ada Moreno/);
-  assert.match(gone, /left town/);
+  assert.match(gone, /^Left town$/m);
   assert.doesNotMatch(gone, /house|factory/, 'no stale places after leaving');
   assert.equal(t.elements.follow.disabled, true, 'nobody to follow');
 });
 
-test('unchanged details do not rewrite the panel', async () => {
+test('a live update rewrites only what changed, inside the region screen readers announce', async () => {
   const t = await tools();
   const ask = pickCar(t, 3);
-  let writes = 0;
-  const el = t.elements['inspector-text'];
-  let text = el.textContent;
-  Object.defineProperty(el, 'textContent', {
-    get: () => text,
-    set: (v) => {
-      writes++;
-      text = v;
-    },
-  });
+  const live = t.elements['inspector-body'];
+  assert.equal(live.getAttribute('aria-live'), 'polite');
+  assert.ok(live.contains(t.elements['inspector-title']), 'the name is read with the lines');
+  assert.ok(live.contains(t.elements['inspector-lines']));
+  const lines = () => t.elements['inspector-lines'].children;
+  const texts = () => lines().map((li) => li.querySelector('span'));
+  const before = texts();
   for (let i = 0; i < 5; i++)
     t.reply({ type: 'citizen', selection: ask.selection, citizen: { ...resident } });
-  assert.equal(writes, 0);
+  assert.deepEqual(texts(), before, 'unchanged details are not rewritten');
+  const kept = before.map((span) => span.childNodes[0]);
+  t.reply({
+    type: 'citizen',
+    selection: ask.selection,
+    citizen: { ...resident, destination: null, location: resident.job },
+  });
+  assert.match(panel(t), /^At work, factory #40$/m);
+  const changed = texts().filter((span, i) => span.childNodes[0] !== kept[i]);
+  assert.equal(changed.length, 1, 'only the line that changed is read again');
 });
 
 test('stale replies, empty ground, Esc and close deselect predictably', async () => {
@@ -157,7 +166,7 @@ test('stale replies, empty ground, Esc and close deselect predictably', async ()
   assert.equal(inspects(t).at(-1).agent, null, 'Esc deselects');
   assert.equal(t.elements.inspector.hidden, true);
   pickCar(t, 3);
-  t.elements['inspector-close'].onclick();
+  t.pressId('inspector-close');
   assert.equal(t.elements.inspector.hidden, true, 'close deselects');
   const count = t.messages.length;
   t.cars.at = null;
@@ -208,7 +217,7 @@ test('follow rides with the car, holds while it is hidden and stops when its res
   });
   step(t);
   assert.equal(t.elements.follow.attributes['aria-pressed'], 'true', 'an arrival holds follow');
-  assert.match(panel(t), /now +at work, factory #40/);
+  assert.match(panel(t), /^At work, factory #40$/m);
   t.reply({
     type: 'citizen',
     selection: ask.selection,
@@ -224,7 +233,7 @@ test('follow rides with the car, holds while it is hidden and stops when its res
 test('panning releases follow; turning and zooming keep it', async () => {
   const t = await tools();
   pickCar(t, 3);
-  t.elements.follow.onclick();
+  t.pressId('follow');
   t.key('q');
   step(t);
   t.keyup('q');
@@ -261,7 +270,7 @@ test('a pan key held when follow starts waits for release instead of fighting it
 test('F obeys the same guards as other shortcuts and needs a selection', async () => {
   const t = await tools();
   t.key('f');
-  assert.equal(t.elements.follow.attributes['aria-pressed'], undefined, 'nothing selected');
+  assert.equal(t.elements.follow.attributes['aria-pressed'], 'false', 'nothing selected');
   pickCar(t, 3);
   const input = { closest: (selector) => (selector.includes('input') ? input : null) };
   for (const options of [

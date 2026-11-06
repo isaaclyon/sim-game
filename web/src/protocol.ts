@@ -24,9 +24,9 @@ export type ToWorker =
   | { type: 'commandLog' }
   /** Explicit synthetic benchmark traffic, not normal play. */
   | { type: 'spawn'; count: number }
-  /** Builds the road through guided `points`, as in `previewRoad` with two points, or three for
-   * a curve. Answered with `buildResult`. */
-  | { type: 'buildRoad'; id: number; points: number[]; class: RoadClass }
+  /** Builds the road through guided `points`, as in `previewRoad`. `chain` requests the
+   * sim-guided control of a successful curve in `buildResult`, for its next continuation. */
+  | { type: 'buildRoad'; id: number; points: number[]; class: RoadClass; chain?: boolean }
   /** Removes the plant under the point, else the nearest line, else the building under the
    * point (ADR 0045), else the nearest road. */
   | { type: 'deleteRoad'; x: number; y: number }
@@ -54,8 +54,11 @@ export type ToWorker =
    * Asks how a road of `class` being drawn would be guided, built and charged (ADR 0036,
    * ADR 0038). `points` is `[x, y, snap]` per clicked point in drawing order, then the cursor:
    * one point asks where a road would start, two a straight road, three a curve (start,
-   * control, end). `snap` is a `Snap` bitmask. `plan` false only guides the points (a curve's
-   * control point). Changes nothing; answered with `roadPreview`.
+   * control, end). For a continuation, the first point has `Snap.Continue`, followed by the
+   * end and the previous curve's sim-guided control; the sim derives the new control. `snap`
+   * otherwise selects drawing guides. `plan` false only guides the points (a curve's control
+   * point). Roads the draft follows take `class` when built (ADR 0048), so a draft over roads
+   * of the same class plans nothing. Changes nothing; answered with `roadPreview`.
    */
   | { type: 'previewRoad'; revision: number; class: RoadClass; points: number[]; plan: boolean }
   /**
@@ -84,6 +87,7 @@ export const Snap = {
   Angle: 1,
   Guides: 2,
   Length: 4,
+  Continue: 8,
 } as const;
 
 /** Zone cell values, matching the sim's `Zone` (ADR 0014). Density is part of the zone. */
@@ -227,6 +231,8 @@ export interface Stats {
   balance: number;
   /** Taxes from residents and filled jobs, dollars per clock hour. */
   taxes: number;
+  /** Flat grant every city receives, dollars per clock hour (ADR 0036). */
+  grant: number;
   /** Road upkeep, dollars per clock hour. */
   upkeep: number;
 }
@@ -259,7 +265,8 @@ export type FromWorker =
    * `stops` is `[x, y, join]` per stop of the previewed road, in order; join is 0 = new end,
    * 1 = existing node, 2 = splits an existing road, -1 = interior curve sample (no marker).
    * Empty means refused, or not asked for (`plan` false). One stop answers a one-point request.
-   * `points` is the guided `[x, y]` per requested point. `guides` is `[x0, y0, x1, y1]` per
+   * `points` is the guided `[x, y]` per point; a continuation returns start, derived control and
+   * end, or no points if refused. `guides` is `[x0, y0, x1, y1]` per
    * guide line used for the last point, from the line's origin to the point. `length` is metres
    * along the road so far; `angle` is degrees from the road its start joins, NaN for none.
    * `angles` is `[x, y, rx, ry, dx, dy]` per angle mark: a junction where the road's start (or,
@@ -332,7 +339,13 @@ export type FromWorker =
   /** `[x, y]` per outline sample of the block under the cursor, closed; empty outside blocks. */
   | { type: 'blockPreview'; outline: Float32Array; revision: number }
   /** `end` is the built road's guided end, where a chained road starts; null when refused. */
-  | { type: 'buildResult'; id: number; success: boolean; end: [number, number] | null }
+  | {
+      type: 'buildResult';
+      id: number;
+      success: boolean;
+      end: [number, number] | null;
+      control?: [number, number];
+    }
   /** Selected road's `[x, y]` centreline samples, or empty on a miss. Sim-owned hit testing.
    * A plant's or building's target is its closed outline and a line's its two ends. */
   | { type: 'bulldozePreview'; segment: Float32Array; revision: number }

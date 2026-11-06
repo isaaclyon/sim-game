@@ -1,4 +1,5 @@
 // Zoning interactions only: the sim owns block outlines and the cells painted by commands.
+// The build menu owns the zone buttons.
 import type { Vector3 } from 'three';
 import type { FromWorker, ToWorker, Zone } from './protocol';
 
@@ -20,12 +21,10 @@ export class ZoneTool {
   private revision = 0;
   private readonly send: (msg: ToWorker) => void;
   private readonly draw: Drawing;
-  private readonly buttons: HTMLButtonElement[];
 
-  constructor(send: (msg: ToWorker) => void, draw: Drawing, buttons: HTMLButtonElement[]) {
+  constructor(send: (msg: ToWorker) => void, draw: Drawing) {
     this.send = send;
     this.draw = draw;
-    this.buttons = buttons;
   }
 
   get zone() {
@@ -38,11 +37,6 @@ export class ZoneTool {
     this.hideOutline();
     this.draw.setLeftDragPans(zone === null);
     this.draw.setZoningVisible(zone !== null);
-    for (const button of this.buttons) {
-      const on = Number(button.dataset.zone) === zone;
-      button.classList.toggle('active', on);
-      button.setAttribute('aria-pressed', String(on));
-    }
   }
 
   /** City replacement also releases the old city's pending request. */

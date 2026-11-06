@@ -98,7 +98,7 @@ fn extending_a_rebuilt_road_follows_the_active_curve() {
         class: RoadClass::Street
     }));
     let mut preview = Vec::new();
-    w.write_road_preview(0.0, 0.0, 300.0, 0.0, &mut preview);
+    w.write_road_preview(0.0, 0.0, 300.0, 0.0, RoadClass::Street, &mut preview);
     assert!(!preview.is_empty());
     assert!(preview.as_chunks::<3>().0.iter().all(|p| p[1] <= 0.0));
     assert!(preview.as_chunks::<3>().0.iter().any(|p| p[1] < -40.0));

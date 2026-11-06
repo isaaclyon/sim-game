@@ -44,11 +44,11 @@ impl World {
         }
     }
 
-    /// Builds a road of `class` along `snap::plan`: joining nodes near its ends, and splitting
-    /// the roads it crosses or ends beside so they meet at a junction.
-    /// Refused when the city cannot afford the new length (ADR 0036).
+    /// Builds a road of `class` along `snap::plan`: joining nodes near its ends, splitting
+    /// the roads it crosses or ends beside so they meet at a junction, and giving the roads it
+    /// follows its class (ADR 0048). Refused when the city cannot afford it (ADR 0036).
     pub(super) fn build_road(&mut self, shape: Shape, class: RoadClass) -> bool {
-        let Some(plan) = snap::plan(&self.roads, shape) else {
+        let Some(plan) = snap::plan(&self.roads, shape, Some(class)) else {
             return false;
         };
         let cost = money::plan_cost(&self.roads, &plan, class);
@@ -66,14 +66,15 @@ impl World {
     }
 
     /// Adds the roads `snap::plan` makes of `shape`, pushing the roads it splits onto `split`.
-    /// Returns the area it changed. The caller syncs the network and removes affected cars.
+    /// Roads it follows keep their class. Returns the area it changed. The caller syncs the
+    /// network and removes affected cars.
     pub(super) fn add_road(
         &mut self,
         shape: Shape,
         class: RoadClass,
         split: &mut Vec<RoadId>,
     ) -> Option<Rect> {
-        let plan = snap::plan(&self.roads, shape)?;
+        let plan = snap::plan(&self.roads, shape, None)?;
         Some(self.add_plan(plan, class, split))
     }
 
@@ -97,8 +98,12 @@ impl World {
         let mut rect = block::shape_rect(plan.legs[0]);
         for (leg, shape) in nodes.windows(2).zip(plan.legs) {
             rect = block::union(rect, block::shape_rect(shape));
-            // False where the plan follows an existing road, which is kept as it is.
+            // False where the plan follows an existing road, which is kept in place.
             self.roads.add_shape(leg[0], leg[1], shape.control, class);
+        }
+        // Lanes and shapes stay, so cars on these roads keep their routes.
+        for road in plan.reclass {
+            self.roads.set_class(road, class);
         }
         rect
     }

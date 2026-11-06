@@ -20,14 +20,29 @@ test('city buttons wait for startup; saving is acknowledged only by worker statu
   assert.equal(save.disabled, true);
   assert.match(t.elements['save-status'].textContent, /Saving/);
   t.reply(status({ dirty: true, savedAt: null }));
-  save.onclick();
+  assert.equal(t.elements.menu.hidden, true, 'the menu waits for the ☰ button');
+  t.pressId('menu-button');
+  assert.equal(t.elements.menu.hidden, false);
+  assert.equal(t.elements['menu-button'].attributes['aria-expanded'], 'true');
+  t.press(save);
   assert.deepEqual({ ...t.messages.at(-1) }, { type: 'saveCity' });
   assert.match(t.elements['save-status'].textContent, /Unsaved/);
+  t.key('Escape');
+  assert.equal(t.elements.menu.hidden, true, 'Esc closes the menu');
+  const badge = t.elements['save-badge'];
   t.reply(status({ error: 'Browser storage is full.', dirty: true }));
+  t.frame();
   assert.match(t.elements['save-status'].textContent, /full/);
+  assert.match(badge.textContent, /full/);
+  assert.equal(badge.dataset.error, 'true', 'a failed save shows red in the top bar');
+  assert.equal(t.elements.menu.hidden, true, 'without opening the menu');
   assert.equal(save.disabled, false);
   t.reply(status());
+  t.frame();
   assert.match(t.elements['save-status'].textContent, /Saved/);
+  assert.equal(badge.dataset.error, 'false');
+  t.press(badge);
+  assert.equal(t.elements.menu.hidden, false, 'the save status opens the menu too');
 });
 
 test('new city requires confirmation; cancel sends nothing and storage errors allow starting over', async () => {
@@ -84,6 +99,7 @@ test('city reset clears tools, follow and interpolation, and synchronizes pause 
       power: { supply: 0, starter: 150, used: 0, demand: 0, unpowered: 0, waiting: 0 },
       balance: 100_000,
       taxes: 0,
+      grant: 0,
       upkeep: 0,
       driving: 0,
       parked: 0,
@@ -97,10 +113,15 @@ test('city reset clears tools, follow and interpolation, and synchronizes pause 
     tickMs: 0,
   };
   t.reply(frame);
-  t.elements.road.onclick();
+  t.pressId('category-roads');
+  t.pressId('street');
+  assert.equal(t.canvas.style.cursor, 'crosshair');
   t.reply({ type: 'cityReset', speed: 0 });
   assert.equal(t.canvas.style.cursor, '');
+  assert.equal(t.elements['items-roads'].hidden, true, 'the build menu closes');
   assert.deepEqual({ ...t.messages.at(-1) }, { type: 'setSpeed', speed: 0 });
+  assert.equal(t.elements['speed-0'].attributes['aria-pressed'], 'true', 'pause shows');
+  assert.equal(t.elements['speed-1'].attributes['aria-pressed'], 'false');
   assert.equal(t.previews.filter((p) => p.type === 'zoningVisible').at(-1).visible, false);
   t.reply(frame);
   t.frame();

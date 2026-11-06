@@ -1,0 +1,148 @@
+/* The interface's look (M4.6): dark frosted glass, a crisp sans-serif, blue for the selection
+   and red only for problems. Every panel, bar and card uses these tokens. */
+:root {
+  --font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --text: #f3f6f9;
+  --text-dim: #aab6c3;
+  --text-faint: #7d8a98;
+  --glass: rgba(20, 26, 34, 0.6);
+  --glass-strong: rgba(20, 26, 34, 0.78);
+  --glass-border: rgba(255, 255, 255, 0.14);
+  --glass-shadow: 0 10px 30px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  --blur: blur(18px) saturate(150%);
+  --control: rgba(255, 255, 255, 0.07);
+  --control-hover: rgba(255, 255, 255, 0.13);
+  --control-border: rgba(255, 255, 255, 0.1);
+  --accent: #3b82f6;
+  --accent-strong: #2563eb;
+  --accent-soft: rgba(59, 130, 246, 0.3);
+  --accent-ring: #8ab8ff;
+  --danger: #ef4444;
+  --danger-soft: rgba(239, 68, 68, 0.22);
+  --good: #6ee7a0;
+  --radius: 14px;
+  --radius-small: 9px;
+  --residential: #7be08f;
+  --commercial: #7fb0ff;
+  --industrial: #f6c35a;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #0f1419;
+  font-family: var(--font);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+canvas {
+  display: block;
+}
+[hidden] {
+  /* biome-ignore lint/complexity/noImportantStyles: hidden must beat every display rule */
+  display: none !important;
+}
+
+.glass {
+  background: var(--glass);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  box-shadow: var(--glass-shadow);
+  color: var(--text);
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--accent-ring);
+  outline-offset: 2px;
+}
+
+/* A plain control: a quiet rounded button that lights up blue when pressed. */
+.control,
+.panel button,
+.card button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-small);
+  background: var(--control);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition:
+    background 0.12s,
+    border-color 0.12s;
+}
+.control:hover:enabled,
+.panel button:hover:enabled,
+.card button:hover:enabled {
+  background: var(--control-hover);
+}
+.control[aria-pressed="true"],
+.panel button[aria-pressed="true"],
+.card button[aria-pressed="true"] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+.panel button.primary {
+  background: var(--accent);
+  border-color: var(--accent-strong);
+  color: white;
+  font-weight: 600;
+}
+.panel button.primary:hover:enabled {
+  background: var(--accent-strong);
+}
+
+svg {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+svg.solid {
+  fill: currentColor;
+  stroke: none;
+}
+
+/* A red dot that marks a problem in a title. */
+.problem::before {
+  content: "";
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: var(--danger);
+  box-shadow: 0 0 0 3px var(--danger-soft);
+  vertical-align: 1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    /* biome-ignore lint/complexity/noImportantStyles: reduced motion beats every transition */
+    transition: none !important;
+  }
+}

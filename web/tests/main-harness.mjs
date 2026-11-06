@@ -4,81 +4,27 @@ import { extname } from 'node:path';
 import { createContext, SourceTextModule, SyntheticModule } from 'node:vm';
 
 import { PlantKind, RoadClass, Snap, Zone } from '../src/protocol.ts';
+import { fakeDocument } from './fake-dom.mjs';
 
-// Exercise main.ts's event handlers without a WebGL context or a running clock.
-export async function tools({ hash = '', clipboard = true } = {}) {
-  function element() {
-    return {
-      textContent: '',
-      hidden: false,
-      disabled: false,
-      style: {},
-      dataset: {},
-      events: {},
-      attributes: {},
-      classList: { toggle() {} },
-      setPointerCapture() {},
-      select() {},
-      setAttribute(key, value) {
-        this.attributes[key] = value;
-      },
-      addEventListener(key, fn) {
-        this.events[key] = fn;
-      },
-    };
-  }
-  const elements = Object.fromEntries(
-    [
-      'hud',
-      'demand',
-      'demand-residential',
-      'demand-commercial',
-      'demand-industrial',
-      'road',
-      'curve',
-      'main-road',
-      'bulldoze',
-      'road-help',
-      'road-readout',
-      'snap-options',
-      'snap-angle',
-      'snap-guides',
-      'snap-length',
-      'inspector',
-      'inspector-text',
-      'follow',
-      'inspector-close',
-      'sound',
-      'traffic',
-      'pollution',
-      'save-city',
-      'new-city',
-      'save-status',
-      'share-status',
-      'share-url',
-      'download-city',
-      'copy-link',
-      'open-city',
-      'open-city-file',
-      'command-log',
-      'plant-coal',
-      'plant-solar',
-      'plant-wind',
-      'power-line',
-      'power-view',
-    ].map((id) => [id, element()]),
-  );
-  const zoneButtons = Object.values(Zone).map((zone) => ({
-    ...element(),
-    dataset: { zone: String(zone) },
-  }));
-  const canvas = element();
+// Exercise main.ts's event handlers without a WebGL context or a running clock. `catalog`, if
+// given, may change the build menu's list (`src/ui/catalog.ts`) before the menu is built.
+export async function tools({ hash = '', clipboard = true, catalog } = {}) {
+  const document = fakeDocument(new URL('../index.html', import.meta.url));
+  const createElement = document.createElement;
+  // A download is a link the game clicks; record it instead of leaving the page.
+  document.createElement = (tag) => {
+    const el = createElement(tag);
+    if (tag === 'a') el.click = () => page.downloads.push({ name: el.download, href: el.href });
+    return el;
+  };
+  /** The page's elements by ID, as main.ts finds them. */
+  const elements = new Proxy({}, { get: (_, id) => document.getElementById(id) });
+  const canvas = createElement('canvas');
   const leftDragPans = [];
   const zoneDrags = [];
   const messages = [];
   const previews = [];
   const events = {};
-  const documentEvents = {};
   const pans = [];
   const clock = { now: 0, cameraMoved: false };
   const confirm = { answer: false, prompts: [] };
@@ -97,6 +43,8 @@ export async function tools({ hash = '', clipboard = true } = {}) {
   // Ambient sound: what main.ts asked of it.
   const sound = { toggles: 0, buildings: [], updates: [] };
   const lightingTimes = [];
+  // The build menu's pictures: which models it asked for, and the data URLs it got back.
+  const pictures = { asked: [] };
   class AmbientSound {
     toggle() {
       sound.toggles++;
@@ -162,6 +110,12 @@ export async function tools({ hash = '', clipboard = true } = {}) {
       cars.drawnSelected.push(selected);
     }
     drawSignals() {}
+    drawPictures(list) {
+      pictures.asked.push(list);
+      return new Map(
+        list.map((p) => [Object.values(p).join(':'), `data:image/png;base64,${p.kind}`]),
+      );
+    }
     setRoads(segments, bounds, fitCamera) {
       previews.push({ type: 'roads', segments, bounds, fitCamera });
     }
@@ -232,20 +186,7 @@ export async function tools({ hash = '', clipboard = true } = {}) {
   const context = createContext({
     innerWidth: 1000,
     innerHeight: 700,
-    document: {
-      body: {},
-      getElementById: (id) => elements[id],
-      querySelectorAll: (selector) => (selector === '[data-zone]' ? zoneButtons : []),
-      visibilityState: 'visible',
-      addEventListener: (key, fn) => {
-        documentEvents[key] = fn;
-      },
-      createElement: () => ({
-        click() {
-          page.downloads.push({ name: this.download, href: this.href });
-        },
-      }),
-    },
+    document,
     location: {
       get hash() {
         return page.hash;
@@ -332,6 +273,11 @@ export async function tools({ hash = '', clipboard = true } = {}) {
     if (!extname(url.pathname)) url.pathname += '.ts';
     return source(url);
   });
+  if (catalog) {
+    const list = source(new URL('../src/ui/catalog.ts', import.meta.url));
+    await list.evaluate();
+    catalog(list.namespace);
+  }
   await module.evaluate();
   const move = (x, y) => canvas.events.pointermove({ clientX: x, clientY: y });
   const click = (x, y, button = 0, shiftKey = false) => {
@@ -339,14 +285,31 @@ export async function tools({ hash = '', clipboard = true } = {}) {
     canvas.events.pointerdown(e);
     canvas.events.pointerup(e);
   };
+  /** A click on a page control as a person makes it, which first closes an open panel. Only a
+   * control on screen can be clicked. */
+  const press = (el) => {
+    for (let n = el; n !== document.body; n = n.parentNode)
+      if (n.hidden) throw new Error(`#${el.id} is not on screen`);
+    document.events.pointerdown?.({ target: el });
+    el.click();
+  };
   return {
+    document,
     elements,
+    press,
+    /** Presses the control with this ID. */
+    pressId: (id) => press(elements[id]),
+    /** The inspector card's title and lines, one per line of text. */
+    card: () =>
+      [elements['inspector-title'], ...elements['inspector-lines'].children]
+        .map((el) => el.textContent)
+        .join('\n'),
+    pictures,
     confirm,
     page,
     frame: () => frame(),
     messages,
     previews,
-    zoneButtons,
     pans: leftDragPans,
     cameraPans: pans,
     canvas,
@@ -366,8 +329,8 @@ export async function tools({ hash = '', clipboard = true } = {}) {
     keyup: (key, options = {}) => events.keyup({ key, ...options }),
     event: (key, e = {}) => events[key](e),
     hide() {
-      context.document.visibilityState = 'hidden';
-      documentEvents.visibilitychange();
+      document.visibilityState = 'hidden';
+      document.events.visibilitychange();
     },
   };
 }

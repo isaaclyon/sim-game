@@ -61,6 +61,7 @@ const stats = {
   power: { supply: 0, starter: 150, used: 0, demand: 0, unpowered: 0, waiting: 0 },
   balance: 12_345,
   taxes: 300,
+  grant: 1_000,
   upkeep: 120,
 };
 
@@ -75,16 +76,30 @@ function show(t, changes) {
   t.frame();
 }
 
-test('the HUD shows the balance, net income and debt', async () => {
+test('the top bar shows the balance and net income with the grant, and turns red in debt', async () => {
   const t = await tools();
+  const { elements: el } = t;
   show(t, {});
-  assert.match(
-    t.elements.hud.textContent,
-    /money {6}\$12,345 {3}\+\$180\/h \(taxes \$300, upkeep \$120\)\n/,
-  );
-  assert.match(t.elements.hud.textContent, /power +0 of 150 used/);
-  show(t, { balance: -40, taxes: 0, upkeep: 120 });
-  assert.match(t.elements.hud.textContent, /money {6}-\$40 {3}-\$120\/h .*in debt: no new roads/);
+  assert.equal(el['money-value'].textContent, '$12,345');
+  assert.equal(el['money-rate'].textContent, '+$1,180/h');
+  assert.equal(el.money.classList.contains('warning'), false);
+  t.pressId('money');
+  assert.equal(el['money-panel'].hidden, false, 'money opens its details');
+  assert.equal(el['money-taxes'].textContent, '+$300/h');
+  assert.equal(el['money-grant'].textContent, '+$1,000/h');
+  assert.equal(el['money-upkeep'].textContent, '-$120/h');
+  assert.equal(el['money-net'].textContent, '+$1,180/h');
+  assert.equal(el['money-debt'].hidden, true);
+  show(t, { balance: -40, taxes: 0, upkeep: 1_120 });
+  assert.equal(el['money-value'].textContent, '-$40');
+  assert.equal(el['money-rate'].textContent, '-$120/h');
+  assert.equal(el.money.classList.contains('warning'), true, 'debt is red');
+  assert.match(el.money.attributes['aria-label'], /in debt/);
+  assert.equal(el['money-title'].textContent, 'In debt');
+  assert.equal(el['money-debt'].hidden, false);
+  assert.match(el['money-debt'].textContent, /No new roads/);
+  t.pressId('money');
+  assert.equal(el['money-panel'].hidden, true, 'a second click closes it');
 });
 
 test('the road tool shows what a road costs and says when the city cannot pay', async () => {
@@ -109,19 +124,19 @@ test('the road tool shows what a road costs and says when the city cannot pay', 
     affordable,
   });
   t.reply(preview(ask.revision, 1000, true));
-  assert.match(t.elements['road-help'].textContent, /Costs \$1,000\. Click the road end/);
+  assert.match(t.elements['build-hint'].textContent, /Costs \$1,000\. Click the road end/);
 
   t.key('m');
   const again = t.messages.at(-1);
   assert.equal(again.type, 'previewRoad', 'switching class asks for a new quote');
   assert.equal(again.class, RoadClass.Main);
   t.reply(preview(again.revision, 2500, false));
-  assert.match(t.elements['road-help'].textContent, /Not enough money: costs \$2,500\./);
+  assert.match(t.elements['build-hint'].textContent, /Not enough money: costs \$2,500\./);
   t.click(100, 0);
   const build = t.messages.at(-1);
   assert.equal(build.type, 'buildRoad');
   t.reply({ type: 'buildResult', id: build.id, success: false });
-  const help = t.elements['road-help'].textContent;
+  const help = t.elements['build-hint'].textContent;
   assert.match(help, /Not enough money/);
   assert.doesNotMatch(help, /Cannot build here/, 'refused for money, not for its shape');
 });

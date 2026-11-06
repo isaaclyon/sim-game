@@ -4,128 +4,138 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>sim-game</title>
-    <style>
-      html, body { margin: 0; height: 100%; overflow: hidden; background: #0f1419; }
-      canvas { display: block; }
-      #hud {
-        position: fixed; top: 12px; left: 12px; padding: 10px 12px; border-radius: 8px;
-        background: rgba(15, 20, 25, 0.85); color: #c9d4df;
-        font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre;
-        pointer-events: none;
-      }
-      #inspector {
-        position: fixed; top: 12px; right: 12px; padding: 10px 12px; border-radius: 8px;
-        background: rgba(15, 20, 25, 0.85); color: #c9d4df;
-        font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
-      }
-      #inspector[hidden] { display: none; }
-      #inspector-text { white-space: pre; }
-      #demand {
-        position: fixed; top: 12px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px;
-        padding: 8px 12px; border-radius: 8px; background: rgba(15, 20, 25, 0.85); color: #c9d4df;
-        font: 12px/1 ui-monospace, SFMono-Regular, Menlo, monospace; pointer-events: auto;
-      }
-      #demand .use { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-      #demand .track { position: relative; width: 14px; height: 48px; background: #1c2530; border-radius: 3px; }
-      #demand .track::after { content: ''; position: absolute; left: -2px; right: -2px; top: 50%; border-top: 1px solid #6b7b8f; }
-      #demand .fill { position: absolute; left: 0; right: 0; bottom: 50%; height: 0; border-radius: 2px; }
-      #demand-residential { background: #7bd88f; }
-      #demand-commercial { background: #6fb3ff; }
-      #demand-industrial { background: #f2c94c; }
-      #demand .fill.surplus { background: #e5484d; }
-      #inspector-text::first-line { color: white; font-weight: 600; }
-      #inspector .actions { display: flex; gap: 6px; margin-top: 8px; }
-      #controls { position: fixed; bottom: 12px; left: 12px; right: 12px; display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none; }
-      #toolbar { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
-      #toolbar button, #snap-options button, #inspector button, #city-controls button {
-        background: #1c2530; color: #c9d4df; border: 1px solid #2e3a47; border-radius: 6px;
-        padding: 6px 10px; font: 12px ui-monospace, Menlo, monospace; cursor: pointer;
-        white-space: nowrap; pointer-events: auto;
-      }
-      #toolbar button:hover:enabled, #inspector button:hover:enabled, #city-controls button:hover:enabled { border-color: #6b7b8f; }
-      #toolbar button:focus-visible, #inspector button:focus-visible, #city-controls button:focus-visible { outline: 2px solid #c9d4df; outline-offset: 2px; }
-      #toolbar button:disabled, #inspector button:disabled, #city-controls button:disabled { opacity: 0.5; cursor: default; }
-      #city-controls { align-self: flex-end; max-width: 440px; padding: 10px 12px; border-radius: 8px; background: rgba(15, 20, 25, 0.85); color: #c9d4df; font: 12px/1.5 ui-monospace, Menlo, monospace; pointer-events: auto; }
-      #city-controls .actions { display: flex; gap: 6px; margin-bottom: 6px; }
-      #save-status, #share-status { overflow-wrap: anywhere; }
-      #save-status[data-error="true"], #share-status[data-error="true"] { color: #ffb4ab; }
-      #share-status:empty { display: none; }
-      #share-url { width: 100%; box-sizing: border-box; margin-top: 4px; background: #0f1419; color: #c9d4df; border: 1px solid #2e3a47; border-radius: 4px; font: 11px ui-monospace, Menlo, monospace; }
-      #share-url[hidden] { display: none; }
-      #save-note { margin-top: 4px; }
-      #road-help { color: #c9d4df; background: #0f1419; padding: 6px 10px; font: 12px/1.5 ui-monospace, monospace; text-align: center; }
-      #road-help:empty { display: none; }
-      #snap-options { display: flex; justify-content: center; gap: 6px; }
-      #snap-options[hidden] { display: none; }
-      #road-readout { position: fixed; pointer-events: none; color: #e8eef4; background: rgba(15, 20, 25, 0.85); padding: 2px 6px; border-radius: 3px; font: 12px/1.4 ui-monospace, monospace; }
-      #toolbar button.active, #snap-options button[aria-pressed="true"], #inspector button[aria-pressed="true"] { background: #2f6fb0; border-color: #4a8bd0; color: white; }
-    </style>
+    <link rel="stylesheet" href="/src/ui/theme.css" />
+    <link rel="stylesheet" href="/src/ui/top-bar.css" />
+    <link rel="stylesheet" href="/src/ui/panels.css" />
+    <link rel="stylesheet" href="/src/ui/build-menu.css" />
   </head>
   <body>
-    <div id="hud">loading…</div>
-    <div id="demand" role="img" aria-label="demand">
-      <div class="use"><div class="track"><div class="fill" id="demand-residential"></div></div>R</div>
-      <div class="use"><div class="track"><div class="fill" id="demand-commercial"></div></div>C</div>
-      <div class="use"><div class="track"><div class="fill" id="demand-industrial"></div></div>I</div>
-    </div>
-    <section id="inspector" aria-label="inspection" hidden>
-      <div id="inspector-text" aria-live="polite"></div>
-      <div class="actions">
-        <button type="button" id="follow" aria-pressed="false" title="camera follows this citizen's car (F)">follow (F)</button>
-        <button type="button" id="inspector-close" title="close (Esc)">close (Esc)</button>
+    <header id="top-bar" class="glass">
+      <div id="clock" class="clock" aria-live="off">Day 1 · 06:00</div>
+      <span class="divider" aria-hidden="true"></span>
+      <fieldset class="speeds" aria-label="Speed">
+        <button type="button" id="speed-0" aria-pressed="false" aria-label="Pause" title="Pause (Space)">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></svg>
+        </button>
+        <button type="button" id="speed-1" aria-pressed="true" title="Normal speed (1)">1×</button>
+        <button type="button" id="speed-3" aria-pressed="false" title="Fast (2)">3×</button>
+        <button type="button" id="speed-10" aria-pressed="false" title="Fastest (3)">10×</button>
+      </fieldset>
+      <span class="divider" aria-hidden="true"></span>
+      <button type="button" id="population" class="figure" aria-expanded="false" aria-controls="population-panel" title="Population details">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.2" /><path d="M3 19.5c0-3.4 2.7-5.8 6-5.8s6 2.4 6 5.8" /><circle cx="17" cy="9" r="2.5" /><path d="M16 13.8c2.6.3 4.6 2.4 4.6 5.4" /></svg>
+        <span id="population-value">Pop 0</span>
+      </button>
+      <span class="divider" aria-hidden="true"></span>
+      <button type="button" id="money" class="figure" aria-expanded="false" aria-controls="money-panel" title="Money details">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="6" rx="7" ry="2.8" /><path d="M5 6v4c0 1.6 3.1 2.8 7 2.8s7-1.2 7-2.8V6M5 10v4c0 1.6 3.1 2.8 7 2.8s7-1.2 7-2.8v-4M5 14v4c0 1.6 3.1 2.8 7 2.8s7-1.2 7-2.8v-4" /></svg>
+        <span id="money-value">$0</span>
+        <span id="money-rate" class="rate">+$0/h</span>
+      </button>
+      <span class="divider" aria-hidden="true"></span>
+      <button type="button" id="power" class="figure" aria-expanded="false" aria-controls="power-panel" title="Power details">
+        <svg viewBox="0 0 24 24" aria-hidden="true" class="solid"><path d="M13.5 2 4.5 13.5h6.2L9.8 22l9.2-12h-6.3z" /></svg>
+        <span id="power-value">0%</span>
+      </button>
+      <span class="divider" aria-hidden="true"></span>
+      <div id="demand" class="demand" role="img" aria-label="demand">
+        <span class="use">R</span><span class="track"><span class="fill residential" id="demand-residential"></span></span>
+        <span class="use">C</span><span class="track"><span class="fill commercial" id="demand-commercial"></span></span>
+        <span class="use">I</span><span class="track"><span class="fill industrial" id="demand-industrial"></span></span>
       </div>
+      <span class="spacer"></span>
+      <button type="button" id="save-badge" class="save-badge" aria-controls="menu" title="Saving and sharing">Opening city…</button>
+      <button type="button" id="menu-button" class="menu-button" aria-label="Menu" aria-expanded="false" aria-controls="menu" title="Menu: save, share, sound and controls">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+      </button>
+    </header>
+
+    <section id="population-panel" class="glass panel" aria-label="Population details" hidden>
+      <h2>Population</h2>
+      <dl class="rows">
+        <dt>Residents</dt><dd id="pop-residents">0</dd>
+        <dt>Unemployed</dt><dd id="pop-unemployed">0</dd>
+        <dt>Driving</dt><dd id="pop-driving">0</dd>
+        <dt>Walking</dt><dd id="pop-walking">0</dd>
+        <dt>Parked cars</dt><dd id="pop-parked">0</dd>
+        <dt>Trips made</dt><dd id="pop-trips">0</dd>
+      </dl>
     </section>
-    <div id="controls">
-    <section id="city-controls" aria-label="City saving and sharing">
-      <div class="actions">
+
+    <section id="money-panel" class="glass panel" aria-label="Money details" hidden>
+      <h2 id="money-title">Money</h2>
+      <dl class="rows">
+        <dt>Balance</dt><dd id="money-balance">$0</dd>
+        <dt>Taxes</dt><dd id="money-taxes">+$0/h</dd>
+        <dt>Grant</dt><dd id="money-grant">+$0/h</dd>
+        <dt>Upkeep</dt><dd id="money-upkeep">-$0/h</dd>
+        <dt>Net</dt><dd id="money-net">+$0/h</dd>
+      </dl>
+      <p id="money-debt" class="warning" hidden>The city is in debt. No new roads until the balance is above zero.</p>
+    </section>
+
+    <section id="power-panel" class="glass panel" aria-label="Power details" hidden>
+      <h2 id="power-title">Power</h2>
+      <div class="meter" aria-hidden="true"><span id="power-meter-fill" class="meter-fill"></span><span id="power-meter-over" class="meter-over"></span><span id="power-meter-mark" class="meter-mark"></span></div>
+      <dl class="rows">
+        <dt>Needed</dt><dd id="power-needed">0</dd>
+        <dt>Available</dt><dd id="power-available">0</dd>
+      </dl>
+      <p id="power-unpowered" hidden></p>
+      <p id="power-waiting" hidden></p>
+      <p id="power-advice" class="advice"></p>
+      <button type="button" id="open-power" class="primary">
+        <svg viewBox="0 0 24 24" aria-hidden="true" class="solid"><path d="M13.5 2 4.5 13.5h6.2L9.8 22l9.2-12h-6.3z" /></svg>
+        Open Power
+      </button>
+    </section>
+
+    <section id="menu" class="glass panel menu" aria-label="Menu" hidden>
+      <h2>City</h2>
+      <div class="menu-actions">
         <button type="button" id="save-city" disabled>Save city</button>
         <button type="button" id="new-city" disabled>New city</button>
+        <button type="button" id="download-city" disabled title="Save this city as a file to send or keep">Download</button>
+        <button type="button" id="open-city" disabled title="Open a city file someone sent you">Open file…</button>
+        <button type="button" id="copy-link" disabled title="Copy a link that opens a copy of this city">Copy link</button>
+        <button type="button" id="command-log" hidden title="Download the commands since this city started, for replay tests">Command log</button>
+      </div>
+      <input type="file" id="open-city-file" accept=".city,application/octet-stream" aria-label="City file" hidden />
+      <div id="save-status" class="status" role="status" aria-live="polite" aria-atomic="true">Opening city…</div>
+      <div id="share-status" class="status" role="status" aria-live="polite" aria-atomic="true"></div>
+      <input type="text" id="share-url" readonly hidden aria-label="Share link" />
+      <p id="save-note" class="note">Your city lives in this browser and autosaves every minute. Clearing browser data removes it. Shared links and files give friends their own copy.</p>
+      <h2>Settings</h2>
+      <div class="menu-actions">
+        <button type="button" id="sound" aria-pressed="true" title="Ambient sound that follows the camera (N)">Sound on</button>
+      </div>
+      <h2>Controls</h2>
+      <dl class="keys">
+        <dt>Move</dt><dd>W A S D or drag</dd>
+        <dt>Turn</dt><dd>Q E or right-drag</dd>
+        <dt>Zoom</dt><dd>Mouse wheel</dd>
+        <dt>Inspect</dt><dd>Click a car, walker or building</dd>
+        <dt>Speed</dt><dd>Space pauses, 1 2 3</dd>
+        <dt>Cancel</dt><dd>Esc or right-click</dd>
+        <dt>Debug</dt><dd>` shows frame timings</dd>
+      </dl>
+    </section>
+
+    <pre id="debug" class="glass debug" hidden></pre>
+
+    <section id="inspector" class="glass card" aria-labelledby="inspector-title" hidden>
+      <div id="inspector-body" aria-live="polite">
+        <h2 id="inspector-title">Inspector</h2>
+        <ul id="inspector-lines" class="card-lines"></ul>
       </div>
       <div class="actions">
-        <button type="button" id="download-city" disabled title="save this city as a file to send or keep">Download</button>
-        <button type="button" id="copy-link" disabled title="copy a link that opens a copy of this city">Copy link</button>
-        <button type="button" id="open-city" disabled title="open a city file someone sent you">Open file…</button>
-        <button type="button" id="command-log" hidden title="download the commands since this city started, for replay tests">Command log</button>
-        <input type="file" id="open-city-file" accept=".city,application/octet-stream" hidden />
+        <button type="button" id="follow" aria-pressed="false" title="Camera follows this citizen (F)">Follow</button>
+        <button type="button" id="inspector-close" title="Close (Esc)">Close</button>
       </div>
-      <div id="save-status" role="status" aria-live="polite" aria-atomic="true">Opening city…</div>
-      <div id="share-status" role="status" aria-live="polite" aria-atomic="true"></div>
-      <input type="text" id="share-url" readonly hidden aria-label="Share link" />
-      <div id="save-note">Autosaves every minute in this browser.<br />Clearing browser data removes your city.<br />Shared links and files give friends their own copy.</div>
     </section>
-    <div id="road-help" role="status" aria-live="polite"></div>
-    <div id="snap-options" hidden>
-      <button type="button" id="snap-angle" aria-pressed="true" title="snap to 15° steps from the road you start on">angle snap</button>
-      <button type="button" id="snap-guides" aria-pressed="true" title="line up with nearby road ends">guide lines</button>
-      <button type="button" id="snap-length" aria-pressed="true" title="snap lengths to whole 8 m cells">length snap</button>
-    </div>
+
     <div id="road-readout" aria-hidden="true" hidden></div>
-    <div id="toolbar">
-      <button type="button" data-speed="0">pause</button>
-      <button type="button" data-speed="1" class="active">1×</button>
-      <button type="button" data-speed="3">3×</button>
-      <button type="button" data-speed="10">10×</button>
-      <button type="button" id="road" aria-pressed="false">straight road (R)</button>
-      <button type="button" id="curve" aria-pressed="false">curved road (V)</button>
-      <button type="button" id="main-road" aria-pressed="false" title="build main roads: faster, wider, carry long trips (M)">main road (M)</button>
-      <button type="button" id="bulldoze" aria-pressed="false">bulldoze (B)</button>
-      <button type="button" data-zone="1" aria-pressed="false" title="residential, low density (Z)">res low</button>
-      <button type="button" data-zone="2" aria-pressed="false" title="residential, high density (Z twice)">res high</button>
-      <button type="button" data-zone="3" aria-pressed="false" title="commercial, low density (X)">com low</button>
-      <button type="button" data-zone="4" aria-pressed="false" title="commercial, high density (X twice)">com high</button>
-      <button type="button" data-zone="5" aria-pressed="false" title="industrial, low density (C)">ind low</button>
-      <button type="button" data-zone="6" aria-pressed="false" title="industrial, high density (C twice)">ind high</button>
-      <button type="button" data-zone="0" aria-pressed="false" title="remove zoning (U)">unzone (U)</button>
-      <button type="button" id="plant-coal" aria-pressed="false" title="coal plant: steady power, must stand beside a road (G)">coal (G)</button>
-      <button type="button" id="plant-solar" aria-pressed="false" title="solar farm: power by day only; join it to a road with a power line (G twice)">solar</button>
-      <button type="button" id="plant-wind" aria-pressed="false" title="wind turbine: power that rises and falls with the wind; join it with a power line (G three times)">wind</button>
-      <button type="button" id="power-line" aria-pressed="false" title="power line: joins a plant to a road, or one road network to another (L)">power line (L)</button>
-      <button type="button" id="power-view" aria-pressed="false" title="mark every building with its grid's colour; red marks buildings without power (O)">power view (O)</button>
-      <button type="button" id="sound" aria-pressed="true" title="ambient sound that follows the camera (N)">sound on (N)</button>
-      <button type="button" id="traffic" aria-pressed="false" title="colour cars by speed: red stopped, green at the limit (T)">traffic view (T)</button>
-      <button type="button" id="pollution" aria-pressed="false" title="show air pollution, ground pollution, noise, then land value (P)">pollution view (P)</button>
-    </div>
-    </div>
+    <div id="build-menu" class="build-menu"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

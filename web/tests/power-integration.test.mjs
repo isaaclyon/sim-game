@@ -10,11 +10,13 @@ test('the game starts empty and pollution, power and traffic shortcuts remain in
   assert.equal(last(t, 'init').grid, false);
   t.key('g');
   assert.ok(pressed(t, 'plant-coal'));
+  assert.ok(pressed(t, 'power-view'), 'a power tool shows the power view');
   for (const key of ['p', 'o', 't']) t.key(key);
   assert.ok(pressed(t, 'plant-coal'), 'view keys do not change the construction tool');
-  assert.ok(pressed(t, 'pollution') && pressed(t, 'power-view') && pressed(t, 'traffic'));
+  assert.ok(pressed(t, 'view-air') && !pressed(t, 'power-view') && pressed(t, 'traffic'));
+  assert.ok(!pressed(t, 'view-plain'), 'one ground overlay at a time');
   assert.equal(t.previews.findLast((p) => p.type === 'pollutionView').view, 'air');
-  assert.equal(t.previews.findLast((p) => p.type === 'powerView').on, true);
+  assert.equal(t.previews.findLast((p) => p.type === 'powerView').on, false);
   t.click(20, 30);
   assert.equal(last(t, 'placePlant').kind, 0, 'P must not switch from coal to solar');
 
@@ -33,8 +35,8 @@ test('guided roads, plants and zones own their clicks and discard old tool previ
   t.move(100, 0);
   const road = last(t, 'previewRoad');
   t.key('g');
-  assert.ok(!pressed(t, 'road'));
-  assert.equal(t.elements['snap-options'].hidden, true);
+  assert.ok(!pressed(t, 'straight') && !pressed(t, 'street'));
+  assert.equal(t.elements['options-roads'].hidden, true, 'road options go with the road tool');
   const before = t.previews.length;
   t.reply({ type: 'roadPreview', revision: road.revision });
   assert.equal(t.previews.length, before, 'a stale road answer cannot draw over the plant');

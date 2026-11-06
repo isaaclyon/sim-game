@@ -52,6 +52,8 @@ export function nightMaterial(
 
 export class Lighting {
   readonly night = { value: 0 };
+  /** Streetlights switch on together as dusk deepens, rather than fading in with the sky. */
+  readonly streetlights = { value: 0 };
   readonly lightHour = { value: 6 };
   readonly sky = new THREE.Color(SKY);
   readonly sun = new THREE.DirectionalLight(LIGHT.sun, LIGHT.sunIntensity);
@@ -77,6 +79,7 @@ export class Lighting {
   update(scene: THREE.Scene, focus: THREE.Vector3, distance: number) {
     const day = daylight(this.secondOfDay);
     this.night.value = 1 - day;
+    this.streetlights.value = THREE.MathUtils.smoothstep(this.night.value, 0.3, 0.5);
     this.sky.copy(NIGHT_SKY).lerp(DAY_SKY, day);
     if (scene.fog) scene.fog.color.copy(this.sky);
     this.ambient.intensity = 0.38 + (LIGHT.hemisphere - 0.38) * day;

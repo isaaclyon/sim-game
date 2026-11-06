@@ -16,6 +16,9 @@ fn advance(w: &mut World, seconds: u32) {
     }
 }
 fn town() -> World {
+    town_at(0)
+}
+fn town_at(tick: u64) -> World {
     let mut w = World::new(
         Config {
             ignore_demand: true,
@@ -24,6 +27,7 @@ fn town() -> World {
         crate::road::RoadNetwork::generate_lattice(4, 3, 120.0),
         crate::rng::Rng::new(1),
     );
+    w.totals.tick = tick;
     for (x, zone) in [
         (50.0, Zone::ResidentialLow),
         (170.0, Zone::CommercialLow),

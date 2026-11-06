@@ -9,7 +9,8 @@
 //   interpolation and orientation into a vertex shader fed by the raw snapshot.
 // - Tools pick against the ground plane; building inspection picks roof and facade triangles.
 // - Roads share one static mesh, rebuilt only when the road snapshot changes.
-// - Ground, water, fields and trees are decoration from `scenery/`, never sim state.
+// - Ground, water, fields and trees are decoration from `scenery/`, never sim state. So are
+//   streetlights (`streetlights.ts`), placed along the roads snapshot and lit at night.
 // - Flat layers share y = 0 without depth writes. Ground draws first; the zone overlay, pollution, lots,
 //   sidewalks, roads and lane paint draw in the transparent pass, after buildings and cars, in that order.
 //   Chimney smoke draws after them (`SMOKE_ORDER`), so roads never show through it.
@@ -37,8 +38,11 @@ import { createSimScene } from './scene';
 import { Scenery } from './scenery/index.ts';
 import { SignalLayer } from './signal-layer.ts';
 import { SmokeLayer } from './smoke-layer.ts';
+import { StreetlightLayer } from './streetlights.ts';
 import { type Ground, ToolPreview } from './tool-preview.ts';
-import type { PollutionView } from './view-buttons.ts';
+import type { Picture } from './ui/catalog.ts';
+import { drawPictures } from './ui/pictures.ts';
+import type { PollutionView } from './ui/views.ts';
 import { ZoneOverlay } from './zone-overlay';
 
 CameraControls.install({ THREE });
@@ -72,6 +76,7 @@ export class Renderer {
   private readonly smoke = new SmokeLayer(this.lighting.night);
   private readonly agents = new AgentLayer(this.scene, nightMaterial(this.lighting.night));
   private readonly signals = new SignalLayer(this.scene);
+  private readonly streetlights = new StreetlightLayer(nightMaterial(this.lighting.streetlights));
   private readonly tools = new ToolPreview();
   private readonly power = new PowerLayer();
   private readonly up = new THREE.Vector3(0, 1, 0);
@@ -94,6 +99,7 @@ export class Renderer {
       this.buildings.group,
       this.power.group,
       this.smoke.group,
+      this.streetlights.group,
       this.tools.group,
     );
 
@@ -148,6 +154,7 @@ export class Renderer {
     );
     this.scenery.setRoads(segments);
     this.lotScenery.setRoads(segments);
+    this.streetlights.set(segments);
 
     if (fitCamera) {
       const [x0, y0, x1, y1] = bounds;
@@ -376,6 +383,11 @@ export class Renderer {
     this.tools.setLine(ends, a, b);
   }
 
+  /** The build menu's pictures, drawn once from the game's models: data URLs by `pictureKey`. */
+  drawPictures(pictures: Picture[]): Map<string, string> {
+    return drawPictures(this.renderer, pictures);
+  }
+
   /** Snapshot time only: paused frames keep the same lighting. */
   setTime(secondOfDay: number) {
     this.lighting.setTime(secondOfDay);
@@ -400,6 +412,7 @@ export class Renderer {
       this.controls.getTarget(this.look, false),
       this.controls.distance,
     );
+    this.streetlights.update(this.lighting.streetlights.value);
     this.renderer.render(this.scene, this.camera);
     return moved;
   }

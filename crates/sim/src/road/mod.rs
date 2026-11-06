@@ -196,6 +196,20 @@ impl RoadNetwork {
         self.class[road as usize]
     }
 
+    /// Gives `road` a new class and its lanes that class's speed limit (ADR 0048). Lanes, ends
+    /// and shape stay as they are, so routes over it stay valid.
+    pub(crate) fn set_class(&mut self, road: RoadId, class: RoadClass) {
+        let r = road as usize;
+        if self.class[r] == class {
+            return;
+        }
+        self.class[r] = class;
+        self.lane_speed[2 * r] = class.speed();
+        self.lane_speed[2 * r + 1] = class.speed();
+        self.adjacency_dirty = true;
+        self.version += 1;
+    }
+
     pub fn lane_class(&self, lane: LaneId) -> RoadClass {
         self.class[lane as usize / 2]
     }

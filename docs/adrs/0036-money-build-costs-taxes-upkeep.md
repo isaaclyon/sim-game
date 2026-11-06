@@ -1,6 +1,6 @@
 # 0036. Money: build costs, taxes and upkeep on an empty starting map
 
-- Status: Accepted; implemented
+- Status: Accepted; implemented; free followed legs superseded by [0048](0048-drawing-over-roads-changes-their-class.md)
 - Date: 2026-11-04
 - Extends: [0033](0033-single-city-state-saves.md) (save version 2) and
   [0034](0034-command-log-replay-tests.md) (`map` start line)

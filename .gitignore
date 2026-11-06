@@ -11,3 +11,4 @@ node_modules/
 /.claude/skills/
 /skills-lock.json
 /.scratch/
+/.pi/openai-codex-images/

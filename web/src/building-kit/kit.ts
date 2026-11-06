@@ -1,265 +1,60 @@
 // The building grammar: every building is a sim footprint, height, use and front edge.
-// Visual-only variety comes from a hash of the footprint, never from sim randomness.
+// Each use has several designs; a hash of the footprint picks one, never sim randomness, so a
+// building keeps its look and the sim stays deterministic (ADR 0027). The designs live in one
+// file per use: houses, flats, shops, stores, industry (workshops) and factories.
 import * as THREE from 'three';
-import { balconies, door, loadingDoors, rooftop, shopfront, windows } from './facade.ts';
+import { FACTORIES } from './factories.ts';
+import { FLATS } from './flats.ts';
+import { HOUSES } from './houses.ts';
+import { classic, hasStack, type Smokestack, WORKSHOPS, type Works } from './industry.ts';
 import { LIGHT_SEED, lightSchedule } from './lights.ts';
 import type { MeshBuilder } from './mesh.ts';
-import { along, at, type Box, clip, convex, edge, obb, type Pt } from './polygon.ts';
-import { flatRoofed, roofed, roofPlanes } from './roof.ts';
+import { type Archetype, type Building, seeded } from './parts.ts';
+import { obb } from './polygon.ts';
+import { SHOPS } from './shops.ts';
+import { STORES } from './stores.ts';
 import type { Style } from './style.ts';
-import { PLINTH, PROUD, plinth } from './trim.ts';
 
-export interface Building {
-  /** `Zone` value: 1/2 residential, 3/4 commercial, 5/6 industrial, low then high density. */
-  zone: number;
-  /** Eave or roof height in metres, from the sim. */
-  height: number;
-  /** The sim's stable roof choice, 0–3 for industry. */
-  roof: number;
-  /** Index of the footprint edge facing the road. */
-  front: number;
-  /** Counter-clockwise footprint in scene-local (x, z). */
-  ring: Pt[];
+export { houseDoorAt } from './houses.ts';
+export type { Smokestack } from './industry.ts';
+export { type Building, seeded } from './parts.ts';
+
+// The classic shed takes one of four roof forms from the sim's roof choice. Listing it four
+// times makes each of its forms as common as each newer design.
+const CLASSIC = [classic, classic, classic, classic];
+
+/** Designs per `Zone` value, 1 to 6. */
+const DESIGNS: Archetype[][] = [
+  HOUSES,
+  FLATS,
+  SHOPS,
+  STORES,
+  [...CLASSIC, ...WORKSHOPS],
+  [...CLASSIC, ...FACTORIES],
+];
+const DESIGN_SEED = 0x64657369;
+
+function design(b: Building): Archetype {
+  const list = DESIGNS[Math.min(Math.max(Math.round(b.zone), 1), 6) - 1];
+  return list[Math.floor(seeded(b.ring, DESIGN_SEED)() * list.length)];
 }
 
-/** A small seeded generator (mulberry32) for one building's visual choices. */
-export function seeded(ring: Pt[], salt = 0): () => number {
-  let a = 0x9e3779b9 ^ salt;
-  for (const [x, z] of ring.slice(0, 2))
-    a = Math.imul(a ^ Math.round(x * 16), 0x85ebca6b) ^ Math.imul(Math.round(z * 16), 0xc2b2ae35);
-  return () => {
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-/** Shared by the house facade and its garden path; independent of other visual choices. */
-export function houseDoorAt(b: Building): number {
-  return edge(b.ring, b.front).L * (0.35 + seeded(b.ring)() * 0.3);
-}
-
-const pick = (list: number[], r: number) => new THREE.Color(list[Math.floor(r * list.length)]);
-
-/** Surround colour that stands out from `wall`. */
-function trimFor(wall: THREE.Color, style: Style): THREE.Color {
-  const { l } = wall.getHSL({ h: 0, s: 0, l: 0 });
-  return new THREE.Color(l > 0.78 ? style.trim.dark : style.trim.light);
+/** The name of the design a building is drawn with, for tests and debugging. */
+export function archetype(b: Building): string {
+  return design(b).name;
 }
 
 export function building(mb: MeshBuilder, b: Building, style: Style) {
   mb.lightSchedule = lightSchedule(b.zone, seeded(b.ring, LIGHT_SEED));
-  const rand = seeded(b.ring);
-  const box = obb(b.ring);
-  const glass = new THREE.Color(style.glass);
-  if (b.zone <= 2) (b.zone === 1 ? house : flats)(mb, b, box, style, rand, glass);
-  else if (b.zone <= 4) shop(mb, b, box, style, rand, glass);
-  else industry(mb, b, box, style, rand, glass);
+  design(b).draw(mb, b, obb(b.ring), style, seeded(b.ring), new THREE.Color(style.glass));
   mb.lightSchedule = [0, 0];
 }
 
-type Part = (
-  mb: MeshBuilder,
-  b: Building,
-  box: Box,
-  style: Style,
-  rand: () => number,
-  glass: THREE.Color,
-) => void;
-
-const house: Part = (mb, b, box, style, rand, glass) => {
-  const s = style.resLow;
-  const wall = pick(s.walls, rand());
-  const roof = pick(s.roofs, rand());
-  const [form, pitch] = [
-    rand() < s.gableShare ? 'gable' : 'hip',
-    s.pitch[0] + rand() * (s.pitch[1] - s.pitch[0]),
-  ] as const;
-  const pitched = convex(b.ring);
-  const base = new THREE.Color(style.plinth);
-  plinth(mb, b.ring, PLINTH, base);
-  const frame = trimFor(wall, style);
-  const top = pitched
-    ? roofed(mb, b.ring, 0, roofPlanes(form, box, b.height, pitch), wall, roof, 0.45)
-    : flatRoofed(mb, b.ring, 0, b.height, wall, roof, 0.4, wall);
-  const doorAt = houseDoorAt(b);
-  const floors = Math.max(1, Math.round(b.height / 3));
-  const rows = { storey: 3, floors, h: 1.25, door: { edge: b.front, at: doorAt } };
-  windows(mb, b.ring, top, rows, glass, frame);
-  door(mb, b.ring, b.front, doorAt, new THREE.Color(style.door), frame, base);
-  if (pitched && rand() < 0.65) {
-    const c = at(box, box.L * (rand() - 0.5) * 0.8, 0);
-    mb.box(
-      c,
-      top(c) - 1.2,
-      0.8,
-      2.3,
-      0.8,
-      Math.atan2(-box.u[1], box.u[0]),
-      new THREE.Color(style.chimney),
-    );
-  }
-};
-
-const flats: Part = (mb, b, box, style, rand, glass) => {
-  const s = style.resHigh;
-  const wall = pick(s.walls, rand());
-  const cap = new THREE.Color(s.parapet);
-  const top = flatRoofed(mb, b.ring, 0, b.height, wall, new THREE.Color(s.roof), 0.7, cap);
-  plinth(mb, b.ring, 0.6, new THREE.Color(style.plinth));
-  const floors = Math.floor(b.height / 3);
-  const rows = { storey: 3, floors, h: 1.4, w: 1.4, gap: 1.2 };
-  windows(mb, b.ring, top, rows, glass, trimFor(wall, style));
-  // A stair and lift housing on the roof, kept inside the walls.
-  rooftop(mb, b.ring, box, b.height, 1, true, rand, cap);
-  if (rand() < 0.6) balconies(mb, b.ring, b.front, floors, cap);
-};
-
-const shop: Part = (mb, b, box, style, rand, glass) => {
-  const high = b.zone === 4;
-  const s = high ? style.comHigh : style.comLow;
-  const wall = pick(s.walls, rand());
-  const roof = new THREE.Color(s.roof);
-  const cap = wall.clone().multiplyScalar(0.9);
-  // Taller blocks on convex lots step back to a smaller top floor.
-  const setback = high && b.height > 20 && rand() < 0.6 && convex(b.ring);
-  const body = setback ? b.height - 4 : b.height;
-  if (!high && convex(b.ring) && rand() < 0.35)
-    roofed(mb, b.ring, 0, roofPlanes('hip', box, body, 18), wall, roof, 0.25);
-  else flatRoofed(mb, b.ring, 0, body, wall, roof, high ? 0.6 : 0.35, cap);
-  if (setback) {
-    const inner = clipBox(b.ring, box, 2.2);
-    if (inner.length >= 3) flatRoofed(mb, inner, body, b.height, wall, roof, 0.5, cap);
-  }
-  plinth(mb, b.ring, 0.35, new THREE.Color(style.plinth));
-  const awning = !high || rand() < 0.5 ? pick(style.awnings, rand()) : null;
-  const entrance = high ? null : edge(b.ring, b.front).L * 0.3;
-  shopfront(mb, b.ring, b.front, awning, style, entrance);
-  if (!high) {
-    const frame = trimFor(wall, style);
-    const front = edge(b.ring, b.front);
-    door(
-      mb,
-      b.ring,
-      b.front,
-      front.L * 0.3,
-      new THREE.Color(style.door),
-      frame,
-      new THREE.Color(style.plinth),
-    );
-    // A shop-sized fascia above its own awning, not a continuous block-wide band.
-    mb.wall(
-      along(front, 0.6, 0.18),
-      along(front, front.L - 0.6, 0.18),
-      3.5,
-      3.95,
-      awning ?? frame,
-      front.n,
-    );
-  }
-  const upper = { storey: 4, first: 4, floors: Math.floor(body / 4) - 1 };
-  const rows = high
-    ? { ...upper, sill: 0.6, h: 2.2, w: 2.6, gap: 0.6 }
-    : { ...upper, h: 1.4, w: 1.3 };
-  // Glass office blocks keep plain windows; their panes nearly touch.
-  windows(mb, b.ring, () => body, rows, glass, high ? null : trimFor(wall, style));
-  if (high) rooftop(mb, b.ring, box, b.height, 3, false, rand, new THREE.Color(style.rooftop));
-};
-
-/** The footprint pulled in by `d` on every side of its bounding box. */
-function clipBox(ring: Pt[], box: Box, d: number): Pt[] {
-  let out = ring;
-  for (const [n, reach] of [
-    [box.u, box.L],
-    [[-box.u[0], -box.u[1]], box.L],
-    [box.v, box.W],
-    [[-box.v[0], -box.v[1]], box.W],
-  ] as [Pt, number][])
-    out = clip(out, (p) => reach - d - ((p[0] - box.c[0]) * n[0] + (p[1] - box.c[1]) * n[1]));
-  return out;
-}
-
-export interface Smokestack {
-  /** Centre in scene-local (x, z). */
-  at: Pt;
-  /** Height of the open top, metres. */
-  top: number;
-}
-
 /**
- * The chimney an industrial building draws, if any: one roof style in four has one. Shared with
- * the smoke layer so puffs leave the drawn stack. Repeats `industry`'s first two choices.
+ * The chimney an industrial building draws, if any: the sim's roof choice 3 gives one. Shared
+ * with the smoke layer so puffs leave the drawn stack.
  */
 export function smokestack(b: Building): Smokestack | null {
-  if (b.zone < 5 || Math.min(Math.max(b.roof, 0), 3) !== 3) return null;
-  const rand = seeded(b.ring);
-  rand(); // wall colour
-  const box = obb(b.ring);
-  return { at: at(box, box.L * 0.6, 0), top: b.height + 9 + rand() * 6 };
-}
-
-const industry: Part = (mb, b, box, style, rand, glass) => {
-  const s = style.industry;
-  const variant = Math.min(Math.max(b.roof, 0), 3);
-  const wall = pick(s.walls, rand());
-  const roof = new THREE.Color(s.roofs[variant]);
-  const h = b.height;
-  const rect = b.ring.length === 4 && convex(b.ring);
-  if (variant === 1 && rect) sawtooth(mb, b.ring, box, h, wall, roof, glass);
-  else if (variant === 2 && rect)
-    roofed(mb, b.ring, 0, roofPlanes('barrel', box, h), wall, roof, 0.3);
-  else {
-    flatRoofed(mb, b.ring, 0, h, wall, roof, 0.6, wall.clone().multiplyScalar(0.88));
-    if (variant === 3) {
-      const stack = smokestack(b) as Smokestack;
-      mb.cylinder(stack.at, h, 1, stack.top - h, 8, new THREE.Color(s.stack));
-      mb.cylinder(at(box, box.L * 0.6 - 4, 0), h, 2.2, 3.5, 8, new THREE.Color(style.rooftop));
-    } else rooftop(mb, b.ring, box, h, 4, true, rand, new THREE.Color(style.rooftop));
-  }
-  loadingDoors(mb, b.ring, b.front, h, new THREE.Color(s.door));
-  plinth(mb, b.ring, 0.5, new THREE.Color(style.plinth), b.front);
-  windows(
-    mb,
-    b.ring,
-    () => h,
-    { storey: h, floors: 1, sill: h - 2.4, h: 1, w: 2.4, gap: 2.2, skip: b.front },
-    glass,
-    null,
-  );
-};
-
-/** North-light roof: sheds across the long axis, glazed on their tall faces. */
-function sawtooth(
-  mb: MeshBuilder,
-  ring: Pt[],
-  box: Box,
-  h: number,
-  wall: THREE.Color,
-  roof: THREE.Color,
-  glass: THREE.Color,
-) {
-  const n = Math.max(2, Math.round((box.L * 2) / 9));
-  const step = (box.L * 2) / n;
-  const across = (p: Pt) => (p[0] - box.c[0]) * box.u[0] + (p[1] - box.c[1]) * box.u[1];
-  for (let k = 0; k < n; k++) {
-    const lo = -box.L + k * step;
-    const strip = clip(
-      clip(ring, (p) => across(p) - lo),
-      (p) => lo + step - across(p),
-    );
-    if (strip.length < 3) continue;
-    const c = at(box, lo + step / 2, 0);
-    roofed(
-      mb,
-      strip,
-      0,
-      [{ n: box.u, c, reach: step / 2, slope: 2.8 / step, base: h }],
-      wall,
-      roof,
-    );
-    // The glass stands proud of the tall face, outside the strip, so the wall cannot show through.
-    const [p, q] = [at(box, lo - PROUD, -box.W + 0.6), at(box, lo - PROUD, box.W - 0.6)];
-    mb.wall(p, q, h + 0.4, h + 2.4, glass, [-box.u[0], -box.u[1]]);
-  }
+  if (b.zone < 5 || !hasStack(b)) return null;
+  return (design(b) as Works).stack(b, obb(b.ring));
 }

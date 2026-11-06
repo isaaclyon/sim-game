@@ -11,26 +11,45 @@ Needs Rust (with the `wasm32-unknown-unknown` target), `wasm-pack`, and Node 24+
 cd web && npm install && npm run dev
 ```
 
+The top bar shows the day and time, the speed buttons, population, money, power and R/C/I
+demand, and the save status. Click population, money or power for details; a second click or
+Esc closes them. Power turns red when the town needs more than it has, money turns red in
+debt, and a failed save turns the save status red. The ☰ menu holds saving, sharing, sound and
+a list of controls. The backtick key (`` ` ``) shows developer numbers: frame rate, tick time,
+stuck cars, failed routes, cars removed by road edits and how long the menu pictures took.
+
+The build menu at the bottom is built from one list (`web/src/ui/catalog.ts`). Roads, Zones and
+Power each open a row of items, drawn from the game's own models. Picking an item starts its
+tool and shows its options (road shape, snaps) with a one-line hint; picking it again, Esc or
+right-click puts it away. Bulldoze sits at the right, beside Views, which picks one ground
+overlay at a time (air, ground, noise, land value) and switches traffic colours and power
+markers. Every tool keeps its key, listed in its tooltip.
+
 Controls: hold W/A/S/D or left-drag to pan, hold Q/E to turn left/right, right-drag orbits,
 wheel zooms to cursor. Held keys move relative to the view, speed up smoothly, glide to a stop
 when released, pan faster when zoomed out, and also work while paused or with a tool on. `R` toggles straight roads
 (click start, click end). `V` toggles curved roads (click start, click bend control, click end).
 The bend control pulls the curve toward it; it is not a point the road passes through.
-Both construction tools continue from the last successful end. `B` toggles bulldoze: hover to
-highlight a whole road between junctions, then click to remove both directions. All tools work
+The continuous curve button starts the same way, then each click adds a smoothly joined piece;
+clicks behind the previous piece's direction are refused. Road tools continue from the last
+successful end. `B` toggles bulldoze: hover to highlight a whole road between junctions, then
+click to remove both directions. All tools work
 while paused. Esc or right-click cancels. Space pauses, 1/2/3 set speed.
 Ambient sound follows the camera: quiet, brief engine sounds near moving cars and birds over
 open land by day. Sparse traffic stays quiet; no moving cars means no traffic sound. Buildings
 never produce a static noise loop. Zooming out makes sound quieter, not louder. Sound starts
-on the first click or key press; `N` or the sound button toggles it, and the choice is remembered.
+on the first click or key press; `N` or Sound in the ☰ menu toggles it, and the choice is remembered.
 A new city starts on an empty map with $50,000. Roads cost money to build: $10 per metre for a
 street and $25 for a main road. The road tool shows what the previewed road costs, and refuses
 a road the city cannot pay for. Every road also costs upkeep each in-game hour, and residents
-and filled jobs pay taxes. The HUD shows the balance and the hourly taxes and upkeep. Upkeep
-can push the balance into debt, which stops new roads until taxes bring it back. Bulldozing
+and filled jobs pay taxes. Every city also receives a flat $1,000 grant each in-game hour, so a
+young town can keep building before taxes add up; it covers the upkeep of about 10 km of street.
+The top bar shows the balance and the net change per hour; its panel splits that into taxes,
+grant and upkeep. Upkeep beyond the grant and taxes
+can push the balance into debt, which stops new roads until income brings it back. Bulldozing
 and zoning are free ([ADR 0036](docs/adrs/0036-money-build-costs-taxes-upkeep.md)). Saves
 from before power was added (versions 1–3) no longer open; start a New city.
-The HUD shows the sim's day clock and speed (`Day 1   06:00   1×`). The game starts on Day 1 at
+The top bar shows the sim's day clock (`Day 1 · 06:00`) beside the speed buttons. The game starts on Day 1 at
 06:00, and each sim second advances the clock 18 seconds, so a day lasts 80 real minutes at 1× and 8
 minutes at 10×. Speed changes how many sim seconds pass per real second; pausing stops the clock.
 Lighting follows that same clock: warm dawn and dusk fade into daylight and a blue night.
@@ -45,7 +64,7 @@ a bounded area around the camera focus so they stay detailed when viewing a larg
 vehicle lamps use emissive faces rather than individual light sources.
 Cars whose remaining route uses a deleted road park and retry; other traffic continues.
 The zone brush paints residential (`Z`), commercial (`X`) or industrial (`C`); press the key
-again to switch between low and high density, or use the tool bar. `U` unzones. Click inside a
+again to switch between low and high density, or pick it under Zones in the build menu. `U` unzones. Click inside a
 block (land enclosed by roads, outlined on hover) to zone all of it, or drag a rectangle to
 paint just that (left-drag paints instead of panning while the brush is on). The sim cuts
 zoned blocks into lots facing their roads, and adds alleys or connector streets where a block
@@ -113,8 +132,10 @@ behind it; lines also snap to roadsides and existing line ends.
 
 Starter power supports a small village. When it runs out, lots wait until a plant supplies
 power. Existing buildings receive power oldest first; a shortage stops their empty homes
-and jobs from filling but does not evict anyone. The HUD reports supply, use and waiting
-lots. Unpowered buildings are marked, and the power view colours separate grids.
+and jobs from filling but does not evict anyone. The top bar shows what the town needs as a
+share of what it has, and turns red above 100%; its panel lists buildings without power,
+waiting lots and what to do. Unpowered buildings are marked, and the power view colours
+separate grids. Picking a power tool shows the power view until the tool is put away.
 
 Placing a plant clears its land. Lines remove buildings they cross and prevent rebuilding
 until the line is bulldozed. Bulldozing selects a plant first, then a line, then a road.
@@ -124,9 +145,11 @@ See [ADR 0041](docs/adrs/0041-power-grids-follow-roads.md) and
 
 ## Saving
 
-The game keeps one city in this browser, at this site address. **Save city** saves immediately;
-autosave saves changes every 60 real seconds, including edits made while paused. The status
-shows unsaved changes, the last successful save time or a storage error. Returning to the game
+The game keeps one city in this browser, at this site address. **Save city** in the ☰ menu saves immediately;
+autosave saves changes every 60 real seconds, including edits made while paused. The save
+status at the right of the top bar shows the last successful save time, "Saving…" or a storage
+error, which turns it red; clicking it opens the ☰ menu, which also says whether there are
+unsaved changes. Returning to the game
 automatically restores the saved city, paused, with its residents, jobs, traffic and scheduled
 events intact. Camera position, tools and inspection are not saved.
 
@@ -160,7 +183,8 @@ not people physically at work. Closing buildings keep their original use and sho
 Demolition clears the selection. Counts refresh while selected, including after paused edits.
 
 Click a car or walker to inspect its citizen instead; `F` toggles following that citizen.
-Buildings and citizens share one panel. Click empty ground, press Esc or use Close to dismiss it.
+Buildings and citizens share one card: a title and one line with a small icon per fact, with
+Follow and Close buttons. Click empty ground, press Esc or use Close to dismiss it.
 Construction and zoning tools keep their normal click behavior. Inspection is read-only and
 shows counts only, not resident or employee lists.
 
@@ -168,7 +192,7 @@ shows counts only, not resident or employee lists.
 
 Normal play starts with no cars. Completed homes receive households gradually, even without
 jobs. The population counter counts residents, including people who are not travelling.
-Next to it, the HUD shows how many residents have no job and what share of the population
+Its panel in the top bar shows how many residents have no job and what share of the population
 that is (0% when nobody lives in town). A job at a workplace that is temporarily cut off by
 road edits still counts as a job.
 Houses hold one household of 1–7 adults; apartments provide several separate homes. Home
@@ -179,7 +203,8 @@ records the capacity formulas and lifecycle contract.
 Residents seek reachable jobs in commercial and industrial buildings. Jobs are limited;
 industrial halls count as one usable floor. Daily trips go to work, optionally shop, then home.
 Unemployed residents sometimes shop during the day. Only commercial buildings offer shopping.
-First activities are staggered shortly after moving in; later departures follow the day clock.
+New residents follow the day clock too: workers wait for their individual 07:00–09:00
+departure, while unemployed residents schedule optional shopping at 10:00–16:00.
 Time spent at work or shopping starts on arrival, and late trips may finish the next day.
 
 Every normal-play car belongs to one resident's trip. Failed routes wait and retry. Road edits
@@ -210,14 +235,18 @@ snapshot keeps its five-float segment format, with multiple segments per curve. 
 samples use join code -1 between actual junctions.
 
 Roads render as asphalt ribbons with simple pads at shared endpoints: streets are eight metres
-wide, main roads twelve. Press M (or the main road button) to build main roads with either road
-tool. Main roads are faster, and long trips ride them in the middle (ADR 0017).
+wide, main roads twelve. Press M (or pick Main road) to build main roads with any road
+tool. Main roads are faster, and long trips ride them in the middle (ADR 0017). To upgrade or
+downgrade roads, draw a straight road of the other type over them from junction to junction:
+they change type in place, and cars keep driving. Upgrading pays the difference in build cost
+($15 per metre from street to main road); downgrading is free
+([ADR 0048](docs/adrs/0048-drawing-over-roads-changes-their-class.md)).
 The view preserves the simulation's right-hand traffic.
 
 Run `scripts/check.sh` for the full checks, including road geometry tests and replay
 regression tests: each `crates/sim/tests/replays/*.cmdlog` session must rebuild the same city
 ([ADR 0034](docs/adrs/0034-command-log-replay-tests.md)). Record a new session in `npm run dev`
-with the city panel's **Command log** button, put it in that folder and run
+with the ☰ menu's **Command log** button, put it in that folder and run
 `BLESS_REPLAYS=1 cargo test -p sim --test replay` to add its expected result. Rerun the same
 command after an intended gameplay change, and review the changed `expect` lines. To run just those
 frontend tests, use `cd web && npm test`.
