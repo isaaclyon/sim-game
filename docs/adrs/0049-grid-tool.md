@@ -1,6 +1,6 @@
 # 0049. The grid tool is one sim command planned edge by edge
 
-- Status: Accepted (M4.5 slice 3); implemented, browser check pending
+- Status: Accepted (M4.5 slice 3); implemented
 - Date: 2026-11-06
 - Extends: [0038](0038-sim-owned-drawing-guides.md), [0034](0034-command-log-replay-tests.md),
   [0036](0036-money-build-costs-taxes-upkeep.md)
