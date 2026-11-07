@@ -1,6 +1,6 @@
 # 0039. Road edit history lives in the sim and is saved with the city
 
-- Status: Proposed (M4.5 slice 5; refine before implementation)
+- Status: Superseded by [0051](0051-road-edit-history-revised.md)
 - Date: 2026-11-04
 
 ## Context
