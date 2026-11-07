@@ -79,6 +79,10 @@ impl World {
     }
 
     fn park(&mut self, agent: AgentId, secs: f32) {
+        if self.fire.is_truck(agent) {
+            self.truck_lost(agent);
+            return;
+        }
         if let Some(c) = self.agents.citizen[agent as usize] {
             self.retry_citizen_trip(c);
             return;
@@ -236,7 +240,14 @@ impl World {
                 }
                 continue;
             };
-            let verdict = self.junctions.request(
+            // Fire trucks ignore lights and right of way (ADR 0053).
+            let ask = if self.fire.is_truck(agent) {
+                crate::junction::Junctions::emergency
+            } else {
+                crate::junction::Junctions::request
+            };
+            let verdict = ask(
+                &mut self.junctions,
                 &self.roads,
                 &self.traffic,
                 &self.agents,
@@ -294,6 +305,10 @@ impl World {
         self.traffic.queues[lane as usize].pop_front();
         let a = agent as usize;
         self.agents.node[a] = self.agents.dest[a];
+        if self.fire.is_truck(agent) {
+            self.truck_arrived(agent);
+            return;
+        }
         self.totals.trips_completed += 1;
         if let Some(c) = self.agents.citizen[a] {
             self.citizen_arrived(c);

@@ -17,7 +17,7 @@ const SIGNAL_OFFSET: f32 = 6.0;
 impl World {
     /// Writes `[x, y, heading, speed_ratio, kind]` per agent, indexed by agent id so the
     /// renderer can interpolate between snapshots. Heading is radians from +x. Kind is 0 = car,
-    /// 1 = walker on the sidewalk (ADR 0026). Agents not on a road or sidewalk get
+    /// 1 = walker on the sidewalk (ADR 0026), 2 = fire truck (ADR 0053). Agents not on a road or sidewalk get
     /// `speed_ratio = -1`.
     pub fn write_agent_snapshot(&self, out: &mut Vec<f32>) {
         let a = &self.agents;
@@ -26,7 +26,14 @@ impl World {
         for i in 0..a.len() {
             let lane = a.lane[i];
             let (side, limit, kind) = match a.state[i] {
-                AgentState::Driving => (LANE_OFFSET, self.roads.lane_speed[lane as usize], 0.0),
+                AgentState::Driving => {
+                    let kind = if self.fire.is_truck(i as u32) {
+                        2.0
+                    } else {
+                        0.0
+                    };
+                    (LANE_OFFSET, self.roads.lane_speed[lane as usize], kind)
+                }
                 AgentState::Walking => {
                     let main = self.roads.lane_class(lane) == RoadClass::Main;
                     let side = if main {
@@ -63,16 +70,23 @@ impl World {
     }
 
     /// Writes `[x, y]` per centreline sample of the bulldoze target, or nothing on a miss. A
-    /// plant's, pump's, tower's or building's target is its closed outline, a line's its two
-    /// ends; plants, lines, pumps and towers, and then buildings win over roads (ADR 0045).
+    /// plant's, station's, pump's, tower's, building's or ruin's target is its closed outline,
+    /// a line's its two ends; stations, plants, lines, pumps and towers, buildings and then
+    /// ruins win over roads (ADR 0045, 0053).
     pub fn write_bulldoze_preview(&self, x: f32, y: f32, out: &mut Vec<f32>) {
         out.clear();
-        if self.write_power_bulldoze(x, y, out) || self.write_water_bulldoze(x, y, out) {
+        if self.write_station_bulldoze(x, y, out)
+            || self.write_power_bulldoze(x, y, out)
+            || self.write_water_bulldoze(x, y, out)
+        {
             return;
         }
         if let Some(b) = self.building_at(x, y) {
             let ring = self.buildings.footprint(b);
             out.extend(ring.iter().chain(&ring[..1]).flat_map(|p| [p.0, p.1]));
+            return;
+        }
+        if self.write_ruin_bulldoze(x, y, out) {
             return;
         }
         if let Some(road) = snap::bulldoze_target(&self.roads, x, y) {
@@ -306,6 +320,7 @@ impl World {
         self.power.hash_into(&mut mix);
         self.water.hash_into(&mut mix);
         self.pollution.hash_into(&mut mix);
+        self.fire.hash_into(self.cfg.seed, &mut mix);
         for chunk in self.zones.cells.chunks(8) {
             let mut word = [0u8; 8];
             word[..chunk.len()].copy_from_slice(chunk);

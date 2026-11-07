@@ -52,9 +52,9 @@ pub enum Command {
         y: f32,
         class: RoadClass,
     },
-    /// Removes the plant under the point, else the nearest line in reach, else the pump or
-    /// tower under the point, else the building under the point (ADR 0045), else the nearest
-    /// road.
+    /// Removes the fire station or plant under the point, else the nearest line in reach,
+    /// else the pump or tower under the point, else the building under the point (ADR 0045),
+    /// else ruins (ADR 0053), else the nearest road.
     DeleteRoad {
         x: f32,
         y: f32,
@@ -80,6 +80,16 @@ pub enum Command {
         ay: f32,
         bx: f32,
         by: f32,
+    },
+    /// Places a fire station beside the nearest road, facing it (ADR 0053). Refused away from
+    /// roads, over roads, plants, pumps, towers and stations, and when the city cannot pay.
+    PlaceStation {
+        x: f32,
+        y: f32,
+    },
+    /// Turns this city's fires on or off (ADR 0053).
+    SetFires {
+        on: bool,
     },
     /// Sets every zone cell whose centre is inside the rectangle with these corners. `Zone::None`
     /// unzones. See ADR 0014.

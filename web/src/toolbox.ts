@@ -1,6 +1,9 @@
-// Which tool is in use: a road tool, bulldoze, a zone brush or a power tool, never two at once.
+// Which tool is in use: a road tool, bulldoze, a zone brush, a power tool or the fire station
+// tool, never two at once.
 // The build menu and the keys both start tools here (M4.6); each tool keeps its own canvas
-// handling and sim commands. Picking a power or water tool shows that view until it is put away.
+// handling and sim commands. Picking a power, water or fire station tool shows that service's
+// view until it is put away.
+import { FireTools } from './fire-tools';
 import { PowerTools, WATER_TOOLS } from './power-tools';
 import { RoadClass, type ToWorker, type WaterKind, Zone } from './protocol';
 import type { Renderer } from './renderer';
@@ -15,10 +18,11 @@ export class Toolbox {
   readonly roads: RoadTool;
   readonly zoning: ZoneTool;
   readonly power: PowerTools;
+  readonly fire: FireTools;
   /** The road shape the road items start with: the last one picked. */
   private shape: RoadMode = 'straight';
   /** Whether each service's view showed before its tool turned it on; null when it did not. */
-  private viewBefore: Record<Service, boolean | null> = { power: null, water: null };
+  private viewBefore: Record<Service, boolean | null> = { power: null, water: null, fire: null };
   private readonly renderer: Renderer;
   private readonly hint: HTMLElement;
   private readonly views: Views;
@@ -39,6 +43,7 @@ export class Toolbox {
     this.roads = new RoadTool(send, renderer, { help: el.hint, readout: el.readout });
     this.zoning = new ZoneTool(send, renderer);
     this.power = new PowerTools(send, renderer, el.hint, () => this.use(null));
+    this.fire = new FireTools(send, renderer, el.hint, () => this.use(null));
     // The player's own choice stands when the tool is put away.
     views.onPlayerMarkers = (service) => {
       this.viewBefore[service] = null;
@@ -46,7 +51,8 @@ export class Toolbox {
   }
 
   get active() {
-    return this.roads.mode !== null || this.zoning.zone !== null || this.power.active;
+    const { roads, zoning, power, fire } = this;
+    return roads.mode !== null || zoning.zone !== null || power.active || fire.active;
   }
 
   get selection(): Selection {
@@ -64,7 +70,9 @@ export class Toolbox {
               ? { kind: 'water', water: WATER_TOOLS.indexOf(p) as WaterKind }
               : p !== null
                 ? { kind: 'plant', plant: p }
-                : null;
+                : this.fire.active
+                  ? { kind: 'station' }
+                  : null;
     const roadMode = roads.roadMode ? this.shape : null;
     return { tool, roadMode, snap: roads.snaps, gridCell: roads.cell };
   }
@@ -78,6 +86,7 @@ export class Toolbox {
     }
     // The hint line is shared, and each tool clears only what it wrote: stop them all first.
     this.power.set(null);
+    this.fire.set(false);
     this.zoning.set(null);
     this.roads.setMode(null);
     this.hint.textContent = '';
@@ -91,10 +100,12 @@ export class Toolbox {
     } else if (tool?.kind === 'plant') this.power.set(tool.plant);
     else if (tool?.kind === 'line') this.power.set('line');
     else if (tool?.kind === 'water') this.power.set(WATER_TOOLS[tool.water]);
+    else if (tool?.kind === 'station') this.fire.set(true);
     const t = this.power.tool;
     const water = t === 'pump' || t === 'tower';
     this.showView('power', t !== null && !water);
     this.showView('water', water);
+    this.showView('fire', this.fire.active);
     this.renderer.renderer.domElement.style.cursor = tool ? 'crosshair' : '';
     this.changed();
   }
@@ -118,7 +129,7 @@ export class Toolbox {
     }
   }
 
-  /** The tool keys: R, V, B, M, Z, X, C, U, G and L. False for any other key. */
+  /** The tool keys: R, V, B, M, Z, X, C, U, G, L and H. False for any other key. */
   key(key: string): boolean {
     const k = key.toLowerCase();
     const toggle = (mode: RoadMode) =>
@@ -135,6 +146,7 @@ export class Toolbox {
       const plant = this.power.nextPlant();
       this.use(plant === null ? null : { kind: 'plant', plant });
     } else if (k === 'l') this.use(this.power.tool === 'line' ? null : { kind: 'line' });
+    else if (k === 'h') this.use(this.fire.active ? null : { kind: 'station' });
     else return false;
     return true;
   }

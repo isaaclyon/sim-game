@@ -90,8 +90,8 @@ impl World {
             .is_some_and(|at| self.spot_fits(at, kind == PlantKind::Coal))
     }
 
-    /// Whether a plant, pump or tower at `at` is clear of roads, plants, pumps and towers,
-    /// and, when it must stand `beside_road`, within reach of one.
+    /// Whether a plant, pump, tower or fire station at `at` is clear of roads, plants, pumps,
+    /// towers and stations, and, when it must stand `beside_road`, within reach of one.
     pub(in crate::world) fn spot_fits(&self, at: Footprint, beside_road: bool) -> bool {
         let near_road = |margin| {
             self.roads.active_roads().any(|road| {
@@ -107,7 +107,10 @@ impl World {
             .map(|p| self.power.footprint(p))
             .chain(self.water.active_pieces().map(|p| self.water.footprint(p)))
             .any(|other| other.overlaps(at));
-        !overlaps && !near_road(ROAD_CLEARANCE) && (!beside_road || near_road(PLANT_REACH))
+        !overlaps
+            && !self.station_overlaps(at)
+            && !near_road(ROAD_CLEARANCE)
+            && (!beside_road || near_road(PLANT_REACH))
     }
 
     /// Places a plant at its `plant_spot`, unzoning the land under it and removing the

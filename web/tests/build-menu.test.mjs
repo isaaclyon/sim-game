@@ -10,7 +10,7 @@ const last = (t, type) => t.messages.findLast((m) => m.type === type);
 test('one entry in the list adds a keyboard-reachable item that starts its tool', async () => {
   const t = await tools({
     catalog({ CATEGORIES }) {
-      CATEGORIES.find((c) => c.id === 'services').items.push({
+      CATEGORIES.find((c) => c.id === 'transit').items.push({
         id: 'test-turbine',
         label: 'Test turbine',
         tip: 'An item added by one list entry.',
@@ -20,13 +20,13 @@ test('one entry in the list adds a keyboard-reachable item that starts its tool'
     },
   });
   const { elements: el, document } = t;
-  const category = el['category-services'];
+  const category = el['category-transit'];
   assert.equal(category.localName, 'button', 'a hidden category shows once it has an item');
-  assert.equal(category.attributes['aria-label'], 'Services');
+  assert.equal(category.attributes['aria-label'], 'Transit');
   // Enter on a focused category opens its items and moves focus to the first one.
   category.focus();
   category.click({ detail: 0 });
-  assert.equal(el['items-services'].hidden, false);
+  assert.equal(el['items-transit'].hidden, false);
   assert.equal(document.activeElement, el['test-turbine']);
   const item = el['test-turbine'];
   assert.equal(item.localName, 'button');
@@ -39,7 +39,7 @@ test('one entry in the list adds a keyboard-reachable item that starts its tool'
   );
   item.click({ detail: 0 });
   assert.ok(pressed(t, 'test-turbine'));
-  assert.equal(el['items-services'].hidden, false, 'its own row stays open');
+  assert.equal(el['items-transit'].hidden, false, 'its own row stays open');
   t.move(10, 20);
   const ask = last(t, 'previewPlant');
   assert.deepEqual([ask.kind, ask.x, ask.y], [PlantKind.Wind, 10, 20]);
@@ -95,6 +95,7 @@ test('Bulldoze sits apart at the right of the category bar and switches like B',
     'category-zones',
     'category-power',
     'category-water',
+    'category-services',
     'divider',
     'bulldoze',
     'views',

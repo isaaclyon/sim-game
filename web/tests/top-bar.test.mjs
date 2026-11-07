@@ -13,6 +13,18 @@ const STATS = {
   demand: { residential: 60, commercial: 0, industrial: -60 },
   power: { supply: 0, starter: 150, used: 0, demand: 120, unpowered: 0, waiting: 0 },
   water: { supply: 0, used: 0, demand: 0, stored: 0, capacity: 0, dry: 0, waiting: 0 },
+  fire: {
+    enabled: true,
+    threshold: 1000,
+    stations: 0,
+    trucks: 0,
+    freeTrucks: 0,
+    burning: 0,
+    unattended: 0,
+    covered: 0,
+    saved: 0,
+    destroyed: 0,
+  },
   agents: 9,
   parked: 3,
   awaitingPath: 0,
@@ -211,4 +223,64 @@ test('speed buttons set the speed and show the one in use', async () => {
   assert.equal(t.elements['speed-1'].attributes['aria-pressed'], 'false');
   t.key(' ');
   assert.equal(t.elements['speed-0'].attributes['aria-pressed'], 'true');
+});
+
+const FIRE = STATS.fire;
+
+test('fire warns as the town nears the threshold, and turns red for a fire with no truck', async () => {
+  const t = await tools();
+  const { elements: el } = t;
+  show(t, { population: 500 });
+  assert.equal(el['fire-value'].textContent, 'No fires yet');
+  assert.equal(el.fire.classList.contains('caution'), false);
+  show(t, { population: 850 });
+  assert.equal(el['fire-value'].textContent, 'Fires at 1,000');
+  assert.equal(el.fire.classList.contains('caution'), true, 'amber before fires start');
+  assert.equal(el.fire.classList.contains('warning'), false);
+  show(t, { population: 1200, fire: { ...FIRE, stations: 1, trucks: 2, freeTrucks: 2 } });
+  assert.equal(el['fire-value'].textContent, '1 station');
+  assert.equal(el.fire.classList.contains('caution'), false, 'a station answers the warning');
+  // A fire burns with no truck on the way: red, and the panel can show it.
+  t.reply({
+    type: 'fire',
+    stations: new Float32Array(),
+    fires: new Float32Array([10, 20, 8, 1, 30, 40, 6, 0]),
+    ruins: new Float32Array(),
+    coverRoads: new Float32Array(),
+    coverBuildings: new Float32Array(),
+  });
+  const burning = { ...FIRE, stations: 1, trucks: 2, freeTrucks: 1, burning: 2, unattended: 1 };
+  show(t, { population: 1200, fire: burning });
+  assert.equal(el['fire-value'].textContent, '2 burning');
+  assert.equal(el.fire.classList.contains('warning'), true);
+  t.pressId('fire');
+  assert.equal(el['fire-title'].textContent, 'Fire with no truck');
+  assert.equal(el['fire-trucks'].textContent, '1 of 2 free');
+  assert.match(el['fire-advice'].textContent, /no truck/);
+  t.pressId('show-fire');
+  const shown = t.previews.filter((p) => p.type === 'showPoint');
+  assert.deepEqual(shown.at(-1), { type: 'showPoint', x: 30, y: 40 }, 'the fire with no truck');
+  t.pressId('fire-setting');
+  assert.deepEqual({ ...t.messages.at(-1) }, { type: 'setFires', on: false });
+  show(t, { population: 1200, fire: { ...FIRE, enabled: false } });
+  assert.equal(el['fire-value'].textContent, 'Off');
+  assert.equal(el['fire-setting'].textContent, 'Turn fires on');
+});
+
+test('the fire station tool shows coverage and places a station where clicked', async () => {
+  const t = await tools();
+  t.key('h');
+  assert.deepEqual(t.previews.filter((p) => p.type === 'fireView').at(-1), {
+    type: 'fireView',
+    on: true,
+  });
+  t.move(5, 6);
+  assert.equal(t.messages.at(-1).type, 'previewStation');
+  t.click(5, 6);
+  assert.ok(t.messages.some((m) => m.type === 'placeStation' && m.x === 5 && m.y === 6));
+  t.key('Escape');
+  assert.deepEqual(t.previews.filter((p) => p.type === 'fireView').at(-1), {
+    type: 'fireView',
+    on: false,
+  });
 });

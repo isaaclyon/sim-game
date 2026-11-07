@@ -14,6 +14,7 @@ use std::f32::consts::{PI, TAU};
 use crate::agents::{AgentId, Agents};
 use crate::road::{LaneId, NodeId, RoadClass, RoadNetwork};
 
+mod emergency;
 mod movement;
 mod signal;
 #[cfg(test)]

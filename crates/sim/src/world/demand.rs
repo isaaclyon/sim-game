@@ -53,12 +53,14 @@ impl World {
                 .active_plants()
                 .map(|p| self.power.plant_kind[p as usize].jobs())
                 .sum::<u32>();
-        let jobs = (self.supply.commercial_jobs + industrial_jobs) as i32;
+        // Fire stations' jobs (ADR 0053) count as commerce.
+        let commercial_jobs = self.supply.commercial_jobs + self.fire_jobs();
+        let jobs = (commercial_jobs + industrial_jobs) as i32;
         let room = self.residents.vacant.len() as i32 * ROOM_PER_VACANT_HOME;
         Demand {
             residential: RESIDENTIAL_BASE + jobs - population - room,
             commercial: COMMERCIAL_BASE + population * COMMERCIAL_SHARE / 100
-                - self.supply.commercial_jobs as i32,
+                - commercial_jobs as i32,
             industrial: INDUSTRIAL_BASE + population * INDUSTRIAL_SHARE / 100
                 - industrial_jobs as i32,
         }
@@ -104,14 +106,19 @@ impl World {
 
     /// Due lots build while demand clears the land-value threshold (ADR 0037), power is
     /// available (ADR 0041) and, for dense lots, pump water is (ADR 0052); the rest wait and
-    /// check again. Lots under a plant or line are
-    /// dropped until it goes. Each new building is registered at once, so the next lot due
+    /// check again. Lots under a plant, line or fire station are dropped until it goes, and
+    /// ruins hold theirs for a day (ADR 0053). Each new building is registered at once, so the next lot due
     /// this tick sees its homes, jobs and power use.
     pub(super) fn grow_buildings(&mut self) {
         let tick = self.totals.tick;
         let (dt, seed) = (self.cfg.dt, self.cfg.seed);
         while let Some((lot, zone)) = self.buildings.next_due(tick) {
-            if self.lot_blocked(lot) {
+            if self.lot_blocked(lot) || self.station_blocks(lot) {
+                continue;
+            }
+            // Ruins hold the lot for a day (ADR 0053).
+            if self.fire.ruined(lot) {
+                self.buildings.defer(lot, zone, tick, dt, seed, Wait::Demand);
                 continue;
             }
             if !self.cfg.ignore_demand && self.demand_for(zone) <= self.land_threshold(lot, zone) {

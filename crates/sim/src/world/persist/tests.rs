@@ -332,7 +332,7 @@ fn combined_town() -> World {
 fn combined_save_restores_power_pollution_and_money_and_keeps_evolving() {
     let mut w = combined_town();
     let save = w.save().unwrap();
-    assert_eq!(u32::from_le_bytes(le(&save, 8)), 5);
+    assert_eq!(u32::from_le_bytes(le(&save, 8)), SAVE_VERSION);
     let mut loaded = World::load(&save).unwrap();
     assert_eq!(loaded.save().unwrap(), save);
     assert_eq!(loaded.state_hash(), w.state_hash());

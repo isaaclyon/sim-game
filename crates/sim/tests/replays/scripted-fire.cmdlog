@@ -1,0 +1,94 @@
+# Scripted: a generated grid zoned whole grows past the fire threshold (ADR 0053). The first
+# fire, with no station, destroys its building; a station placed right after saves the next.
+# Fires are turned off at the end. Two pumps water the dense zones (ADR 0052).
+sim-game command log 1
+seed 28
+grid 10 10
+1 fill 60 60 residential-high
+1 fill 60 180 commercial-high
+1 fill 60 300 residential-high
+1 fill 60 420 industrial-high
+1 fill 60 540 residential-high
+1 fill 60 660 commercial-high
+1 fill 60 780 residential-high
+1 fill 60 900 industrial-high
+1 fill 60 1020 residential-high
+1 fill 180 60 industrial-high
+1 fill 180 180 residential-high
+1 fill 180 300 commercial-high
+1 fill 180 420 residential-high
+1 fill 180 540 industrial-high
+1 fill 180 660 residential-high
+1 fill 180 780 commercial-high
+1 fill 180 900 residential-high
+1 fill 180 1020 industrial-high
+1 fill 300 60 residential-high
+1 fill 300 180 industrial-high
+1 fill 300 300 residential-high
+1 fill 300 420 commercial-high
+1 fill 300 540 residential-high
+1 fill 300 660 industrial-high
+1 fill 300 780 residential-high
+1 fill 300 900 commercial-high
+1 fill 300 1020 residential-high
+1 fill 420 60 commercial-high
+1 fill 420 180 residential-high
+1 fill 420 300 industrial-high
+1 fill 420 420 residential-high
+1 fill 420 540 commercial-high
+1 fill 420 660 residential-high
+1 fill 420 780 industrial-high
+1 fill 420 900 residential-high
+1 fill 420 1020 commercial-high
+1 fill 540 60 residential-high
+1 fill 540 180 commercial-high
+1 fill 540 300 residential-high
+1 fill 540 420 industrial-high
+1 fill 540 540 residential-high
+1 fill 540 660 commercial-high
+1 fill 540 780 residential-high
+1 fill 540 900 industrial-high
+1 fill 540 1020 residential-high
+1 fill 660 60 industrial-high
+1 fill 660 180 residential-high
+1 fill 660 300 commercial-high
+1 fill 660 420 residential-high
+1 fill 660 540 industrial-high
+1 fill 660 660 residential-high
+1 fill 660 780 commercial-high
+1 fill 660 900 residential-high
+1 fill 660 1020 industrial-high
+1 fill 780 60 residential-high
+1 fill 780 180 industrial-high
+1 fill 780 300 residential-high
+1 fill 780 420 commercial-high
+1 fill 780 540 residential-high
+1 fill 780 660 industrial-high
+1 fill 780 780 residential-high
+1 fill 780 900 commercial-high
+1 fill 780 1020 residential-high
+1 fill 900 60 commercial-high
+1 fill 900 180 residential-high
+1 fill 900 300 industrial-high
+1 fill 900 420 residential-high
+1 fill 900 540 commercial-high
+1 fill 900 660 residential-high
+1 fill 900 780 industrial-high
+1 fill 900 900 residential-high
+1 fill 900 1020 commercial-high
+1 fill 1020 60 residential-high
+1 fill 1020 180 commercial-high
+1 fill 1020 300 residential-high
+1 fill 1020 420 industrial-high
+1 fill 1020 540 residential-high
+1 fill 1020 660 commercial-high
+1 fill 1020 780 residential-high
+1 fill 1020 900 industrial-high
+1 fill 1020 1020 residential-high
+2 plant 540 540 coal
+2 water 540 300 pump
+2 water 540 780 pump
+3400 station 60 60
+6800 fires off
+end 7000
+expect hash 97398d051557b001 population 1039 buildings 26 trips 789

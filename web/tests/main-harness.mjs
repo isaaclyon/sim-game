@@ -3,7 +3,7 @@ import { stripTypeScriptTypes } from 'node:module';
 import { extname } from 'node:path';
 import { createContext, SourceTextModule, SyntheticModule } from 'node:vm';
 
-import { PlantKind, RoadClass, Snap, WaterKind, Zone } from '../src/protocol.ts';
+import { FIRE_STRIDE, PlantKind, RoadClass, Snap, WaterKind, Zone } from '../src/protocol.ts';
 import { fakeDocument } from './fake-dom.mjs';
 
 // Exercise main.ts's event handlers without a WebGL context or a running clock. `catalog`, if
@@ -187,6 +187,15 @@ export async function tools({ hash = '', clipboard = true, catalog } = {}) {
     setWaterView(on) {
       previews.push({ type: 'waterView', on });
     }
+    setFire(fire) {
+      previews.push({ type: 'fire', fire });
+    }
+    setFireView(on) {
+      previews.push({ type: 'fireView', on });
+    }
+    showPoint(x, y) {
+      previews.push({ type: 'showPoint', x, y });
+    }
     setPlantPreview(outline, ok) {
       previews.push({ type: 'plant', outline, ok });
     }
@@ -252,7 +261,7 @@ export async function tools({ hash = '', clipboard = true, catalog } = {}) {
   for (const [name, exports] of [
     ['renderer', { Renderer }],
     ['ambient-sound', { AmbientSound }],
-    ['protocol', { PlantKind, RoadClass, Snap, WaterKind, Zone }],
+    ['protocol', { FIRE_STRIDE, PlantKind, RoadClass, Snap, WaterKind, Zone }],
   ]) {
     const identifier = new URL(`./${name}.ts`, mainUrl).href;
     modules.set(

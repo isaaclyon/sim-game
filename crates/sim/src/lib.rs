@@ -30,7 +30,8 @@ pub mod zone;
 
 pub use replay::CommandLog;
 pub use world::{
-    Command, Config, PLANT_STRIDE, POWER_BUILDING_STRIDE, PowerStats, SaveError, Stats,
-    WATER_BUILDING_STRIDE, WATER_PIECE_STRIDE, WaterStats, World,
+    Command, Config, FIRE_STRIDE, FireStats, PLANT_STRIDE, POWER_BUILDING_STRIDE, PowerStats,
+    STATION_STRIDE, SaveError, Stats, WATER_BUILDING_STRIDE, WATER_PIECE_STRIDE, WaterStats,
+    World,
 };
 pub use zone::Zone;

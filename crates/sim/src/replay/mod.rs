@@ -19,6 +19,8 @@
 //! 170 plant 400 40 coal
 //! 180 line 400 40 600 40
 //! 190 water 300 40 pump
+//! 190 station 300 50
+//! 200 fires off
 //! end 3000
 //! expect hash 0123456789abcdef population 12 buildings 30 trips 40
 //! ```
@@ -308,6 +310,11 @@ fn command_text(cmd: &Command) -> String {
             nums("water", &[x, y]);
             s + " " + name(&WATER, kind)
         }
+        Command::PlaceStation { x, y } => {
+            nums("station", &[x, y]);
+            s
+        }
+        Command::SetFires { on } => format!("fires {}", if on { "on" } else { "off" }),
     }
 }
 

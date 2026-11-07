@@ -81,7 +81,7 @@ pub struct Money {
     pub balance: i64,
     pub taxes: i64,
     pub grant: i64,
-    /// Road upkeep.
+    /// Road and fire station upkeep (ADR 0053).
     pub upkeep: i64,
     /// Upkeep of plants, pumps and towers.
     pub utilities: i64,
@@ -92,7 +92,8 @@ pub(super) struct Treasury {
     pub(super) balance: i64,
     /// Dollar-minutes not yet settled as a whole dollar, `0..60`.
     pub(super) carry: i64,
-    /// Road upkeep per clock hour; derived from the roads, refreshed whenever they change.
+    /// Road and fire station upkeep per clock hour; derived from them, refreshed whenever
+    /// they change.
     #[serde(skip)]
     pub(super) upkeep: i64,
     /// Utility upkeep per clock hour; derived like `upkeep` from plants, pumps and towers.
@@ -244,7 +245,7 @@ impl World {
     }
 
     pub(super) fn refresh_upkeep(&mut self) {
-        self.treasury.upkeep = road_upkeep(&self.roads);
+        self.treasury.upkeep = road_upkeep(&self.roads) + self.fire_upkeep();
         self.treasury.utilities = utility_upkeep(&self.power, &self.water);
     }
 

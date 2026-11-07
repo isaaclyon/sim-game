@@ -434,8 +434,23 @@ Goals and consequences, kept light so they don't crowd out building.
   pump beside a factory district visibly gives less, a tower carries a network through a
   dip, and a cut-off dense block empties slowly and refills once reconnected.
 
-- Remaining services with coverage areas: roads maintenance, then fire, police, health and
-  schools.
+- **Fire — implemented, awaiting browser approval**
+  ([ADR 0053](adrs/0053-fire-stations-send-trucks-through-traffic.md)). Roadside fire
+  stations cover buildings within a driving distance along roads and raise their land value.
+  Above about 1,000 residents, grown buildings occasionally catch fire (industry and dense
+  more often). A station sends a real truck through traffic; one that arrives in time saves
+  the building, otherwise it burns down, its people rehome or leave, and ruins stand for a
+  day before the lot regrows. A city setting turns fires off. Police, health and schools
+  later reuse the same shape.
+
+  Done when: a town nearing 1,000 people sees the warning, builds a station, watches a truck
+  cross town and save a house, loses a building in an uncovered or jammed area, and can turn
+  fires off.
+
+  Built: the fire station under Services (key H), the fire view under Views, red trucks, flames
+  and ruins, and a fire figure in the top bar whose panel shows a fire and turns fires off.
+
+- Remaining services with coverage areas: roads maintenance, then police, health and schools.
 - **Children** ([ADR 0054](adrs/0054-children-births-and-growing-up.md)), after water and
   fire merge. Families arrive with children and have babies when their home has room.
   Children grow up in about 10 clock days, look for work, then move into a vacant home or

@@ -1,6 +1,17 @@
 // Messages between the main thread and the sim worker. The worker owns the sim; the main
 // thread only sends commands and draws snapshots.
 
+import type {
+  FireStats,
+  PlantKind,
+  PowerStats,
+  ServiceMessage,
+  WaterKind,
+  WaterStats,
+} from './protocol-services.ts';
+
+export * from './protocol-services.ts';
+
 export type ToWorker =
   /**
    * `grid` starts on the generated `cols` × `rows` street grid (tests and benchmarks); false
@@ -41,8 +52,9 @@ export type ToWorker =
   /** Asks which road `setRoadClass` would change and for what. Answered with
    * `roadClassPreview`. Changes nothing. */
   | { type: 'previewRoadClass'; x: number; y: number; class: RoadClass; revision: number }
-  /** Removes the plant under the point, else the nearest line, else the pump or tower under the
-   * point (ADR 0052), else the building under the point (ADR 0045), else the nearest road. */
+  /** Removes the fire station or plant under the point, else the nearest line, else the pump
+   * or tower under the point (ADR 0052), else the building under the point (ADR 0045), else
+   * ruins (ADR 0053), else the nearest road. */
   | { type: 'deleteRoad'; x: number; y: number }
   /** Places a power plant at the point: coal snaps beside the nearest road and faces it, others
    * centre on the point (ADR 0041, 0042). Refused, changing nothing, when it does not fit or
@@ -54,6 +66,13 @@ export type ToWorker =
   /** Draws a transmission line; each end snaps to a line end, a plant's terminal, or the
    * sidewalk of a road in reach on the side facing the other end (ADR 0042). */
   | { type: 'buildLine'; ax: number; ay: number; bx: number; by: number }
+  /** Places a fire station beside the nearest road, facing it (ADR 0053). Refused away from
+   * roads, over roads, plants and stations, and when the city cannot pay. */
+  | { type: 'placeStation'; x: number; y: number }
+  /** Asks where a station asked for here would stand. Answered with `stationPreview`. */
+  | { type: 'previewStation'; x: number; y: number; revision: number }
+  /** Turns this city's fires on or off; off puts out every fire burning now (ADR 0053). */
+  | { type: 'setFires'; on: boolean }
   /** Asks whether a plant fits here. Answered with `plantPreview`. */
   | { type: 'previewPlant'; kind: PlantKind; x: number; y: number; revision: number }
   /** Asks whether a pump or tower fits here. Answered with `waterPreview`. */
@@ -157,31 +176,6 @@ export const Zone = {
 } as const;
 export type Zone = (typeof Zone)[keyof typeof Zone];
 
-/** Power plant kinds, matching the sim's `PlantKind` (ADR 0041). */
-export const PlantKind = {
-  Coal: 0,
-  Solar: 1,
-  Wind: 2,
-} as const;
-export type PlantKind = (typeof PlantKind)[keyof typeof PlantKind];
-
-/** Water pieces, matching the sim's `WaterKind` (ADR 0052). */
-export const WaterKind = {
-  Pump: 0,
-  Tower: 1,
-} as const;
-export type WaterKind = (typeof WaterKind)[keyof typeof WaterKind];
-
-/** Floats per piece in `water.pieces`. */
-export const WATER_PIECE_STRIDE = 9;
-/** Floats per building in `water.buildings`. */
-export const WATER_BUILDING_STRIDE = 5;
-
-/** Floats per plant in `power.plants`. */
-export const PLANT_STRIDE = 10;
-/** Floats per building in `power.buildings`. */
-export const POWER_BUILDING_STRIDE = 5;
-
 /** What a citizen is doing or travelling to do, matching the sim's `Activity`. */
 export const Activity = {
   Home: 0,
@@ -192,10 +186,11 @@ export type Activity = (typeof Activity)[keyof typeof Activity];
 
 /** Floats per agent in the `frame` agents snapshot. */
 export const AGENT_STRIDE = 5;
-/** The `kind` field of an agent snapshot entry (ADR 0026). */
+/** The `kind` field of an agent snapshot entry (ADR 0026, 0053). */
 export const AgentKind = {
   Car: 0,
   Walker: 1,
+  FireTruck: 2,
 } as const;
 export type AgentKind = (typeof AgentKind)[keyof typeof AgentKind];
 
@@ -250,40 +245,6 @@ export interface Demand {
   industrial: number;
 }
 
-/** The town's power from the sim (ADR 0041), in the units of a building's demand. */
-export interface PowerStats {
-  /** What plants produce now on grids with at least one standing building, not counting
-   * starter power. A plant no building can draw from adds nothing. */
-  supply: number;
-  /** The small supply every city starts with, given to its oldest buildings. */
-  starter: number;
-  /** Demand of the powered buildings. */
-  used: number;
-  /** Demand of every standing building. */
-  demand: number;
-  unpowered: number;
-  /** Scheduled lots whose last growth check failed for power, preserved across loads. */
-  waiting: number;
-}
-
-/** The town's water from the sim (ADR 0052), in the units of a building's use. Only dense
- * buildings use water. */
-export interface WaterStats {
-  /** What all pumps give each update now. */
-  supply: number;
-  /** Use of the dense buildings that get water, from pumps or towers. */
-  used: number;
-  /** Use of every standing dense building. */
-  demand: number;
-  /** Water in all towers, and what they hold when full. */
-  stored: number;
-  capacity: number;
-  /** Standing dense buildings without water. */
-  dry: number;
-  /** Scheduled lots whose last growth check failed for water, preserved across loads. */
-  waiting: number;
-}
-
 export interface Stats {
   tick: number;
   /** Day clock from the sim (`sim::clock`): 1-based day and seconds since midnight. */
@@ -324,10 +285,11 @@ export interface Stats {
   taxes: number;
   /** Flat grant every city receives, dollars per clock hour (ADR 0036). */
   grant: number;
-  /** Road upkeep, dollars per clock hour. */
+  /** Road and fire station upkeep, dollars per clock hour (ADR 0036, 0053). */
   upkeep: number;
   /** Upkeep of plants, pumps and towers, dollars per clock hour (ADR 0052). */
   utilities: number;
+  fire: FireStats;
 }
 
 /** Persistence metadata only. A commit acknowledges the captured revision, not later edits. */
@@ -438,36 +400,7 @@ export type FromWorker =
    * flush immediately, so paused road edits never leave displaced buildings visible.
    */
   | { type: 'buildings'; data: Float32Array; ids: Uint32Array }
-  /**
-   * Power (ADR 0041), sent whole when plants, lines, grids or who is powered change; growth
-   * is coalesced like `buildings`. `plants` is `[kind, x, y, halfSize, frontX, frontY,
-   * terminalX, terminalY, output, grid]` per plant (`PLANT_STRIDE`): its footprint is the
-   * square `halfSize` around (x, y), turned so its front faces the unit direction (frontX,
-   * frontY) (toward its road for coal; ADR 0042); lines join it at the terminal. `lines` is
-   * `[ax, ay, bx, by]` per line. `buildings` is `[x, y, height, grid, powered]` per standing
-   * building (`POWER_BUILDING_STRIDE`): footprint mean point, metres, grid (-1 = none), 1 or 0.
-   * Grid numbers are only stable within one message.
-   */
-  | { type: 'power'; plants: Float32Array; lines: Float32Array; buildings: Float32Array }
-  /**
-   * Water (ADR 0052), sent whole when pieces, networks, tower levels or who has water change;
-   * growth is coalesced like `buildings`. `pieces` is `[kind, x, y, halfSize, frontX, frontY,
-   * output, level, network]` per pump or tower (`WATER_PIECE_STRIDE`): its square footprint
-   * faces (frontX, frontY), toward its road; output is what a pump gives now (0 for towers),
-   * level what a tower holds (0 for pumps). `buildings` is `[x, y, height, network, watered]`
-   * per standing dense building (`WATER_BUILDING_STRIDE`): footprint mean point, metres,
-   * network (-1 = none), 1 or 0. Network numbers are only stable within one message.
-   */
-  | { type: 'water'; pieces: Float32Array; buildings: Float32Array }
-  /** `outline` is the closed `[x, y]` footprint the pump or tower asked about would take,
-   * snapped beside a road; `ok` if it fits. */
-  | { type: 'waterPreview'; outline: Float32Array; ok: boolean; revision: number }
-  /** `outline` is the closed `[x, y]` footprint the plant asked about would take, snapped
-   * beside a road for coal (ADR 0042); `ok` if it fits. */
-  | { type: 'plantPreview'; outline: Float32Array; ok: boolean; revision: number }
-  /** `[ax, ay, aJoin, bx, by, bJoin]`, join 1 where an end meets a line, plant or road and 0
-   * where it stands free; empty means refused. */
-  | { type: 'linePreview'; ends: Float32Array; revision: number }
+  | ServiceMessage
   /** `[x, y]` per outline sample of the block under the cursor, closed; empty outside blocks. */
   | { type: 'blockPreview'; outline: Float32Array; revision: number }
   /** `end` is the built road's guided end, where a chained road starts; null when refused. */
@@ -479,8 +412,8 @@ export type FromWorker =
       control?: [number, number];
     }
   /** Selected road's `[x, y]` centreline samples, or empty on a miss. Sim-owned hit testing.
-   * A plant's, pump's, tower's or building's target is its closed outline and a line's its
-   * two ends. */
+   * A station's, plant's, pump's, tower's, building's or ruins' target is its closed outline
+   * and a line's its two ends. */
   | { type: 'bulldozePreview'; segment: Float32Array; revision: number }
   /** `[x, y]` centreline samples of the road `setRoadClass` would change, as for
    * `bulldozePreview`; empty when it would change nothing (no road in reach, or already that
@@ -499,7 +432,7 @@ export type FromWorker =
   | { type: 'building'; selection: number; building: Building | null }
   /**
    * `agents` is `[x, y, heading, speedRatio, kind]` per agent id (`AGENT_STRIDE`); speedRatio
-   * < 0 means hidden; kind is an `AgentKind` (ADR 0026).
+   * < 0 means hidden; kind is an `AgentKind` (ADR 0026, 0053).
    * `signals` is `[x, y, heading, state]` per signalised approach, at its stop line; state is
    * 0 = red, 1 = green, 2 = protected-left green.
    */

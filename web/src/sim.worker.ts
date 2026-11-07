@@ -2,6 +2,7 @@
 
 import { CitySession } from './city-session';
 import { gridPreview, rawDraft, roadPreview } from './drafts';
+import { FireSender, readFireStats } from './fire-worker';
 import init, { type Sim } from './pkg/sim_wasm';
 import type {
   Activity,
@@ -13,6 +14,7 @@ import type {
   ToWorker,
   Zone,
 } from './protocol';
+import { WaterSender } from './water-worker';
 
 /** If the sim falls this far behind, drop the backlog instead of spiralling. */
 const MAX_TICKS_PER_STEP = 20;
@@ -29,8 +31,6 @@ let buildingsVersion = -1;
 let buildingsSentAt = -Infinity;
 let powerVersion = -1;
 let powerSentAt = -Infinity;
-let waterVersion = -1;
-let waterSentAt = -Infinity;
 let pollutionVersion = -1;
 let pollutionSentAt = -Infinity;
 /** One inspector subject. Citizens persist even while their travel slot is hidden. */
@@ -100,19 +100,6 @@ function sendPowerIfChanged(s: Sim, force = false) {
   ]);
 }
 
-/** Water changes with growth and tower levels, so it is coalesced too (ADR 0052). */
-function sendWaterIfChanged(s: Sim, force = false) {
-  const version = s.water_version();
-  if (version === waterVersion) return;
-  const now = performance.now();
-  if (!force && now - waterSentAt < BUILDING_SNAPSHOT_INTERVAL_MS) return;
-  waterVersion = version;
-  waterSentAt = now;
-  const pieces = s.water_pieces();
-  const buildings = s.water_buildings();
-  post({ type: 'water', pieces, buildings }, [pieces.buffer, buildings.buffer]);
-}
-
 function sendPollutionIfChanged(s: Sim, force = false) {
   const version = s.pollution_version();
   if (version === pollutionVersion) return;
@@ -125,14 +112,18 @@ function sendPollutionIfChanged(s: Sim, force = false) {
   post({ type: 'pollution', cells, layout: [x0, y0, cell, cols, rows] }, [cells.buffer]);
 }
 
+const fire = new FireSender(post);
+const water = new WaterSender(post);
+
 /** After an edit: zoning can add alleys, and road edits can recut lots (ADR 0016). */
 function sendEdits(s: Sim) {
+  fire.sendIfChanged(s, true);
   sendRoadsIfChanged(s);
   sendZonesIfChanged(s);
   sendLotsIfChanged(s);
   sendBuildingsIfChanged(s, true);
   sendPowerIfChanged(s, true);
-  sendWaterIfChanged(s, true);
+  water.sendIfChanged(s, true);
   sendPollutionIfChanged(s, true);
   sendFrame(s); // Cars and signals also change while paused.
 }
@@ -148,10 +139,11 @@ const cities = new CitySession(post, (next, initialSpeed) => {
     lotsVersion =
     buildingsVersion =
     powerVersion =
-    waterVersion =
     pollutionVersion =
       -1;
-  buildingsSentAt = powerSentAt = waterSentAt = pollutionSentAt = -Infinity;
+  buildingsSentAt = powerSentAt = pollutionSentAt = -Infinity;
+  fire.reset();
+  water.reset();
   inspected = null;
   post({ type: 'cityReset', speed });
   sendEdits(next);
@@ -205,6 +197,7 @@ function readStats(s: Sim): Stats {
     grant: st.grant,
     upkeep: st.upkeep,
     utilities: st.utilities,
+    fire: readFireStats(s),
   };
   st.free();
   return out;
@@ -291,8 +284,9 @@ function step() {
       sendRoadsIfChanged(sim);
       sendBuildingsIfChanged(sim);
       sendPowerIfChanged(sim);
-      sendWaterIfChanged(sim);
+      water.sendIfChanged(sim);
       sendPollutionIfChanged(sim);
+      fire.sendIfChanged(sim);
       sendFrame(sim, perTick);
     }
   }
@@ -339,8 +333,9 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
       if (speed === 0 && sim) {
         sendBuildingsIfChanged(sim, true);
         sendPowerIfChanged(sim, true);
-        sendWaterIfChanged(sim, true);
+        water.sendIfChanged(sim, true);
         sendPollutionIfChanged(sim, true);
+        fire.sendIfChanged(sim, true);
       }
       break;
     case 'spawn':
@@ -392,6 +387,14 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
             ? sim.place_water(msg.kind, msg.x, msg.y)
             : sim.build_line(msg.ax, msg.ay, msg.bx, msg.by))
       ) {
+        cities.changed();
+        sendEdits(sim);
+      }
+      break;
+    case 'placeStation':
+    case 'previewStation':
+    case 'setFires':
+      if (fire.command(sim, msg, cities.ready) && sim) {
         cities.changed();
         sendEdits(sim);
       }

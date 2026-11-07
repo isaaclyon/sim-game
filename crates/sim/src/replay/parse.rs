@@ -150,6 +150,13 @@ impl<'a> Line<'a> {
                 let kind = self.named(&WATER, "water kind")?;
                 Command::PlaceWater { kind, x, y }
             }
+            "station" => {
+                let [x, y] = self.coords()?;
+                Command::PlaceStation { x, y }
+            }
+            "fires" => Command::SetFires {
+                on: self.named(&[(true, "on"), (false, "off")], "fires setting")?,
+            },
             other => return self.fail(format!("unknown command `{other}`")),
         })
     }

@@ -43,8 +43,13 @@ const tools = new Toolbox(
   views,
   () => menu.show(tools.selection),
 );
-const { roads, zoning, power } = tools;
-const topBar = new TopBar(byId, popovers, setSpeed, (id, focus) => menu.openCategory(id, focus));
+const { roads, zoning, power, fire } = tools;
+const topBar = new TopBar(byId, popovers, {
+  setSpeed,
+  openCategory: (id, focus) => menu.openCategory(id, focus),
+  setFires: (on) => send({ type: 'setFires', on }),
+  showPoint: (x, y) => renderer.showPoint(x, y),
+});
 // Each item's picture is drawn once from the game's own models (M4.6); the debug panel shows
 // how long that added to startup.
 const picturesStart = performance.now();
@@ -86,7 +91,8 @@ let buildingsSeen = false;
 
 worker.onmessage = (e: MessageEvent<FromWorker>) => {
   const msg = e.data;
-  if (power.receive(msg)) return;
+  if (msg.type === 'fire') topBar.setFires(msg.fires);
+  if (power.receive(msg) || fire.receive(msg)) return;
   if (msg.type === 'cityStatus') {
     cityControls.receive(msg);
     topBar.setCity(msg);
@@ -177,6 +183,7 @@ canvas.addEventListener('pointerup', (e) => {
     return zoning.release(e.button, still, renderer.pick(e.clientX, e.clientY));
   }
   if (power.active) return power.release(e.button, still, renderer.pick(e.clientX, e.clientY));
+  if (fire.active) return fire.release(e.button, still, renderer.pick(e.clientX, e.clientY));
   if (!roads.mode) {
     if (e.button === 0 && still) {
       const agent = renderer.carAt(e.clientX, e.clientY);
@@ -197,12 +204,14 @@ function hover(e: { clientX: number; clientY: number }) {
   pointer = e;
   if (zoning.zone !== null) return zoning.hover(renderer.pick(e.clientX, e.clientY));
   if (power.active) return power.hover(renderer.pick(e.clientX, e.clientY));
+  if (fire.active) return fire.hover(renderer.pick(e.clientX, e.clientY));
   if (roads.mode) roads.hover(renderer.pick(e.clientX, e.clientY), e);
 }
 canvas.addEventListener('pointermove', hover);
 canvas.addEventListener('pointerleave', () => {
   pointer = null;
   power.hover(null);
+  fire.hover(null);
   zoning.leave();
   roads.leave();
 });

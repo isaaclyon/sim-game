@@ -5,6 +5,7 @@ mod closure;
 mod command;
 mod demand;
 mod demolish;
+mod fire;
 mod grid;
 mod inspect;
 mod money;
@@ -39,6 +40,7 @@ use crate::zone::ZoneGrid;
 
 pub use command::Command;
 pub use demand::Demand;
+pub use fire::{FIRE_STRIDE, FireStats, STATION_STRIDE};
 pub use grid::{GridPreview, MAX_BLOCKS, MAX_CELL, MIN_CELL};
 pub use inspect::{BuildingInfo, CitizenInfo, Place};
 pub use money::{GRANT, JOB_TAX, Money, RESIDENT_TAX, START_FUNDS, plant_price, water_price};
@@ -107,6 +109,8 @@ pub struct Stats {
     pub water: WaterStats,
     /// Balance, taxes, grant and upkeep (ADR 0036).
     pub money: Money,
+    /// Stations, trucks and fires (ADR 0053).
+    pub fire: FireStats,
     /// Synthetic vehicles waiting between random trips; dormant citizen slots are excluded.
     pub parked: u32,
     pub awaiting_path: u32,
@@ -180,12 +184,15 @@ pub struct World {
     totals: Stats,
     /// Air, ground, noise, traffic flow and land value (ADR 0037).
     pub pollution: Pollution,
+    /// Fire stations, trucks, fires and ruins (ADR 0053).
+    fire: fire::Fire,
 }
 
 impl World {
     pub fn new(cfg: Config, roads: RoadNetwork, rng: Rng) -> Self {
         let mut world = Self {
             residents: residents::Residents::new(cfg.seed),
+            fire: fire::Fire::new(cfg.seed),
             closures: Default::default(),
             supply: Default::default(),
             treasury: Default::default(),
@@ -262,6 +269,7 @@ impl World {
             self.power.version,
             self.water.version,
             self.buildings.version,
+            self.fire.version,
         );
         let roads = self.roads.version;
         let changed = match cmd {
@@ -299,9 +307,11 @@ impl World {
             Command::BuildGrid { .. } => self.build_grid(&cmd),
             Command::SetRoadClass { x, y, class } => self.set_road_class(x, y, class),
             Command::DeleteRoad { x, y } => {
-                self.bulldoze_power(x, y)
+                self.bulldoze_station(x, y)
+                    || self.bulldoze_power(x, y)
                     || self.bulldoze_water(x, y)
                     || self.demolish(x, y)
+                    || self.clear_ruin(x, y)
                     || self.delete_road(x, y)
             }
             Command::PlacePlant { kind, x, y } => self.place_plant(kind, x, y),
@@ -322,6 +332,8 @@ impl World {
                 !changed.is_empty()
             }
             Command::FillBlock { x, y, zone } => self.fill_block(x, y, zone),
+            Command::PlaceStation { x, y } => self.place_station(x, y),
+            Command::SetFires { on } => self.set_fires(on),
         };
         let now = (
             self.lots.version,
@@ -329,6 +341,7 @@ impl World {
             self.power.version,
             self.water.version,
             self.buildings.version,
+            self.fire.version,
         );
         if versions != now {
             self.buildings.reconcile(
@@ -346,11 +359,13 @@ impl World {
         if roads != self.roads.version || versions.2 != now.2 || versions.3 != now.3 {
             self.refresh_upkeep();
         }
+        self.ensure_fire();
         changed
     }
 
     pub fn tick(&mut self) {
         self.sync_roads();
+        self.ensure_fire();
         self.tick_closures();
         self.ensure_power();
         self.ensure_water();
@@ -380,6 +395,7 @@ impl World {
         self.tick_pollution();
         self.settle_money();
         self.tick_water();
+        self.tick_fire();
         self.grow_buildings();
         // Current at every tick boundary, so a loaded world reads the same allocation.
         self.ensure_power();
@@ -395,6 +411,7 @@ impl World {
         s.power = self.power_stats();
         s.water = self.water_stats();
         s.money = self.money();
+        s.fire = self.fire_stats();
         if s.population > 0 {
             s.unemployment_percent = s.unemployed as f32 * 100.0 / s.population as f32;
         }

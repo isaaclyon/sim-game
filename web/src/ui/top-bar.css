@@ -101,6 +101,11 @@
   border-color: #ff8a8a;
   color: white;
 }
+/* Amber, not red: a coming problem, such as fires starting soon with no station. */
+.figure.caution {
+  border-color: var(--industrial);
+  color: var(--industrial);
+}
 .menu-button svg {
   width: 22px;
   height: 22px;

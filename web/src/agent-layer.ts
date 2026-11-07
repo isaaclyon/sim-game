@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { CAR_DETAIL_PX, Detail, detail, WALKER_DETAIL_PX, WALKER_HIDE_PX } from './agent-lod.ts';
 import { ensureInstances } from './instances';
 import { AGENT_STRIDE, AgentKind } from './protocol';
-import { VEHICLES, vehicleModel, vehiclePaint } from './vehicle-models.ts';
+import { FIRE_RED, FIRE_TRUCK, VEHICLES, vehicleModel, vehiclePaint } from './vehicle-models.ts';
 import {
   FAR_WALKER,
   FIGURE,
@@ -21,6 +21,9 @@ import {
   trousersOf,
 } from './walker-figure.ts';
 
+/** Citizens' cars, then the fire truck (ADR 0053) at index `TRUCK`. */
+const MODELS = [...VEHICLES, FIRE_TRUCK];
+const TRUCK = VEHICLES.length;
 const SELECTED_COLOR = new THREE.Color(0x3fd0ff);
 const WHITE = new THREE.Color(0xffffff);
 const Z = new THREE.Vector3(0, 0, 1);
@@ -97,15 +100,16 @@ export class AgentLayer {
       for (let i = 0; i < models.length; i++) models[i] = vehicleModel(i);
       this.models = models;
     }
-    const perModel = VEHICLES.map(() => 0);
+    const perModel = MODELS.map(() => 0);
     let walkers = 0;
     for (let i = 0; i < count; i++) {
       const o = i * AGENT_STRIDE;
       if (curr[o + 3] < 0) continue;
-      if (curr[o + 4] === AgentKind.Walker) walkers++;
-      else perModel[this.models[i]]++;
+      const kind = curr[o + 4];
+      if (kind === AgentKind.Walker) walkers++;
+      else perModel[kind === AgentKind.FireTruck ? TRUCK : this.models[i]]++;
     }
-    VEHICLES.forEach((v, m) => {
+    MODELS.forEach((v, m) => {
       this.bodies[m] = ensureInstances(
         this.scene,
         this.bodies[m],
@@ -144,8 +148,8 @@ export class AgentLayer {
 
     if (this.drawn.length < count * 2) this.drawn = new Float32Array(count * 3);
     this.drawn.fill(Number.NaN);
-    const used = VEHICLES.map(() => 0);
-    const usedFar = VEHICLES.map(() => 0);
+    const used = MODELS.map(() => 0);
+    const usedFar = MODELS.map(() => 0);
     let w = 0;
     let fw = 0;
     this.hairs = [0, 0];
@@ -191,13 +195,13 @@ export class AgentLayer {
         }
         continue;
       }
-      const m = this.models[i];
+      const m = kind === AgentKind.FireTruck ? TRUCK : this.models[i];
       const body = this.bodies[m] as THREE.InstancedMesh;
       const trim = this.trims[m] as THREE.InstancedMesh;
       if (i === selected) this.color.copy(SELECTED_COLOR);
       else if (this.trafficView) this.color.setHSL(Math.min(ratio, 1) * 0.33, 0.85, 0.55);
-      else this.color.copy(vehiclePaint(i));
-      if (detail(VEHICLES[m].length, distance, pxPerMetre, CAR_DETAIL_PX) === Detail.Simple) {
+      else this.color.copy(m === TRUCK ? FIRE_RED : vehiclePaint(i));
+      if (detail(MODELS[m].length, distance, pxPerMetre, CAR_DETAIL_PX) === Detail.Simple) {
         const far = this.fars[m] as THREE.InstancedMesh;
         far.setMatrixAt(usedFar[m], this.matrix);
         far.setColorAt(usedFar[m]++, this.color);
@@ -209,7 +213,7 @@ export class AgentLayer {
       trim.setColorAt(used[m], WHITE);
       used[m]++;
     }
-    VEHICLES.forEach((_, m) => {
+    MODELS.forEach((_, m) => {
       finish(this.bodies[m], used[m]);
       finish(this.trims[m], used[m]);
       finish(this.fars[m], usedFar[m]);
