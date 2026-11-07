@@ -2,6 +2,7 @@
 //! edits, with its money refunded and charged again, also after a save and load.
 mod pieces;
 mod roads;
+mod view;
 
 use sim::road::RoadClass;
 use sim::{Command, Config, World};

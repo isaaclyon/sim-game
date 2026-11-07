@@ -52,6 +52,8 @@ export class BuildMenu {
   /** The one-line hint in the options row; the tools write to it. */
   readonly hint: HTMLElement;
   readonly viewsButton: HTMLElement;
+  /** The category bar, which other controls such as undo and redo join at its end. */
+  readonly bar: HTMLElement;
   private open: string | null = null;
   private selection: Selection = { tool: null, roadMode: null, snap: 0, gridCell: 0 };
   private readonly categories: Category[];
@@ -110,6 +112,7 @@ export class BuildMenu {
       },
     );
     bar.append(this.bulldozeButton, this.viewsButton);
+    this.bar = bar;
     root.append(this.optionsRow, ...this.categories.map((c) => this.itemRow(c)), bar);
     this.render();
   }

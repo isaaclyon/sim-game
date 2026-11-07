@@ -4,6 +4,7 @@ use sim::{Command, CommandLog, World, Zone};
 use wasm_bindgen::prelude::*;
 
 mod fire;
+mod history;
 mod roads;
 mod utilities;
 

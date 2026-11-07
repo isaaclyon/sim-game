@@ -183,6 +183,50 @@
   border-left: 1px solid rgba(255, 255, 255, 0.14);
 }
 
+/* Undo and redo (ADR 0051): icon-only, at the end of the bar. */
+.history-button {
+  justify-content: center;
+  width: 46px;
+  padding: 0;
+}
+.history-button svg {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.history-button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.history-button:disabled:hover {
+  background: transparent;
+}
+/* A redo the city cannot pay for. */
+.history-button.short {
+  color: var(--danger);
+}
+.history-button.refused {
+  animation: refused 0.3s ease-in-out 2;
+  box-shadow: 0 0 0 2px var(--danger-soft);
+}
+@media (prefers-reduced-motion: reduce) {
+  .history-button.refused {
+    animation: none;
+  }
+}
+@keyframes refused {
+  25% {
+    transform: translateX(-3px);
+  }
+  75% {
+    transform: translateX(3px);
+  }
+}
+
 /* The Views list and the Snaps list open above their buttons. */
 .choices {
   display: flex;

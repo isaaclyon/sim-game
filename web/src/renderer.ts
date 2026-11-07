@@ -439,6 +439,11 @@ export class Renderer {
     this.fire.setView(on);
   }
 
+  /** See `ToolPreview.setHistory`; empty lists hide it (ADR 0051). */
+  setHistoryPreview(remove: Float32Array, restore: Float32Array, ok: boolean) {
+    this.tools.setHistory(remove, restore, ok);
+  }
+
   /** See `ToolPreview.setPlant`. */
   setPlantPreview(outline: Float32Array, ok: boolean) {
     this.tools.setPlant(outline, ok);

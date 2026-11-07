@@ -1,6 +1,6 @@
 # 0051. Edit history records before-and-after shapes and replays them as new edits
 
-- Status: Accepted; amended 2026-11-07; not yet implemented (M4.5 slice 5)
+- Status: Accepted; amended 2026-11-07; implemented (M4.5 slice 5)
 - Date: 2026-11-06
 - Supersedes: [0039](0039-road-edit-history.md)
 - Extends: [0013](0013-road-deletion-tombstones.md), [0033](0033-single-city-state-saves.md),

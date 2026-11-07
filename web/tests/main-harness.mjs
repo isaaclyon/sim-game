@@ -196,6 +196,9 @@ export async function tools({ hash = '', clipboard = true, catalog } = {}) {
     showPoint(x, y) {
       previews.push({ type: 'showPoint', x, y });
     }
+    setHistoryPreview(remove, restore, ok) {
+      previews.push({ type: 'history', remove, restore, ok });
+    }
     setPlantPreview(outline, ok) {
       previews.push({ type: 'plant', outline, ok });
     }

@@ -119,6 +119,13 @@ What to build next and why lives in `docs/ROADMAP.md`. Work on the current miles
   capped like buildings. Station preview: closed `[x, y]` footprint plus `ok`. `setFires`
   turns the city's fires on or off (`fires on|off` in command logs; `station x y` places one).
   Frames carry `stats.fire` (`FireStats`). Flames, smoke and rubble are display only.
+- Undo and redo (ADR 0051): the sim keeps the history and saves it with the city. `undo` and
+  `redo` answer `historyResult` (`ok` false = refused); command logs write them as `undo` and
+  `redo`, and continuous curves after the first as `curve … chain`. Frames carry `history`: the
+  step kinds undo and redo would take (null = none), `undoRefund`, `redoCost` and
+  `redoAffordable`. `previewHistory` answers `historyPreview`: `remove` and `restore`,
+  `[n, x0, y0, …]` per road centreline, closed plant/pump/tower/station outline or line's two
+  ends, plus `ok`; read-only, echoing the revision.
 - Citizen inspection: `inspect` names a car or walker by its agent snapshot index; the worker maps it once
   to a citizen and answers `citizen` for that one citizen only, at once and after every frame
   and edit while selected (ADR 0022). Read-only, not hashed; names are derived from the seed and

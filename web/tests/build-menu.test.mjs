@@ -86,7 +86,7 @@ test('a category opens its items without starting a tool; an item starts one', a
   assert.equal(el['items-power'].hidden, true, 'Esc closes an open row with no tool');
 });
 
-test('Bulldoze sits apart at the right of the category bar and switches like B', async () => {
+test('Bulldoze sits apart at the right of the category bar, before undo and redo, and switches like B', async () => {
   const t = await tools();
   const bar = t.document.querySelector('nav');
   const ids = bar.children.map((b) => b.id || b.attributes.class);
@@ -99,6 +99,9 @@ test('Bulldoze sits apart at the right of the category bar and switches like B',
     'divider',
     'bulldoze',
     'views',
+    'divider',
+    'undo',
+    'redo',
   ]);
   t.pressId('bulldoze');
   assert.ok(pressed(t, 'bulldoze'));
@@ -153,7 +156,8 @@ test('every control has an accessible name, is a native control, and shows its p
     'only native controls take clicks, so Enter and Space work on all of them',
   );
   const menu = t.elements['build-menu'];
-  const buttons = menu.querySelectorAll('button[aria-label]');
+  // Undo and redo show line icons instead of pictures.
+  const buttons = menu.querySelectorAll('button[aria-label]:not(.history-button)');
   assert.ok(buttons.length >= 17, 'every category, item, Bulldoze and Views');
   for (const b of buttons) {
     const img = b.querySelector('img');

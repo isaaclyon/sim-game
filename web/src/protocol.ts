@@ -1,6 +1,7 @@
 // Messages between the main thread and the sim worker. The worker owns the sim; the main
 // thread only sends commands and draws snapshots.
 
+import type { HistoryCommand, HistoryMessage, HistoryStatus } from './protocol-history.ts';
 import type {
   FireStats,
   PlantKind,
@@ -10,9 +11,11 @@ import type {
   WaterStats,
 } from './protocol-services.ts';
 
+export * from './protocol-history.ts';
 export * from './protocol-services.ts';
 
 export type ToWorker =
+  | HistoryCommand
   /**
    * `grid` starts on the generated `cols` × `rows` street grid (tests and benchmarks); false
    * starts on an empty map of that size, as the game does.
@@ -411,6 +414,7 @@ export type FromWorker =
    */
   | { type: 'buildings'; data: Float32Array; ids: Uint32Array }
   | ServiceMessage
+  | HistoryMessage
   /** `[x, y]` per outline sample of the block under the cursor, closed; empty outside blocks. */
   | { type: 'blockPreview'; outline: Float32Array; revision: number }
   /** `end` is the built road's guided end, where a chained road starts; null when refused. */
@@ -444,12 +448,14 @@ export type FromWorker =
    * `agents` is `[x, y, heading, speedRatio, kind]` per agent id (`AGENT_STRIDE`); speedRatio
    * < 0 means hidden; kind is an `AgentKind` (ADR 0026, 0053).
    * `signals` is `[x, y, heading, state]` per signalised approach, at its stop line; state is
-   * 0 = red, 1 = green, 2 = protected-left green.
+   * 0 = red, 1 = green, 2 = protected-left green. `history` is what undo and redo would do
+   * (ADR 0051).
    */
   | {
       type: 'frame';
       agents: Float32Array;
       signals: Float32Array;
       stats: Stats;
+      history: HistoryStatus;
       tickMs: number;
     };

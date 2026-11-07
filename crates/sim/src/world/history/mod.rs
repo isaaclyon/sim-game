@@ -6,6 +6,7 @@ mod apply;
 mod capture;
 mod pieces;
 mod roads;
+mod view;
 
 use serde::{Deserialize, Serialize};
 
@@ -17,6 +18,7 @@ use crate::road::RoadClass;
 use crate::water::WaterKind;
 
 pub(super) use capture::Capture;
+pub use view::HistoryView;
 
 /// At most this many steps, undo and redo together; the oldest undo steps go first.
 pub const MAX_STEPS: usize = 100;

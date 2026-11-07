@@ -43,7 +43,9 @@ pub use command::Command;
 pub use demand::Demand;
 pub use fire::{FIRE_STRIDE, FireStats, STATION_STRIDE};
 pub use grid::{GridPreview, MAX_BLOCKS, MAX_CELL, MIN_CELL};
-pub use history::{History, MAX_RECORDS, MAX_STEPS, Record, RoadRecord, Step, StepKind};
+pub use history::{
+    History, HistoryView, MAX_RECORDS, MAX_STEPS, Record, RoadRecord, Step, StepKind,
+};
 pub use inspect::{BuildingInfo, CitizenInfo, Place};
 pub use money::{GRANT, JOB_TAX, Money, RESIDENT_TAX, START_FUNDS, plant_price, water_price};
 pub use persist::{SAVE_VERSION, SaveError};

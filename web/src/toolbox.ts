@@ -110,6 +110,12 @@ export class Toolbox {
     this.changed();
   }
 
+  /** Undo or redo changed the map under a road or line being drawn: start it again. */
+  dropDrafts() {
+    if (this.roads.mode) this.roads.setMode(this.roads.mode);
+    if (this.power.tool) this.power.set(this.power.tool);
+  }
+
   /** Esc: puts the tool in use away; false if none was. */
   cancel(): boolean {
     if (!this.active) return false;

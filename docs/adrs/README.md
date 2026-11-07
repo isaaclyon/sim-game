@@ -56,7 +56,7 @@ rewriting history; mark the old one `Superseded by NNNN`.
 | [0048](0048-drawing-over-roads-changes-their-class.md) | Drawing a road over existing roads changes their class | Accepted; implemented |
 | [0049](0049-grid-tool.md) | The grid tool is one sim command planned edge by edge | Accepted; implemented |
 | [0050](0050-click-to-change-road-class.md) | Clicking a road changes its class | Accepted; implemented |
-| [0051](0051-road-edit-history-revised.md) | Edit history records before-and-after shapes and replays them as new edits | Accepted; amended; not yet implemented; supersedes 0039 |
+| [0051](0051-road-edit-history-revised.md) | Edit history records before-and-after shapes and replays them as new edits | Accepted; amended; implemented; supersedes 0039 |
 | [0052](0052-water-follows-roads-and-supplies-dense-buildings.md) | Water follows roads and supplies dense buildings | Accepted; implemented |
 | [0053](0053-fire-stations-send-trucks-through-traffic.md) | Fire stations send real trucks through traffic | Accepted; implemented |
 | [0054](0054-children-births-and-growing-up.md) | Children are citizens who are born, grow up and move out | Accepted; implemented |

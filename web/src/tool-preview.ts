@@ -44,6 +44,9 @@ export class ToolPreview {
   readonly ribbon: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
   /** Roads a drawn road would change to its class, over the draft's own ribbon. */
   readonly reclass: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
+  /** What undo or redo would take away (red) and put back (blue) (ADR 0051). */
+  readonly historyRemove: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
+  readonly historyRestore: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
   readonly markers: THREE.Points;
   readonly zoneDrag: THREE.LineLoop;
   /** Dashed guide lines a drawn point snapped to, from each line's origin to the point. */
@@ -67,6 +70,9 @@ export class ToolPreview {
     this.reclass.material.color.copy(RECLASS_COLOR);
     // Just above the draft's ribbon, so the changing roads show through it.
     this.reclass.position.y = RIBBON_Y + 0.05;
+    this.historyRemove = ribbonMesh();
+    this.historyRemove.material.color.copy(PREVIEW_REFUSED_COLOR);
+    this.historyRestore = ribbonMesh();
     this.markers = new THREE.Points(
       new THREE.BufferGeometry(),
       new THREE.PointsMaterial({ size: MARKER_PX, sizeAttenuation: false, vertexColors: true }),
@@ -108,6 +114,8 @@ export class ToolPreview {
       this.line,
       this.ribbon,
       this.reclass,
+      this.historyRemove,
+      this.historyRestore,
       this.markers,
       this.zoneDrag,
       this.guides,
@@ -255,6 +263,28 @@ export class ToolPreview {
   setUpgrade(segment: Float32Array, ok: boolean, roadClass: number) {
     this.setMarkers([], []);
     this.setPath([...segment], ok ? PREVIEW_COLOR : PREVIEW_REFUSED_COLOR, roadClass);
+  }
+
+  /** What undo or redo would change: `remove` and `restore` are `[n, x0, y0, …]` per record,
+   * drawn road-wide in red and blue; blue turns red too when `ok` is false, as it would be
+   * refused. Empty lists hide them. */
+  setHistory(remove: Float32Array, restore: Float32Array, ok: boolean) {
+    const pieces = (xy: Float32Array) => {
+      const out: number[] = [];
+      for (let i = 0; i < xy.length; i += 1 + 2 * xy[i])
+        for (let j = i + 3; j < i + 1 + 2 * xy[i]; j += 2)
+          out.push(xy[j - 2], xy[j - 1], xy[j], xy[j + 1], 0);
+      return new Float32Array(out);
+    };
+    this.historyRestore.material.color.copy(ok ? PREVIEW_COLOR : PREVIEW_REFUSED_COLOR);
+    for (const [mesh, xy] of [
+      [this.historyRemove, remove],
+      [this.historyRestore, restore],
+    ] as const) {
+      mesh.visible = xy.length > 0;
+      mesh.geometry.dispose();
+      mesh.geometry = buildRoadGeometry(pieces(xy));
+    }
   }
 
   /** A plant's footprint, closed `[x, y]`, blue where it fits and red where it does not. */

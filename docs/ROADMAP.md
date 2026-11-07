@@ -303,7 +303,7 @@ grid tool, upgrade and undo land in the new interface.
    Clicking is implemented and approved in the browser: the Upgrade option of the road items gives
    the clicked road the selected class, on the same terms
    ([ADR 0050](adrs/0050-click-to-change-road-class.md)).
-5. **Undo and redo** for every placeable built with a build tool: roads (including grids and
+5. **Undo and redo — implemented; awaiting the browser check.** For every placeable built with a build tool: roads (including grids and
    class changes), power plants and lines, pumps, towers and fire stations, and their
    bulldozing; not zone painting, demolished buildings or cleared ruins. Many steps, Ctrl+Z and
    Ctrl+Shift+Z. A whole continuous curve chain is one step. Undo refunds what the edit
@@ -313,6 +313,8 @@ grid tool, upgrade and undo land in the new interface.
    ([ADR 0051](adrs/0051-road-edit-history-revised.md), amended for water and fire).
    Done when: building, upgrading, a curve chain, plants, lines, pumps, towers, stations and
    bulldozing can each be undone and redone, also after a reload, and replay tests stay exact.
+   Undo and redo sit at the end of the build bar. Each names its step and money, and hovering
+   one draws what it would take away and put back.
 
 Done when: someone used to Cities: Skylines lays out a town's roads without fighting the tool.
 

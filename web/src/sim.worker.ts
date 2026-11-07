@@ -2,18 +2,11 @@
 
 import { CitySession } from './city-session';
 import { gridPreview, rawDraft, roadPreview } from './drafts';
-import { FireSender, readFireStats } from './fire-worker';
+import { FireSender } from './fire-worker';
+import { historyCommand, readHistory } from './history-worker';
 import init, { type Sim } from './pkg/sim_wasm';
-import type {
-  Activity,
-  Building,
-  Citizen,
-  FromWorker,
-  Place,
-  Stats,
-  ToWorker,
-  Zone,
-} from './protocol';
+import type { Activity, Building, Citizen, FromWorker, Place, ToWorker, Zone } from './protocol';
+import { readStats } from './stats-worker';
 import { WaterSender } from './water-worker';
 
 /** If the sim falls this far behind, drop the backlog instead of spiralling. */
@@ -150,67 +143,11 @@ const cities = new CitySession(post, (next, initialSpeed) => {
 });
 let started = false;
 
-function readStats(s: Sim): Stats {
-  const st = s.stats();
-  const out: Stats = {
-    tick: st.tick,
-    day: st.day,
-    secondOfDay: st.second_of_day,
-    agents: st.agents,
-    population: st.population,
-    children: st.children,
-    unemployed: st.unemployed,
-    unemploymentPercent: st.unemployment_percent,
-    demand: {
-      residential: st.demand_residential,
-      commercial: st.demand_commercial,
-      industrial: st.demand_industrial,
-    },
-    power: {
-      supply: st.power_supply,
-      starter: st.power_starter,
-      used: st.power_used,
-      demand: st.power_demand,
-      unpowered: st.power_unpowered,
-      waiting: st.power_waiting,
-    },
-    water: {
-      supply: st.water_supply,
-      used: st.water_used,
-      demand: st.water_demand,
-      stored: st.water_stored,
-      capacity: st.water_capacity,
-      dry: st.water_dry,
-      waiting: st.water_waiting,
-    },
-    parked: st.parked,
-    awaitingPath: st.awaiting_path,
-    entering: st.entering,
-    driving: st.driving,
-    walking: st.walking,
-    tripsCompleted: st.trips_completed,
-    walksCompleted: st.walks_completed,
-    pathsFailed: st.paths_failed,
-    despawnedStuck: st.despawned_stuck,
-    despawnedByEdit: st.despawned_by_edit,
-    balance: st.balance,
-    taxes: st.taxes,
-    grant: st.grant,
-    upkeep: st.upkeep,
-    utilities: st.utilities,
-    fire: readFireStats(s),
-  };
-  st.free();
-  return out;
-}
-
 function sendFrame(s: Sim, perTick = 0) {
   const agents = s.agent_snapshot();
   const signals = s.signal_snapshot();
-  post({ type: 'frame', agents, signals, stats: readStats(s), tickMs: perTick }, [
-    agents.buffer,
-    signals.buffer,
-  ]);
+  const frame = { agents, signals, stats: readStats(s), history: readHistory(s) };
+  post({ type: 'frame', ...frame, tickMs: perTick }, [agents.buffer, signals.buffer]);
   sendCitizen(s);
   sendBuilding(s);
 }
@@ -392,6 +329,14 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
             ? sim.place_water(msg.kind, msg.x, msg.y)
             : sim.build_line(msg.ax, msg.ay, msg.bx, msg.by))
       ) {
+        cities.changed();
+        sendEdits(sim);
+      }
+      break;
+    case 'undo':
+    case 'redo':
+    case 'previewHistory':
+      if (historyCommand(sim, msg, cities.ready, post) && sim) {
         cities.changed();
         sendEdits(sim);
       }

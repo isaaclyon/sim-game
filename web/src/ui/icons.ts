@@ -1,4 +1,4 @@
-// Small line icons for the inspector card, drawn in the text colour (24 × 24 view box).
+// Small line icons for the inspector card and the undo and redo buttons, drawn in the text colour (24 × 24 view box).
 // Constant markup only; text never goes through here.
 
 const PATHS = {
@@ -15,6 +15,8 @@ const PATHS = {
     '<circle cx="9" cy="8" r="3"/><path d="M3.5 19.5c0-3.2 2.5-5.5 5.5-5.5s5.5 2.3 5.5 5.5"/><circle cx="17" cy="9" r="2.3"/><path d="M16 13.8c2.4.3 4.4 2.3 4.4 5"/>',
   open: '<circle cx="12" cy="12" r="8"/><path d="M8.5 12h7"/>',
   warning: '<path d="M12 4 21 19.5H3zM12 10v4.5M12 17v.5"/>',
+  undo: '<path d="M9 5 4.5 9.5 9 14M4.5 9.5H14a5.5 5.5 0 0 1 0 11h-3"/>',
+  redo: '<path d="m15 5 4.5 4.5L15 14m4.5-4.5H10a5.5 5.5 0 0 0 0 11h3"/>',
 } as const;
 
 export type IconName = keyof typeof PATHS;

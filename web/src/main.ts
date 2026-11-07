@@ -7,6 +7,7 @@ import { Toolbox } from './toolbox';
 import { BuildMenu } from './ui/build-menu';
 import { BULLDOZE, CATEGORIES } from './ui/catalog';
 import { DebugPanel } from './ui/debug-panel';
+import { HistoryButtons } from './ui/history-buttons';
 import { Popovers } from './ui/popover';
 import { TopBar } from './ui/top-bar';
 import { Views } from './ui/views';
@@ -44,6 +45,7 @@ const tools = new Toolbox(
   () => menu.show(tools.selection),
 );
 const { roads, zoning, power, fire } = tools;
+const undoRedo = new HistoryButtons(menu.bar, send, renderer, () => tools.dropDrafts());
 const topBar = new TopBar(byId, popovers, {
   setSpeed,
   openCategory: (id, focus) => menu.openCategory(id, focus),
@@ -108,6 +110,7 @@ worker.onmessage = (e: MessageEvent<FromWorker>) => {
     roads.reset();
     prev = curr = undefined;
     stats = undefined;
+    undoRedo.set(null);
     roadsSeen = zonesSeen = buildingsSeen = false;
     frameGap = 100;
     setSpeed(msg.speed);
@@ -142,6 +145,8 @@ worker.onmessage = (e: MessageEvent<FromWorker>) => {
     inspector.receiveBuilding(msg.selection, msg.building);
   } else if (msg.type === 'blockPreview') {
     zoning.receive(msg);
+  } else if (msg.type === 'historyResult' || msg.type === 'historyPreview') {
+    undoRedo.receive(msg);
   } else {
     const now = performance.now();
     if (curr) frameGap = frameGap * 0.8 + (now - currAt) * 0.2;
@@ -152,6 +157,7 @@ worker.onmessage = (e: MessageEvent<FromWorker>) => {
     tickMs = msg.tickMs;
     renderer.setTime(stats.secondOfDay);
     renderer.drawSignals(msg.signals);
+    undoRedo.set(msg.history);
   }
 };
 
@@ -265,6 +271,8 @@ function cancel() {
 }
 
 addEventListener('keydown', (e) => {
+  // Undo and redo work in any tool, but not while typing.
+  if (!(e.target as HTMLElement | null)?.closest?.(TEXT_ENTRY) && undoRedo.key(e)) return;
   // Holding Shift places road points freely (no angle, guide or length snapping).
   if (e.key === 'Shift') roads.setShift(true);
   // Keep browser shortcuts, held keys and text entry from toggling tools or panning.

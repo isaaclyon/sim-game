@@ -18,7 +18,7 @@ pub(super) enum Piece {
     Station(u32),
 }
 
-fn footprint(record: Record) -> Option<Footprint> {
+pub(super) fn footprint(record: Record) -> Option<Footprint> {
     let (centre, front, half) = match record {
         Record::Plant {
             kind,
