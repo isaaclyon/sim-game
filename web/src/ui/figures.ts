@@ -27,12 +27,14 @@ export function populationRows(s: Stats): Record<string, string> {
   };
 }
 
-/** Power needed against power available (ADR 0041), and whether the town is short. */
+/** Power needed against power available (ADR 0041), whether the town is short, and whether
+ * to warn: also while lots wait for power to grow. */
 export function powerFigures(p: PowerStats) {
   const available = p.supply + p.starter;
   const short = p.demand > available;
+  const warning = short || p.waiting > 0;
   const share = available > 0 ? Math.round(percent(p.demand, available)) : p.demand > 0 ? null : 0;
-  return { available, short, text: share === null ? 'No power' : `${fmt(share)}%` };
+  return { available, short, warning, text: share === null ? 'No power' : `${fmt(share)}%` };
 }
 
 /** One line on what to do about power. */

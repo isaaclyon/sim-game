@@ -141,6 +141,26 @@ test('power turns red when the town needs more than it has, and its panel says w
   assert.equal(el['category-power'].attributes['aria-expanded'], 'true');
 });
 
+test('power turns red while lots wait for power, even with supply to spare', async () => {
+  const t = await tools();
+  const { elements: el } = t;
+  show(t, {
+    power: { supply: 100, starter: 150, used: 248, demand: 248, unpowered: 0, waiting: 3 },
+  });
+  assert.equal(el['power-value'].textContent, '99%');
+  assert.equal(el.power.classList.contains('warning'), true);
+  assert.match(el.power.attributes['aria-label'], /3 lots waiting for power/);
+  t.pressId('power');
+  assert.equal(el['power-title'].textContent, 'More power needed');
+  assert.equal(el['power-title'].classList.contains('problem'), true);
+  assert.match(el['power-advice'].textContent, /need more power to grow/);
+  show(t, {
+    power: { supply: 100, starter: 150, used: 248, demand: 248, unpowered: 0, waiting: 0 },
+  });
+  assert.equal(el.power.classList.contains('warning'), false);
+  assert.equal(el['power-title'].textContent, 'Power');
+});
+
 test('Open Power from the keyboard moves focus to the first Power item', async () => {
   const t = await tools();
   const { elements: el, document } = t;

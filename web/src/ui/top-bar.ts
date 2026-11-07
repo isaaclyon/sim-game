@@ -108,15 +108,14 @@ export class TopBar {
   private drawPower(s: Stats) {
     const $ = this.byId;
     const p = s.power;
-    const { available, short, text } = powerFigures(p);
+    const { available, short, warning, text } = powerFigures(p);
+    const waitingText = `${fmt(p.waiting)} ${p.waiting === 1 ? 'lot' : 'lots'} waiting for power`;
     put($('power-value'), text);
-    mark($('power'), 'warning', short);
-    $('power').setAttribute(
-      'aria-label',
-      `Power: ${text} of supply needed${short ? ', not enough power' : ''}`,
-    );
-    put($('power-title'), short ? 'Not enough power' : 'Power');
-    mark($('power-title'), 'problem', short);
+    mark($('power'), 'warning', warning);
+    const why = short ? ', not enough power' : warning ? `, ${waitingText}` : '';
+    $('power').setAttribute('aria-label', `Power: ${text} of supply needed${why}`);
+    put($('power-title'), short ? 'Not enough power' : warning ? 'More power needed' : 'Power');
+    mark($('power-title'), 'problem', warning);
     put($('power-needed'), fmt(p.demand));
     put($('power-available'), `${fmt(available)} (starter ${fmt(p.starter)})`);
     const unpowered = $('power-unpowered');
@@ -126,7 +125,7 @@ export class TopBar {
     );
     show(unpowered, p.unpowered > 0);
     const waiting = $('power-waiting');
-    put(waiting, `${fmt(p.waiting)} ${p.waiting === 1 ? 'lot' : 'lots'} waiting for power`);
+    put(waiting, waitingText);
     show(waiting, p.waiting > 0);
     put($('power-advice'), powerAdvice(p));
     // The bar spans the larger of need and supply; the mark is the supply.
