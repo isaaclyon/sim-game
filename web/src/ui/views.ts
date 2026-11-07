@@ -24,6 +24,7 @@ export interface ViewDrawing {
   toggleTrafficView(): boolean;
   setPollutionView(view: PollutionView): void;
   setPowerView(on: boolean): void;
+  setFireView(on: boolean): void;
 }
 
 export class Views {
@@ -31,12 +32,17 @@ export class Views {
   power = false;
   /** Called when the player switches the power markers, by key or button. */
   onPlayerPower: (() => void) | null = null;
+  /** The fire coverage view is on (ADR 0053). */
+  fire = false;
+  /** Called when the player switches the fire view. */
+  onPlayerFire: (() => void) | null = null;
   private overlay: PollutionView = 'plain';
   private traffic = false;
   private readonly draw: ViewDrawing;
   private readonly overlayButtons: HTMLElement[];
   private readonly trafficButton: HTMLElement;
   private readonly powerButton: HTMLElement;
+  private readonly fireButton: HTMLElement;
   private readonly button: HTMLElement;
 
   /** `button` is the Views button in the category bar; the list opens above it. */
@@ -80,6 +86,20 @@ export class Views {
       'Power markers',
     );
     this.powerButton.onclick = () => this.togglePower();
+    this.fireButton = h(
+      'button',
+      {
+        type: 'button',
+        id: 'fire-view',
+        'aria-pressed': 'false',
+        title: tooltip('Fire coverage', 'Roads and buildings a fire station reaches in time.'),
+      },
+      'Fire coverage',
+    );
+    this.fireButton.onclick = () => {
+      this.setFire(!this.fire);
+      this.onPlayerFire?.();
+    };
     const panel = h(
       'section',
       { id: 'views-panel', class: 'glass panel views', 'aria-label': 'Views', hidden: true },
@@ -95,7 +115,7 @@ export class Views {
         ...this.overlayButtons,
       ),
       h('h2', {}, 'Also show'),
-      h('div', { class: 'choices' }, this.trafficButton, this.powerButton),
+      h('div', { class: 'choices' }, this.trafficButton, this.powerButton, this.fireButton),
     );
     document.body.append(panel);
     button.setAttribute('aria-controls', 'views-panel');
@@ -125,6 +145,14 @@ export class Views {
     this.mark();
   }
 
+  /** Shows or hides fire coverage without counting as the player's choice. */
+  setFire(on: boolean) {
+    this.fire = on;
+    this.draw.setFireView(on);
+    press(this.fireButton, on);
+    this.mark();
+  }
+
   togglePower() {
     this.setPower(!this.power);
     this.onPlayerPower?.();
@@ -142,6 +170,9 @@ export class Views {
 
   /** The Views button reads as on while any view shows. */
   private mark() {
-    this.button.classList.toggle('on', this.overlay !== 'plain' || this.traffic || this.power);
+    this.button.classList.toggle(
+      'on',
+      this.overlay !== 'plain' || this.traffic || this.power || this.fire,
+    );
   }
 }

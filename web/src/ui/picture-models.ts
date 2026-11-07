@@ -7,6 +7,7 @@ import { buildBuildingGeometry } from '../building-kit/index.ts';
 import { MeshBuilder } from '../building-kit/mesh.ts';
 import type { Pt } from '../building-kit/polygon.ts';
 import { createCoalPlant } from '../coal-plant.ts';
+import { createFireStation } from '../fire-station.ts';
 import { GROUND, ROADS, SIDEWALK, ZONE_OVERLAY } from '../palette.ts';
 import { PlantKind, RoadClass, Zone } from '../protocol.ts';
 import { buildRoadGeometry } from '../road-geometry.ts';
@@ -182,6 +183,11 @@ export function pictureModel(p: Picture): THREE.Object3D {
       return roadModel(p.roadClass, 28);
     case 'line':
       return lineModel();
+    case 'station': {
+      const station = new THREE.Group().add(createFireStation(12));
+      station.rotation.y = Math.PI;
+      return station;
+    }
     case 'icon':
       if (p.name === 'roads') return roadModel(RoadClass.Street, 20);
       if (p.name === 'zones') return zonesIcon();

@@ -14,6 +14,7 @@ export type Tool =
   | { kind: 'zone'; zone: Zone }
   | { kind: 'plant'; plant: PlantKind }
   | { kind: 'line' }
+  | { kind: 'station' }
   | { kind: 'bulldoze' };
 
 /** What an option changes on the tool in use. */
@@ -28,6 +29,7 @@ export type Picture =
   | { kind: 'zone'; zone: Zone }
   | { kind: 'plant'; plant: PlantKind }
   | { kind: 'line' }
+  | { kind: 'station' }
   | { kind: 'icon'; name: 'roads' | 'zones' | 'power' | 'bulldoze' | 'views' | 'eraser' };
 
 /** A stable name for a picture model, so each is drawn once. */
@@ -215,9 +217,18 @@ export const CATEGORIES: Category[] = [
   {
     id: 'services',
     label: 'Services',
-    tip: 'Police, fire, health and schools',
-    icon: { kind: 'icon', name: 'zones' },
-    items: [],
+    tip: 'Fire stations; police, health and schools later',
+    icon: { kind: 'station' },
+    items: [
+      {
+        id: 'fire-station',
+        label: 'Fire station',
+        tip: 'Sends trucks to fires along the roads; stands beside a road.',
+        key: 'H',
+        picture: { kind: 'station' },
+        tool: { kind: 'station' },
+      },
+    ],
   },
   {
     id: 'transit',
@@ -239,7 +250,7 @@ export const CATEGORIES: Category[] = [
 export const BULLDOZE: Item = {
   id: 'bulldoze',
   label: 'Bulldoze',
-  tip: 'Remove a road, building, plant or power line.',
+  tip: 'Remove a road, building, plant, power line, fire station or ruins.',
   key: 'B',
   picture: { kind: 'icon', name: 'bulldoze' },
   tool: { kind: 'bulldoze' },
