@@ -118,7 +118,8 @@ impl World {
             }
             // Ruins hold the lot for a day (ADR 0053).
             if self.fire.ruined(lot) {
-                self.buildings.defer(lot, zone, tick, dt, seed, Wait::Demand);
+                self.buildings
+                    .defer(lot, zone, tick, dt, seed, Wait::Demand);
                 continue;
             }
             if !self.cfg.ignore_demand && self.demand_for(zone) <= self.land_threshold(lot, zone) {

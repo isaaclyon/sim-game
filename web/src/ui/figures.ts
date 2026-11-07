@@ -1,13 +1,6 @@
 // Words and numbers for the top bar, its detail panels and the debug panel. Display only: every
 // figure comes from the sim's stats or the worker's save status.
-import type {
-  CityStatus,
-  Demand,
-  FireStats,
-  PowerStats,
-  Stats,
-  WaterStats,
-} from '../protocol';
+import type { CityStatus, Demand, FireStats, PowerStats, Stats, WaterStats } from '../protocol';
 
 export const fmt = (n: number) => n.toLocaleString('en-US');
 /** Whole dollars with the sign in front: `$1,234`, `-$56`. */
