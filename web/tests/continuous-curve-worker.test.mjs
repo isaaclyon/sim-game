@@ -46,3 +46,26 @@ test('five pieces keep their sim-guided controls through the worker', async () =
     if (id < 5) points = [...result.end, 8, ...targets[id - 1], 0, ...result.control, 0];
   }
 });
+
+test('a draft request reach closes a square from a click about a pixel off its corner', async () => {
+  const w = await worker(0);
+  w.ready();
+  await w.init;
+  await w.send({ type: 'setSpeed', speed: 0 });
+  for (const [id, points] of [
+    [1, [-1000, -1000, 0, -920, -1000, 0]],
+    [2, [-920, -1000, 0, -920, -920, 0]],
+  ]) {
+    await w.send({ type: 'buildRoad', id, points, class: 0 });
+    assert.equal(w.messages.at(-1).success, true);
+  }
+  const points = [-920, -920, 7, -1008, -917, 7];
+  await w.send({ type: 'previewRoad', points, plan: true, class: 0, revision: 1 });
+  assert.notDeepEqual([...w.messages.at(-1).points.slice(2)], [-1000, -920], 'default reach');
+  await w.send({ type: 'previewRoad', points, reach: 75, plan: true, class: 0, revision: 2 });
+  assert.deepEqual([...w.messages.at(-1).points.slice(2)], [-1000, -920]);
+  await w.send({ type: 'buildRoad', id: 3, points, reach: 75, class: 0 });
+  assert.deepEqual([...w.messages.at(-1).end], [-1000, -920]);
+  await w.send({ type: 'commandLog' });
+  assert.match(w.messages.at(-1).text, /\n\d+ road -920 -920 -1000 -920 street\n/);
+});

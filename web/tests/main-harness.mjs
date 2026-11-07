@@ -26,6 +26,8 @@ export async function tools({ hash = '', clipboard = true, catalog } = {}) {
   const previews = [];
   const events = {};
   const pans = [];
+  // Ground metres per screen pixel; `pick` maps pixels to metres one to one.
+  const zoom = { metresPerPixel: 1 };
   const clock = { now: 0, cameraMoved: false };
   const confirm = { answer: false, prompts: [] };
   // City sharing: the page URL, downloads made and text copied.
@@ -133,6 +135,9 @@ export async function tools({ hash = '', clipboard = true, catalog } = {}) {
     renderer = { domElement: canvas };
     pick(x, z) {
       return { x, z };
+    }
+    metresPerPixel() {
+      return zoom.metresPerPixel;
     }
     setPreview(stops, a, b, roadClass, reclass) {
       previews.push({ type: 'road', stops, a, b, roadClass, reclass });
@@ -318,6 +323,7 @@ export async function tools({ hash = '', clipboard = true, catalog } = {}) {
     previews,
     pans: leftDragPans,
     cameraPans: pans,
+    zoom,
     canvas,
     clock,
     zoneDrags,

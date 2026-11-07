@@ -384,3 +384,32 @@ test('angle marks are drawn as the sim sent them and cleared with the tool', asy
   t.key('Escape');
   assert.equal(marks(), null);
 });
+
+test('road and grid requests carry a snap reach of ten screen pixels at the current zoom', async () => {
+  const t = await tools();
+  t.zoom.metresPerPixel = 7.5;
+  t.key('r');
+  t.move(10, 20);
+  let ask = t.messages.at(-1);
+  assert.deepEqual([ask.type, ask.reach], ['previewRoad', 75]);
+  t.click(10, 20);
+  t.zoom.metresPerPixel = 0.5;
+  t.reply(answer(ask, [10, 20], [10, 20, 0]));
+  t.move(100, 20);
+  ask = t.messages.at(-1);
+  assert.deepEqual([ask.type, ask.reach], ['previewRoad', 5], 'zooming in narrows it');
+  t.click(100, 20);
+  assert.deepEqual([t.messages.at(-1).type, t.messages.at(-1).reach], ['buildRoad', 5]);
+  const g = await tools();
+  g.zoom.metresPerPixel = 3;
+  g.pressId('category-roads');
+  g.pressId('main-road');
+  g.pressId('grid-road');
+  g.move(0, 0);
+  ask = g.messages.at(-1);
+  assert.deepEqual([ask.type, ask.reach], ['previewRoad', 30], 'the grid starts like a road');
+  g.click(0, 0);
+  g.reply(answer(ask, [0, 0], [0, 0, 0]));
+  g.move(80, 0);
+  assert.deepEqual([g.messages.at(-1).type, g.messages.at(-1).reach], ['previewGrid', 30]);
+});

@@ -53,6 +53,7 @@ test('Grid under Roads asks for the first edge, then the area, and builds one gr
     class: RoadClass.Main,
     cell: 80,
     points: [1, 2, ALL, 80, 0, ALL],
+    reach: 10,
   });
   t.click(80, 0);
   t.reply(answer(edge, []));
@@ -83,6 +84,7 @@ test('Grid under Roads asks for the first edge, then the area, and builds one gr
     class: RoadClass.Main,
     cell: 80,
     points: [1, 2, ALL, 80, 0, ALL],
+    reach: 10,
     cursor: [160, 70],
   });
   assert.match(hint(t), /Building grid/);

@@ -1,7 +1,7 @@
 // Runs the WASM sim on a fixed-timestep clock, off the main thread.
 
 import { CitySession } from './city-session';
-import { gridPreview, roadPreview } from './drafts';
+import { gridPreview, rawDraft, roadPreview } from './drafts';
 import init, { type Sim } from './pkg/sim_wasm';
 import type {
   Activity,
@@ -320,12 +320,12 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
       // Capture the sim-guided control before the build changes the network.
       const draft =
         msg.chain && sim && cities.ready
-          ? sim.road_draft(new Float32Array(msg.points), false, msg.class)
+          ? sim.road_draft(rawDraft(msg), false, msg.class)
           : null;
       const control: [number, number] | undefined =
         draft?.[0] === 3 ? [draft[8], draft[9]] : undefined;
       const built =
-        sim && cities.ready ? sim.build_draft(new Float32Array(msg.points), msg.class) : null;
+        sim && cities.ready ? sim.build_draft(rawDraft(msg), msg.class) : null;
       const end: [number, number] | null = built?.length === 2 ? [built[0], built[1]] : null;
       if (end && sim) {
         cities.changed();
@@ -418,7 +418,7 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
     }
     case 'buildGrid': {
       const cursor = new Float32Array(msg.cursor ?? []);
-      const points = new Float32Array(msg.points);
+      const points = rawDraft(msg);
       const success =
         !!sim && cities.ready && sim.build_grid_draft(points, cursor, msg.cell, msg.class);
       if (success && sim) {
