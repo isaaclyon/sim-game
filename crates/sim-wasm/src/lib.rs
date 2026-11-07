@@ -5,6 +5,8 @@ use sim::road::RoadClass;
 use sim::{Command, CommandLog, World, Zone};
 use wasm_bindgen::prelude::*;
 
+mod fire;
+
 #[wasm_bindgen]
 pub struct Sim {
     world: World,

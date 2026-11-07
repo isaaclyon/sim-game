@@ -13,6 +13,12 @@ fn closed_ring(ring: &[(f32, f32)], out: &mut Vec<f32>) {
 }
 
 impl World {
+    /// Bumped whenever stations, fires, ruins or the fire setting change. Coverage also
+    /// follows roads and buildings, which have versions of their own.
+    pub fn fire_version(&self) -> u32 {
+        self.fire.version
+    }
+
     /// `[x, y, half_size, front_x, front_y]` per active station, in ID order.
     pub fn write_fire_stations(&self, out: &mut Vec<f32>) {
         out.clear();

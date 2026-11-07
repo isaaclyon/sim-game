@@ -27,8 +27,8 @@ export type ToWorker =
   /** Builds the road through guided `points`, as in `previewRoad`. `chain` requests the
    * sim-guided control of a successful curve in `buildResult`, for its next continuation. */
   | { type: 'buildRoad'; id: number; points: number[]; class: RoadClass; chain?: boolean }
-  /** Removes the plant under the point, else the nearest line, else the building under the
-   * point (ADR 0045), else the nearest road. */
+  /** Removes the fire station or plant under the point, else the nearest line, else the
+   * building under the point (ADR 0045), else ruins (ADR 0053), else the nearest road. */
   | { type: 'deleteRoad'; x: number; y: number }
   /** Places a power plant at the point: coal snaps beside the nearest road and faces it, others
    * centre on the point (ADR 0041, 0042). Refusals change nothing. */
@@ -36,6 +36,13 @@ export type ToWorker =
   /** Draws a transmission line; each end snaps to a line end, a plant's terminal, or the
    * sidewalk of a road in reach on the side facing the other end (ADR 0042). */
   | { type: 'buildLine'; ax: number; ay: number; bx: number; by: number }
+  /** Places a fire station beside the nearest road, facing it (ADR 0053). Refused away from
+   * roads, over roads, plants and stations, and when the city cannot pay. */
+  | { type: 'placeStation'; x: number; y: number }
+  /** Asks where a station asked for here would stand. Answered with `stationPreview`. */
+  | { type: 'previewStation'; x: number; y: number; revision: number }
+  /** Turns this city's fires on or off; off puts out every fire burning now (ADR 0053). */
+  | { type: 'setFires'; on: boolean }
   /** Asks whether a plant fits here. Answered with `plantPreview`. */
   | { type: 'previewPlant'; kind: PlantKind; x: number; y: number; revision: number }
   /** Asks where a line would go. Answered with `linePreview`. */
@@ -125,11 +132,17 @@ export type Activity = (typeof Activity)[keyof typeof Activity];
 
 /** Floats per agent in the `frame` agents snapshot. */
 export const AGENT_STRIDE = 5;
-/** The `kind` field of an agent snapshot entry (ADR 0026). */
+/** The `kind` field of an agent snapshot entry (ADR 0026, 0053). */
 export const AgentKind = {
   Car: 0,
   Walker: 1,
+  FireTruck: 2,
 } as const;
+
+/** Floats per station in `fire.stations`. */
+export const STATION_STRIDE = 5;
+/** Floats per burning building in `fire.fires`. */
+export const FIRE_STRIDE = 4;
 export type AgentKind = (typeof AgentKind)[keyof typeof AgentKind];
 
 /** A building, named by its ID and original use. */
@@ -195,6 +208,25 @@ export interface PowerStats {
   waiting: number;
 }
 
+/** The city's fire figures from the sim (ADR 0053). */
+export interface FireStats {
+  /** The city's fire setting; off, no fire starts. */
+  enabled: boolean;
+  /** No fire starts while fewer people than this live in the city. */
+  threshold: number;
+  stations: number;
+  trucks: number;
+  /** Trucks at their station, free to go. */
+  freeTrucks: number;
+  burning: number;
+  /** Burning with no truck on the way. */
+  unattended: number;
+  /** Standing buildings a station covers. */
+  covered: number;
+  saved: number;
+  destroyed: number;
+}
+
 export interface Stats {
   tick: number;
   /** Day clock from the sim (`sim::clock`): 1-based day and seconds since midnight. */
@@ -235,6 +267,7 @@ export interface Stats {
   grant: number;
   /** Road upkeep, dollars per clock hour. */
   upkeep: number;
+  fire: FireStats;
 }
 
 /** Persistence metadata only. A commit acknowledges the captured revision, not later edits. */
@@ -333,6 +366,26 @@ export type FromWorker =
   /** `outline` is the closed `[x, y]` footprint the plant asked about would take, snapped
    * beside a road for coal (ADR 0042); `ok` if it fits. */
   | { type: 'plantPreview'; outline: Float32Array; ok: boolean; revision: number }
+  /**
+   * Fire (ADR 0053), sent whole when stations, fires, ruins, the fire setting, roads or
+   * buildings change; growth is coalesced like `buildings`. `stations` is `[x, y, halfSize,
+   * frontX, frontY]` per station (`STATION_STRIDE`): a square turned to face its road.
+   * `fires` is `[x, y, height, truck]` per burning building (`FIRE_STRIDE`), oldest first:
+   * footprint mean point, metres, 1 if a truck is on the way. `ruins` is `[n, x0, y0, …]` per
+   * lot holding ruins, like `lots`. `coverRoads` is `[ax, ay, bx, by]` per rendered segment of
+   * a road a station reaches; `coverBuildings` is `[x, y]` per covered building.
+   */
+  | {
+      type: 'fire';
+      stations: Float32Array;
+      fires: Float32Array;
+      ruins: Float32Array;
+      coverRoads: Float32Array;
+      coverBuildings: Float32Array;
+    }
+  /** `outline` is the closed `[x, y]` footprint a station asked about would take, beside its
+   * road, empty where no road is in reach; `ok` if it would be placed. */
+  | { type: 'stationPreview'; outline: Float32Array; ok: boolean; revision: number }
   /** `[ax, ay, aJoin, bx, by, bJoin]`, join 1 where an end meets a line, plant or road and 0
    * where it stands free; empty means refused. */
   | { type: 'linePreview'; ends: Float32Array; revision: number }
@@ -347,7 +400,8 @@ export type FromWorker =
       control?: [number, number];
     }
   /** Selected road's `[x, y]` centreline samples, or empty on a miss. Sim-owned hit testing.
-   * A plant's or building's target is its closed outline and a line's its two ends. */
+   * A station's, plant's, building's or ruins' target is its closed outline and a line's its
+   * two ends. */
   | { type: 'bulldozePreview'; segment: Float32Array; revision: number }
   /** The inspected citizen, or null if the selected agent has no resident. Answers `inspect`. */
   | { type: 'citizen'; selection: number; citizen: Citizen | null }
@@ -355,7 +409,7 @@ export type FromWorker =
   | { type: 'building'; selection: number; building: Building | null }
   /**
    * `agents` is `[x, y, heading, speedRatio, kind]` per agent id (`AGENT_STRIDE`); speedRatio
-   * < 0 means hidden; kind is an `AgentKind` (ADR 0026).
+   * < 0 means hidden; kind is an `AgentKind` (ADR 0026, 0053).
    * `signals` is `[x, y, heading, state]` per signalised approach, at its stop line; state is
    * 0 = red, 1 = green, 2 = protected-left green.
    */

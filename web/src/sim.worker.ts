@@ -1,6 +1,7 @@
 // Runs the WASM sim on a fixed-timestep clock, off the main thread.
 
 import { CitySession } from './city-session';
+import { FireSender, readFireStats } from './fire-worker';
 import init, { type Sim } from './pkg/sim_wasm';
 import type {
   Activity,
@@ -109,8 +110,11 @@ function sendPollutionIfChanged(s: Sim, force = false) {
   post({ type: 'pollution', cells, layout: [x0, y0, cell, cols, rows] }, [cells.buffer]);
 }
 
+const fire = new FireSender(post);
+
 /** After an edit: zoning can add alleys, and road edits can recut lots (ADR 0016). */
 function sendEdits(s: Sim) {
+  fire.sendIfChanged(s, true);
   sendRoadsIfChanged(s);
   sendZonesIfChanged(s);
   sendLotsIfChanged(s);
@@ -134,6 +138,7 @@ const cities = new CitySession(post, (next, initialSpeed) => {
     pollutionVersion =
       -1;
   buildingsSentAt = powerSentAt = pollutionSentAt = -Infinity;
+  fire.reset();
   inspected = null;
   post({ type: 'cityReset', speed });
   sendEdits(next);
@@ -177,6 +182,7 @@ function readStats(s: Sim): Stats {
     taxes: st.taxes,
     grant: st.grant,
     upkeep: st.upkeep,
+    fire: readFireStats(s),
   };
   st.free();
   return out;
@@ -263,6 +269,7 @@ function step() {
       sendBuildingsIfChanged(sim);
       sendPowerIfChanged(sim);
       sendPollutionIfChanged(sim);
+      fire.sendIfChanged(sim);
       sendFrame(sim, perTick);
     }
   }
@@ -310,6 +317,7 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
         sendBuildingsIfChanged(sim, true);
         sendPowerIfChanged(sim, true);
         sendPollutionIfChanged(sim, true);
+        fire.sendIfChanged(sim, true);
       }
       break;
     case 'spawn':
@@ -354,6 +362,14 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
           ? sim.place_plant(msg.kind, msg.x, msg.y)
           : sim.build_line(msg.ax, msg.ay, msg.bx, msg.by))
       ) {
+        cities.changed();
+        sendEdits(sim);
+      }
+      break;
+    case 'placeStation':
+    case 'previewStation':
+    case 'setFires':
+      if (fire.command(sim, msg, cities.ready) && sim) {
         cities.changed();
         sendEdits(sim);
       }
