@@ -423,7 +423,8 @@ Goals and consequences, kept light so they don't crowd out building.
   Done when: a player grows a village on starter power, sees why growth stops, adds a plant,
   and connects an off-road wind farm with a line.
 
-- **Fire** ([ADR 0053](adrs/0053-fire-stations-send-trucks-through-traffic.md)). Roadside fire
+- **Fire — implemented, awaiting browser approval**
+  ([ADR 0053](adrs/0053-fire-stations-send-trucks-through-traffic.md)). Roadside fire
   stations cover buildings within a driving distance along roads and raise their land value.
   Above about 1,000 residents, grown buildings occasionally catch fire (industry and dense
   more often). A station sends a real truck through traffic; one that arrives in time saves
@@ -434,6 +435,9 @@ Goals and consequences, kept light so they don't crowd out building.
   Done when: a town nearing 1,000 people sees the warning, builds a station, watches a truck
   cross town and save a house, loses a building in an uncovered or jammed area, and can turn
   fires off.
+
+  Built: the fire station under Services (key H), the fire view under Views, red trucks, flames
+  and ruins, and a fire figure in the top bar whose panel shows a fire and turns fires off.
 
 - Remaining services with coverage areas: water, roads maintenance, then police, health and
   schools.

@@ -1,6 +1,6 @@
 # 0053. Fire stations send real trucks through traffic
 
-- Status: Accepted; not yet implemented
+- Status: Accepted; implemented
 - Date: 2026-11-06
 - Extends: [0021](0021-citizens-households-and-trips.md), [0026](0026-walking-trips-and-household-cars.md),
   [0036](0036-money-build-costs-taxes-upkeep.md), [0037](0037-pollution-and-land-value-steer-growth.md),

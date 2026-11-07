@@ -20,13 +20,14 @@ What to build next and why lives in `docs/ROADMAP.md`. Work on the current miles
 
 ## Snapshot formats
 - Agents: `[x, y, heading, speed_ratio, kind]` per agent (`SNAPSHOT_STRIDE`, `AGENT_STRIDE`),
-  speed_ratio < 0 = hidden, kind 0 = car, 1 = walker on the sidewalk (ADR 0026).
+  speed_ratio < 0 = hidden, kind 0 = car, 1 = walker on the sidewalk (ADR 0026), 2 = fire
+  truck (ADR 0053; not a citizen, so inspecting one answers null).
 - Roads: `[ax, ay, bx, by, class]` per active rendered segment, class 0 = street, 1 = main road,
   2 = alley; curves emit multiple segments. Packed in road ID order, not indexed by road ID
   (ADR 0015, 0017).
 - Bulldoze preview: `[x, y]` per centreline sample of the selected road, or a closed outline
-  for a plant or building (ADR 0045); empty = no target. Plants, lines, then buildings win
-  over roads.
+  for a fire station, plant, building or ruins (ADR 0045, 0053); empty = no target. Stations,
+  plants, lines, buildings, then ruins win over roads.
   Read-only. Road/lane IDs are never reused after deletion (ADR 0013). Lane counts include
   tombstone slots.
 - Road class clicks (ADR 0050): `setRoadClass` gives the road nearest `[x, y]` in bulldoze
@@ -90,7 +91,17 @@ What to build next and why lives in `docs/ROADMAP.md`. Work on the current miles
   none. Grid numbers are stable within one message only. Sent whole when plants, lines, grids
   or who is powered change; growth is capped like buildings. Plant preview: closed `[x, y]`
   footprint where the plant would stand (coal snapped beside a road) plus `ok`. Line preview: `[ax, ay, a_join, bx, by, b_join]`, join 1 = meets a line,
-  plant or road; empty = refused. Bulldoze removes a plant, else a line, else a building, else a road.
+  plant or road; empty = refused. Bulldoze removes a fire station, else a plant, else a line,
+  else a building, else ruins, else a road.
+- Fire (ADR 0053): `fire` carries stations `[x, y, half_size, front_x, front_y]`
+  (`STATION_STRIDE`), a square turned to face its road like coal; fires `[x, y, height, truck]`
+  per burning building (`FIRE_STRIDE`), oldest first, truck 1 = one is on the way; ruins
+  `[n, x0, y0, …]` per ruined lot like lots; `coverRoads` `[ax, ay, bx, by]` per rendered
+  segment of a road a station reaches; `coverBuildings` `[x, y]` per covered building. Sent
+  whole when stations, fires, ruins, the setting, roads, lots or buildings change; growth is
+  capped like buildings. Station preview: closed `[x, y]` footprint plus `ok`. `setFires`
+  turns the city's fires on or off (`fires on|off` in command logs; `station x y` places one).
+  Frames carry `stats.fire` (`FireStats`). Flames, smoke and rubble are display only.
 - Citizen inspection: `inspect` names a car or walker by its agent snapshot index; the worker maps it once
   to a citizen and answers `citizen` for that one citizen only, at once and after every frame
   and edit while selected (ADR 0022). Read-only, not hashed; names are derived from the seed and
