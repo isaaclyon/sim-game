@@ -104,3 +104,38 @@ test('Upgrade drops stale answers, follows the class keys and leaves the other k
   assert.equal(pressed(t, 'upgrade-road'), false);
   assert.equal(hint(t), '');
 });
+
+test('a draft that follows roads says and shows which roads change class (ADR 0048)', async () => {
+  const t = await tools();
+  t.key('r');
+  t.click(0, 0);
+  t.move(100, 0);
+  const ask = t.messages.at(-1);
+  // The sim's answer: the draft runs along a main road from (0, 0) to (100, 0).
+  const reclass = new Float32Array([2, 0, 0, 100, 0]);
+  const preview = (revision, more, cost, affordable) => ({
+    type: 'roadPreview',
+    revision,
+    stops: new Float32Array([0, 0, 1, 100, 0, 1]),
+    points: new Float32Array([0, 0, 100, 0]),
+    guides: new Float32Array(),
+    angles: new Float32Array(),
+    length: 100,
+    angle: Number.NaN,
+    cost,
+    affordable,
+    reclass: more,
+  });
+  t.reply(preview(ask.revision, reclass, 0, true));
+  assert.match(hint(t), /Changes 1 road to street\. Costs \$0\. Click the road end/);
+  const drawn = t.previews.findLast((p) => p.type === 'road');
+  assert.deepEqual(drawn.reclass, reclass, 'the changing road is drawn at its new class');
+
+  t.key('m');
+  const two = new Float32Array([2, 0, 0, 50, 0, 2, 50, 0, 100, 0]);
+  t.reply(preview(t.messages.at(-1).revision, two, 1240, true));
+  assert.match(hint(t), /Upgrades 2 roads to main road\. Costs \$1,240\./);
+
+  t.reply(preview(t.messages.at(-1).revision, new Float32Array(), 1000, true));
+  assert.doesNotMatch(hint(t), /road to|roads to/, 'no hint when nothing changes class');
+});

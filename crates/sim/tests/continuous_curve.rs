@@ -95,7 +95,7 @@ fn invalid_sources_and_backwards_are_refused() {
         assert!(w.draft_cost(&raw, RoadClass::Street).is_none());
         let mut out = Vec::new();
         w.write_road_draft(&raw, true, RoadClass::Street, &mut out);
-        assert_eq!(out.len(), 5);
+        assert_eq!(out.len(), 6);
         assert_eq!(out[0], 0.0);
     }
     assert!(
@@ -135,7 +135,7 @@ fn preview_cost_and_build_use_same_snapped_curve() {
     else {
         panic!("not a curve")
     };
-    assert_eq!(&out[5..11], &[ax, ay, cx, cy, bx, by]);
+    assert_eq!(&out[6..12], &[ax, ay, cx, cy, bx, by]);
     close(
         (cx - ax, cy - ay),
         ((bx - ax + by - ay) / 4.0, (bx - ax + by - ay) / 4.0),

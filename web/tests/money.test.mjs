@@ -122,6 +122,7 @@ test('the road tool shows what a road costs and says when the city cannot pay', 
     angle: Number.NaN,
     cost,
     affordable,
+    reclass: new Float32Array(),
   });
   t.reply(preview(ask.revision, 1000, true));
   assert.match(t.elements['build-hint'].textContent, /Costs \$1,000\. Click the road end/);

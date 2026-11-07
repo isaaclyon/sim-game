@@ -14,7 +14,13 @@ type Ground = { x: number; z: number };
 type Clicked = Ground & { snap: number };
 
 interface Drawing {
-  setPreview(stops: Float32Array | null, a: Ground | null, b: Ground | null, cls?: number): void;
+  setPreview(
+    stops: Float32Array | null,
+    a: Ground | null,
+    b: Ground | null,
+    cls?: number,
+    reclass?: Float32Array,
+  ): void;
   setGuides(lines: Float32Array | null): void;
   setAngles(marks: Float32Array | null): void;
   setBulldozePreview(segment: Float32Array): void;
@@ -256,13 +262,14 @@ export class RoadTool {
     if (!this.planAsked && n === 2) {
       // A curve's control guide, not a road. Only the sim evaluates the actual Bézier curve.
       this.draw.setPreview(new Float32Array([pts[0], pts[1], 0, pts[2], pts[3], -1]), at(0), at(1));
-    } else this.draw.setPreview(msg.stops, n > 1 ? at(0) : null, at(n - 1), this.roadClass);
+    } else
+      this.draw.setPreview(msg.stops, n > 1 ? at(0) : null, at(n - 1), this.roadClass, msg.reclass);
     this.draw.setGuides(msg.guides);
     this.draw.setAngles(msg.angles);
     this.refused = this.planAsked && n > 1 && msg.stops.length === 0;
     this.quote =
       this.planAsked && n > 1 && !this.refused
-        ? { cost: msg.cost, affordable: msg.affordable }
+        ? { cost: msg.cost, affordable: msg.affordable, changes: roadCount(msg.reclass) }
         : null;
     this.showReadout(this.planAsked && n > 1 ? '' : null, msg.length, msg.angle);
     this.updateHelp();
@@ -402,4 +409,11 @@ export class RoadTool {
       this.quote,
     );
   }
+}
+
+/** How many roads `[n, x0, y0, …]` per road lists (the sim's `reclass`, ADR 0048). */
+function roadCount(roads: Float32Array) {
+  let count = 0;
+  for (let i = 0; i < roads.length; i += 1 + 2 * roads[i]) count++;
+  return count;
 }

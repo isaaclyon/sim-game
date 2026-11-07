@@ -51,7 +51,9 @@ What to build next and why lives in `docs/ROADMAP.md`. Work on the current miles
   (dollars the guided road would charge, null when nothing is planned) and `affordable`
   (false = the build would be refused for money; ADR 0036). Changes nothing. The request's
   `class` matters: roads the draft follows take that class when built, so a draft over roads
-  of the same class plans nothing (ADR 0048).
+  of the same class plans nothing (ADR 0048). `reclass` lists those roads, `[n, x0, y0, …]`
+  per road whose class would change (its centreline samples, as the Upgrade click preview);
+  empty = none. The road tool names them in its hint and highlights them at the new width.
   `buildResult` carries the guided `end`, null if refused, and the guided `control` for a
   successful curve when the request sets `chain`.
 - Grid drafts (ADR 0049): `previewGrid`/`buildGrid` send the first edge's two raw

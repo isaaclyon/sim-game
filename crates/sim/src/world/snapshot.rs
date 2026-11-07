@@ -155,10 +155,12 @@ impl World {
         );
     }
 
-    /// Guides raw `[x, y, snap]` points (ADR 0038) and writes `[n, m, length, angle, k]`, then
-    /// `[x, y]` per guided point, `[x0, y0, x1, y1]` per guide line, `[x, y, rx, ry, dx, dy]` per
-    /// angle mark (`guide::Mark`; the start's, then, if `plan`, the end's), then, if `plan`, the
-    /// road preview of the guided points as `class`: one stop for one point (where a road would
+    /// Guides raw `[x, y, snap]` points (ADR 0038) and writes `[n, m, length, angle, k, r]`,
+    /// then `[x, y]` per guided point, `[x0, y0, x1, y1]` per guide line, `[x, y, rx, ry, dx,
+    /// dy]` per angle mark (`guide::Mark`; the start's, then, if `plan`, the end's), then `r`
+    /// floats of `[count, x0, y0, …]` per existing road the build would change to `class`
+    /// (ADR 0048; its centreline samples, as the class preview), then, if `plan`, the road
+    /// preview of the guided points as `class`: one stop for one point (where a road would
     /// start), as `write_road_preview` for two, `write_curve_preview` for three. Changes nothing.
     pub fn write_road_draft(&self, raw: &[f32], plan: bool, class: RoadClass, out: &mut Vec<f32>) {
         out.clear();
@@ -169,24 +171,48 @@ impl World {
             .into_iter()
             .chain(d.end_mark.filter(|_| plan))
             .collect();
+        let shape = match d.points[..] {
+            [a, b] => Some(Shape {
+                a,
+                b,
+                control: None,
+            }),
+            [a, c, b] => Some(Shape {
+                a,
+                b,
+                control: Some(c),
+            }),
+            _ => None,
+        };
+        let road_plan = shape
+            .filter(|_| plan)
+            .and_then(|shape| snap::plan(&self.roads, shape, Some(class)));
+        let mut reclass = Vec::new();
+        for &road in road_plan.iter().flat_map(|p| &p.reclass) {
+            let at = reclass.len();
+            reclass.push(0.0);
+            self.write_centreline(road, &mut reclass);
+            reclass[at] = ((reclass.len() - at - 1) / 2) as f32;
+        }
         out.extend([
             d.points.len() as f32,
             d.lines.len() as f32,
             d.length,
             d.angle,
             marks.len() as f32,
+            reclass.len() as f32,
         ]);
         out.extend(d.points.iter().flat_map(|p| [p.0, p.1]));
         out.extend(d.lines.iter().flatten());
         out.extend(marks.iter().flatten());
+        out.extend(reclass);
         if !plan {
             return;
         }
         let mut stops = Vec::new();
-        match d.points[..] {
-            [p] => self.write_snap_preview(p.0, p.1, &mut stops),
-            [a, b] => self.write_road_preview(a.0, a.1, b.0, b.1, class, &mut stops),
-            [a, c, b] => self.write_curve_preview(a.0, a.1, c.0, c.1, b.0, b.1, class, &mut stops),
+        match (&d.points[..], road_plan) {
+            ([p], _) => self.write_snap_preview(p.0, p.1, &mut stops),
+            (_, Some(road_plan)) => write_stops(&road_plan, &mut stops),
             _ => {}
         }
         out.extend(stops);
@@ -194,20 +220,8 @@ impl World {
 
     fn write_build_preview(&self, shape: Shape, class: RoadClass, out: &mut Vec<f32>) {
         out.clear();
-        let Some(plan) = snap::plan(&self.roads, shape, Some(class)) else {
-            return;
-        };
-        let first = plan.stops[0];
-        out.extend([first.x, first.y, join_code(first.join)]);
-        for (i, leg) in plan.legs.iter().enumerate() {
-            for (_, _, t, p) in leg.segments() {
-                let join = if t == 1.0 {
-                    join_code(plan.stops[i + 1].join)
-                } else {
-                    -1.0
-                };
-                out.extend([p.0, p.1, join]);
-            }
+        if let Some(plan) = snap::plan(&self.roads, shape, Some(class)) {
+            write_stops(&plan, out);
         }
     }
 
@@ -307,6 +321,22 @@ impl World {
 }
 
 /// How a preview stop joins the network, as the frontend reads it.
+/// `[x, y, join]` per stop and interior curve sample (join -1) of `plan`, in order.
+fn write_stops(plan: &snap::Plan, out: &mut Vec<f32>) {
+    let first = plan.stops[0];
+    out.extend([first.x, first.y, join_code(first.join)]);
+    for (i, leg) in plan.legs.iter().enumerate() {
+        for (_, _, t, p) in leg.segments() {
+            let join = if t == 1.0 {
+                join_code(plan.stops[i + 1].join)
+            } else {
+                -1.0
+            };
+            out.extend([p.0, p.1, join]);
+        }
+    }
+}
+
 fn join_code(join: Join) -> f32 {
     match join {
         Join::New => 0.0,
