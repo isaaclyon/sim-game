@@ -29,6 +29,7 @@ for (const type of ['buildRoad', 'buildCurve', 'deleteRoad']) {
     const w = await worker(0);
     w.ready();
     await w.init;
+    await w.water();
     await w.send({ type: 'fillBlock', x: 50, y: 50, zone: 2 });
     for (let i = 0; i < 1200; i++) w.advance(101);
     await w.send({ type: 'setSpeed', speed: 0 });
@@ -158,9 +159,10 @@ test('every preview request gets a reply even during WASM initialization', async
   assert.equal(w.messages.at(-1).segment.length, 4);
   await w.send({ type: 'setSpeed', speed: 0 });
   await w.send({ type: 'deleteRoad', x, y });
-  assert.equal(w.messages.at(-3).type, 'roads');
-  assert.equal(w.messages.at(-3).segments.length, roads.length - 5);
-  assert.equal(w.messages.at(-2).type, 'power', 'grids follow roads (ADR 0041)');
+  assert.equal(w.messages.at(-4).type, 'roads');
+  assert.equal(w.messages.at(-4).segments.length, roads.length - 5);
+  assert.equal(w.messages.at(-3).type, 'power', 'grids follow roads (ADR 0041)');
+  assert.equal(w.messages.at(-2).type, 'water', 'so do water networks (ADR 0052)');
   assert.equal(w.messages.at(-1).type, 'frame', 'paused edits refresh cars and signals');
   assert.equal(w.messages.at(-1).stats.tick, 0, 'deletion does not advance time');
 });

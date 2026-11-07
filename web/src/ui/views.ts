@@ -1,5 +1,5 @@
-// The Views list (M4.6): one ground overlay at a time, plus traffic colours and power markers
-// as separate switches, combining as before. Display only. P, T and O work as they always have.
+// The Views list (M4.6): one ground overlay at a time, plus traffic colours and power and
+// water markers as separate switches, combining as before. Display only. P, T and O work as they always have.
 import { h, press, tooltip } from './dom';
 import type { Popovers } from './popover';
 
@@ -19,24 +19,42 @@ export function nextPollutionView(view: PollutionView): PollutionView {
   return POLLUTION_VIEWS[(POLLUTION_VIEWS.indexOf(view) + 1) % POLLUTION_VIEWS.length];
 }
 
+/** A service whose markers can show: power grids (ADR 0041) or water networks (ADR 0052). */
+export type Service = 'power' | 'water';
+
+const MARKERS: Record<Service, { id: string; label: string; tip: string; key?: string }> = {
+  power: {
+    id: 'power-view',
+    label: 'Power markers',
+    tip: "Each building in its grid's colour; red has no power.",
+    key: 'O',
+  },
+  water: {
+    id: 'water-view',
+    label: 'Water markers',
+    tip: "Pumps, towers and dense buildings in their network's colour; red is dry.",
+  },
+};
+
 /** What the views draw on; `Renderer` implements it. */
 export interface ViewDrawing {
   toggleTrafficView(): boolean;
   setPollutionView(view: PollutionView): void;
   setPowerView(on: boolean): void;
+  setWaterView(on: boolean): void;
 }
 
 export class Views {
-  /** The power markers are on. */
-  power = false;
-  /** Called when the player switches the power markers, by key or button. */
-  onPlayerPower: (() => void) | null = null;
+  /** Which service markers are on. */
+  readonly markers: Record<Service, boolean> = { power: false, water: false };
+  /** Called when the player switches a service's markers, by key or button. */
+  onPlayerMarkers: ((service: Service) => void) | null = null;
   private overlay: PollutionView = 'plain';
   private traffic = false;
   private readonly draw: ViewDrawing;
   private readonly overlayButtons: HTMLElement[];
   private readonly trafficButton: HTMLElement;
-  private readonly powerButton: HTMLElement;
+  private readonly markerButtons: Record<Service, HTMLElement>;
   private readonly button: HTMLElement;
 
   /** `button` is the Views button in the category bar; the list opens above it. */
@@ -64,22 +82,23 @@ export class Views {
       'Traffic colours',
     );
     this.trafficButton.onclick = () => this.toggleTraffic();
-    this.powerButton = h(
-      'button',
-      {
-        type: 'button',
-        id: 'power-view',
-        'aria-pressed': 'false',
-        'aria-keyshortcuts': 'O',
-        title: tooltip(
-          'Power markers',
-          "Each building in its grid's colour; red has no power.",
-          'O',
-        ),
-      },
-      'Power markers',
-    );
-    this.powerButton.onclick = () => this.togglePower();
+    const marker = (service: Service) => {
+      const m = MARKERS[service];
+      const b = h(
+        'button',
+        {
+          type: 'button',
+          id: m.id,
+          'aria-pressed': 'false',
+          ...(m.key ? { 'aria-keyshortcuts': m.key } : {}),
+          title: tooltip(m.label, m.tip, m.key),
+        },
+        m.label,
+      );
+      b.onclick = () => this.toggleMarkers(service);
+      return b;
+    };
+    this.markerButtons = { power: marker('power'), water: marker('water') };
     const panel = h(
       'section',
       { id: 'views-panel', class: 'glass panel views', 'aria-label': 'Views', hidden: true },
@@ -95,7 +114,13 @@ export class Views {
         ...this.overlayButtons,
       ),
       h('h2', {}, 'Also show'),
-      h('div', { class: 'choices' }, this.trafficButton, this.powerButton),
+      h(
+        'div',
+        { class: 'choices' },
+        this.trafficButton,
+        this.markerButtons.power,
+        this.markerButtons.water,
+      ),
     );
     document.body.append(panel);
     button.setAttribute('aria-controls', 'views-panel');
@@ -117,17 +142,18 @@ export class Views {
     this.mark();
   }
 
-  /** Shows or hides the power markers without counting as the player's choice. */
-  setPower(on: boolean) {
-    this.power = on;
-    this.draw.setPowerView(on);
-    press(this.powerButton, on);
+  /** Shows or hides a service's markers without counting as the player's choice. */
+  setMarkers(service: Service, on: boolean) {
+    this.markers[service] = on;
+    if (service === 'power') this.draw.setPowerView(on);
+    else this.draw.setWaterView(on);
+    press(this.markerButtons[service], on);
     this.mark();
   }
 
-  togglePower() {
-    this.setPower(!this.power);
-    this.onPlayerPower?.();
+  toggleMarkers(service: Service) {
+    this.setMarkers(service, !this.markers[service]);
+    this.onPlayerMarkers?.(service);
   }
 
   /** P cycles the ground overlays, T and O switch traffic colours and power markers. */
@@ -135,13 +161,14 @@ export class Views {
     const k = key.toLowerCase();
     if (k === 'p') this.setOverlay(nextPollutionView(this.overlay));
     else if (k === 't') this.toggleTraffic();
-    else if (k === 'o') this.togglePower();
+    else if (k === 'o') this.toggleMarkers('power');
     else return false;
     return true;
   }
 
   /** The Views button reads as on while any view shows. */
   private mark() {
-    this.button.classList.toggle('on', this.overlay !== 'plain' || this.traffic || this.power);
+    const { power, water } = this.markers;
+    this.button.classList.toggle('on', this.overlay !== 'plain' || this.traffic || power || water);
   }
 }

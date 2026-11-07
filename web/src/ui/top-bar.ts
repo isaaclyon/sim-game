@@ -1,4 +1,4 @@
-// The top bar: clock, speed, population, money, power, R/C/I demand and the save status.
+// The top bar: clock, speed, population, money, power, water, R/C/I demand and the save status.
 // Clicking a figure opens its details; a figure turns red when something is wrong.
 import type { CityStatus, Stats } from '../protocol';
 import {
@@ -12,6 +12,8 @@ import {
   powerAdvice,
   powerFigures,
   saveBadge,
+  waterAdvice,
+  waterFigures,
 } from './figures';
 import type { Popovers } from './popover';
 
@@ -35,26 +37,27 @@ export class TopBar {
   private readonly speeds: HTMLElement[];
   private city: CityStatus | null = null;
 
-  /** `openPower` opens the Power category of the build menu, focusing its first item when
-   * asked from the keyboard. */
+  /** `openCategory` opens a build menu category (Power or Water), focusing its first item
+   * when asked from the keyboard. */
   constructor(
     byId: Lookup,
     popovers: Popovers,
     setSpeed: (speed: number) => void,
-    openPower: (focus: boolean) => void,
+    openCategory: (id: 'power' | 'water', focus: boolean) => void,
   ) {
     this.byId = byId;
     this.speeds = SPEEDS.map((s) => byId(`speed-${s}`));
     this.speeds.forEach((b, i) => {
       b.onclick = () => setSpeed(SPEEDS[i]);
     });
-    for (const figure of ['population', 'money', 'power'])
+    for (const figure of ['population', 'money', 'power', 'water'])
       popovers.bind(byId(figure), byId(`${figure}-panel`));
     popovers.bind(byId('menu-button'), byId('menu'), false, byId('save-badge'));
-    byId('open-power').onclick = (e?: MouseEvent) => {
-      popovers.close();
-      openPower(e?.detail === 0);
-    };
+    for (const id of ['power', 'water'] as const)
+      byId(`open-${id}`).onclick = (e?: MouseEvent) => {
+        popovers.close();
+        openCategory(id, e?.detail === 0);
+      };
   }
 
   showSpeed(speed: number) {
@@ -80,12 +83,13 @@ export class TopBar {
     for (const [id, text] of Object.entries(populationRows(s))) put($(id), text);
     this.drawMoney(s);
     this.drawPower(s);
+    this.drawWater(s);
     this.drawDemand(s);
   }
 
   private drawMoney(s: Stats) {
     const $ = this.byId;
-    const net = s.taxes + s.grant - s.upkeep;
+    const net = s.taxes + s.grant - s.upkeep - s.utilities;
     const debt = s.balance < 0;
     put($('money-value'), dollars(s.balance));
     put($('money-rate'), perHour(net));
@@ -97,6 +101,7 @@ export class TopBar {
     put($('money-taxes'), perHour(s.taxes));
     put($('money-grant'), perHour(s.grant));
     put($('money-upkeep'), perHour(-s.upkeep));
+    put($('money-utilities'), perHour(-s.utilities));
     put($('money-net'), perHour(net));
     show($('money-debt'), debt);
     $('money').setAttribute(
@@ -136,6 +141,30 @@ export class TopBar {
     $('power-meter-over').style.left = width(available);
     $('power-meter-over').style.width = width(Math.max(p.demand - available, 0));
     $('power-meter-mark').style.left = width(available);
+  }
+
+  private drawWater(s: Stats) {
+    const $ = this.byId;
+    const w = s.water;
+    const { short, text } = waterFigures(w);
+    put($('water-value'), text);
+    mark($('water'), 'warning', short);
+    $('water').setAttribute(
+      'aria-label',
+      `Water: ${text} of pump output needed${short ? ', buildings are dry' : ''}`,
+    );
+    put($('water-title'), short ? 'Not enough water' : 'Water');
+    mark($('water-title'), 'problem', short);
+    put($('water-needed'), fmt(w.demand));
+    put($('water-pumped'), fmt(w.supply));
+    put($('water-stored'), `${fmt(w.stored)} of ${fmt(w.capacity)}`);
+    const dry = $('water-dry');
+    put(dry, `${fmt(w.dry)} dense ${w.dry === 1 ? 'building' : 'buildings'} without water`);
+    show(dry, w.dry > 0);
+    const waiting = $('water-waiting');
+    put(waiting, `${fmt(w.waiting)} ${w.waiting === 1 ? 'lot' : 'lots'} waiting for water`);
+    show(waiting, w.waiting > 0);
+    put($('water-advice'), waterAdvice(w));
   }
 
   /** ADR 0025: a bar grows right of the middle for demand and left of it for a surplus. */

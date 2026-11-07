@@ -38,6 +38,11 @@
         <span id="power-value">0%</span>
       </button>
       <span class="divider" aria-hidden="true"></span>
+      <button type="button" id="water" class="figure" aria-expanded="false" aria-controls="water-panel" title="Water details">
+        <svg viewBox="0 0 24 24" aria-hidden="true" class="solid"><path d="M12 2.5C9 7 6 10.4 6 14a6 6 0 0 0 12 0c0-3.6-3-7-6-11.5z" /></svg>
+        <span id="water-value">0%</span>
+      </button>
+      <span class="divider" aria-hidden="true"></span>
       <div id="demand" class="demand" role="img" aria-label="demand">
         <span class="use">R</span><span class="track"><span class="fill residential" id="demand-residential"></span></span>
         <span class="use">C</span><span class="track"><span class="fill commercial" id="demand-commercial"></span></span>
@@ -68,7 +73,8 @@
         <dt>Balance</dt><dd id="money-balance">$0</dd>
         <dt>Taxes</dt><dd id="money-taxes">+$0/h</dd>
         <dt>Grant</dt><dd id="money-grant">+$0/h</dd>
-        <dt>Upkeep</dt><dd id="money-upkeep">-$0/h</dd>
+        <dt>Road upkeep</dt><dd id="money-upkeep">-$0/h</dd>
+        <dt>Utilities</dt><dd id="money-utilities">-$0/h</dd>
         <dt>Net</dt><dd id="money-net">+$0/h</dd>
       </dl>
       <p id="money-debt" class="warning" hidden>The city is in debt. No new roads until the balance is above zero.</p>
@@ -87,6 +93,22 @@
       <button type="button" id="open-power" class="primary">
         <svg viewBox="0 0 24 24" aria-hidden="true" class="solid"><path d="M13.5 2 4.5 13.5h6.2L9.8 22l9.2-12h-6.3z" /></svg>
         Open Power
+      </button>
+    </section>
+
+    <section id="water-panel" class="glass panel" aria-label="Water details" hidden>
+      <h2 id="water-title">Water</h2>
+      <dl class="rows">
+        <dt>Needed</dt><dd id="water-needed">0</dd>
+        <dt>Pumped</dt><dd id="water-pumped">0</dd>
+        <dt>In towers</dt><dd id="water-stored">0 of 0</dd>
+      </dl>
+      <p id="water-dry" hidden></p>
+      <p id="water-waiting" hidden></p>
+      <p id="water-advice" class="advice"></p>
+      <button type="button" id="open-water" class="primary">
+        <svg viewBox="0 0 24 24" aria-hidden="true" class="solid"><path d="M12 2.5C9 7 6 10.4 6 14a6 6 0 0 0 12 0c0-3.6-3-7-6-11.5z" /></svg>
+        Open Water
       </button>
     </section>
 

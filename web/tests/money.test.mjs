@@ -59,10 +59,12 @@ const stats = {
   pathsFailed: 0,
   despawnedByEdit: 0,
   power: { supply: 0, starter: 150, used: 0, demand: 0, unpowered: 0, waiting: 0 },
+  water: { supply: 0, used: 0, demand: 0, stored: 0, capacity: 0, dry: 0, waiting: 0 },
   balance: 12_345,
   taxes: 300,
   grant: 1_000,
   upkeep: 120,
+  utilities: 0,
 };
 
 function show(t, changes) {
@@ -90,7 +92,12 @@ test('the top bar shows the balance and net income with the grant, and turns red
   assert.equal(el['money-upkeep'].textContent, '-$120/h');
   assert.equal(el['money-net'].textContent, '+$1,180/h');
   assert.equal(el['money-debt'].hidden, true);
-  show(t, { balance: -40, taxes: 0, upkeep: 1_120 });
+  show(t, { balance: -40, taxes: 0, upkeep: 1_000, utilities: 120 });
+  assert.equal(
+    el['money-utilities'].textContent,
+    '-$120/h',
+    'plants, pumps and towers cost upkeep',
+  );
   assert.equal(el['money-value'].textContent, '-$40');
   assert.equal(el['money-rate'].textContent, '-$120/h');
   assert.equal(el.money.classList.contains('warning'), true, 'debt is red');

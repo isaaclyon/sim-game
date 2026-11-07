@@ -13,6 +13,18 @@ export function coalSpot(sim) {
   throw new Error('no room for a coal plant');
 }
 
+/** A spot below the generated city, away from the coal plant's smoke, where a pump fits. */
+export function pumpSpot(sim) {
+  for (let x = 100; x < 400; x += 10)
+    for (let y = -10; y > -60; y -= 2) if (sim.water_preview(0, x, y)[0] === 1) return { x, y };
+  throw new Error('no room for a pump');
+}
+
+/** Places a pump beside the generated city, so dense buildings there can grow. */
+export function pump(sim) {
+  if (!sim.place_water(0, ...Object.values(pumpSpot(sim)))) throw new Error('pump refused');
+}
+
 /** Runs sim.worker.ts against the real WASM sim with a fake clock and local save slot. */
 export async function worker(agents = 100, size = 3, storage, grid = true) {
   let ready;
@@ -103,6 +115,16 @@ export async function worker(agents = 100, size = 3, storage, grid = true) {
     init,
     advance,
     settled: () => new Promise(setImmediate),
+    /** Places `n` pumps below the city so dense lots grow; the worker must be initialised. */
+    async water(n = 1) {
+      const mirror = new Sim(1, size, size);
+      for (let i = 0; i < n; i++) {
+        const spot = pumpSpot(mirror);
+        mirror.place_water(0, spot.x, spot.y);
+        await send({ type: 'placeWater', kind: 0, ...spot });
+      }
+      mirror.free();
+    },
     /** Places a coal plant beside the city; the worker must be initialised. */
     async power() {
       const mirror = new Sim(1, size, size);

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { tools } from './main-harness.mjs';
 
-const home = { building: 9, zone: 2, capacity: 84, occupied: 53, closing: false };
+const home = { building: 9, zone: 2, capacity: 84, occupied: 53, closing: false, watered: true };
 const asks = (t) => t.messages.filter((m) => m.type === 'inspectBuilding');
 const text = (t) => t.card();
 function select(t, building = home) {
@@ -33,6 +33,9 @@ test('homes show live resident counts; workplaces show total, filled and unfille
   assert.notEqual(t.elements.follow.attributes['aria-pressed'], 'true');
   t.reply({ type: 'building', selection: ask.selection, building: { ...home, occupied: 60 } });
   assert.match(text(t), /^Residents: 60$/m);
+  assert.doesNotMatch(text(t), /water/);
+  t.reply({ type: 'building', selection: ask.selection, building: { ...home, watered: false } });
+  assert.match(text(t), /^No water: no one moves in, and people leave after a day$/m);
   for (const zone of [3, 4, 5, 6]) {
     const ask = select(t, { ...home, building: zone + 20, zone, capacity: 120, occupied: 71 });
     assert.match(text(t), /^Total jobs: 120$/m);

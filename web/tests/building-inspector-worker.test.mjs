@@ -8,6 +8,7 @@ async function town() {
   w.ready();
   await w.init;
   await w.power();
+  await w.water(2);
   for (const [x, zone] of [
     [60, 2],
     [180, 4],

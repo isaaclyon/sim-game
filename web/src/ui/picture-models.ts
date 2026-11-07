@@ -8,10 +8,11 @@ import { MeshBuilder } from '../building-kit/mesh.ts';
 import type { Pt } from '../building-kit/polygon.ts';
 import { createCoalPlant } from '../coal-plant.ts';
 import { GROUND, ROADS, SIDEWALK, ZONE_OVERLAY } from '../palette.ts';
-import { PlantKind, RoadClass, Zone } from '../protocol.ts';
+import { PlantKind, RoadClass, type WaterKind, Zone } from '../protocol.ts';
 import { buildRoadGeometry } from '../road-geometry.ts';
 import { buildRoadMarkings } from '../road-markings.ts';
 import { createSolarPlant } from '../solar-plant.ts';
+import { createWaterPiece, MODEL_HALF } from '../water-pieces.ts';
 import { createWindPlant } from '../wind-plant.ts';
 import type { Picture } from './catalog.ts';
 
@@ -88,6 +89,26 @@ function roadModel(roadClass: RoadClass, length: number): THREE.Object3D {
     flat(buildRoadGeometry(segments, 0, ROAD_COLORS), lambert, 0.06),
     flat(buildRoadMarkings(segments), lambert, 0.09),
   );
+}
+
+/** The pump or tower model at its drawn size, on grass, its front toward the viewer. */
+function waterModel(kind: WaterKind): THREE.Object3D {
+  const piece = createWaterPiece(kind, MODEL_HALF[kind]);
+  piece.rotation.y = Math.PI;
+  const size = MODEL_HALF[kind] * 2 + 4;
+  return group(piece, pad(size, size));
+}
+
+/** A water drop: a cone on a squat, many-sided ball. */
+function waterIcon(): THREE.Object3D {
+  const mb = new MeshBuilder();
+  const blue = color(0x4a9fd8);
+  mb.cylinder([0, 0], 0, 4.2, 4.6, 14, blue, 5);
+  mb.cylinder([0, 0], 4.6, 5, 9, 14, blue, 0);
+  mb.cylinder([0, 0], -1.4, 3.6, 1.4, 14, blue, 4.2);
+  const drop = meshOf(mb);
+  drop.rotation.x = 0.35;
+  return drop;
 }
 
 /** Two poles with cross arms and three wires, along sim x. */
@@ -182,10 +203,13 @@ export function pictureModel(p: Picture): THREE.Object3D {
       return roadModel(p.roadClass, 28);
     case 'line':
       return lineModel();
+    case 'water':
+      return waterModel(p.water);
     case 'icon':
       if (p.name === 'roads') return roadModel(RoadClass.Street, 20);
       if (p.name === 'zones') return zonesIcon();
       if (p.name === 'power') return powerIcon();
+      if (p.name === 'water') return waterIcon();
       if (p.name === 'bulldoze') return bulldozerIcon();
       if (p.name === 'views') return viewsIcon();
       return eraserIcon();

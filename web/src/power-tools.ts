@@ -1,7 +1,8 @@
-// The plant and transmission line tools (ADR 0041). Like the road tools, they ask the sim what
-// a click would do and draw its answer; they never decide it themselves. The build menu owns
-// their buttons and the Views list owns the power view.
-import { type FromWorker, PlantKind, type ToWorker } from './protocol';
+// The plant, transmission line, pump and water tower tools (ADR 0041, 0052). Like the road
+// tools, they ask the sim what a click would do and draw its answer; they never decide it
+// themselves. The build menu owns their buttons and the Views list owns the power and water
+// views.
+import { type FromWorker, PlantKind, type ToWorker, type WaterKind } from './protocol';
 
 const PLANT_NAMES = ['Coal plant', 'Solar farm', 'Wind turbine'];
 const PLANT_HELP = [
@@ -9,6 +10,22 @@ const PLANT_HELP = [
   'Join it to a road with a power line (L).',
   'Join it to a road with a power line (L).',
 ];
+/** Water tools by `WaterKind`. */
+export const WATER_TOOLS = ['pump', 'tower'] as const;
+export type WaterTool = (typeof WATER_TOOLS)[number];
+const WATER_HELP: Record<WaterTool, string> = {
+  pump: 'Pump: click beside a road. It gives less water on polluted ground.',
+  tower: 'Water tower: click beside a road. It stores spare water for shortages.',
+};
+
+/** A placement tool: a plant kind, a power line, or a water piece. */
+export type PlacementTool = PlantKind | 'line' | WaterTool;
+
+function isWater(t: PlacementTool | null): t is WaterTool {
+  return t === 'pump' || t === 'tower';
+}
+
+const waterKind = (t: WaterTool) => WATER_TOOLS.indexOf(t) as WaterKind;
 
 /** A ground point in sim coordinates: x, and z for the sim's y. */
 export interface Spot {
@@ -21,11 +38,12 @@ export interface PowerView {
   setPlantPreview(outline: Float32Array, ok: boolean): void;
   setLinePreview(ends: Float32Array | null, a: Spot | null, b: Spot | null): void;
   setPower(plants: Float32Array, lines: Float32Array, buildings: Float32Array): void;
+  setWater(pieces: Float32Array, buildings: Float32Array): void;
 }
 
 export class PowerTools {
-  /** The plant being placed, `'line'`, or null when neither tool is on. */
-  tool: PlantKind | 'line' | null = null;
+  /** The plant or water piece being placed, `'line'`, or null when no tool is on. */
+  tool: PlacementTool | null = null;
   private start: Spot | null = null;
   private at: Spot | null = null;
   private wanted = false;
@@ -54,7 +72,7 @@ export class PowerTools {
   }
 
   /** Switches tool without touching the others; `Toolbox.use` puts them away first. */
-  set(tool: PlantKind | 'line' | null) {
+  set(tool: PlacementTool | null) {
     const was = this.tool;
     this.tool = tool;
     this.start = this.ends = null;
@@ -82,7 +100,9 @@ export class PowerTools {
   private click(p: Spot) {
     const t = this.tool;
     if (t === null) return;
-    if (t !== 'line') {
+    if (isWater(t)) {
+      this.send({ type: 'placeWater', kind: waterKind(t), x: p.x, y: p.z });
+    } else if (t !== 'line') {
       this.send({ type: 'placePlant', kind: t, x: p.x, y: p.z });
     } else if (!this.start) {
       this.start = p;
@@ -108,20 +128,28 @@ export class PowerTools {
     this.ask();
   }
 
-  /** Handles the power messages; true means `msg` was one of them. */
+  /** Handles the power and water messages; true means `msg` was one of them. */
   receive(
     msg: FromWorker,
-  ): msg is Extract<FromWorker, { type: 'power' | 'plantPreview' | 'linePreview' }> {
+  ): msg is Extract<
+    FromWorker,
+    { type: 'power' | 'water' | 'plantPreview' | 'waterPreview' | 'linePreview' }
+  > {
     if (msg.type === 'power') {
       this.draw.setPower(msg.plants, msg.lines, msg.buildings);
       return true;
     }
-    if (msg.type !== 'plantPreview' && msg.type !== 'linePreview') return false;
+    if (msg.type === 'water') {
+      this.draw.setWater(msg.pieces, msg.buildings);
+      return true;
+    }
+    const placed = msg.type === 'plantPreview' || msg.type === 'waterPreview';
+    if (!placed && msg.type !== 'linePreview') return false;
     this.inFlight = false;
     if (msg.revision === this.revision && this.at) {
-      if (msg.type === 'plantPreview' && typeof this.tool === 'number') {
-        this.draw.setPlantPreview(msg.outline, msg.ok);
-      }
+      const t = this.tool;
+      const wanted = msg.type === 'plantPreview' ? typeof t === 'number' : isWater(t);
+      if (placed && wanted) this.draw.setPlantPreview(msg.outline, msg.ok);
       if (msg.type === 'linePreview' && this.tool === 'line') {
         this.ends = msg.ends;
         this.draw.setLinePreview(msg.ends, this.start, this.at);
@@ -142,10 +170,13 @@ export class PowerTools {
     }
     this.inFlight = true;
     const revision = this.revision;
+    const at = { x: p.x, y: p.z, revision };
     this.send(
       t === 'line' && a
         ? { type: 'previewLine', ax: a.x, ay: a.z, bx: p.x, by: p.z, revision }
-        : { type: 'previewPlant', kind: t as PlantKind, x: p.x, y: p.z, revision },
+        : isWater(t)
+          ? { type: 'previewWater', kind: waterKind(t), ...at }
+          : { type: 'previewPlant', kind: t as PlantKind, ...at },
     );
   }
 
@@ -164,6 +195,8 @@ export class PowerTools {
         ? ''
         : t === 'line'
           ? `${no}${this.start ? 'Click the line end.' : 'Click where the line starts: a plant, road or line.'} Esc stops.`
-          : `${PLANT_NAMES[t]}: click to place. ${PLANT_HELP[t]} Esc stops.`;
+          : isWater(t)
+            ? `${WATER_HELP[t]} Esc stops.`
+            : `${PLANT_NAMES[t]}: click to place. ${PLANT_HELP[t]} Esc stops.`;
   }
 }
