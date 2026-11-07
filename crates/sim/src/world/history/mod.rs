@@ -20,9 +20,9 @@ use crate::water::WaterKind;
 pub(super) use capture::Capture;
 pub use view::HistoryView;
 
-/// At most this many steps, undo and redo together; the oldest undo steps go first.
+/// At most this many steps, undo and redo together; the oldest steps go first.
 pub const MAX_STEPS: usize = 100;
-/// At most this many records across all steps; the oldest undo steps go first.
+/// At most this many records across all steps; the oldest steps go first.
 pub const MAX_RECORDS: usize = 10_000;
 
 /// A road as it stood: its ends, a curve's control point and its class.
@@ -153,18 +153,24 @@ impl History {
         (self.undo.len(), self.redo.len())
     }
 
-    /// Drops the oldest undo steps past the caps; the newest step always stays.
-    fn trim(&mut self) {
+    /// Drops steps past the caps, oldest first: undo steps, then the farthest redo steps. The
+    /// newest step (the redo step undo just made when `newest_redo`, else the newest undo step)
+    /// goes last, and only when it alone breaks the caps, so every history saves and loads.
+    fn trim(&mut self, newest_redo: bool) {
         let records = |s: &Step| s.before.len() + s.after.len();
         let mut total: usize = self.undo.iter().chain(&self.redo).map(records).sum();
-        let mut drop = 0;
-        while self.undo.len() - drop > 1
-            && (self.undo.len() - drop + self.redo.len() > MAX_STEPS || total > MAX_RECORDS)
-        {
-            total -= records(&self.undo[drop]);
-            drop += 1;
+        let over = |h: &Self, total| h.undo.len() + h.redo.len() > MAX_STEPS || total > MAX_RECORDS;
+        let keep_undo = usize::from(!newest_redo);
+        while self.undo.len() > keep_undo && over(self, total) {
+            total -= records(&self.undo.remove(0));
         }
-        self.undo.drain(..drop);
+        let keep_redo = usize::from(newest_redo);
+        while self.redo.len() > keep_redo && over(self, total) {
+            total -= records(&self.redo.remove(0));
+        }
+        if over(self, total) {
+            *self = Self::default();
+        }
     }
 
     pub(crate) fn check(&self) -> Check {
@@ -231,6 +237,67 @@ impl World {
         }
         h.chain_open = kind == StepKind::Curve;
         h.redo.clear();
-        h.trim();
+        h.trim(false);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn step(records: usize) -> Step {
+        let line = Record::Line {
+            a: (0.0, 0.0),
+            b: (1.0, 0.0),
+        };
+        Step {
+            kind: StepKind::Line,
+            before: vec![line; records],
+            after: Vec::new(),
+            cost: 0,
+        }
+    }
+
+    fn history(undo: &[usize], redo: &[usize]) -> History {
+        History {
+            undo: undo.iter().map(|&n| step(n)).collect(),
+            redo: redo.iter().map(|&n| step(n)).collect(),
+            chain_open: false,
+        }
+    }
+
+    fn sizes(steps: &[Step]) -> Vec<usize> {
+        steps.iter().map(|s| s.before.len()).collect()
+    }
+
+    #[test]
+    fn an_undo_that_grew_its_redo_step_still_saves_within_the_caps() {
+        // Undo made the redo step bigger than the step it took back (an alley split the
+        // road since): the oldest redo steps go once no undo step is left to drop.
+        let mut h = history(&[], &[4_000, 3_000, 3_001]);
+        h.trim(true);
+        assert_eq!(
+            (sizes(&h.undo), sizes(&h.redo)),
+            (vec![], vec![3_000, 3_001])
+        );
+        assert!(h.check().is_ok());
+    }
+
+    #[test]
+    fn trimming_keeps_the_newest_step_and_drops_the_oldest_first() {
+        let mut h = history(&[5_000, 4_000, 1_001], &[100]);
+        h.trim(false);
+        assert_eq!(
+            (sizes(&h.undo), sizes(&h.redo)),
+            (vec![4_000, 1_001], vec![100])
+        );
+        // After a redo, other redo steps go before the step it just made.
+        let mut h = history(&[9_000], &[1_000, 500]);
+        h.trim(false);
+        assert_eq!((sizes(&h.undo), sizes(&h.redo)), (vec![9_000], vec![500]));
+        // A newest step past the cap on its own is dropped too, so the save still loads.
+        let mut h = history(&[10, MAX_RECORDS + 1], &[]);
+        h.trim(false);
+        assert!(h.undo.is_empty() && h.check().is_ok());
     }
 }

@@ -155,7 +155,9 @@ building demolition and spawning do not; redo after them still goes through the 
   1 record; a full 20×20 grid is up to about 900 records (about 25 KB). Plants and lines do not
   change the estimate.
 - The undo and redo lists together hold at most **100 steps and 10,000 records**. Past either,
-  the oldest undo steps are dropped; the newest step is always kept. That caps history at
+  the oldest undo steps are dropped, then the farthest redo steps (an undo can record more
+  than the step it took back, when an alley split a road since); the newest step goes only if
+  it alone breaks the caps, so every saved history loads. That caps history at
   roughly 300 KB in the save, far below the shared-link limit (ADR 0035).
 
 ### Effects outside history

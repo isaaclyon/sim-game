@@ -145,6 +145,8 @@ export class HistoryButtons {
           : `Gives back ${dollars(money)}.`;
     }
     b.disabled = kind === null;
+    // A disabled button may never hear the pointer leave, so its preview goes now.
+    if (b.disabled && this.hovered === redo) this.preview(null);
     b.classList.toggle('short', redo && kind !== null && !affordable);
     if (b.getAttribute('aria-label') !== label) b.setAttribute('aria-label', label);
     b.title = tooltip(label, tip, key);

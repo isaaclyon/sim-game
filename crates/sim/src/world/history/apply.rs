@@ -27,7 +27,7 @@ impl World {
             cost: step.cost,
         });
         h.chain_open = false;
-        h.trim();
+        h.trim(true);
         true
     }
 
@@ -55,7 +55,7 @@ impl World {
             cost: step.cost,
         });
         h.chain_open = false;
-        h.trim();
+        h.trim(false);
         true
     }
 
