@@ -56,6 +56,8 @@ rewriting history; mark the old one `Superseded by NNNN`.
 | [0048](0048-drawing-over-roads-changes-their-class.md) | Drawing a road over existing roads changes their class | Accepted; implemented |
 | [0049](0049-grid-tool.md) | The grid tool is one sim command planned edge by edge | Accepted; implemented |
 | [0050](0050-click-to-change-road-class.md) | Clicking a road changes its class | Accepted; implemented |
+| [0054](0054-children-births-and-growing-up.md) | Children are citizens who are born, grow up and move out | Accepted |
+| [0055](0055-schools-and-education-levels.md) | Schools teach children, and education shapes who fills jobs | Accepted |
 
 ADRs are only for decisions that are hard to reverse. See [AGENTS.md](AGENTS.md) for when to
 write one and how.

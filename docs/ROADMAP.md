@@ -425,6 +425,20 @@ Goals and consequences, kept light so they don't crowd out building.
 
 - Remaining services with coverage areas: water, roads maintenance, then fire, police, health
   and schools.
+- **Children** ([ADR 0054](adrs/0054-children-births-and-growing-up.md)), after water and
+  fire merge. Families arrive with children and have babies when their home has room.
+  Children grow up in about 10 clock days, look for work, then move into a vacant home or
+  leave the city. No old age yet.
+  Done when: a town with spare housing grows without arrivals, and a grown child is seen
+  taking a job and moving into their own home.
+- **Schools and education** ([ADR 0055](adrs/0055-schools-and-education-levels.md)), after
+  children. Primary and high schools beside roads, with seats and an area along roads.
+  Children walk or are driven to school; schooled children grow up more educated. Dense
+  industry prefers primary-educated workers and dense commerce high school; less-educated
+  workers fill those jobs more slowly. Arrivals bring a mix. University comes with offices
+  in M6.
+  Done when: school runs fill the sidewalks at 8am, and a town that built schools early sees
+  its dense shops fill faster a childhood later.
 - Citizen happiness from services, traffic and pollution, feeding back into demand and growth.
   The citizen inspector shows each person's mood and complaints.
 - Data overlays: traffic, coverage, land value, happiness.
