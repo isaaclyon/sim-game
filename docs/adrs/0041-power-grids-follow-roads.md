@@ -1,6 +1,8 @@
 # 0041. Power grids follow roads and gate growth
 
-- Status: Accepted; pollution from coal superseded by [0044](0044-coal-plants-pollute.md)
+- Status: Accepted; pollution from coal superseded by [0044](0044-coal-plants-pollute.md);
+  free plants superseded by [0052](0052-water-follows-roads-and-supplies-dense-buildings.md)
+  (plants now have build costs and upkeep; lines stay free)
 - Date: 2026-11-04
 - Extends: [0025](0025-rci-demand-gates-growth.md), [0033](0033-single-city-state-saves.md)
 

@@ -25,8 +25,8 @@ What to build next and why lives in `docs/ROADMAP.md`. Work on the current miles
   2 = alley; curves emit multiple segments. Packed in road ID order, not indexed by road ID
   (ADR 0015, 0017).
 - Bulldoze preview: `[x, y]` per centreline sample of the selected road, or a closed outline
-  for a plant or building (ADR 0045); empty = no target. Plants, lines, then buildings win
-  over roads.
+  for a plant, pump, tower or building (ADR 0045, 0052); empty = no target. Plants, lines,
+  pumps and towers, then buildings win over roads.
   Read-only. Road/lane IDs are never reused after deletion (ADR 0013). Lane counts include
   tombstone slots.
 - Signals: `[x, y, heading, state]` per signalised approach (`SIGNAL_STRIDE`), state 0 = red,
@@ -77,7 +77,18 @@ What to build next and why lives in `docs/ROADMAP.md`. Work on the current miles
   none. Grid numbers are stable within one message only. Sent whole when plants, lines, grids
   or who is powered change; growth is capped like buildings. Plant preview: closed `[x, y]`
   footprint where the plant would stand (coal snapped beside a road) plus `ok`. Line preview: `[ax, ay, a_join, bx, by, b_join]`, join 1 = meets a line,
-  plant or road; empty = refused. Bulldoze removes a plant, else a line, else a building, else a road.
+  plant or road; empty = refused. Bulldoze removes a plant, else a line, else a pump or tower,
+  else a building, else a road. Placing a plant is refused when the city cannot pay (ADR 0052).
+- Water (ADR 0052): networks follow roads, derived with power's road grids, no pipe tool.
+  `placeWater`/`previewWater` take `kind` 0 = pump, 1 = tower and a point; the piece snaps
+  beside the nearest road facing it, refused off roads, over other pieces or when unaffordable.
+  `water` sends pieces `[kind, x, y, half_size, front_x, front_y, output, level, network]` per
+  pump or tower (`WATER_PIECE_STRIDE`; output 0 for towers, level 0 for pumps) and buildings
+  `[x, y, height, network, watered]` per standing dense building (`WATER_BUILDING_STRIDE`),
+  network -1 = none, stable within one message only. Sent whole when pieces, networks, tower
+  levels or who has water change; growth is capped like buildings. Water preview answers
+  `waterPreview` with a closed `[x, y]` footprint plus `ok`, like the plant preview. Frames
+  carry `water` stats: `supply`, `used`, `demand`, `stored`, `capacity`, `dry`, `waiting`.
 - Citizen inspection: `inspect` names a car or walker by its agent snapshot index; the worker maps it once
   to a citizen and answers `citizen` for that one citizen only, at once and after every frame
   and edit while selected (ADR 0022). Read-only, not hashed; names are derived from the seed and
@@ -85,13 +96,15 @@ What to build next and why lives in `docs/ROADMAP.md`. Work on the current miles
 - Building inspection: `inspectBuilding` selects a stable building ID from the geometry message's
   parallel `ids` array. Replaces citizen inspection and vice versa. The worker answers `building`
   at once and after every frame/edit while selected, echoing the selection counter; null after
-  demolition. Capacity and occupancy are sim-owned residency/employment counts, not attendance.
+  demolition. Capacity and occupancy are sim-owned residency/employment counts, not attendance. `watered`
+  is false for a dry dense building (ADR 0052).
   Read-only, not hashed (ADR 0029).
 - Shared cities: a `.city` file is the ADR 0033 save bytes unchanged; a link is `#city=` plus
   base64url(raw deflate(save bytes)) in the URL fragment, refused above 1,000,000 characters
   (`web/src/city-share.ts`, ADR 0035). Opening one replaces the local city as an independent copy.
 - Money: the sim owns the balance, build costs, taxes, a flat grant and upkeep (ADR 0036);
-  frames carry `balance`, `taxes`, `grant` and `upkeep` (dollars, rates per clock hour). A fresh game city is an
+  frames carry `balance`, `taxes`, `grant`, `upkeep` (roads) and `utilities` (plants, pumps
+  and towers; ADR 0052), in dollars and rates per clock hour. A fresh game city is an
   empty map (`World::empty`); the generated grid is for tests and benchmarks.
 - Command logs: versioned text owned by `sim::replay` (ADR 0034); the third line is `map` (empty
   map, as the game starts) or `grid` (generated streets); fixtures live in

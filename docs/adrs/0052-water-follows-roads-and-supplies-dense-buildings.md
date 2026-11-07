@@ -1,6 +1,6 @@
 # 0052. Water follows roads and supplies dense buildings
 
-- Status: Accepted; not yet implemented
+- Status: Accepted; implemented
 - Date: 2026-11-06
 - Extends: [0041](0041-power-grids-follow-roads.md), [0042](0042-roadside-pieces-snap-to-roads.md),
   [0036](0036-money-build-costs-taxes-upkeep.md), [0037](0037-pollution-and-land-value-steer-growth.md),
