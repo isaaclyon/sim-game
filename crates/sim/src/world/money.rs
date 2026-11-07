@@ -123,6 +123,14 @@ impl World {
         }
     }
 
+    /// Adds `dollars` to the balance outside the economy, for benchmarks that draw large
+    /// layouts through `Command`s. Not a `Command`, so players, saves and replays cannot reach
+    /// it.
+    #[doc(hidden)]
+    pub fn add_funds_for_bench(&mut self, dollars: i64) {
+        self.treasury.balance = self.treasury.balance.saturating_add(dollars);
+    }
+
     /// Whether the city can pay `cost` now. Free edits, such as moving a road to a cheaper
     /// class (ADR 0048), are always affordable; a city in debt can afford nothing else.
     pub fn can_afford(&self, cost: i64) -> bool {

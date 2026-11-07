@@ -7,7 +7,9 @@
 //!
 //! `--layout grid` (default) is the generated street grid with avenues. `--layout organic` is a
 //! radial town drawn street by street through `Command::BuildRoad`, the way a player builds:
-//! rings joined by spokes, with gaps, T-junctions and 5-way junctions, and no avenues.
+//! rings joined by spokes, with gaps, T-junctions and 5-way junctions, and no avenues. It
+//! starts with ample funds so money (ADR 0036) cannot stop it, and fails if far fewer junctions
+//! than planned get built.
 //! `--layout perfect` is a `--grid` × `--grid` lattice of identical square blocks with no
 //! jitter, no gaps and no avenues: the cleanest case for traffic and lots.
 //! `--zone` paints the whole map residential before timing and reports how long that took.
@@ -158,6 +160,7 @@ fn organic_town(cfg: Config) -> World {
     let mut rng = Rng::new(cfg.seed ^ 0x5eed);
     let seed = cfg.seed;
     let mut world = World::new(cfg, RoadNetwork::default(), Rng::new(seed));
+    world.add_funds_for_bench(1_000_000_000_000);
 
     // ring[r][i] = position of junction i on ring r; ring 0 is the centre.
     let mut ring: Vec<Vec<(f32, f32)>> = vec![vec![(0.0, 0.0)]];
@@ -200,5 +203,11 @@ fn organic_town(cfg: Config) -> World {
             build(here, inner);
         }
     }
+    let planned = ring.iter().map(Vec::len).sum::<usize>();
+    let built = world.roads.node_count();
+    assert!(
+        built * 10 >= planned * 9,
+        "organic layout built {built} of {planned} junctions; its roads were refused"
+    );
     world
 }
