@@ -453,12 +453,14 @@ Goals and consequences, kept light so they don't crowd out building.
   and ruins, and a fire figure in the top bar whose panel shows a fire and turns fires off.
 
 - Remaining services with coverage areas: roads maintenance, then police, health and schools.
-- **Children** ([ADR 0054](adrs/0054-children-births-and-growing-up.md)): implemented,
-  browser check pending. Families arrive with children and have babies when their home has room.
+- **Children** ([ADR 0054](adrs/0054-children-births-and-growing-up.md)): implemented and
+  approved in the browser. Families arrive with children and have babies when their home has
+  room.
   Children grow up in about 10 clock days, look for work, then move into a vacant home or
   leave the city. No old age yet.
   Done when: a town with spare housing grows without arrivals, and a grown child is seen
-  taking a job and moving into their own home.
+  taking a job and moving into their own home. The citizen card marks adults who grew up in
+  town and whether they have found a home of their own yet.
 - **Schools and education** ([ADR 0055](adrs/0055-schools-and-education-levels.md)), after
   children. Primary and high schools beside roads, with seats and an area along roads.
   Children walk or are driven to school; schooled children grow up more educated. Dense
