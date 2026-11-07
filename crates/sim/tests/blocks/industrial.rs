@@ -39,6 +39,7 @@ fn industrial_curves_keep_connected_lots_and_stable_ids_after_repainting() {
         bx: 240.0,
         by: 100.0,
         class: RoadClass::Street,
+        chain: false,
     });
     fill(&mut w, 50.0, 50.0, Zone::IndustrialLow);
     let ids = check_lots(&w);

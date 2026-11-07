@@ -11,6 +11,9 @@
 //! 0 spawn 100
 //! 120 road 10.5 20 300 20 street
 //! 130 curve 0 0 50 50 100 0 main
+//! 132 curve 100 0 150 -50 200 0 main chain
+//! 133 undo
+//! 134 redo
 //! 135 class 60 20 main
 //! 138 roadgrid 0 0 1 0 80 3 -2 street
 //! 140 delete 60 20
@@ -30,6 +33,8 @@
 //! Command lines start with their tick, which never decreases and never passes `end`.
 //! Coordinates are `f32` written in their shortest exact form, so they read back bit for bit.
 //! `roadgrid` is origin, unit axis, cell size, signed block counts and class (ADR 0049).
+//! `chain` marks a continuous curve's later pieces; `undo` and `redo` step through the edit
+//! history (ADR 0051).
 //! `expect` is optional: what the replay must reach at `end`.
 
 mod parse;
@@ -42,7 +47,8 @@ use crate::water::WaterKind;
 use crate::{Command, Config, World, Zone};
 
 /// Bump when a log of the previous version would read differently. Adding a command word
-/// (`class`, ADR 0050; `roadgrid`, ADR 0049) does not: older logs read the same.
+/// (`class`, ADR 0050; `roadgrid`, ADR 0049; `undo`, `redo` and a trailing `chain`, ADR 0051)
+/// does not: older logs read the same.
 pub const LOG_VERSION: u32 = 1;
 const TITLE: &str = "sim-game command log";
 const CLASSES: [(RoadClass, &str); 3] = [
@@ -259,9 +265,10 @@ fn command_text(cmd: &Command) -> String {
             bx,
             by,
             class,
+            chain,
         } => {
             nums("curve", &[ax, ay, cx, cy, bx, by]);
-            s + " " + name(&CLASSES, class)
+            s + " " + name(&CLASSES, class) + if chain { " chain" } else { "" }
         }
         Command::BuildGrid {
             ox,
@@ -315,6 +322,8 @@ fn command_text(cmd: &Command) -> String {
             s
         }
         Command::SetFires { on } => format!("fires {}", if on { "on" } else { "off" }),
+        Command::Undo => "undo".into(),
+        Command::Redo => "redo".into(),
     }
 }
 

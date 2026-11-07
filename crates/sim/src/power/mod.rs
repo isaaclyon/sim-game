@@ -188,13 +188,18 @@ impl Power {
         self.version = self.version.wrapping_add(1);
     }
 
-    /// Refuses short lines and duplicates of a standing line.
-    pub(crate) fn add_line(&mut self, a: Point, b: Point) -> bool {
+    /// Whether a line from `a` to `b` is long enough and duplicates no standing line.
+    pub(crate) fn line_fits(&self, a: Point, b: Point) -> bool {
         let same = |l| {
             let (p, q) = self.line(l);
             (p == a && q == b) || (p == b && q == a)
         };
-        if crate::geometry::dist(a, b) < MIN_LINE || self.active_lines().any(same) {
+        crate::geometry::dist(a, b) >= MIN_LINE && !self.active_lines().any(same)
+    }
+
+    /// Refuses short lines and duplicates of a standing line.
+    pub(crate) fn add_line(&mut self, a: Point, b: Point) -> bool {
+        if !self.line_fits(a, b) {
             return false;
         }
         self.line_ax.push(a.0);

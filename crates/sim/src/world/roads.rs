@@ -23,8 +23,12 @@ impl World {
     }
 
     /// The command that builds the road through guided raw points: two for a straight road,
-    /// three for a curve (start, control, end). None for any other count.
+    /// three for a curve (start, control, end). None for any other count. A continuous
+    /// curve's draft (`guide::CONTINUE` on its start) gives a `chain` piece (ADR 0051).
     pub fn draft_command(&self, raw: &[f32], class: RoadClass) -> Option<Command> {
+        let chain = raw
+            .get(2)
+            .is_some_and(|&snap| snap as u8 & guide::CONTINUE != 0);
         match self.draft(raw).points[..] {
             [(ax, ay), (bx, by)] => Some(Command::BuildRoad {
                 ax,
@@ -41,6 +45,7 @@ impl World {
                 bx,
                 by,
                 class,
+                chain,
             }),
             _ => None,
         }
@@ -150,7 +155,7 @@ impl World {
 
     /// Joins every pair of straight roads meeting end to end in a line (ADR 0040). Their lots
     /// move to the kept road. Returns the roads changed, whose cars the caller removes.
-    fn join_straight_roads(&mut self) -> Vec<RoadId> {
+    pub(super) fn join_straight_roads(&mut self) -> Vec<RoadId> {
         let mut changed = Vec::new();
         for n in self.roads.two_road_nodes() {
             let Some(j) = self.roads.join_straight(n) else {

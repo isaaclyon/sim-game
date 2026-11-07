@@ -95,7 +95,8 @@ fn extending_a_rebuilt_road_follows_the_active_curve() {
         cy: -100.0,
         bx: 200.0,
         by: 0.0,
-        class: RoadClass::Street
+        class: RoadClass::Street,
+        chain: false,
     }));
     let mut preview = Vec::new();
     w.write_road_preview(0.0, 0.0, 300.0, 0.0, RoadClass::Street, &mut preview);
@@ -150,7 +151,8 @@ fn refused_curves_are_atomic() {
             cy: 50.0,
             bx: 200.0,
             by: 0.0,
-            class: RoadClass::Street
+            class: RoadClass::Street,
+            chain: false,
         }));
     }
     assert!(!w.apply(Command::BuildCurve {
@@ -160,7 +162,8 @@ fn refused_curves_are_atomic() {
         cy: 0.0,
         bx: 0.0,
         by: 0.0,
-        class: RoadClass::Street
+        class: RoadClass::Street,
+        chain: false,
     }));
     assert_eq!(w.roads.node_count(), 0);
     assert!(w.apply(curve()));

@@ -70,7 +70,8 @@ fn fill_follows_curved_edges() {
         cy: 200.0,
         bx: 100.0,
         by: 100.0,
-        class: RoadClass::Street
+        class: RoadClass::Street,
+        chain: false,
     }));
     assert!(fill(&mut w, 50.0, 130.0, Zone::ResidentialHigh));
     let zone = |x, y| w.zones.zone_at(x, y);

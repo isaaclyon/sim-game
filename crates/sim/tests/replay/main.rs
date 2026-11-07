@@ -51,6 +51,11 @@ fn saved_sessions_replay_to_their_expected_cities() {
             assert!(!s.enabled, "{name}: the log turns fires off");
         }
 
+        if name == "scripted-undo-redo.cmdlog" {
+            // Every undo and redo in the log succeeded, also after the halfway load.
+            assert_eq!(loaded.history().len(), (9, 1), "{name}");
+        }
+
         if bless {
             if log.expect != Some(reached) {
                 log.expect = Some(reached);

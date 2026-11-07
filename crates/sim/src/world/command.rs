@@ -20,6 +20,8 @@ pub enum Command {
         by: f32,
         class: RoadClass,
     },
+    /// Builds a curve of `class`. `chain` marks a continuous curve's later pieces, which join
+    /// the previous piece's undo step while that chain is open (ADR 0046, 0051).
     BuildCurve {
         ax: f32,
         ay: f32,
@@ -28,6 +30,7 @@ pub enum Command {
         bx: f32,
         by: f32,
         class: RoadClass,
+        chain: bool,
     },
     /// Lays a lattice of `cols` × `rows` blocks of `cell` metres from the origin along the unit
     /// axis `(ux, uy)`; negative counts go the other way, and rows run to the axis's left
@@ -100,6 +103,12 @@ pub enum Command {
         by: f32,
         zone: Zone,
     },
+    /// Takes back the newest placeable edit still in the history, refunding what it cost
+    /// (ADR 0051). Refused when there is none or it no longer fits the map.
+    Undo,
+    /// Makes the newest undone edit again, charging what it cost (ADR 0051). Refused when
+    /// there is none, it no longer fits the map, or the city cannot pay.
+    Redo,
     /// Sets every cell of the block containing `(x, y)`; outside every block it changes nothing.
     /// See ADR 0016.
     FillBlock {

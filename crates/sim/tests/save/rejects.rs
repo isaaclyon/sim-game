@@ -59,8 +59,9 @@ fn other_schema_versions_are_unsupported() {
     let save = bytes();
     // The schema version follows the 8-byte format tag, little-endian. Versions 1–3
     // predate the combined money, pollution and power state, version 4 water (ADR 0052) and
-    // version 5 fire (ADR 0053), version 6 children (ADR 0054).
-    for version in [0u32, 1, 2, 3, 4, 5, 6, 8, 99, u32::MAX] {
+    // version 5 fire (ADR 0053), version 6 children (ADR 0054), version 7 the edit history
+    // (ADR 0051).
+    for version in [0u32, 1, 2, 3, 4, 5, 6, 7, 9, 99, u32::MAX] {
         let mut other = save.clone();
         other[8..12].copy_from_slice(&version.to_le_bytes());
         assert!(

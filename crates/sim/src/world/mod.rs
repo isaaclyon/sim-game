@@ -7,6 +7,7 @@ mod demand;
 mod demolish;
 mod fire;
 mod grid;
+mod history;
 mod inspect;
 mod money;
 mod persist;
@@ -42,6 +43,7 @@ pub use command::Command;
 pub use demand::Demand;
 pub use fire::{FIRE_STRIDE, FireStats, STATION_STRIDE};
 pub use grid::{GridPreview, MAX_BLOCKS, MAX_CELL, MIN_CELL};
+pub use history::{History, MAX_RECORDS, MAX_STEPS, Record, RoadRecord, Step, StepKind};
 pub use inspect::{BuildingInfo, CitizenInfo, Place};
 pub use money::{GRANT, JOB_TAX, Money, RESIDENT_TAX, START_FUNDS, plant_price, water_price};
 pub use persist::{SAVE_VERSION, SaveError};
@@ -188,6 +190,8 @@ pub struct World {
     pub pollution: Pollution,
     /// Fire stations, trucks, fires and ruins (ADR 0053).
     fire: fire::Fire,
+    /// Undo and redo for placeables (ADR 0051).
+    history: History,
 }
 
 impl World {
@@ -226,6 +230,7 @@ impl World {
             wake: BinaryHeap::new(),
             rng,
             totals: Stats::default(),
+            history: History::default(),
         };
         world.pollution = Pollution::covering(&world.zones);
         world.water.step = world.water_step();
@@ -274,6 +279,8 @@ impl World {
             self.fire.version,
         );
         let roads = self.roads.version;
+        let captured = self.before_command(&cmd);
+        let chain = matches!(cmd, Command::BuildCurve { chain: true, .. });
         let changed = match cmd {
             Command::SpawnAgents { count } => self.spawn_agents(count),
             Command::BuildRoad {
@@ -298,6 +305,7 @@ impl World {
                 bx,
                 by,
                 class,
+                ..
             } => self.build_road(
                 Shape {
                     a: (ax, ay),
@@ -336,6 +344,8 @@ impl World {
             Command::FillBlock { x, y, zone } => self.fill_block(x, y, zone),
             Command::PlaceStation { x, y } => self.place_station(x, y),
             Command::SetFires { on } => self.set_fires(on),
+            Command::Undo => self.undo(),
+            Command::Redo => self.redo(),
         };
         let now = (
             self.lots.version,
@@ -362,6 +372,9 @@ impl World {
             self.refresh_upkeep();
         }
         self.ensure_fire();
+        if changed {
+            self.after_command(chain, captured);
+        }
         changed
     }
 

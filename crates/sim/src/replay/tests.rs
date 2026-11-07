@@ -4,7 +4,7 @@ use super::*;
 fn session() -> (CommandLog, World) {
     let mut log = CommandLog::new(5, 4, 4);
     let mut world = log.world();
-    let steps: [(u32, Command); 12] = [
+    let steps: [(u32, Command); 14] = [
         (0, Command::SpawnAgents { count: 20 }),
         (
             30,
@@ -44,6 +44,7 @@ fn session() -> (CommandLog, World) {
                 bx: 360.0,
                 by: 360.0,
                 class: RoadClass::Street,
+                chain: true,
             },
         ),
         (
@@ -80,6 +81,8 @@ fn session() -> (CommandLog, World) {
             },
         ),
         (10, Command::DeleteRoad { x: 300.0, y: 120.0 }),
+        (3, Command::Undo),
+        (2, Command::Redo),
         (
             5,
             Command::BuildGrid {
@@ -118,7 +121,7 @@ fn session() -> (CommandLog, World) {
 #[test]
 fn recorded_session_replays_to_the_same_world() {
     let (log, live) = session();
-    assert_eq!(log.commands.len(), 12);
+    assert_eq!(log.commands.len(), 14);
     let replayed = log.replay();
     assert_eq!(replayed.tick_count(), live.tick_count());
     assert_eq!(Outcome::of(&replayed), Outcome::of(&live));
@@ -130,6 +133,11 @@ fn text_round_trips_bit_for_bit() {
     log.expect = Some(Outcome::of(&live));
     let text = log.to_string();
     assert!(text.contains(" class 60 60 street\n"), "{text}");
+    assert!(text.contains(" 360 street chain\n"), "{text}");
+    assert!(
+        text.contains(" undo\n") && text.contains(" redo\n"),
+        "{text}"
+    );
     assert!(
         text.contains(" roadgrid 700.25 -40.5 0.6 0.8 80 2 -1 street\n"),
         "{text}"

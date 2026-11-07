@@ -167,6 +167,7 @@ fn a_straight_line_between_a_curved_roads_ends_upgrades_the_curve() {
         bx: 200.0,
         by: 0.0,
         class: RoadClass::Street,
+        chain: false,
     }));
     let roads = w.roads.road_count();
     assert!(road(&mut w, 0.0, 0.0, 200.0, 0.0, RoadClass::Main));

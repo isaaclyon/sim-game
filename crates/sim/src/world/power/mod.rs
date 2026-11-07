@@ -93,10 +93,19 @@ impl World {
     /// Whether a plant, pump, tower or fire station at `at` is clear of roads, plants, pumps,
     /// towers and stations, and, when it must stand `beside_road`, within reach of one.
     pub(in crate::world) fn spot_fits(&self, at: Footprint, beside_road: bool) -> bool {
+        self.spot_fits_on(&self.roads, at, beside_road)
+    }
+
+    /// `spot_fits` against the roads `net`, as they will be after an undo or redo (ADR 0051).
+    pub(in crate::world) fn spot_fits_on(
+        &self,
+        net: &crate::road::RoadNetwork,
+        at: Footprint,
+        beside_road: bool,
+    ) -> bool {
         let near_road = |margin| {
-            self.roads.active_roads().any(|road| {
-                self.roads
-                    .shape(road)
+            net.active_roads().any(|road| {
+                net.shape(road)
                     .segments()
                     .any(|(_, a, _, b)| at.hits_segment(a, b, margin))
             })

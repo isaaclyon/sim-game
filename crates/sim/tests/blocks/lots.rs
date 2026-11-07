@@ -164,6 +164,7 @@ fn lots_from_facing_roads_meet_on_one_line_without_slivers() {
         bx: 440.0,
         by: 20.0,
         class: RoadClass::Street,
+        chain: false,
     }));
     assert!(fill(&mut w, 50.0, 50.0, Zone::ResidentialLow));
     assert!(fill(&mut w, 320.0, 60.0, Zone::ResidentialLow));

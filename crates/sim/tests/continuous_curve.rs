@@ -16,7 +16,8 @@ fn curve(w: &mut World, a: (f32, f32), c: (f32, f32), b: (f32, f32)) {
         cy: c.1,
         bx: b.0,
         by: b.1,
-        class: RoadClass::Street
+        class: RoadClass::Street,
+        chain: false,
     }));
 }
 fn road(w: &mut World, a: (f32, f32), b: (f32, f32)) {

@@ -55,6 +55,7 @@ fn bends_mixed_classes_and_curves_keep_their_junction() {
         bx: 450.0,
         by: 100.0,
         class: RoadClass::Main,
+        chain: false,
     }));
     assert_eq!(w.roads.road_count(), 4);
 }

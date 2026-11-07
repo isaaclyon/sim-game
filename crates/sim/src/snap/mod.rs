@@ -1,7 +1,11 @@
 //! Construction planning shared by previews and commands. Planning never mutates the graph.
 
+mod exact;
+
 use crate::geometry::{Point, Shape, dist, lerp, project};
 use crate::road::{NodeId, RoadClass, RoadId, RoadNetwork};
+
+pub(crate) use exact::{EXACT_EPS, exact_plan};
 
 /// Clicks near a node or road join it. Splits near an end join that end instead.
 pub const SNAP_RADIUS: f32 = 15.0;

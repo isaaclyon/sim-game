@@ -85,6 +85,10 @@ impl<'a> Line<'a> {
             "curve" => {
                 let [ax, ay, cx, cy, bx, by] = self.coords()?;
                 let class = self.named(&CLASSES, "road class")?;
+                let chain = self.words.clone().next() == Some("chain");
+                if chain {
+                    self.words.next();
+                }
                 Command::BuildCurve {
                     ax,
                     ay,
@@ -93,6 +97,7 @@ impl<'a> Line<'a> {
                     bx,
                     by,
                     class,
+                    chain,
                 }
             }
             "roadgrid" => {
@@ -154,6 +159,8 @@ impl<'a> Line<'a> {
                 let [x, y] = self.coords()?;
                 Command::PlaceStation { x, y }
             }
+            "undo" => Command::Undo,
+            "redo" => Command::Redo,
             "fires" => Command::SetFires {
                 on: self.named(&[(true, "on"), (false, "off")], "fires setting")?,
             },

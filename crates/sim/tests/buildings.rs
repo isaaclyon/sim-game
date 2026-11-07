@@ -262,7 +262,8 @@ fn curved_street_buildings_follow_lots_without_replacing_them_with_boxes() {
         cy: 180.0,
         bx: 0.0,
         by: 120.0,
-        class: RoadClass::Street
+        class: RoadClass::Street,
+        chain: false,
     }));
     assert!(w.apply(Command::FillBlock {
         x: 50.0,

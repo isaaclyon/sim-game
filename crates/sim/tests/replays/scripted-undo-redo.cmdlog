@@ -1,0 +1,40 @@
+# Written by hand (ADR 0051): undo and redo while cars drive. A street crossing the town is
+# undone and redone, a bulldozed street is brought back, a curve chain is undone and redone
+# as one step, a class change is undone in place, and a station, pump and line are undone
+# and redone. The halfway save and load falls between steps, so history is saved too.
+sim-game command log 1
+seed 3
+map 12 12
+0 road 0 0 600 0 main
+0 road 0 0 0 400 street
+0 road 600 0 600 400 street
+0 road 0 400 600 400 street
+0 road 300 0 300 400 street
+10 fill 150 200 residential-low
+10 fill 450 200 commercial-low
+20 spawn 80
+400 road 600 200 900 200 street
+600 undo
+800 redo
+900 delete 300 300
+1000 undo
+1100 curve 600 400 700 500 800 400 street
+1101 curve 800 400 900 300 1000 400 street chain
+1200 undo
+1300 class 150 400 main
+1400 undo
+1450 redo
+1500 station 540 430
+1510 water 400 430 pump
+1520 line 150 520 150 700
+1700 undo
+1700 undo
+1800 redo
+2000 undo
+2000 undo
+2000 undo
+2200 redo
+2200 redo
+2400 redo
+end 3000
+expect hash 1fa5736f770d6d0b population 44 buildings 22 trips 119

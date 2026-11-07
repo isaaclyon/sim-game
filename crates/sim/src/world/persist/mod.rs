@@ -15,8 +15,9 @@ const MAGIC: &[u8; 8] = b"CITYSAVE";
 /// refused, never read as something else. Version 2 added money (ADR 0036); version 3 added
 /// pollution (ADR 0037); version 4 added power (ADR 0041); version 5 added water and lots
 /// waiting for it (ADR 0052) on one branch and fire (ADR 0053) on another; version 6 has both;
-/// version 7 added children, births and grown children moving out (ADR 0054).
-pub const SAVE_VERSION: u32 = 7;
+/// version 7 added children, births and grown children moving out (ADR 0054); version 8 added
+/// the edit history (ADR 0051).
+pub const SAVE_VERSION: u32 = 8;
 const HEADER: usize = 8 + 4 + 8 + 8;
 
 /// Why a save could not be written or read. Loading never yields a partial world.

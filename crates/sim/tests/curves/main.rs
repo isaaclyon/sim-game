@@ -14,6 +14,7 @@ fn curve() -> Command {
         bx: 200.0,
         by: 0.0,
         class: RoadClass::Street,
+        chain: false,
     }
 }
 fn close(a: (f32, f32), b: (f32, f32)) {

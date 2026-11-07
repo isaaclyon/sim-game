@@ -38,6 +38,12 @@ impl World {
             return false;
         }
         self.treasury.balance -= STATION_COST;
+        self.add_station(at);
+        true
+    }
+
+    /// Adds a station and its trucks at `at` and clears the land under it, free of charge.
+    pub(in crate::world) fn add_station(&mut self, at: Footprint) {
         let f = &mut self.fire;
         let s = f.station_active.len() as u32;
         f.station_x.push(at.centre.0);
@@ -59,7 +65,6 @@ impl World {
         }
         self.claim_land(at);
         self.refresh_upkeep();
-        true
     }
 
     /// Bulldozes the station under the point; its trucks are taken off the roads for good.
@@ -67,6 +72,12 @@ impl World {
         let Some(s) = self.station_at(x, y) else {
             return false;
         };
+        self.remove_station(s);
+        true
+    }
+
+    /// Removes station `s`; its trucks are taken off the roads for good.
+    pub(in crate::world) fn remove_station(&mut self, s: u32) {
         self.fire.station_active[s as usize] = false;
         for t in 0..self.fire.truck_agent.len() {
             if self.fire.truck_station[t] == s {
@@ -77,7 +88,6 @@ impl World {
         }
         self.fire.bump();
         self.refresh_upkeep();
-        true
     }
 
     /// The active station whose footprint holds the point.

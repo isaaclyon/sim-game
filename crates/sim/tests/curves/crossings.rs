@@ -74,7 +74,8 @@ fn curves_cross_each_other_and_preview_marks_only_real_junctions() {
         cy: 0.0,
         bx: 100.0,
         by: 100.0,
-        class: RoadClass::Street
+        class: RoadClass::Street,
+        chain: false,
     }));
     assert_eq!(w.roads.road_count(), 4);
     let split = preview
@@ -105,7 +106,8 @@ fn curve_cannot_join_then_recross_the_same_road() {
         cy: 100.0,
         bx: 200.0,
         by: -100.0,
-        class: RoadClass::Street
+        class: RoadClass::Street,
+        chain: false,
     }));
     assert_eq!(w.roads.version, before);
 }
@@ -123,7 +125,8 @@ fn a_second_connection_to_the_same_curve_cannot_silently_lose_its_crossing() {
             cy: 200.0,
             bx: 200.0,
             by: 0.0,
-            class: RoadClass::Street
+            class: RoadClass::Street,
+            chain: false,
         }));
         let version = w.roads.version;
         assert!(!w.apply(Command::BuildRoad {
@@ -149,7 +152,8 @@ fn curve_t_junctions_work_far_from_the_origin() {
                 cy: offset + 100.0,
                 bx: offset + 200.0,
                 by: offset,
-                class: RoadClass::Street
+                class: RoadClass::Street,
+                chain: false,
             }));
             let len = w.roads.lane_len[0];
             let p = w.roads.lane_point(0, len * k as f32 / 20.0, 0.0);
@@ -203,6 +207,7 @@ fn short_t_junctions_on_large_city_coordinates_are_not_duplicate_crossings() {
             bx: sx - 25.0 * y,
             by: sy + 25.0 * x,
             class: RoadClass::Street,
+            chain: false,
         },
     ] {
         let mut copy = World::new(Config::default(), w.roads.clone(), Rng::new(1));

@@ -40,6 +40,7 @@ impl World {
         self.pollution
             .check(&self.zones, self.roads.lane_count() / 2)?;
         self.junctions.check(&self.roads)?;
+        self.history.check()?;
         self.traffic
             .check(self.roads.lane_count(), self.agents.len())?;
         self.check_agents()?;
