@@ -223,6 +223,10 @@ export interface Citizen {
   driving: boolean;
   /** The current trip is on foot (ADR 0026); the walker is drawn once it sets off. */
   onFoot: boolean;
+  /** Age in years from the sim; a child until 18 (ADR 0054). */
+  age: number;
+  /** A child, who lives at home with their household. */
+  child: boolean;
 }
 
 /** Sim-owned counts, not physical attendance. Original use persists during closure. */
@@ -250,11 +254,13 @@ export interface Stats {
   /** Day clock from the sim (`sim::clock`): 1-based day and seconds since midnight. */
   day: number;
   secondOfDay: number;
-  /** Resident individuals, including people at home/work/shop. Not a vehicle count. */
+  /** Resident individuals, children included, at home/work/shop. Not a vehicle count. */
   population: number;
-  /** Residents without an assigned job, from the sim. A disconnected job still counts. */
+  /** Residents who are children (ADR 0054); the rest are adults. */
+  children: number;
+  /** Adults without an assigned job, from the sim. A disconnected job still counts. */
   unemployed: number;
-  /** Sim-computed `unemployed` as a percentage of `population`; 0 with no residents. */
+  /** Sim-computed `unemployed` as a percentage of adults; 0 with no adults. */
   unemploymentPercent: number;
   /** R/C/I demand from the sim, in people (ADR 0025). Growth also needs demand above its
    * land-value threshold, available power and, when dense, water; negative demand is a

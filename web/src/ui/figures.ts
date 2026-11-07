@@ -19,6 +19,8 @@ export function clockText(s: Pick<Stats, 'day' | 'secondOfDay'>) {
 export function populationRows(s: Stats): Record<string, string> {
   return {
     'pop-residents': fmt(s.population),
+    'pop-adults': fmt(s.population - s.children),
+    'pop-children': fmt(s.children),
     'pop-unemployed': `${fmt(s.unemployed)} (${s.unemploymentPercent.toFixed(1)}%)`,
     'pop-driving': fmt(s.driving),
     'pop-walking': fmt(s.walking),

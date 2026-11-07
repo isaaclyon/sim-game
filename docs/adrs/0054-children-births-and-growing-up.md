@@ -1,6 +1,6 @@
 # 0054. Children are citizens who are born, grow up and move out
 
-- Status: Accepted; not yet implemented
+- Status: Accepted; implemented
 - Date: 2026-11-06
 - Supersedes: "All citizens are adults" and "Household membership is fixed" in
   [0021](0021-citizens-households-and-trips.md)
@@ -50,3 +50,21 @@ age yet. One clock day is about 80 real minutes at 1×.
   fire rehoming) must count only the right citizens; children have no job and no car.
 - Replays change once, because arrivals now include children; expectations are re-blessed.
 - Old age, retirement and deaths remain later work.
+
+## Implementation notes
+
+- Tuning (`crates/sim/src/world/residents/family.rs`): childhood 10 clock days; 40% of arriving
+  members after the first adult are children, aged uniformly up to 10 days; arriving adults
+  are 18 to 60 years old; each household gets a birth check once per clock day (first within a
+  day of moving in) with a 15% chance; a grown child waits up to 3 clock days for a home.
+- Ages are shown in years on a scale where coming of age is 18, so a clock day is 1.8 years.
+  Adults keep ageing; with no old age they can pass 100.
+- A grown child keeps their surname after moving out: names use the household the citizen
+  first belonged to (`Citizens::family`), still derived from the seed and IDs.
+- Every vacant home already has a pending arrival event; when it comes up, the grown child
+  with the earliest deadline takes the home instead of a new household.
+- Residential demand compares jobs with adults; commercial and industrial demand and the
+  resident tax still count everyone. Fires start by total population.
+- Grown children draw car ownership when they move into their own home, not before.
+- Children have no travel slot yet, so the inspector reaches them only once ADR 0055 sends
+  them to school.

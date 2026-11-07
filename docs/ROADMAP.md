@@ -453,8 +453,8 @@ Goals and consequences, kept light so they don't crowd out building.
   and ruins, and a fire figure in the top bar whose panel shows a fire and turns fires off.
 
 - Remaining services with coverage areas: roads maintenance, then police, health and schools.
-- **Children** ([ADR 0054](adrs/0054-children-births-and-growing-up.md)), after water and
-  fire merge. Families arrive with children and have babies when their home has room.
+- **Children** ([ADR 0054](adrs/0054-children-births-and-growing-up.md)): implemented,
+  browser check pending. Families arrive with children and have babies when their home has room.
   Children grow up in about 10 clock days, look for work, then move into a vacant home or
   leave the city. No old age yet.
   Done when: a town with spare housing grows without arrivals, and a grown child is seen

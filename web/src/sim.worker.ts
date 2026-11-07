@@ -158,6 +158,7 @@ function readStats(s: Sim): Stats {
     secondOfDay: st.second_of_day,
     agents: st.agents,
     population: st.population,
+    children: st.children,
     unemployed: st.unemployed,
     unemploymentPercent: st.unemployment_percent,
     demand: {
@@ -236,6 +237,8 @@ function sendCitizen(s: Sim) {
       agent: v.agent ?? null,
       driving: v.driving,
       onFoot: v.on_foot,
+      age: v.age,
+      child: v.child,
     };
     v.free();
   }

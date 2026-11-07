@@ -25,6 +25,8 @@ pub struct SimStats {
     pub second_of_day: u32,
     pub agents: u32,
     pub population: u32,
+    /// Residents who are children (ADR 0054); unemployment counts adults only.
+    pub children: u32,
     pub unemployed: u32,
     pub unemployment_percent: f32,
     /// R/C/I demand in people (ADR 0025): positive wants more buildings, negative is a surplus.
@@ -86,6 +88,10 @@ pub struct CitizenView {
     pub agent: Option<u32>,
     pub driving: bool,
     pub on_foot: bool,
+    /// Age in years; a child until 18 (ADR 0054).
+    pub age: u32,
+    /// A child, who lives at home.
+    pub child: bool,
 }
 
 /// Sim-owned counts for one standing building; no attendance or visitor counts.
@@ -313,6 +319,8 @@ impl Sim {
             agent: c.agent,
             driving: c.driving,
             on_foot: c.on_foot,
+            age: c.age,
+            child: c.child,
         })
     }
 
@@ -350,6 +358,7 @@ impl Sim {
             second_of_day: clock.second_of_day,
             agents: s.agents,
             population: s.population,
+            children: s.children,
             unemployed: s.unemployed,
             unemployment_percent: s.unemployment_percent,
             demand_residential: s.demand.residential,

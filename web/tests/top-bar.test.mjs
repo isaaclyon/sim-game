@@ -8,6 +8,7 @@ const STATS = {
   day: 2,
   secondOfDay: 8 * 3600 + 5 * 60,
   population: 1234,
+  children: 234,
   unemployed: 56,
   unemploymentPercent: 4.538087,
   demand: { residential: 60, commercial: 0, industrial: -60 },
@@ -95,6 +96,8 @@ test('population opens its details; a second click or Esc closes them', async ()
   t.pressId('population');
   assert.equal(el['population-panel'].hidden, false);
   assert.equal(el.population.attributes['aria-expanded'], 'true');
+  assert.equal(el['pop-adults'].textContent, '1,000');
+  assert.equal(el['pop-children'].textContent, '234');
   assert.equal(el['pop-unemployed'].textContent, '56 (4.5%)');
   assert.equal(el['pop-driving'].textContent, '2');
   assert.equal(el['pop-walking'].textContent, '4');

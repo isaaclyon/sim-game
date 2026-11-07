@@ -16,6 +16,8 @@ const resident = {
   agent: 3,
   driving: true,
   onFoot: false,
+  age: 34,
+  child: false,
 };
 const inspects = (t) => t.messages.filter((m) => m.type === 'inspect');
 /** Clicks car `agent` in idle mode and answers as the worker would. */
@@ -102,6 +104,11 @@ test('the panel tells the truth about each state', async () => {
     return panel(t);
   };
   assert.match(show({ job: null }), /^Job: unemployed$/m);
+  assert.match(show({}), /^Age 34$/m);
+  const child = show({ job: null, age: 7, child: true, activity: Activity.Home, destination: null });
+  assert.match(child, /^Age 7, a child: lives at home$/m);
+  assert.doesNotMatch(child, /Job:/);
+  assert.match(child, /^At home$/m);
   assert.match(show({ driving: false, onFoot: true }), /^Walking to work at factory #40$/m);
   assert.match(
     show({ driving: false }),

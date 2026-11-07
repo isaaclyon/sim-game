@@ -42,7 +42,10 @@ export function describe(c: Citizen): Card {
     title: c.name,
     lines: [
       { icon: 'home', text: `Home: ${c.home ? label(c.home) : 'none'}` },
-      { icon: 'work', text: c.job ? `Job: ${label(c.job)}` : 'Job: unemployed' },
+      c.child
+        ? { icon: 'people', text: `Age ${c.age}, a child: lives at home` }
+        : { icon: 'work', text: c.job ? `Job: ${label(c.job)}` : 'Job: unemployed' },
+      ...(c.child ? [] : [{ icon: 'people', text: `Age ${c.age}` } as const]),
       now,
     ],
   };
