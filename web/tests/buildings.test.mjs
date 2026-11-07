@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Sim } from '../src/pkg/sim_wasm.js';
-import { coalSpot, worker as makeWorker } from './worker-harness.mjs';
+import { coalSpot, worker as makeWorker, pump } from './worker-harness.mjs';
 
 test('WASM sends sim-owned building footprints, fronts, heights and original zones', () => {
   const s = new Sim(1, 3, 3);
   assert.equal(s.building_snapshot().length, 0);
+  pump(s);
   assert.ok(s.fill_block(50, 50, 2));
   s.tick(610);
   const data = s.building_snapshot();
@@ -35,6 +36,7 @@ test('industrial snapshots keep varied roofs and halls until repainting closes t
   const s = new Sim(1, 6, 6);
   const coal = coalSpot(s);
   assert.ok(s.place_plant(0, coal.x, coal.y), 'more than starter power');
+  pump(s);
   // A populated block supplies enough demand for variety; an empty town now needs only
   // one high-capacity factory, which is the intended industrial land balance.
   assert.ok(s.fill_block(60, 300, 2));
@@ -84,6 +86,7 @@ async function worker() {
   const w = await makeWorker(0, 3);
   w.ready();
   await w.init;
+  await w.water();
   return { ...w, buildings: () => w.messages.filter((m) => m.type === 'buildings') };
 }
 
@@ -123,6 +126,7 @@ test('worker publishes buildings removed by closure while running', async () => 
 test('fast growth limits full geometry updates and pausing flushes the latest buildings', async () => {
   const w = await worker();
   await w.power();
+  await w.water();
   await w.send({ type: 'fillBlock', x: 50, y: 50, zone: 2 });
   await w.send({ type: 'setSpeed', speed: 10 });
   for (let i = 0; i < 100; i++) w.advance(10);
@@ -135,6 +139,7 @@ test('fast growth limits full geometry updates and pausing flushes the latest bu
   const mirror = new Sim(1, 3, 3);
   const coal = coalSpot(mirror);
   mirror.place_plant(0, coal.x, coal.y);
+  pump(mirror);
   mirror.fill_block(50, 50, 2);
   mirror.tick(w.messages.findLast((m) => m.type === 'frame').stats.tick);
   const expected = mirror.building_snapshot();

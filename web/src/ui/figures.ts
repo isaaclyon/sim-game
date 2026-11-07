@@ -1,6 +1,6 @@
 // Words and numbers for the top bar, its detail panels and the debug panel. Display only: every
 // figure comes from the sim's stats or the worker's save status.
-import type { CityStatus, Demand, PowerStats, Stats } from '../protocol';
+import type { CityStatus, Demand, PowerStats, Stats, WaterStats } from '../protocol';
 
 export const fmt = (n: number) => n.toLocaleString('en-US');
 /** Whole dollars with the sign in front: `$1,234`, `-$56`. */
@@ -44,6 +44,21 @@ export function powerAdvice(p: PowerStats) {
     return 'Some buildings are on a grid without enough power. Join it to a powered road with a power line.';
   if (p.waiting) return 'New buildings need more power to grow. Build a plant.';
   return 'Every building has power.';
+}
+
+/** Water use against pump output (ADR 0052); short when a dense building is dry. */
+export function waterFigures(w: WaterStats) {
+  const short = w.dry > 0;
+  const share = w.supply > 0 ? Math.round(percent(w.demand, w.supply)) : w.demand > 0 ? null : 0;
+  return { short, text: share === null ? 'No water' : `${fmt(share)}%` };
+}
+
+/** One line on what to do about water. */
+export function waterAdvice(w: WaterStats) {
+  if (w.dry) return 'Some dense buildings are dry. Build a pump on a road their network reaches.';
+  if (w.demand > w.supply) return 'Towers are draining. Build another pump before they run dry.';
+  if (w.waiting) return 'New dense buildings need more water to grow. Build a pump.';
+  return 'Every dense building has water. Low density needs none.';
 }
 
 /** Signed share of a bar's half-width for a demand in people; never overflows the track. */

@@ -12,6 +12,7 @@ const STATS = {
   unemploymentPercent: 4.538087,
   demand: { residential: 60, commercial: 0, industrial: -60 },
   power: { supply: 0, starter: 150, used: 0, demand: 120, unpowered: 0, waiting: 0 },
+  water: { supply: 0, used: 0, demand: 0, stored: 0, capacity: 0, dry: 0, waiting: 0 },
   agents: 9,
   parked: 3,
   awaitingPath: 0,
@@ -27,6 +28,7 @@ const STATS = {
   taxes: 0,
   grant: 0,
   upkeep: 0,
+  utilities: 0,
 };
 
 function show(t, changes = {}) {

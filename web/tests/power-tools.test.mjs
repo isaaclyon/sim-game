@@ -131,7 +131,7 @@ test('the worker places plants and lines, answers previews and reports power', a
   await w.send({ type: 'setSpeed', speed: 0 });
   assert.equal(last(w, 'frame').stats.power.starter, 150);
   const balance = last(w, 'frame').stats.balance;
-  const upkeep = last(w, 'frame').stats.upkeep;
+  const utilities = last(w, 'frame').stats.utilities;
   assert.ok(balance > 0, 'money and power arrive in the same frame');
   assert.ok(last(w, 'pollution').cells.length > 0, 'pollution also arrives at startup');
   await w.send({ type: 'previewPlant', kind: PlantKind.Solar, x: 120, y: 0, revision: 3 });
@@ -147,8 +147,8 @@ test('the worker places plants and lines, answers previews and reports power', a
   assert.ok(Math.abs(Math.hypot(fx, fy) - 1) < 1e-5, 'faces its street along a unit direction');
   assert.ok(power.plants[8] > 0, 'the plant produces power');
   assert.equal(last(w, 'frame').stats.power.supply, 0, 'but serves no building yet');
-  assert.equal(last(w, 'frame').stats.balance, balance, 'plants remain free');
-  assert.equal(last(w, 'frame').stats.upkeep, upkeep, 'plants add no upkeep');
+  assert.equal(last(w, 'frame').stats.balance, balance - 20_000, 'coal costs $20,000 (ADR 0052)');
+  assert.equal(last(w, 'frame').stats.utilities, utilities + 120, 'and $120 an hour');
 
   const { Sim } = await import('../src/pkg/sim_wasm.js');
   const mirror = new Sim(1, 3, 3);
@@ -166,8 +166,8 @@ test('the worker places plants and lines, answers previews and reports power', a
   assert.deepEqual([...preview.ends.subarray(0, 2)], [...power.plants.subarray(6, 8)]);
   await w.send({ type: 'buildLine', ...line });
   assert.equal(last(w, 'power').lines.length, 4);
-  assert.equal(last(w, 'frame').stats.balance, balance, 'lines remain free');
-  assert.equal(last(w, 'frame').stats.upkeep, upkeep, 'lines add no upkeep');
+  assert.equal(last(w, 'frame').stats.balance, balance - 20_000, 'lines remain free');
+  assert.equal(last(w, 'frame').stats.utilities, utilities + 120, 'lines add no upkeep');
   const [ax, ay, bx, by] = last(w, 'power').lines;
   await w.send({ type: 'deleteRoad', x: (ax + bx) / 2, y: (ay + by) / 2 + 1 });
   assert.equal(last(w, 'power').lines.length, 0, 'bulldozing takes the line first');

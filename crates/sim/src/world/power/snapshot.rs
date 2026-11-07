@@ -36,7 +36,7 @@ impl World {
                 terminal.0,
                 terminal.1,
                 c.output.get(i).copied().unwrap_or(0) as f32,
-                c.grids.plant.get(i).copied().unwrap_or(u32::MAX) as f32,
+                c.grids.piece.get(i).copied().unwrap_or(u32::MAX) as f32,
             ]);
         }
     }
@@ -57,18 +57,24 @@ impl World {
         let c = &self.power_cache;
         for b in self.buildings.active_buildings() {
             let i = b as usize;
-            let ring = self.buildings.footprint(b);
-            let n = ring.len().max(1) as f32;
-            let (sx, sy) = ring.iter().fold((0.0, 0.0), |(x, y), p| (x + p.0, y + p.1));
+            let (x, y) = self.building_centre(b);
             let grid = c.grid.get(i).copied().unwrap_or(u32::MAX);
             out.extend([
-                sx / n,
-                sy / n,
+                x,
+                y,
                 self.buildings.height[i],
                 if grid == u32::MAX { -1.0 } else { grid as f32 },
                 f32::from(u8::from(self.building_powered(b))),
             ]);
         }
+    }
+
+    /// The mean point of a building's footprint, where markers stand.
+    pub(in crate::world) fn building_centre(&self, b: crate::building::BuildingId) -> (f32, f32) {
+        let ring = self.buildings.footprint(b);
+        let n = ring.len().max(1) as f32;
+        let (sx, sy) = ring.iter().fold((0.0, 0.0), |(x, y), p| (x + p.0, y + p.1));
+        (sx / n, sy / n)
     }
 
     /// `[ok, x0, y0, …]`: whether a plant of `kind` asked for here fits, then the footprint

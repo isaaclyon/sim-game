@@ -49,7 +49,7 @@ pub(in crate::world) struct PowerCache {
     pub(super) output: Vec<u32>,
     /// Bumped whenever the allocation may have changed, so the frontend knows to redraw.
     pub(super) version: u32,
-    pub(super) blocked_key: Option<(u32, u32)>,
+    pub(super) blocked_key: Option<(u32, u32, u32)>,
     pub(super) blocked: Vec<bool>,
 }
 
@@ -77,23 +77,24 @@ impl World {
         self.power_cache.powered.get(b as usize) == Some(&true)
     }
 
-    /// New homes and jobs fill only in open, powered buildings (ADR 0023, ADR 0041).
+    /// New homes and jobs fill only in open, powered buildings with water if they need it
+    /// (ADR 0023, 0041, 0052).
     pub(in crate::world) fn building_fills_vacancies(&self, b: BuildingId) -> bool {
-        self.building_accepts_assignments(b) && self.building_powered(b)
+        self.building_accepts_assignments(b) && self.building_powered(b) && self.building_watered(b)
     }
 
-    fn lot_grid(&self, lot: LotId) -> u32 {
+    /// The network in `nodes` (per road node) of the lot's road; `u32::MAX` once it is gone.
+    pub(in crate::world) fn lot_network(&self, lot: LotId, nodes: &[u32]) -> u32 {
         let road = self.lots.road[lot as usize];
         if !self.roads.is_road_active(road) {
             return u32::MAX;
         }
         let node = self.roads.lane_from[road as usize * 2] as usize;
-        self.power_cache
-            .grids
-            .node
-            .get(node)
-            .copied()
-            .unwrap_or(u32::MAX)
+        nodes.get(node).copied().unwrap_or(u32::MAX)
+    }
+
+    fn lot_grid(&self, lot: LotId) -> u32 {
+        self.lot_network(lot, &self.power_cache.grids.node)
     }
 
     /// Brings the allocation up to date with roads, power, buildings, lots and the clock.
@@ -111,7 +112,8 @@ impl World {
         }
         let grids_key = (self.roads.version, self.power.version);
         if self.power_cache.grids_key != Some(grids_key) {
-            self.power_cache.grids = grid::derive(&self.roads, &self.power);
+            self.power_cache.grids =
+                grid::derive(&self.roads, &self.power.footprints(), &self.power.lines());
             self.power_cache.grids_key = Some(grids_key);
         }
         let n = self.buildings.active.len();
@@ -136,7 +138,7 @@ impl World {
             let i = p as usize;
             let out = self.power.plant_kind[i].output(self.cfg.seed, at);
             cache.output[i] = out;
-            cache.supply[cache.grids.plant[i] as usize] += out;
+            cache.supply[cache.grids.piece[i] as usize] += out;
         }
         cache.left = cache.supply.clone();
         cache.open = vec![true; cache.grids.count];

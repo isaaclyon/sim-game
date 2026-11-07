@@ -18,6 +18,7 @@
 //! 160 fill 50 50 industrial-high
 //! 170 plant 400 40 coal
 //! 180 line 400 40 600 40
+//! 190 water 300 40 pump
 //! end 3000
 //! expect hash 0123456789abcdef population 12 buildings 30 trips 40
 //! ```
@@ -35,6 +36,7 @@ use std::fmt::{self, Write};
 
 use crate::power::PlantKind;
 use crate::road::RoadClass;
+use crate::water::WaterKind;
 use crate::{Command, Config, World, Zone};
 
 /// Bump when a log of the previous version would read differently. Adding a command word
@@ -51,6 +53,7 @@ const PLANTS: [(PlantKind, &str); 3] = [
     (PlantKind::Solar, "solar"),
     (PlantKind::Wind, "wind"),
 ];
+const WATER: [(WaterKind, &str); 2] = [(WaterKind::Pump, "pump"), (WaterKind::Tower, "tower")];
 const ZONES: [(Zone, &str); 7] = [
     (Zone::None, "none"),
     (Zone::ResidentialLow, "residential-low"),
@@ -300,6 +303,10 @@ fn command_text(cmd: &Command) -> String {
         Command::BuildLine { ax, ay, bx, by } => {
             nums("line", &[ax, ay, bx, by]);
             s
+        }
+        Command::PlaceWater { kind, x, y } => {
+            nums("water", &[x, y]);
+            s + " " + name(&WATER, kind)
         }
     }
 }

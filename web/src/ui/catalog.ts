@@ -2,7 +2,7 @@
 // options of their tools. The menu is built from it, so a new tool is one entry here and one
 // picture model in `pictures.ts`. Keys are shown in tooltips; main.ts handles them.
 import { ZONE_OVERLAY } from '../palette';
-import { PlantKind, RoadClass, Snap, Zone } from '../protocol';
+import { PlantKind, RoadClass, Snap, WaterKind, Zone } from '../protocol';
 
 /** How the road tool works: draw a road of a shape, lay a grid of blocks, or click roads to
  * change their class. */
@@ -14,6 +14,7 @@ export type Tool =
   | { kind: 'zone'; zone: Zone }
   | { kind: 'plant'; plant: PlantKind }
   | { kind: 'line' }
+  | { kind: 'water'; water: WaterKind }
   | { kind: 'bulldoze' };
 
 /** What an option changes on the tool in use. */
@@ -28,7 +29,11 @@ export type Picture =
   | { kind: 'zone'; zone: Zone }
   | { kind: 'plant'; plant: PlantKind }
   | { kind: 'line' }
-  | { kind: 'icon'; name: 'roads' | 'zones' | 'power' | 'bulldoze' | 'views' | 'eraser' };
+  | { kind: 'water'; water: WaterKind }
+  | {
+      kind: 'icon';
+      name: 'roads' | 'zones' | 'power' | 'water' | 'bulldoze' | 'views' | 'eraser';
+    };
 
 /** A stable name for a picture model, so each is drawn once. */
 export function pictureKey(p: Picture): string {
@@ -95,6 +100,14 @@ const plant = (id: string, label: string, kind: PlantKind, key: string, tip: str
   key,
   picture: { kind: 'plant', plant: kind },
   tool: { kind: 'plant', plant: kind },
+});
+
+const water = (id: string, label: string, kind: WaterKind, tip: string): Item => ({
+  id,
+  label,
+  tip,
+  picture: { kind: 'water', water: kind },
+  tool: { kind: 'water', water: kind },
 });
 
 export const CATEGORIES: Category[] = [
@@ -211,6 +224,16 @@ export const CATEGORIES: Category[] = [
       },
     ],
   },
+  {
+    id: 'water',
+    label: 'Water',
+    tip: 'Pumps and water towers; pipes follow roads',
+    icon: { kind: 'icon', name: 'water' },
+    items: [
+      water('water-pump', 'Pump', WaterKind.Pump, 'Water for apartments, stores and factories.'),
+      water('water-tower', 'Water tower', WaterKind.Tower, 'Stores spare water for shortages.'),
+    ],
+  },
   // Later milestones fill these; until then they are hidden.
   {
     id: 'services',
@@ -239,7 +262,7 @@ export const CATEGORIES: Category[] = [
 export const BULLDOZE: Item = {
   id: 'bulldoze',
   label: 'Bulldoze',
-  tip: 'Remove a road, building, plant or power line.',
+  tip: 'Remove a road, building, plant, power line, pump or water tower.',
   key: 'B',
   picture: { kind: 'icon', name: 'bulldoze' },
   tool: { kind: 'bulldoze' },

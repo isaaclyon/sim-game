@@ -12,6 +12,7 @@ mod snapshot;
 mod tests;
 
 use super::World;
+use super::money::plant_price;
 use crate::block::Rect;
 use crate::building::BuildingId;
 use crate::frontage::frontage;
@@ -32,6 +33,10 @@ const ROAD_CLEARANCE: f32 = 6.0;
 /// A pole joining a road stands this far inside its kerb, metres.
 const SIDEWALK_POLE: f32 = 1.0;
 
+fn on_map(x: f32, y: f32) -> bool {
+    x.is_finite() && y.is_finite() && x.abs() < 1e6 && y.abs() < 1e6
+}
+
 /// What a line end joins once snapped.
 #[derive(Clone, Copy, PartialEq)]
 enum End {
@@ -41,20 +46,29 @@ enum End {
 
 impl World {
     /// Where a plant of `kind` asked for at the cursor would stand. Coal snaps beside the
-    /// nearest road in reach, its front just outside the kerb and facing the road, sliding
-    /// along it with the cursor. Others stand where asked, facing +y. `None` off the map.
+    /// nearest road in reach (`roadside_spot`). Others stand where asked, facing +y. `None`
+    /// off the map.
     pub fn plant_spot(&self, kind: PlantKind, x: f32, y: f32) -> Option<Footprint> {
-        if !(x.is_finite() && y.is_finite() && x.abs() < 1e6 && y.abs() < 1e6) {
+        if !on_map(x, y) {
             return None;
         }
         let half = kind.half_size();
-        let free = Footprint {
+        if kind == PlantKind::Coal {
+            return self.roadside_spot(half, x, y);
+        }
+        Some(Footprint {
             centre: (x, y),
             front: (0.0, 1.0),
             half,
-        };
-        if kind != PlantKind::Coal {
-            return Some(free);
+        })
+    }
+
+    /// Where a roadside piece (coal, pump or tower; ADR 0042) asked for at the cursor would
+    /// stand: its front just outside the kerb of the nearest road in reach and facing it,
+    /// sliding along it with the cursor; where asked, facing +y, with no road in reach.
+    pub(in crate::world) fn roadside_spot(&self, half: f32, x: f32, y: f32) -> Option<Footprint> {
+        if !on_map(x, y) {
+            return None;
         }
         Some(match frontage(&self.roads, (x, y), COAL_SNAP) {
             Some(f) => Footprint {
@@ -62,17 +76,23 @@ impl World {
                 front: f.front,
                 half,
             },
-            None => free,
+            None => Footprint {
+                centre: (x, y),
+                front: (0.0, 1.0),
+                half,
+            },
         })
     }
 
     /// Whether `plant_spot` is clear of roads and other plants, and for coal, beside a road.
     pub fn plant_fits(&self, kind: PlantKind, x: f32, y: f32) -> bool {
         self.plant_spot(kind, x, y)
-            .is_some_and(|at| self.spot_fits(kind, at))
+            .is_some_and(|at| self.spot_fits(at, kind == PlantKind::Coal))
     }
 
-    fn spot_fits(&self, kind: PlantKind, at: Footprint) -> bool {
+    /// Whether a plant, pump or tower at `at` is clear of roads, plants, pumps and towers,
+    /// and, when it must stand `beside_road`, within reach of one.
+    pub(in crate::world) fn spot_fits(&self, at: Footprint, beside_road: bool) -> bool {
         let near_road = |margin| {
             self.roads.active_roads().any(|road| {
                 self.roads
@@ -84,22 +104,30 @@ impl World {
         let overlaps = self
             .power
             .active_plants()
-            .any(|p| self.power.footprint(p).overlaps(at));
-        !overlaps
-            && !near_road(ROAD_CLEARANCE)
-            && (kind != PlantKind::Coal || near_road(PLANT_REACH))
+            .map(|p| self.power.footprint(p))
+            .chain(self.water.active_pieces().map(|p| self.water.footprint(p)))
+            .any(|other| other.overlaps(at));
+        !overlaps && !near_road(ROAD_CLEARANCE) && (!beside_road || near_road(PLANT_REACH))
     }
 
     /// Places a plant at its `plant_spot`, unzoning the land under it and removing the
-    /// buildings it covers.
+    /// buildings it covers. Refused when the city cannot pay for it (ADR 0052).
     pub(super) fn place_plant(&mut self, kind: PlantKind, x: f32, y: f32) -> bool {
         let Some(at) = self.plant_spot(kind, x, y) else {
             return false;
         };
-        if !self.spot_fits(kind, at) {
+        let cost = plant_price(kind).0;
+        if !self.spot_fits(at, kind == PlantKind::Coal) || !self.can_afford(cost) {
             return false;
         }
+        self.treasury.balance -= cost;
         self.power.add_plant(kind, at);
+        self.claim_land(at);
+        true
+    }
+
+    /// Unzones the land under a new plant, pump or tower and removes the buildings it covers.
+    pub(in crate::world) fn claim_land(&mut self, at: Footprint) {
         self.clear_buildings(|ring| at.hits_ring(ring));
         let bounds = at.bounds();
         let under: Vec<u32> = self
@@ -111,7 +139,6 @@ impl World {
         if !changed.is_empty() {
             self.after_zoning(bounds as Rect, &changed);
         }
-        true
     }
 
     /// Where a line end at `(x, y)` goes: onto a line end, onto the terminal of a plant it
@@ -202,7 +229,7 @@ impl World {
 
     /// Removes every standing building whose footprint `hit` says is in the way, as a road
     /// edit does. The caller's command then reconciles closures and residents.
-    fn clear_buildings(&mut self, hit: impl Fn(&[Point]) -> bool) {
+    pub(in crate::world) fn clear_buildings(&mut self, hit: impl Fn(&[Point]) -> bool) {
         let doomed: Vec<BuildingId> = self
             .buildings
             .active_buildings()
@@ -220,9 +247,9 @@ impl World {
         }
     }
 
-    /// Whether a plant or line stands on the lot, so nothing new is built there.
+    /// Whether a plant, line, pump or tower stands on the lot, so nothing new is built there.
     pub(super) fn lot_blocked(&mut self, lot: LotId) -> bool {
-        let key = (self.lots.version, self.power.version);
+        let key = (self.lots.version, self.power.version, self.water.version);
         if self.power_cache.blocked_key != Some(key) {
             self.power_cache.blocked = (0..self.lots.len() as LotId)
                 .map(|l| self.lots.active[l as usize] && self.blocks_lot(l))
@@ -238,7 +265,12 @@ impl World {
             .power
             .active_plants()
             .any(|p| self.power.footprint(p).hits_ring(ring));
+        let piece = self
+            .water
+            .active_pieces()
+            .any(|p| self.water.footprint(p).hits_ring(ring));
         plant
+            || piece
             || self.power.active_lines().any(|l| {
                 let (a, b) = self.power.line(l);
                 segment_hits_ring(a, b, ring)

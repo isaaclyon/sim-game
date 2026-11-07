@@ -196,6 +196,7 @@ impl World {
             let eligible = if job {
                 self.residents.workers[b] < self.residents.jobs[b]
                     && self.building_powered(b as u32)
+                    && self.building_watered(b as u32)
             } else {
                 matches!(
                     self.buildings.zone[b],

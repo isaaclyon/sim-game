@@ -44,7 +44,7 @@ const tools = new Toolbox(
   () => menu.show(tools.selection),
 );
 const { roads, zoning, power } = tools;
-const topBar = new TopBar(byId, popovers, setSpeed, (focus) => menu.openCategory('power', focus));
+const topBar = new TopBar(byId, popovers, setSpeed, (id, focus) => menu.openCategory(id, focus));
 // Each item's picture is drawn once from the game's own models (M4.6); the debug panel shows
 // how long that added to startup.
 const picturesStart = performance.now();

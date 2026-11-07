@@ -43,6 +43,7 @@ import { type Ground, ToolPreview } from './tool-preview.ts';
 import type { Picture } from './ui/catalog.ts';
 import { drawPictures } from './ui/pictures.ts';
 import type { PollutionView } from './ui/views.ts';
+import { WaterLayer } from './water-layer.ts';
 import { ZoneOverlay } from './zone-overlay';
 
 CameraControls.install({ THREE });
@@ -79,6 +80,7 @@ export class Renderer {
   private readonly streetlights = new StreetlightLayer(nightMaterial(this.lighting.streetlights));
   private readonly tools = new ToolPreview();
   private readonly power = new PowerLayer();
+  private readonly water = new WaterLayer();
   private readonly up = new THREE.Vector3(0, 1, 0);
   private readonly look = new THREE.Vector3();
   /** Called when a mouse or touch drag pans the camera, so follow can let go. */
@@ -98,6 +100,7 @@ export class Renderer {
       this.pollution.group,
       this.buildings.group,
       this.power.group,
+      this.water.group,
       this.smoke.group,
       this.streetlights.group,
       this.tools.group,
@@ -403,6 +406,16 @@ export class Renderer {
   /** The power view marks every building with its grid's colour, not only unpowered ones. */
   setPowerView(on: boolean) {
     this.power.setView(on);
+  }
+
+  /** Draws pumps, towers and water markers; see `water` in protocol.ts. */
+  setWater(pieces: Float32Array, buildings: Float32Array) {
+    this.water.set(pieces, buildings);
+  }
+
+  /** The water view marks dense buildings, pumps and towers with their network's colour. */
+  setWaterView(on: boolean) {
+    this.water.setView(on);
   }
 
   /** See `ToolPreview.setPlant`. */

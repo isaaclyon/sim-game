@@ -17,9 +17,16 @@ fn lattice() -> World {
     )
 }
 
-/// Every block zoned, so growth is limited by demand and power only.
+/// Every block zoned and a pump, so growth is limited by demand and power only.
 fn zoned() -> World {
     let mut w = lattice();
+    // Apartments need water (ADR 0052).
+    assert!(w.apply(Command::PlaceWater {
+        kind: crate::water::WaterKind::Pump,
+        x: -20.0,
+        y: 60.0,
+    }));
+
     for (x, zone) in [
         (60.0, Zone::ResidentialHigh),
         (180.0, Zone::CommercialLow),
@@ -393,29 +400,52 @@ fn powered_homes_still_wait_for_the_land_value_threshold() {
 }
 
 #[test]
-fn power_placement_and_bulldozing_are_free_even_in_debt() {
-    for balance in [crate::world::START_FUNDS, 0, -100] {
+fn plants_cost_money_and_upkeep_but_lines_and_bulldozing_are_free() {
+    use crate::world::plant_price;
+    let mut w = lattice();
+    let start = w.money();
+    let mut balance = start.balance;
+    let mut utilities = 0;
+    for (kind, x, y) in [
+        (PlantKind::Coal, COAL.0, COAL.1),
+        (PlantKind::Wind, 500.0, 60.0),
+        (PlantKind::Solar, 500.0, 180.0),
+    ] {
+        assert!(plant(&mut w, kind, x, y));
+        let (cost, upkeep) = plant_price(kind);
+        balance -= cost;
+        utilities += upkeep;
+        assert_eq!(w.money().balance, balance, "{kind:?} costs {cost}");
+        assert_eq!(w.money().utilities, utilities);
+    }
+    assert_eq!(w.money().upkeep, start.upkeep, "road upkeep is separate");
+    assert!(line(&mut w, (500.0, 60.0), (362.0, 60.0)));
+    assert_eq!(w.money().balance, balance, "lines are free");
+    for (x, y) in [(450.0, 60.0), (500.0, 60.0), (500.0, 180.0), COAL] {
+        assert!(w.apply(Command::DeleteRoad { x, y }));
+        assert_eq!(w.money().balance, balance, "power demolition is free");
+    }
+    assert_eq!(w.money().utilities, 0, "upkeep ends with the plant");
+    assert_eq!(w.power.active_plants().count(), 0);
+}
+
+#[test]
+fn plants_are_refused_when_the_city_cannot_pay() {
+    use crate::world::plant_price;
+    for kind in [PlantKind::Coal, PlantKind::Solar, PlantKind::Wind] {
         let mut w = lattice();
-        w.treasury.balance = balance;
-        let money = w.money();
-        let roads = w.roads.road_count();
-        for (kind, x, y) in [
-            (PlantKind::Coal, COAL.0, COAL.1),
-            (PlantKind::Wind, 500.0, 60.0),
-            (PlantKind::Solar, 500.0, 180.0),
-        ] {
-            assert!(plant(&mut w, kind, x, y));
-            assert_eq!(w.money(), money, "plants have no build cost or upkeep");
-        }
-        assert!(line(&mut w, (500.0, 60.0), (362.0, 60.0)));
-        assert_eq!(w.money(), money);
-        for (x, y) in [(450.0, 60.0), (500.0, 60.0), (500.0, 180.0), COAL] {
-            assert!(w.apply(Command::DeleteRoad { x, y }));
-            assert_eq!(w.money(), money, "power demolition is free");
-        }
-        assert_eq!(w.power.active_plants().count(), 0);
-        assert_eq!(w.power.active_lines().count(), 0);
-        assert_eq!(w.roads.road_count(), roads, "power targets win over roads");
+        let (x, y) = if kind == PlantKind::Coal {
+            COAL
+        } else {
+            (500.0, 60.0)
+        };
+        w.treasury.balance = plant_price(kind).0 - 1;
+        let hash = w.state_hash();
+        assert!(!plant(&mut w, kind, x, y), "{kind:?}");
+        assert_eq!(w.state_hash(), hash, "a refused plant changes nothing");
+        w.treasury.balance = plant_price(kind).0;
+        assert!(plant(&mut w, kind, x, y), "{kind:?}");
+        assert_eq!(w.money().balance, 0);
     }
 }
 

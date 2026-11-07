@@ -1,6 +1,7 @@
 # Scripted through the WASM build: every command kind, a rezoning and a deleted road.
 # Power lines added by hand (ADR 0041): a wind plant joined by a line, a coal plant, a
 # bulldozed plant.
+# Water added by hand (ADR 0052): a pump and a tower before the dense homes.
 # Road class clicks (ADR 0050) came later and are covered by scripted-road-class.cmdlog.
 sim-game command log 1
 seed 1
@@ -15,7 +16,9 @@ grid 4 4
 700 plant 400 80 coal
 950 road -60 60 0 60 street
 950 delete 60 120
+1900 water -20 200 pump
+1900 water -20 300 tower
 1950 fill 170 50 residential-high
 2500 delete 430 200
 end 4950
-expect hash 0bbf48106b072c8f population 176 buildings 28 trips 149
+expect hash c2da78e606136905 population 176 buildings 28 trips 149

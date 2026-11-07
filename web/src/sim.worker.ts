@@ -29,6 +29,8 @@ let buildingsVersion = -1;
 let buildingsSentAt = -Infinity;
 let powerVersion = -1;
 let powerSentAt = -Infinity;
+let waterVersion = -1;
+let waterSentAt = -Infinity;
 let pollutionVersion = -1;
 let pollutionSentAt = -Infinity;
 /** One inspector subject. Citizens persist even while their travel slot is hidden. */
@@ -98,6 +100,19 @@ function sendPowerIfChanged(s: Sim, force = false) {
   ]);
 }
 
+/** Water changes with growth and tower levels, so it is coalesced too (ADR 0052). */
+function sendWaterIfChanged(s: Sim, force = false) {
+  const version = s.water_version();
+  if (version === waterVersion) return;
+  const now = performance.now();
+  if (!force && now - waterSentAt < BUILDING_SNAPSHOT_INTERVAL_MS) return;
+  waterVersion = version;
+  waterSentAt = now;
+  const pieces = s.water_pieces();
+  const buildings = s.water_buildings();
+  post({ type: 'water', pieces, buildings }, [pieces.buffer, buildings.buffer]);
+}
+
 function sendPollutionIfChanged(s: Sim, force = false) {
   const version = s.pollution_version();
   if (version === pollutionVersion) return;
@@ -117,6 +132,7 @@ function sendEdits(s: Sim) {
   sendLotsIfChanged(s);
   sendBuildingsIfChanged(s, true);
   sendPowerIfChanged(s, true);
+  sendWaterIfChanged(s, true);
   sendPollutionIfChanged(s, true);
   sendFrame(s); // Cars and signals also change while paused.
 }
@@ -132,9 +148,10 @@ const cities = new CitySession(post, (next, initialSpeed) => {
     lotsVersion =
     buildingsVersion =
     powerVersion =
+    waterVersion =
     pollutionVersion =
       -1;
-  buildingsSentAt = powerSentAt = pollutionSentAt = -Infinity;
+  buildingsSentAt = powerSentAt = waterSentAt = pollutionSentAt = -Infinity;
   inspected = null;
   post({ type: 'cityReset', speed });
   sendEdits(next);
@@ -164,6 +181,15 @@ function readStats(s: Sim): Stats {
       unpowered: st.power_unpowered,
       waiting: st.power_waiting,
     },
+    water: {
+      supply: st.water_supply,
+      used: st.water_used,
+      demand: st.water_demand,
+      stored: st.water_stored,
+      capacity: st.water_capacity,
+      dry: st.water_dry,
+      waiting: st.water_waiting,
+    },
     parked: st.parked,
     awaitingPath: st.awaiting_path,
     entering: st.entering,
@@ -178,6 +204,7 @@ function readStats(s: Sim): Stats {
     taxes: st.taxes,
     grant: st.grant,
     upkeep: st.upkeep,
+    utilities: st.utilities,
   };
   st.free();
   return out;
@@ -235,6 +262,7 @@ function sendBuilding(s: Sim) {
         occupied: v.occupied,
         closing: v.closing,
         powered: v.powered,
+        watered: v.watered,
       }
     : null;
   v?.free();
@@ -263,6 +291,7 @@ function step() {
       sendRoadsIfChanged(sim);
       sendBuildingsIfChanged(sim);
       sendPowerIfChanged(sim);
+      sendWaterIfChanged(sim);
       sendPollutionIfChanged(sim);
       sendFrame(sim, perTick);
     }
@@ -310,6 +339,7 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
       if (speed === 0 && sim) {
         sendBuildingsIfChanged(sim, true);
         sendPowerIfChanged(sim, true);
+        sendWaterIfChanged(sim, true);
         sendPollutionIfChanged(sim, true);
       }
       break;
@@ -351,24 +381,31 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
       }
       break;
     case 'placePlant':
+    case 'placeWater':
     case 'buildLine':
       if (
         cities.ready &&
         sim &&
         (msg.type === 'placePlant'
           ? sim.place_plant(msg.kind, msg.x, msg.y)
-          : sim.build_line(msg.ax, msg.ay, msg.bx, msg.by))
+          : msg.type === 'placeWater'
+            ? sim.place_water(msg.kind, msg.x, msg.y)
+            : sim.build_line(msg.ax, msg.ay, msg.bx, msg.by))
       ) {
         cities.changed();
         sendEdits(sim);
       }
       break;
-    case 'previewPlant': {
-      const data = sim?.plant_preview(msg.kind, msg.x, msg.y) ?? new Float32Array();
+    case 'previewPlant':
+    case 'previewWater': {
+      const plant = msg.type === 'previewPlant';
+      const data =
+        (plant
+          ? sim?.plant_preview(msg.kind, msg.x, msg.y)
+          : sim?.water_preview(msg.kind, msg.x, msg.y)) ?? new Float32Array();
       const outline = data.slice(1);
-      post({ type: 'plantPreview', outline, ok: data[0] === 1, revision: msg.revision }, [
-        outline.buffer,
-      ]);
+      const type = plant ? 'plantPreview' : 'waterPreview';
+      post({ type, outline, ok: data[0] === 1, revision: msg.revision }, [outline.buffer]);
       break;
     }
     case 'previewLine': {

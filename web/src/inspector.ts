@@ -58,6 +58,14 @@ export function describeBuilding(b: Building): Card {
       ...(b.closing
         ? [{ icon: 'warning', text: 'Closing: not accepting new residents or workers' } as const]
         : []),
+      ...(b.watered
+        ? []
+        : [
+            {
+              icon: 'warning',
+              text: 'No water: no one moves in, and people leave after a day',
+            } as const,
+          ]),
       ...(residential
         ? ([
             { icon: 'building', text: `Resident capacity: ${b.capacity}` },

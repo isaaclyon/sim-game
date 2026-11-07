@@ -2,7 +2,8 @@ mod editing;
 mod traffic;
 
 use super::*;
-use crate::road::{NodeId, RoadNetwork};
+use crate::road::{NodeId, RoadClass, RoadNetwork};
+use crate::zone::Zone;
 
 fn small_world(seed: u64) -> World {
     let cfg = Config {

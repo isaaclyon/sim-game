@@ -1,17 +1,17 @@
 //! Thin wasm-bindgen wrapper. Logic belongs in `sim`; this crate only converts types.
 
-use sim::power::PlantKind;
 use sim::{Command, CommandLog, World, Zone};
 use wasm_bindgen::prelude::*;
 
 mod roads;
+mod utilities;
 
 #[wasm_bindgen]
 pub struct Sim {
-    world: World,
+    pub(crate) world: World,
     /// Commands since a fresh start (ADR 0034); a loaded city has no log.
     log: Option<CommandLog>,
-    buf: Vec<f32>,
+    pub(crate) buf: Vec<f32>,
 }
 
 /// Counters are f64 because JS numbers can't hold a u64 without BigInt.
@@ -38,6 +38,15 @@ pub struct SimStats {
     pub power_demand: u32,
     pub power_unpowered: u32,
     pub power_waiting: u32,
+    /// Water (ADR 0052): pump output now, use of watered and of all dense buildings, tower
+    /// storage and capacity, dry dense buildings and lots waiting for water.
+    pub water_supply: u32,
+    pub water_used: u32,
+    pub water_demand: u32,
+    pub water_stored: u32,
+    pub water_capacity: u32,
+    pub water_dry: u32,
+    pub water_waiting: u32,
     pub parked: u32,
     pub awaiting_path: u32,
     pub entering: u32,
@@ -53,6 +62,8 @@ pub struct SimStats {
     pub taxes: f64,
     pub grant: f64,
     pub upkeep: f64,
+    /// Upkeep of plants, pumps and towers per clock hour (ADR 0052).
+    pub utilities: f64,
 }
 
 /// One citizen's details for the inspector (ADR 0022); see `World::citizen_info`. Places are
@@ -86,10 +97,12 @@ pub struct BuildingView {
     pub occupied: u32,
     pub closing: bool,
     pub powered: bool,
+    /// Has water, or is low density and does not need it (ADR 0052).
+    pub watered: bool,
 }
 
 impl Sim {
-    fn apply(&mut self, cmd: Command) -> bool {
+    pub(crate) fn apply(&mut self, cmd: Command) -> bool {
         match &mut self.log {
             Some(log) => log.apply(&mut self.world, cmd),
             None => self.world.apply(cmd),
@@ -189,56 +202,6 @@ impl Sim {
         self.buf.clone()
     }
 
-    /// `kind` is 0 = coal, 1 = solar, 2 = wind (ADR 0041). Unknown values build nothing.
-    pub fn place_plant(&mut self, kind: u8, x: f32, y: f32) -> bool {
-        let Some(kind) = PlantKind::from_u8(kind) else {
-            return false;
-        };
-        self.apply(Command::PlacePlant { kind, x, y })
-    }
-
-    pub fn build_line(&mut self, ax: f32, ay: f32, bx: f32, by: f32) -> bool {
-        self.apply(Command::BuildLine { ax, ay, bx, by })
-    }
-
-    /// `[ok, x0, y0, …]`; see `World::write_plant_preview`. Empty for an unknown kind.
-    pub fn plant_preview(&mut self, kind: u8, x: f32, y: f32) -> Vec<f32> {
-        self.buf.clear();
-        if let Some(kind) = PlantKind::from_u8(kind) {
-            self.world.write_plant_preview(kind, x, y, &mut self.buf);
-        }
-        self.buf.clone()
-    }
-
-    /// `[ax, ay, a_join, bx, by, b_join]`; see `World::write_line_preview`.
-    pub fn line_preview(&mut self, ax: f32, ay: f32, bx: f32, by: f32) -> Vec<f32> {
-        self.world.write_line_preview(ax, ay, bx, by, &mut self.buf);
-        self.buf.clone()
-    }
-
-    pub fn power_version(&self) -> u32 {
-        self.world.power_version()
-    }
-
-    /// `[kind, x, y, half_size, front_x, front_y, terminal_x, terminal_y, output, grid]` per
-    /// plant; see `World::write_plant_snapshot`.
-    pub fn plant_snapshot(&mut self) -> Vec<f32> {
-        self.world.write_plant_snapshot(&mut self.buf);
-        self.buf.clone()
-    }
-
-    /// `[ax, ay, bx, by]` per transmission line.
-    pub fn line_snapshot(&mut self) -> Vec<f32> {
-        self.world.write_line_snapshot(&mut self.buf);
-        self.buf.clone()
-    }
-
-    /// `[x, y, height, grid, powered]` per active building; see `World::write_power_buildings`.
-    pub fn power_buildings(&mut self) -> Vec<f32> {
-        self.world.write_power_buildings(&mut self.buf);
-        self.buf.clone()
-    }
-
     pub fn lots_version(&self) -> u32 {
         self.world.lots.version
     }
@@ -263,6 +226,7 @@ impl Sim {
             occupied: b.occupied,
             closing: b.closing,
             powered: self.world.building_powered(id),
+            watered: self.world.building_watered(id),
         })
     }
 
@@ -396,6 +360,13 @@ impl Sim {
             power_demand: s.power.demand,
             power_unpowered: s.power.unpowered,
             power_waiting: s.power.waiting,
+            water_supply: s.water.supply,
+            water_used: s.water.used,
+            water_demand: s.water.demand,
+            water_stored: s.water.stored,
+            water_capacity: s.water.capacity,
+            water_dry: s.water.dry,
+            water_waiting: s.water.waiting,
             parked: s.parked,
             awaiting_path: s.awaiting_path,
             entering: s.entering,
@@ -410,6 +381,7 @@ impl Sim {
             taxes: s.money.taxes as f64,
             grant: s.money.grant as f64,
             upkeep: s.money.upkeep as f64,
+            utilities: s.money.utilities as f64,
         }
     }
 }

@@ -30,13 +30,26 @@ impl World {
     /// Atomically reserve an eligible vacant home for the whole household, or leave town.
     /// Also usable by gradual closure; it deliberately excludes the current home.
     pub fn relocate_household(&mut self, household: HouseholdId) {
+        self.move_household(household, true);
+    }
+
+    /// The household moves out of the city, leaving its home vacant (ADR 0052).
+    pub(in crate::world) fn household_leaves_city(&mut self, household: HouseholdId) {
+        self.move_household(household, false);
+    }
+
+    fn move_household(&mut self, household: HouseholdId, may_stay: bool) {
         let hh = household as usize;
         if !self.households.active[hh] {
             return;
         }
         let old = self.households.home[hh] as usize;
         let size = self.households.members[hh].len();
-        let replacement = self.vacant_home(old, size);
+        let replacement = if may_stay {
+            self.vacant_home(old, size)
+        } else {
+            None
+        };
         self.homes.household[old] = None;
         let b = self.homes.building[old];
         if self.buildings.active[b as usize] {

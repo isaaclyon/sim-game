@@ -33,6 +33,14 @@ impl Zone {
             _ => return None,
         })
     }
+
+    /// High density: the uses that need water (ADR 0052).
+    pub fn is_dense(self) -> bool {
+        matches!(
+            self,
+            Zone::ResidentialHigh | Zone::CommercialHigh | Zone::IndustrialHigh
+        )
+    }
 }
 
 /// A fixed, row-major grid of zone cells. Cell `(c, r)` covers

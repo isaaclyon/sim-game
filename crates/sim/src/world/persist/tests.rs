@@ -2,6 +2,7 @@
 use super::*;
 use crate::agents::AgentState;
 use crate::road::RoadClass;
+use crate::water::WaterKind;
 use crate::{Command, Config, Zone};
 use std::cmp::Reverse;
 
@@ -312,11 +313,15 @@ fn combined_town() -> World {
         bx: 480.0,
         by: 60.0,
     }));
+    for (kind, y) in [(WaterKind::Pump, 60.0), (WaterKind::Tower, 180.0)] {
+        assert!(w.apply(Command::PlaceWater { kind, x: -20.0, y }));
+    }
     w.cfg.ignore_demand = false;
     for _ in 0..1000 {
         w.tick();
     }
     assert!(w.power_stats().supply > 0);
+    assert!(w.water_stats().stored > 0);
     assert!(w.money().upkeep > 0);
     assert_ne!(w.money().balance, crate::world::START_FUNDS);
     assert!(w.pollution.ground.iter().any(|&g| g > 0));
@@ -327,7 +332,7 @@ fn combined_town() -> World {
 fn combined_save_restores_power_pollution_and_money_and_keeps_evolving() {
     let mut w = combined_town();
     let save = w.save().unwrap();
-    assert_eq!(u32::from_le_bytes(le(&save, 8)), 4);
+    assert_eq!(u32::from_le_bytes(le(&save, 8)), 5);
     let mut loaded = World::load(&save).unwrap();
     assert_eq!(loaded.save().unwrap(), save);
     assert_eq!(loaded.state_hash(), w.state_hash());
@@ -337,6 +342,11 @@ fn combined_save_restores_power_pollution_and_money_and_keeps_evolving() {
     loaded.write_power_buildings(&mut b);
     assert_eq!(a, b, "power allocation is restored before ticking");
     assert_eq!(loaded.power_stats(), w.power_stats());
+    assert_eq!(loaded.water_stats(), w.water_stats());
+    let (mut a, mut b) = (Vec::new(), Vec::new());
+    w.write_water_buildings(&mut a);
+    loaded.write_water_buildings(&mut b);
+    assert_eq!(a, b, "water allocation is restored before ticking");
     let (mut a, mut b) = (Vec::new(), Vec::new());
     w.pollution.write_snapshot(&mut a);
     loaded.pollution.write_snapshot(&mut b);
@@ -368,4 +378,19 @@ fn combined_save_validates_and_hashes_each_system() {
     w.pollution.flow.push(f32::NAN);
     assert_ne!(w.state_hash(), hash);
     assert_eq!(refused(&w), SaveError::Invalid("traffic flow"));
+
+    let mut w = combined_town();
+    let hash = w.state_hash();
+    w.water.level[1] = crate::water::TOWER_CAPACITY + 1;
+    assert_ne!(w.state_hash(), hash);
+    assert_eq!(refused(&w), SaveError::Invalid("tower levels"));
+
+    let mut w = combined_town();
+    let hash = w.state_hash();
+    w.water.dry_since.push(0);
+    w.water
+        .dry_since
+        .resize(w.buildings.active.len() + 1, u64::MAX);
+    assert_ne!(w.state_hash(), hash);
+    assert_eq!(refused(&w), SaveError::Invalid("dry buildings"));
 }

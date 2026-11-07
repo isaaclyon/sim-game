@@ -2,6 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 mod closure;
+mod command;
 mod demand;
 mod demolish;
 mod grid;
@@ -15,6 +16,7 @@ mod roads;
 mod snapshot;
 mod trips;
 mod walking;
+mod water;
 mod zoning;
 
 use std::cmp::Reverse;
@@ -28,18 +30,21 @@ use crate::junction::Junctions;
 use crate::lot::Lots;
 use crate::path::Pathfinder;
 use crate::pollution::Pollution;
-use crate::power::{PlantKind, Power};
+use crate::power::Power;
 use crate::rng::Rng;
-use crate::road::{LaneId, RoadClass, RoadNetwork};
+use crate::road::{LaneId, RoadNetwork};
 use crate::traffic::Traffic;
-use crate::zone::{Zone, ZoneGrid};
+use crate::water::Water;
+use crate::zone::ZoneGrid;
 
+pub use command::Command;
 pub use demand::Demand;
 pub use grid::{GridPreview, MAX_BLOCKS, MAX_CELL, MIN_CELL};
 pub use inspect::{BuildingInfo, CitizenInfo, Place};
-pub use money::{GRANT, JOB_TAX, Money, RESIDENT_TAX, START_FUNDS};
+pub use money::{GRANT, JOB_TAX, Money, RESIDENT_TAX, START_FUNDS, plant_price, water_price};
 pub use persist::{SAVE_VERSION, SaveError};
 pub use power::{PLANT_STRIDE, POWER_BUILDING_STRIDE, PowerStats};
+pub use water::{WATER_BUILDING_STRIDE, WATER_PIECE_STRIDE, WaterStats};
 
 /// Floats per agent in `write_agent_snapshot`.
 pub const SNAPSHOT_STRIDE: usize = 5;
@@ -62,8 +67,9 @@ pub struct Config {
     /// most city builders.
     pub stuck_limit_s: f32,
     pub grid_spacing: f32,
-    /// Builds every due lot whatever the demand (ADR 0025) and powers every building (ADR
-    /// 0041). For tests and benchmarks that need full blocks; the game leaves it off.
+    /// Builds every due lot whatever the demand (ADR 0025) and powers and waters every
+    /// building (ADR 0041, 0052). For tests and benchmarks that need full blocks; the game
+    /// leaves it off.
     pub ignore_demand: bool,
 }
 
@@ -82,91 +88,6 @@ impl Default for Config {
     }
 }
 
-/// Player actions. Everything that changes the world from outside goes through `World::apply`,
-/// so the seed plus a command log is enough to replay a session (`crate::replay`, ADR 0034).
-#[derive(Clone, Debug, PartialEq)]
-pub enum Command {
-    SpawnAgents {
-        count: u32,
-    },
-    /// Builds a road of `class`. Roads it follows take that class (ADR 0048).
-    BuildRoad {
-        ax: f32,
-        ay: f32,
-        bx: f32,
-        by: f32,
-        class: RoadClass,
-    },
-    BuildCurve {
-        ax: f32,
-        ay: f32,
-        cx: f32,
-        cy: f32,
-        bx: f32,
-        by: f32,
-        class: RoadClass,
-    },
-    /// Lays a lattice of `cols` × `rows` blocks of `cell` metres from the origin along the unit
-    /// axis `(ux, uy)`; negative counts go the other way, and rows run to the axis's left
-    /// (counter-clockwise). Each edge is planned like a hand-drawn road, edges an existing
-    /// road runs alongside are left out, and existing roads keep their class. All or nothing
-    /// on money; `Alley`, more than `MAX_BLOCKS` either way and cells outside `MIN_CELL` to
-    /// `MAX_CELL` are refused (ADR 0049).
-    BuildGrid {
-        ox: f32,
-        oy: f32,
-        ux: f32,
-        uy: f32,
-        cell: f32,
-        cols: i32,
-        rows: i32,
-        class: RoadClass,
-    },
-    /// Gives the road nearest the point, in bulldoze reach, `class` in place, as drawing over
-    /// the whole road would (ADR 0048, 0050). Refused for a road already of `class`.
-    SetRoadClass {
-        x: f32,
-        y: f32,
-        class: RoadClass,
-    },
-    /// Removes the plant under the point, else the nearest line in reach, else the building
-    /// under the point (ADR 0045), else the nearest road.
-    DeleteRoad {
-        x: f32,
-        y: f32,
-    },
-    /// Places a power plant at the point; coal snaps beside a road and faces it (ADR 0042).
-    /// Refused over roads and other plants, and for coal away from roads.
-    PlacePlant {
-        kind: PlantKind,
-        x: f32,
-        y: f32,
-    },
-    /// Draws a transmission line; each end snaps to a line end, plant or road in reach.
-    BuildLine {
-        ax: f32,
-        ay: f32,
-        bx: f32,
-        by: f32,
-    },
-    /// Sets every zone cell whose centre is inside the rectangle with these corners. `Zone::None`
-    /// unzones. See ADR 0014.
-    PaintZone {
-        ax: f32,
-        ay: f32,
-        bx: f32,
-        by: f32,
-        zone: Zone,
-    },
-    /// Sets every cell of the block containing `(x, y)`; outside every block it changes nothing.
-    /// See ADR 0016.
-    FillBlock {
-        x: f32,
-        y: f32,
-        zone: Zone,
-    },
-}
-
 #[derive(Clone, Copy, Default, Debug, Serialize, Deserialize)]
 pub struct Stats {
     pub tick: u64,
@@ -182,6 +103,8 @@ pub struct Stats {
     pub demand: Demand,
     /// Supply and use of power (ADR 0041).
     pub power: PowerStats,
+    /// Supply, use and storage of water (ADR 0052).
+    pub water: WaterStats,
     /// Balance, taxes, grant and upkeep (ADR 0036).
     pub money: Money,
     /// Synthetic vehicles waiting between random trips; dormant citizen slots are excluded.
@@ -221,6 +144,11 @@ pub struct World {
     /// Grids and who is powered, derived from the rest.
     #[serde(skip)]
     power_cache: power::PowerCache,
+    /// Pumps, towers, tower levels and dry buildings (ADR 0052).
+    pub water: Water,
+    /// Networks and who has water, derived from the rest.
+    #[serde(skip)]
+    water_cache: water::WaterCache,
     residents: residents::Residents,
     closures: closure::Closures,
     supply: demand::Supply,
@@ -266,6 +194,8 @@ impl World {
             homes: Default::default(),
             power: Power::default(),
             power_cache: Default::default(),
+            water: Water::default(),
+            water_cache: Default::default(),
             cfg,
             zones: ZoneGrid::covering(roads.bounds()),
             pollution: Pollution::default(),
@@ -289,8 +219,10 @@ impl World {
             totals: Stats::default(),
         };
         world.pollution = Pollution::covering(&world.zones);
+        world.water.step = world.water_step();
         world.sync_roads();
         world.ensure_power();
+        world.ensure_water();
         world.refresh_upkeep();
         world
     }
@@ -328,6 +260,7 @@ impl World {
             self.lots.version,
             self.zones.version,
             self.power.version,
+            self.water.version,
             self.buildings.version,
         );
         let roads = self.roads.version;
@@ -366,9 +299,13 @@ impl World {
             Command::BuildGrid { .. } => self.build_grid(&cmd),
             Command::SetRoadClass { x, y, class } => self.set_road_class(x, y, class),
             Command::DeleteRoad { x, y } => {
-                self.bulldoze_power(x, y) || self.demolish(x, y) || self.delete_road(x, y)
+                self.bulldoze_power(x, y)
+                    || self.bulldoze_water(x, y)
+                    || self.demolish(x, y)
+                    || self.delete_road(x, y)
             }
             Command::PlacePlant { kind, x, y } => self.place_plant(kind, x, y),
+            Command::PlaceWater { kind, x, y } => self.place_water(kind, x, y),
             Command::BuildLine { ax, ay, bx, by } => self.build_line(ax, ay, bx, by),
             Command::PaintZone {
                 ax,
@@ -390,6 +327,7 @@ impl World {
             self.lots.version,
             self.zones.version,
             self.power.version,
+            self.water.version,
             self.buildings.version,
         );
         if versions != now {
@@ -404,7 +342,8 @@ impl World {
             self.reconcile_residents();
         }
         self.ensure_power();
-        if roads != self.roads.version {
+        self.ensure_water();
+        if roads != self.roads.version || versions.2 != now.2 || versions.3 != now.3 {
             self.refresh_upkeep();
         }
         changed
@@ -414,6 +353,7 @@ impl World {
         self.sync_roads();
         self.tick_closures();
         self.ensure_power();
+        self.ensure_water();
         self.tick_residents();
         self.wake_parked();
         self.lane_delay.clear();
@@ -439,9 +379,11 @@ impl World {
         self.totals.tick += 1;
         self.tick_pollution();
         self.settle_money();
+        self.tick_water();
         self.grow_buildings();
         // Current at every tick boundary, so a loaded world reads the same allocation.
         self.ensure_power();
+        self.ensure_water();
     }
 
     pub fn stats(&self) -> Stats {
@@ -451,6 +393,7 @@ impl World {
         s.unemployed = self.residents.population - self.residents.employed;
         s.demand = self.demand();
         s.power = self.power_stats();
+        s.water = self.water_stats();
         s.money = self.money();
         if s.population > 0 {
             s.unemployment_percent = s.unemployed as f32 * 100.0 / s.population as f32;

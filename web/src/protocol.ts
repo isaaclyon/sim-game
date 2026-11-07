@@ -41,17 +41,23 @@ export type ToWorker =
   /** Asks which road `setRoadClass` would change and for what. Answered with
    * `roadClassPreview`. Changes nothing. */
   | { type: 'previewRoadClass'; x: number; y: number; class: RoadClass; revision: number }
-  /** Removes the plant under the point, else the nearest line, else the building under the
-   * point (ADR 0045), else the nearest road. */
+  /** Removes the plant under the point, else the nearest line, else the pump or tower under the
+   * point (ADR 0052), else the building under the point (ADR 0045), else the nearest road. */
   | { type: 'deleteRoad'; x: number; y: number }
   /** Places a power plant at the point: coal snaps beside the nearest road and faces it, others
-   * centre on the point (ADR 0041, 0042). Refusals change nothing. */
+   * centre on the point (ADR 0041, 0042). Refused, changing nothing, when it does not fit or
+   * the city cannot pay (ADR 0052). */
   | { type: 'placePlant'; kind: PlantKind; x: number; y: number }
+  /** Places a pump or water tower beside the nearest road, facing it (ADR 0052). Refused,
+   * changing nothing, away from roads, over other pieces, or when the city cannot pay. */
+  | { type: 'placeWater'; kind: WaterKind; x: number; y: number }
   /** Draws a transmission line; each end snaps to a line end, a plant's terminal, or the
    * sidewalk of a road in reach on the side facing the other end (ADR 0042). */
   | { type: 'buildLine'; ax: number; ay: number; bx: number; by: number }
   /** Asks whether a plant fits here. Answered with `plantPreview`. */
   | { type: 'previewPlant'; kind: PlantKind; x: number; y: number; revision: number }
+  /** Asks whether a pump or tower fits here. Answered with `waterPreview`. */
+  | { type: 'previewWater'; kind: WaterKind; x: number; y: number; revision: number }
   /** Asks where a line would go. Answered with `linePreview`. */
   | { type: 'previewLine'; ax: number; ay: number; bx: number; by: number; revision: number }
   /**
@@ -159,6 +165,18 @@ export const PlantKind = {
 } as const;
 export type PlantKind = (typeof PlantKind)[keyof typeof PlantKind];
 
+/** Water pieces, matching the sim's `WaterKind` (ADR 0052). */
+export const WaterKind = {
+  Pump: 0,
+  Tower: 1,
+} as const;
+export type WaterKind = (typeof WaterKind)[keyof typeof WaterKind];
+
+/** Floats per piece in `water.pieces`. */
+export const WATER_PIECE_STRIDE = 9;
+/** Floats per building in `water.buildings`. */
+export const WATER_BUILDING_STRIDE = 5;
+
 /** Floats per plant in `power.plants`. */
 export const PLANT_STRIDE = 10;
 /** Floats per building in `power.buildings`. */
@@ -221,6 +239,9 @@ export interface Building extends Place {
   closing: boolean;
   /** Starter power or its grid covers it (ADR 0041); if not, its vacancies stay empty. */
   powered: boolean;
+  /** Has water, or is low density and needs none (ADR 0052); if not, its vacancies stay
+   * empty and, after a day, its people slowly leave. */
+  watered: boolean;
 }
 
 export interface Demand {
@@ -245,6 +266,24 @@ export interface PowerStats {
   waiting: number;
 }
 
+/** The town's water from the sim (ADR 0052), in the units of a building's use. Only dense
+ * buildings use water. */
+export interface WaterStats {
+  /** What all pumps give each update now. */
+  supply: number;
+  /** Use of the dense buildings that get water, from pumps or towers. */
+  used: number;
+  /** Use of every standing dense building. */
+  demand: number;
+  /** Water in all towers, and what they hold when full. */
+  stored: number;
+  capacity: number;
+  /** Standing dense buildings without water. */
+  dry: number;
+  /** Scheduled lots whose last growth check failed for water, preserved across loads. */
+  waiting: number;
+}
+
 export interface Stats {
   tick: number;
   /** Day clock from the sim (`sim::clock`): 1-based day and seconds since midnight. */
@@ -257,9 +296,11 @@ export interface Stats {
   /** Sim-computed `unemployed` as a percentage of `population`; 0 with no residents. */
   unemploymentPercent: number;
   /** R/C/I demand from the sim, in people (ADR 0025). Growth also needs demand above its
-   * land-value threshold and available power; negative demand is a surplus. */
+   * land-value threshold, available power and, when dense, water; negative demand is a
+   * surplus. */
   demand: Demand;
   power: PowerStats;
+  water: WaterStats;
   /** Allocated travel slots, including dormant reservations and departed citizens' slots. */
   agents: number;
   /** Synthetic vehicles waiting between trips; not residents at home or dormant slots. */
@@ -285,6 +326,8 @@ export interface Stats {
   grant: number;
   /** Road upkeep, dollars per clock hour. */
   upkeep: number;
+  /** Upkeep of plants, pumps and towers, dollars per clock hour (ADR 0052). */
+  utilities: number;
 }
 
 /** Persistence metadata only. A commit acknowledges the captured revision, not later edits. */
@@ -406,6 +449,19 @@ export type FromWorker =
    * Grid numbers are only stable within one message.
    */
   | { type: 'power'; plants: Float32Array; lines: Float32Array; buildings: Float32Array }
+  /**
+   * Water (ADR 0052), sent whole when pieces, networks, tower levels or who has water change;
+   * growth is coalesced like `buildings`. `pieces` is `[kind, x, y, halfSize, frontX, frontY,
+   * output, level, network]` per pump or tower (`WATER_PIECE_STRIDE`): its square footprint
+   * faces (frontX, frontY), toward its road; output is what a pump gives now (0 for towers),
+   * level what a tower holds (0 for pumps). `buildings` is `[x, y, height, network, watered]`
+   * per standing dense building (`WATER_BUILDING_STRIDE`): footprint mean point, metres,
+   * network (-1 = none), 1 or 0. Network numbers are only stable within one message.
+   */
+  | { type: 'water'; pieces: Float32Array; buildings: Float32Array }
+  /** `outline` is the closed `[x, y]` footprint the pump or tower asked about would take,
+   * snapped beside a road; `ok` if it fits. */
+  | { type: 'waterPreview'; outline: Float32Array; ok: boolean; revision: number }
   /** `outline` is the closed `[x, y]` footprint the plant asked about would take, snapped
    * beside a road for coal (ADR 0042); `ok` if it fits. */
   | { type: 'plantPreview'; outline: Float32Array; ok: boolean; revision: number }
@@ -423,7 +479,8 @@ export type FromWorker =
       control?: [number, number];
     }
   /** Selected road's `[x, y]` centreline samples, or empty on a miss. Sim-owned hit testing.
-   * A plant's or building's target is its closed outline and a line's its two ends. */
+   * A plant's, pump's, tower's or building's target is its closed outline and a line's its
+   * two ends. */
   | { type: 'bulldozePreview'; segment: Float32Array; revision: number }
   /** `[x, y]` centreline samples of the road `setRoadClass` would change, as for
    * `bulldozePreview`; empty when it would change nothing (no road in reach, or already that

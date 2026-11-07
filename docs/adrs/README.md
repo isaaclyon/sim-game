@@ -46,7 +46,7 @@ rewriting history; mark the old one `Superseded by NNNN`.
 | [0038](0038-sim-owned-drawing-guides.md) | Drawing guides are planned by the sim and travel as raw points with snap flags | Accepted; amended (snap reach follows zoom) |
 | [0039](0039-road-edit-history.md) | Road edit history lives in the sim and is saved with the city | Proposed |
 | [0040](0040-straight-joins.md) | Straight roads that meet end to end in a line become one road | Accepted |
-| [0041](0041-power-grids-follow-roads.md) | Power grids follow roads and gate growth | Accepted |
+| [0041](0041-power-grids-follow-roads.md) | Power grids follow roads and gate growth | Accepted; free plants superseded by 0052 |
 | [0042](0042-roadside-pieces-snap-to-roads.md) | Roadside pieces snap to the road and face it | Accepted |
 | [0043](0043-residential-lot-variety.md) | Residential lots mix standard and wider frontages | Accepted |
 | [0044](0044-coal-plants-pollute.md) | Coal plants pollute | Accepted |
@@ -56,6 +56,7 @@ rewriting history; mark the old one `Superseded by NNNN`.
 | [0048](0048-drawing-over-roads-changes-their-class.md) | Drawing a road over existing roads changes their class | Accepted; implemented |
 | [0049](0049-grid-tool.md) | The grid tool is one sim command planned edge by edge | Accepted; implemented |
 | [0050](0050-click-to-change-road-class.md) | Clicking a road changes its class | Accepted; implemented |
+| [0052](0052-water-follows-roads-and-supplies-dense-buildings.md) | Water follows roads and supplies dense buildings | Accepted; implemented |
 | [0054](0054-children-births-and-growing-up.md) | Children are citizens who are born, grow up and move out | Accepted |
 | [0055](0055-schools-and-education-levels.md) | Schools teach children, and education shapes who fills jobs | Accepted |
 

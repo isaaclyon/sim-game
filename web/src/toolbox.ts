@@ -1,14 +1,14 @@
 // Which tool is in use: a road tool, bulldoze, a zone brush or a power tool, never two at once.
 // The build menu and the keys both start tools here (M4.6); each tool keeps its own canvas
-// handling and sim commands. Picking a power tool shows the power view until it is put away.
-import { PowerTools } from './power-tools';
-import { RoadClass, type ToWorker, Zone } from './protocol';
+// handling and sim commands. Picking a power or water tool shows that view until it is put away.
+import { PowerTools, WATER_TOOLS } from './power-tools';
+import { RoadClass, type ToWorker, type WaterKind, Zone } from './protocol';
 import type { Renderer } from './renderer';
 import { RoadTool } from './road-tool';
 import type { Selection } from './ui/build-menu';
 import type { OptionAction, RoadMode, Tool } from './ui/catalog';
 import { zoneHelpText } from './ui/hints';
-import type { Views } from './ui/views';
+import type { Service, Views } from './ui/views';
 import { ZoneTool } from './zone-tool';
 
 export class Toolbox {
@@ -17,8 +17,8 @@ export class Toolbox {
   readonly power: PowerTools;
   /** The road shape the road items start with: the last one picked. */
   private shape: RoadMode = 'straight';
-  /** Whether the power view showed before a power tool turned it on; null when it did not. */
-  private powerViewBefore: boolean | null = null;
+  /** Whether each service's view showed before its tool turned it on; null when it did not. */
+  private viewBefore: Record<Service, boolean | null> = { power: null, water: null };
   private readonly renderer: Renderer;
   private readonly hint: HTMLElement;
   private readonly views: Views;
@@ -40,8 +40,8 @@ export class Toolbox {
     this.zoning = new ZoneTool(send, renderer);
     this.power = new PowerTools(send, renderer, el.hint, () => this.use(null));
     // The player's own choice stands when the tool is put away.
-    views.onPlayerPower = () => {
-      this.powerViewBefore = null;
+    views.onPlayerMarkers = (service) => {
+      this.viewBefore[service] = null;
     };
   }
 
@@ -60,9 +60,11 @@ export class Toolbox {
           ? { kind: 'zone', zone: zoning.zone }
           : p === 'line'
             ? { kind: 'line' }
-            : p !== null
-              ? { kind: 'plant', plant: p }
-              : null;
+            : p === 'pump' || p === 'tower'
+              ? { kind: 'water', water: WATER_TOOLS.indexOf(p) as WaterKind }
+              : p !== null
+                ? { kind: 'plant', plant: p }
+                : null;
     const roadMode = roads.roadMode ? this.shape : null;
     return { tool, roadMode, snap: roads.snaps, gridCell: roads.cell };
   }
@@ -88,7 +90,11 @@ export class Toolbox {
       this.hint.textContent = zoneHelpText(tool.zone);
     } else if (tool?.kind === 'plant') this.power.set(tool.plant);
     else if (tool?.kind === 'line') this.power.set('line');
-    this.showPowerView(this.power.active);
+    else if (tool?.kind === 'water') this.power.set(WATER_TOOLS[tool.water]);
+    const t = this.power.tool;
+    const water = t === 'pump' || t === 'tower';
+    this.showView('power', t !== null && !water);
+    this.showView('water', water);
     this.renderer.renderer.domElement.style.cursor = tool ? 'crosshair' : '';
     this.changed();
   }
@@ -159,13 +165,14 @@ export class Toolbox {
     this.use(zone === null ? null : { kind: 'zone', zone });
   }
 
-  private showPowerView(on: boolean) {
-    if (on && this.powerViewBefore === null) {
-      this.powerViewBefore = this.views.power;
-      this.views.setPower(true);
-    } else if (!on && this.powerViewBefore !== null) {
-      this.views.setPower(this.powerViewBefore);
-      this.powerViewBefore = null;
+  private showView(service: Service, on: boolean) {
+    const before = this.viewBefore[service];
+    if (on && before === null) {
+      this.viewBefore[service] = this.views.markers[service];
+      this.views.setMarkers(service, true);
+    } else if (!on && before !== null) {
+      this.views.setMarkers(service, before);
+      this.viewBefore[service] = null;
     }
   }
 }

@@ -12,4 +12,4 @@ grid 4 4
 900 class 296 111 main
 900 class 600 600 main
 end 3000
-expect hash 4bb07ccf82a64c30 population 27 buildings 11 trips 110
+expect hash 046db0b0142267d5 population 27 buildings 11 trips 110
