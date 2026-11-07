@@ -21,6 +21,7 @@ test('lighting receives sim snapshot time and never advances from animation fram
     stats: {
       secondOfDay: 64800,
       population: 0,
+      children: 0,
       unemployed: 0,
       unemploymentPercent: 0,
       driving: 0,

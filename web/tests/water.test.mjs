@@ -13,6 +13,7 @@ const STATS = {
   day: 1,
   secondOfDay: 8 * 3600,
   population: 0,
+  children: 0,
   unemployed: 0,
   unemploymentPercent: 0,
   demand: { residential: 0, commercial: 0, industrial: 0 },

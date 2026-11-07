@@ -29,6 +29,7 @@ test('normal startup has no synthetic traffic and the top bar shows authoritativ
     day: 1,
     secondOfDay: 21600,
     population: 1234,
+    children: 0,
     unemployed: 56,
     unemploymentPercent: 4.538087,
     demand: { residential: 0, commercial: 0, industrial: 0 },

@@ -93,6 +93,7 @@ test('city reset clears tools, follow and interpolation, and synchronizes pause 
       day: 1,
       secondOfDay: 43200,
       population: 0,
+      children: 0,
       unemployed: 0,
       unemploymentPercent: 0,
       demand: { residential: 0, commercial: 0, industrial: 0 },

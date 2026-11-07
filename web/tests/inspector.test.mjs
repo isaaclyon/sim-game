@@ -39,6 +39,7 @@ const showCars = (t) =>
       day: 1,
       secondOfDay: 0,
       population: 0,
+      children: 0,
       unemployed: 0,
       unemploymentPercent: 0,
       demand: { residential: 0, commercial: 0, industrial: 0 },
@@ -105,7 +106,13 @@ test('the panel tells the truth about each state', async () => {
   };
   assert.match(show({ job: null }), /^Job: unemployed$/m);
   assert.match(show({}), /^Age 34$/m);
-  const child = show({ job: null, age: 7, child: true, activity: Activity.Home, destination: null });
+  const child = show({
+    job: null,
+    age: 7,
+    child: true,
+    activity: Activity.Home,
+    destination: null,
+  });
   assert.match(child, /^Age 7, a child: lives at home$/m);
   assert.doesNotMatch(child, /Job:/);
   assert.match(child, /^At home$/m);
