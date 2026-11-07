@@ -74,7 +74,7 @@ fn dense() -> World {
         crate::rng::Rng::new(1),
     );
     // Dense flats pass the fire threshold; a burnt shop would muddle the closure checks.
-    w.apply(crate::world::Command::SetFires { on: false });
+    w.apply(Command::SetFires { on: false });
     paint(&mut w, 50.0, Zone::ResidentialHigh);
     paint(&mut w, 170.0, Zone::CommercialLow);
     advance(&mut w, 200);
