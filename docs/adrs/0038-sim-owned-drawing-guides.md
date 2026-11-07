@@ -1,6 +1,6 @@
 # 0038. Drawing guides are planned by the sim and travel as raw points with snap flags
 
-- Status: Accepted
+- Status: Accepted; amended 2026-11-07 (snap reach follows zoom)
 - Date: 2026-11-04
 
 ## Context
@@ -41,3 +41,23 @@ road the start joins, or from the start-to-control direction for a curve's end.
 - The previous `previewSnap` / `previewCurve` messages and the browser-drawn curve control
   guide are replaced by one `previewRoad` message carrying points. Rust writers, `protocol.ts`,
   the worker, the tool preview and the project instructions change together.
+
+## Amended 2026-11-07: the snap reach follows zoom
+
+An acceptance check of M4.5 slice 1 found that squares only closed when a click landed within
+about 2 m of the corner. At the default zoom one screen pixel spans about 7.5 m, and guide lines
+captured within a fixed 6 m, junctions within 15 m, and angle steps within an angle that is a
+pixel or two on screen for a short road.
+
+- Road and grid draft requests (`previewRoad`, `buildRoad`, `previewGrid`, `buildGrid`) carry
+  an optional `reach`: ten screen pixels in ground metres at the cursor. The worker passes it
+  to the sim as one float after the `[x, y, snap]` records.
+- The sim (`guide::draft_within`) lets guide lines capture within the larger of `reach` and
+  6 m, junctions within the larger of `reach` and 15 m, and an angle step within the larger of
+  its angle tolerance and `reach` (scaled down for steps other than right angles in the same
+  proportion as the angle tolerances). Reaches are capped at the 400 m guide range. Joining
+  roads in `snap::plan` keeps its fixed 15 m.
+- Without `reach` the old fixed values apply. Continuous curves and the grid's first edge are
+  guided by the same function and take the same reach.
+- Commands and command logs are unchanged: they still record guided coordinates, so the
+  reach never feeds world state and old logs replay as before.

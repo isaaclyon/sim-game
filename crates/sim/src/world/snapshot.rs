@@ -155,7 +155,8 @@ impl World {
         );
     }
 
-    /// Guides raw `[x, y, snap]` points (ADR 0038) and writes `[n, m, length, angle, k, r]`,
+    /// Guides raw `[x, y, snap]` points and an optional trailing snap reach (ADR 0038; see
+    /// `World::draft`) and writes `[n, m, length, angle, k, r]`,
     /// then `[x, y]` per guided point, `[x0, y0, x1, y1]` per guide line, `[x, y, rx, ry, dx,
     /// dy]` per angle mark (`guide::Mark`; the start's, then, if `plan`, the end's), then `r`
     /// floats of `[count, x0, y0, …]` per existing road the build would change to `class`

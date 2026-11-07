@@ -8,7 +8,8 @@ use crate::Sim;
 
 #[wasm_bindgen]
 impl Sim {
-    /// Guides raw `[x, y, snap]` points and, if `plan`, previews the road of `class` through
+    /// Guides raw `[x, y, snap]` points (then optionally one float, the snap reach in metres;
+    /// `guide::draft_within`) and, if `plan`, previews the road of `class` through
     /// them; see `World::write_road_draft` (ADR 0038, 0048). Unknown classes plan nothing.
     pub fn road_draft(&mut self, points: &[f32], plan: bool, class: u8) -> Vec<f32> {
         let (plan, class) = match RoadClass::from_u8(class) {
@@ -20,7 +21,8 @@ impl Sim {
         self.buf.clone()
     }
 
-    /// Builds the road through guided raw `[x, y, snap]` points (two, or three for a curve).
+    /// Builds the road through guided raw `[x, y, snap]` points (two, or three for a curve),
+    /// optionally followed by the snap reach, as in `road_draft`.
     /// Returns the guided end `[x, y]`, or nothing if refused. `class` is 0 = street,
     /// 1 = main road, 2 = alley; unknown values build nothing.
     pub fn build_draft(&mut self, points: &[f32], class: u8) -> Vec<f32> {
@@ -73,7 +75,8 @@ impl Sim {
         Some(self.world.class_cost(x, y, class)? as f64)
     }
 
-    /// Guides a grid's first edge, two raw `[x, y, snap]` points, and previews the grid of
+    /// Guides a grid's first edge, two raw `[x, y, snap]` points and an optional snap reach as
+    /// in `road_draft`, and previews the grid of
     /// `cell`-metre blocks reaching `cursor` (`[x, y]`, or empty while the edge is drawn); see
     /// `World::write_grid_draft` (ADR 0049). Unknown classes plan nothing.
     pub fn grid_draft(&mut self, points: &[f32], cursor: &[f32], cell: f32, class: u8) -> Vec<f32> {
