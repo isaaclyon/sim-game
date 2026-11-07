@@ -277,6 +277,8 @@ grid tool, upgrade and undo land in the new interface.
    new roads off their angle ([ADR 0040](adrs/0040-straight-joins.md)).
    Done when: a player can draw a square block and a T-junction exactly at 90° without
    zooming in, and can draw a free-angle road by holding Shift.
+   Snapping reach grows with zoom (about ten screen pixels), so this holds at the default
+   zoom; approved in the browser after the acceptance audit.
 2. **Continuous curves — implemented and approved in the browser** ([ADR 0046](adrs/0046-continuous-curves.md)).
    A separate mode starts with start, bend and end clicks; each later click adds a piece that
    leaves the previous one tangentially. The sim derives the bend for preview and build, and
@@ -423,7 +425,7 @@ Goals and consequences, kept light so they don't crowd out building.
   Done when: a player grows a village on starter power, sees why growth stops, adds a plant,
   and connects an off-road wind farm with a line.
 
-- **Water — implemented, browser check pending** ([ADR 0052](adrs/0052-water-follows-roads-and-supplies-dense-buildings.md)).
+- **Water — implemented and approved in the browser** ([ADR 0052](adrs/0052-water-follows-roads-and-supplies-dense-buildings.md)).
   Pipes follow roads. Roadside pumps give less water on polluted ground; water towers store
   spare water for shortfalls. Only dense buildings need water: low density is on wells. Dry
   dense lots don't build, and dry dense buildings slowly empty after a day's grace, then
@@ -434,7 +436,7 @@ Goals and consequences, kept light so they don't crowd out building.
   pump beside a factory district visibly gives less, a tower carries a network through a
   dip, and a cut-off dense block empties slowly and refills once reconnected.
 
-- **Fire — implemented, awaiting browser approval**
+- **Fire — implemented and approved in the browser**
   ([ADR 0053](adrs/0053-fire-stations-send-trucks-through-traffic.md)). Roadside fire
   stations cover buildings within a driving distance along roads and raise their land value.
   Above about 1,000 residents, grown buildings occasionally catch fire (industry and dense
