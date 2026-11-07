@@ -95,16 +95,16 @@ fn the_world_previews_and_builds_the_same_guided_road() {
     w.write_road_draft(&raw, true, RoadClass::Street, &mut out);
     let (n, m, k) = (out[0] as usize, out[1] as usize, out[4] as usize);
     assert_eq!(n, 2);
-    let end = (out[5 + 2], out[5 + 3]);
+    let end = (out[6 + 2], out[6 + 3]);
     close(end, (100.0, 64.0));
-    let stops = &out[5 + 2 * n + 4 * m + 6 * k..];
+    let stops = &out[6 + 2 * n + 4 * m + 6 * k + out[5] as usize..];
     close((stops[stops.len() - 3], stops[stops.len() - 2]), end);
     let cmd = w.draft_command(&raw, RoadClass::Street).expect("buildable");
     assert!(w.apply(cmd));
     assert!(w.roads.nearest_node(100.0, 64.0, 0.05).is_some());
     // Guide-only answers for a curve's control point plan no road.
     w.write_road_draft(&raw[..6], false, RoadClass::Street, &mut out);
-    assert_eq!(out.len(), 5 + 4 + 4 * out[1] as usize + 6 * out[4] as usize);
+    assert_eq!(out.len(), 6 + 4 + 4 * out[1] as usize + 6 * out[4] as usize);
 }
 
 #[test]

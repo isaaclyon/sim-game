@@ -4,7 +4,7 @@ use super::*;
 fn session() -> (CommandLog, World) {
     let mut log = CommandLog::new(5, 4, 4);
     let mut world = log.world();
-    let steps: [(u32, Command); 10] = [
+    let steps: [(u32, Command); 12] = [
         (0, Command::SpawnAgents { count: 20 }),
         (
             30,
@@ -71,7 +71,28 @@ fn session() -> (CommandLog, World) {
                 y: 180.25,
             },
         ),
+        (
+            10,
+            Command::SetRoadClass {
+                x: 60.0,
+                y: 60.0,
+                class: RoadClass::Street,
+            },
+        ),
         (10, Command::DeleteRoad { x: 300.0, y: 120.0 }),
+        (
+            5,
+            Command::BuildGrid {
+                ox: 700.25,
+                oy: -40.5,
+                ux: 0.6,
+                uy: 0.8,
+                cell: 80.0,
+                cols: 2,
+                rows: -1,
+                class: RoadClass::Street,
+            },
+        ),
         (
             0,
             Command::FillBlock {
@@ -97,7 +118,7 @@ fn session() -> (CommandLog, World) {
 #[test]
 fn recorded_session_replays_to_the_same_world() {
     let (log, live) = session();
-    assert_eq!(log.commands.len(), 10);
+    assert_eq!(log.commands.len(), 12);
     let replayed = log.replay();
     assert_eq!(replayed.tick_count(), live.tick_count());
     assert_eq!(Outcome::of(&replayed), Outcome::of(&live));
@@ -108,6 +129,11 @@ fn text_round_trips_bit_for_bit() {
     let (mut log, live) = session();
     log.expect = Some(Outcome::of(&live));
     let text = log.to_string();
+    assert!(text.contains(" class 60 60 street\n"), "{text}");
+    assert!(
+        text.contains(" roadgrid 700.25 -40.5 0.6 0.8 80 2 -1 street\n"),
+        "{text}"
+    );
     assert_eq!(CommandLog::parse(&text), Ok(log.clone()));
     // Comments and blank lines are ignored.
     let commented = format!(
@@ -182,6 +208,10 @@ fn malformed_logs_name_the_line_and_problem() {
     assert_eq!(
         error(&format!("{head}0 fill 1 2 parkland\nend 0\n")),
         "line 4: unknown zone `parkland`"
+    );
+    assert_eq!(
+        error(&format!("{head}0 class 1 2 avenue\nend 0\n")),
+        "line 4: unknown road class `avenue`"
     );
     assert_eq!(
         error(&format!("{head}0 teleport\nend 0\n")),

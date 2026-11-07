@@ -47,3 +47,15 @@ start a New city. The grid replay fixtures reach the same population, buildings 
 only their hashes change. A generated grid owes about $100,000 an hour in upkeep, so grid
 tests that build many roads give their world funds. New logs from the game start with `map`. Tax rates are fixed until happiness (#39) gives a reason to change them; a
 player-set rate would add a command then.
+
+## Amendment (2026-11-06)
+
+Records what shipped after acceptance; the decision above stands.
+
+- **A flat grant is a second income.** Every city receives $1,000 per clock hour (`GRANT`),
+  whatever its size, settled each clock minute with taxes and upkeep. It pays for the first
+  roads before there are residents to tax, and covers the upkeep of about 10 km of street.
+  Frames carry it as `grant`. The amount is a tuning value. Adding it changed every city's
+  balance, which is hashed, so the replay fixtures' `expect` hashes were re-blessed.
+- **Free edits are always affordable.** `can_afford` accepts any cost of $0, so a city in debt
+  can still move a road to a cheaper class (ADR 0048). Debt refuses only edits that cost money.

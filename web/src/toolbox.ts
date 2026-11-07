@@ -65,7 +65,8 @@ export class Toolbox {
               : p !== null
                 ? { kind: 'plant', plant: p }
                 : null;
-    return { tool, roadMode: roads.roadMode ? this.shape : null, snap: roads.snaps };
+    const roadMode = roads.roadMode ? this.shape : null;
+    return { tool, roadMode, snap: roads.snaps, gridCell: roads.cell };
   }
 
   /** Puts every tool away, then starts `tool`, if any. */
@@ -105,10 +106,13 @@ export class Toolbox {
     return true;
   }
 
-  /** An option in the build menu's options row. */
+  /** An option in the build menu's options row. A block size starts the grid tool. */
   option(action: OptionAction) {
     if (action.kind === 'roadMode') this.setShape(action.mode);
-    else {
+    else if (action.kind === 'gridCell') {
+      this.roads.setCell(action.cell);
+      this.setShape('grid');
+    } else {
       this.roads.toggleSnap(action.flag);
       this.changed();
     }

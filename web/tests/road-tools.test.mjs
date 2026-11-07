@@ -15,6 +15,7 @@ const answer = (ask, points, stops, extra = {}) => ({
   angles: new Float32Array(),
   length: 0,
   angle: Number.NaN,
+  reclass: new Float32Array(),
   ...extra,
 });
 /** The last road preview drawn, skipping guide lines. */

@@ -2,6 +2,7 @@
 # Power lines added by hand (ADR 0041): a wind plant joined by a line, a coal plant, a
 # bulldozed plant.
 # Water added by hand (ADR 0052): a pump and a tower before the dense homes.
+# Road class clicks (ADR 0050) came later and are covered by scripted-road-class.cmdlog.
 sim-game command log 1
 seed 1
 grid 4 4

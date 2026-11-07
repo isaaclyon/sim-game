@@ -1,10 +1,10 @@
 //! Thin wasm-bindgen wrapper. Logic belongs in `sim`; this crate only converts types.
 
-mod utilities;
-
-use sim::road::RoadClass;
 use sim::{Command, CommandLog, World, Zone};
 use wasm_bindgen::prelude::*;
+
+mod roads;
+mod utilities;
 
 #[wasm_bindgen]
 pub struct Sim {
@@ -166,47 +166,6 @@ impl Sim {
 
     pub fn spawn_agents(&mut self, count: u32) -> bool {
         self.apply(Command::SpawnAgents { count })
-    }
-
-    /// Guides raw `[x, y, snap]` points and, if `plan`, previews the road of `class` through
-    /// them; see `World::write_road_draft` (ADR 0038, 0048). Unknown classes plan nothing.
-    pub fn road_draft(&mut self, points: &[f32], plan: bool, class: u8) -> Vec<f32> {
-        let (plan, class) = match RoadClass::from_u8(class) {
-            Some(class) => (plan, class),
-            None => (false, RoadClass::Street),
-        };
-        self.world
-            .write_road_draft(points, plan, class, &mut self.buf);
-        self.buf.clone()
-    }
-
-    /// Builds the road through guided raw `[x, y, snap]` points (two, or three for a curve).
-    /// Returns the guided end `[x, y]`, or nothing if refused. `class` is 0 = street,
-    /// 1 = main road, 2 = alley; unknown values build nothing.
-    pub fn build_draft(&mut self, points: &[f32], class: u8) -> Vec<f32> {
-        let Some(class) = RoadClass::from_u8(class) else {
-            return Vec::new();
-        };
-        let Some(cmd) = self.world.draft_command(points, class) else {
-            return Vec::new();
-        };
-        let end = match cmd {
-            Command::BuildRoad { bx, by, .. } | Command::BuildCurve { bx, by, .. } => vec![bx, by],
-            _ => Vec::new(),
-        };
-        if self.apply(cmd) { end } else { Vec::new() }
-    }
-
-    /// What `build_draft` would charge in dollars (ADR 0036), or undefined if it would be
-    /// refused for its shape. Unknown classes cost nothing to quote and build nothing.
-    pub fn draft_cost(&self, points: &[f32], class: u8) -> Option<f64> {
-        let class = RoadClass::from_u8(class)?;
-        Some(self.world.draft_cost(points, class)? as f64)
-    }
-
-    /// Whether the city can pay `cost` dollars now; a city in debt can afford nothing.
-    pub fn can_afford(&self, cost: f64) -> bool {
-        self.world.can_afford(cost as i64)
     }
 
     pub fn delete_road(&mut self, x: f32, y: f32) -> bool {

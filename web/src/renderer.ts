@@ -312,10 +312,17 @@ export class Renderer {
    * (see `roadPreview` in protocol.ts): the line follows the stops, with a marker where it joins
    * the network. Join -1 marks interior curve samples without a marker. Empty `stops` means
    * refused: a red straight line. A single stop is where a road would start, drawn as a marker
-   * even for a new end. `null` hides the preview.
+   * even for a new end. `null` hides the preview. `reclass` is `[n, x0, y0, …]` per existing
+   * road the build would change to `roadClass` (ADR 0048), highlighted at that class's width.
    */
-  setPreview(stops: Float32Array | null, a: Ground | null, b: Ground | null, roadClass = 0) {
-    this.tools.setRoad(stops, a, b, roadClass);
+  setPreview(
+    stops: Float32Array | null,
+    a: Ground | null,
+    b: Ground | null,
+    roadClass = 0,
+    reclass = new Float32Array(),
+  ) {
+    this.tools.setRoad(stops, a, b, roadClass, reclass);
   }
 
   /** Dashed drawing guides, `[x0, y0, x1, y1]` per line (ADR 0038); null hides them. */
@@ -363,6 +370,22 @@ export class Renderer {
   /** Draw the full centreline selected by the sim, in the destructive-action color. */
   setBulldozePreview(segment: Float32Array) {
     this.tools.setBulldoze(segment);
+  }
+
+  /** The road an upgrade click would change, at its new class's width (ADR 0050). */
+  setUpgradePreview(segment: Float32Array, ok: boolean, roadClass: number) {
+    this.tools.setUpgrade(segment, ok, roadClass);
+  }
+
+  /** The grid a click would build; see `ToolPreview.setGrid` (ADR 0049). */
+  setGridPreview(
+    roads: Float32Array,
+    dropped: Float32Array,
+    edge: Float32Array,
+    ok: boolean,
+    roadClass: number,
+  ) {
+    this.tools.setGrid(roads, dropped, edge, ok, roadClass);
   }
 
   /** Draws plants, lines and power markers; see `power` in protocol.ts. */

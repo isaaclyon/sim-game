@@ -11,6 +11,8 @@
 //! 0 spawn 100
 //! 120 road 10.5 20 300 20 street
 //! 130 curve 0 0 50 50 100 0 main
+//! 135 class 60 20 main
+//! 138 roadgrid 0 0 1 0 80 3 -2 street
 //! 140 delete 60 20
 //! 150 paint 0 0 100 100 residential-low
 //! 160 fill 50 50 industrial-high
@@ -25,6 +27,7 @@
 //! grid, which is how the game starts, or `grid cols rows` for the generated street grid.
 //! Command lines start with their tick, which never decreases and never passes `end`.
 //! Coordinates are `f32` written in their shortest exact form, so they read back bit for bit.
+//! `roadgrid` is origin, unit axis, cell size, signed block counts and class (ADR 0049).
 //! `expect` is optional: what the replay must reach at `end`.
 
 mod parse;
@@ -36,7 +39,8 @@ use crate::road::RoadClass;
 use crate::water::WaterKind;
 use crate::{Command, Config, World, Zone};
 
-/// Bump when a log of the previous version would read differently.
+/// Bump when a log of the previous version would read differently. Adding a command word
+/// (`class`, ADR 0050; `roadgrid`, ADR 0049) does not: older logs read the same.
 pub const LOG_VERSION: u32 = 1;
 const TITLE: &str = "sim-game command log";
 const CLASSES: [(RoadClass, &str); 3] = [
@@ -255,6 +259,23 @@ fn command_text(cmd: &Command) -> String {
             class,
         } => {
             nums("curve", &[ax, ay, cx, cy, bx, by]);
+            s + " " + name(&CLASSES, class)
+        }
+        Command::BuildGrid {
+            ox,
+            oy,
+            ux,
+            uy,
+            cell,
+            cols,
+            rows,
+            class,
+        } => {
+            nums("roadgrid", &[ox, oy, ux, uy, cell]);
+            format!("{s} {cols} {rows} {}", name(&CLASSES, class))
+        }
+        Command::SetRoadClass { x, y, class } => {
+            nums("class", &[x, y]);
             s + " " + name(&CLASSES, class)
         }
         Command::DeleteRoad { x, y } => {

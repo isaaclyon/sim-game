@@ -134,8 +134,8 @@ export async function tools({ hash = '', clipboard = true, catalog } = {}) {
     pick(x, z) {
       return { x, z };
     }
-    setPreview(stops, a, b, roadClass) {
-      previews.push({ type: 'road', stops, a, b, roadClass });
+    setPreview(stops, a, b, roadClass, reclass) {
+      previews.push({ type: 'road', stops, a, b, roadClass, reclass });
     }
     setGuides(lines) {
       previews.push({ type: 'guides', lines });
@@ -157,6 +157,12 @@ export async function tools({ hash = '', clipboard = true, catalog } = {}) {
     }
     setBulldozePreview(segment) {
       previews.push({ type: 'bulldoze', segment });
+    }
+    setUpgradePreview(segment, ok, roadClass) {
+      previews.push({ type: 'upgrade', segment, ok, roadClass });
+    }
+    setGridPreview(roads, dropped, edge, ok, roadClass) {
+      previews.push({ type: 'grid', roads, dropped, edge, ok, roadClass });
     }
     setBlockOutline(outline, zone) {
       previews.push({ type: 'block', outline, zone });

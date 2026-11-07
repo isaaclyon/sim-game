@@ -101,6 +101,7 @@ const preview = (ask) => ({
   angles: new Float32Array(),
   length: 0,
   angle: Number.NaN,
+  reclass: new Float32Array(),
 });
 
 test('panning works paused and with tools, and keeps tool previews under the cursor', async () => {
