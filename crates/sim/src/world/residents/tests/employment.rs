@@ -8,14 +8,16 @@ fn check(w: &World) -> (u32, u32) {
         .clone()
         .filter(|&i| w.citizens.job[i].is_some())
         .count() as u32;
-    assert_eq!(s.population, active.count() as u32);
+    assert_eq!(s.population, active.clone().count() as u32);
     assert!(employed <= s.population);
     assert_eq!(employed, w.residents.workers.iter().sum::<u32>());
-    assert_eq!(s.unemployed, s.population - employed);
-    let percent = if s.population == 0 {
+    let adults = active.clone().filter(|&i| !w.citizens.child[i]).count() as u32;
+    assert_eq!(s.population - s.children, adults);
+    assert_eq!(s.unemployed, adults - employed);
+    let percent = if adults == 0 {
         0.0
     } else {
-        s.unemployed as f32 * 100.0 / s.population as f32
+        s.unemployed as f32 * 100.0 / adults as f32
     };
     assert_eq!(s.unemployment_percent, percent);
     (s.population, s.unemployed)
@@ -56,7 +58,7 @@ fn residents_without_jobs_are_unemployed_until_assigned() {
     advance(&mut w, 120);
     let (population, unemployed) = check(&w);
     assert!(population > 0);
-    assert_eq!(unemployed, population);
+    assert_eq!(unemployed, population - w.stats().children, "every adult");
     assert_eq!(w.stats().unemployment_percent, 100.0);
     // Apartments house more residents than one block of shops employs, leaving a mixture.
     assert!(w.apply(Command::FillBlock {
@@ -114,7 +116,7 @@ fn departure_removes_employed_and_unemployed_residents_from_both_counts() {
         let size = members.len() as u32;
         let idle = members
             .iter()
-            .filter(|&&c| w.citizens.job[c as usize].is_none())
+            .filter(|&&c| w.citizens.job[c as usize].is_none() && !w.citizens.child[c as usize])
             .count() as u32;
         w.relocate_household(hh);
         assert_eq!(check(&w), (population - size, unemployed - idle));

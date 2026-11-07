@@ -11,6 +11,10 @@ fn midnight_move_ins_wait_for_their_morning_departure() {
     for i in 0..w.citizens.active.len() {
         assert_eq!(w.citizens.activity[i], Activity::Home);
         assert!(w.citizens.destination[i].is_none());
+        if w.citizens.child[i] {
+            assert_eq!(w.citizens.due[i], u64::MAX, "children stay home");
+            continue;
+        }
         let at = crate::clock::clock_at(w.citizens.due[i], w.cfg.dt);
         assert_eq!(at.day, 2);
         if w.citizens.job[i].is_some() {
@@ -55,7 +59,6 @@ fn daily_work_repeats_without_overlapping_trips_or_growing_vehicle_slots() {
     let job = distant(&w, 0);
     assign_job(&mut w, 0, job);
     w.schedule_day(0);
-    let slots = w.agents.len();
     let mut work_arrivals = 0;
     for _ in 0..300_000 {
         let was_travelling = w.citizens.destination[0].is_some();
@@ -84,10 +87,9 @@ fn daily_work_repeats_without_overlapping_trips_or_growing_vehicle_slots() {
         }
     }
     assert!(work_arrivals >= 2, "regular work resumes on later days");
-    assert!(
-        w.agents.len() <= slots + 1,
-        "one stable reservation, not one per trip"
-    );
+    // Children who come of age meanwhile reserve slots of their own (ADR 0054).
+    let own = w.agents.citizen.iter().filter(|&&c| c == Some(0)).count();
+    assert!(own == 1, "one stable reservation, not one per trip");
 }
 
 #[test]

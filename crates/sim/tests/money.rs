@@ -201,7 +201,8 @@ fn residents_and_filled_jobs_pay_taxes() {
     advance(&mut w, HOUR);
     let s = w.stats();
     assert!(s.population > 0 && s.unemployed < s.population, "{s:?}");
-    let employed = (s.population - s.unemployed) as i64;
+    // Every resident pays; only adults hold jobs (ADR 0054).
+    let employed = (s.population - s.children - s.unemployed) as i64;
     assert_eq!(
         s.money.taxes,
         s.population as i64 * RESIDENT_TAX + employed * JOB_TAX

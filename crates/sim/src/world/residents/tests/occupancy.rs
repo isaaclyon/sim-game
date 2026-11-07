@@ -63,6 +63,10 @@ fn relocation_reserves_one_home_for_all_members_and_departure_cleans_ownership()
         assert!(w.citizens.active[c as usize]);
         assert_eq!(w.home_building(c), w.homes.building[donor]);
         assert_eq!(w.citizens.location[c as usize], w.homes.building[donor]);
+        if w.citizens.child[c as usize] {
+            assert_eq!(w.citizens.due[c as usize], u64::MAX, "children stay home");
+            continue;
+        }
         let at = crate::clock::clock_at(w.citizens.due[c as usize], w.cfg.dt);
         assert_eq!(at.day, 2);
         assert!((7 * 3600..=16 * 3600).contains(&at.second_of_day));

@@ -1,7 +1,7 @@
 //! Children, births, growing up and moving out (ADR 0054).
 use super::*;
-use std::cmp::Reverse;
 use crate::world::residents::family::{ADULT_YEARS, CHILDHOOD_DAYS, MOVE_OUT_DAYS};
+use std::cmp::Reverse;
 
 /// Low and dense homes, shops and industry, settled.
 fn families() -> World {
@@ -74,7 +74,10 @@ fn arriving_families_bring_children_who_stay_home() {
         assert!(!w.citizens.owns_car[i]);
         assert_eq!(w.citizens.activity[i], Activity::Home);
         assert_eq!(w.citizens.location[i], w.home_building(c));
-        assert_eq!((w.citizens.due[i], w.citizens.job_due[i]), (u64::MAX, u64::MAX));
+        assert_eq!(
+            (w.citizens.due[i], w.citizens.job_due[i]),
+            (u64::MAX, u64::MAX)
+        );
         assert!(w.age_years(c) < ADULT_YEARS);
         let info = w.citizen_info(c).unwrap();
         assert!(info.child && info.age < ADULT_YEARS);
@@ -96,7 +99,11 @@ fn births_need_an_adult_and_room_at_home() {
         assert!(w.households.members[hh as usize].len() <= capacity);
     }
     let members = w.households.members[hh as usize].clone();
-    assert_eq!(members.len(), capacity, "a home with room fills with babies");
+    assert_eq!(
+        members.len(),
+        capacity,
+        "a home with room fills with babies"
+    );
     let born = w.residents.population - population;
     assert!(born > 0);
     let baby = *members.last().unwrap() as usize;
@@ -119,15 +126,16 @@ fn birth_checks_run_from_the_event_heap() {
     let mut w = families();
     let households = w.households.active.iter().filter(|&&a| a).count();
     assert_eq!(w.residents.births.len(), households);
-    let population = w.residents.population;
     let children = w.residents.children;
     advance(&mut w, (4.0 * 4800.0) as u32);
     assert!(w.residents.children > children, "families had babies");
-    assert!(w.residents.population > population);
-    assert_eq!(
-        w.residents.births.len(),
-        w.households.active.iter().filter(|&&a| a).count()
-    );
+    // Exactly one pending check per active household; stale ones drop when they come up.
+    let mut checks: Vec<u32> = w.residents.births.iter().map(|e| e.0.1).collect();
+    checks.retain(|&hh| w.households.active[hh as usize]);
+    checks.sort_unstable();
+    checks.dedup();
+    let active = w.households.active.iter().filter(|&&a| a).count();
+    assert_eq!(checks.len(), active);
 }
 
 #[test]
@@ -139,12 +147,29 @@ fn a_child_who_comes_of_age_looks_for_work_and_a_home() {
     assert_eq!(w.residents.children, children);
     assert_eq!(w.age_years(c), ADULT_YEARS);
     let deadline = w.citizens.move_by[i];
-    assert_eq!(deadline, w.totals.tick - 1 + w.days_to_ticks(MOVE_OUT_DAYS));
+    let came_of_age = w.citizens.born[i] + w.days_to_ticks(CHILDHOOD_DAYS) as i64;
+    assert_eq!(
+        deadline,
+        came_of_age as u64 + w.days_to_ticks(MOVE_OUT_DAYS)
+    );
     assert!(w.residents.movers.contains(&(deadline, c)));
     assert_ne!(w.citizens.job_due[i], u64::MAX, "a job search is due");
+    // Free a job near home, in case every job is taken.
+    let home = w.home_building(c);
+    let worker = (0..w.citizens.active.len() as u32)
+        .filter(|&o| w.citizens.job[o as usize].is_some())
+        .min_by(|&a, &b| {
+            let d = |o: u32| w.front_distance(home, w.citizens.job[o as usize].unwrap());
+            d(a).total_cmp(&d(b))
+        })
+        .unwrap();
+    w.release_job(worker);
     advance(&mut w, 5);
     assert!(w.citizens.job[i].is_some(), "takes a job");
-    assert!(!w.citizens.owns_car[i], "no car until moving into their own home");
+    assert!(
+        !w.citizens.owns_car[i],
+        "no car until moving into their own home"
+    );
 }
 
 #[test]
@@ -168,10 +193,15 @@ fn grown_children_take_vacant_homes_before_arrivals() {
     assert_eq!(w.households.members[own as usize], vec![c]);
     assert_eq!(w.homes.household[home as usize], Some(own));
     assert!(!w.households.members[parents as usize].contains(&c));
-    assert!(w.residents.movers.is_empty());
+    assert!(w.residents.movers.iter().all(|&(_, m)| m != c));
     assert_eq!(w.citizens.move_by[c as usize], u64::MAX);
-    assert_eq!(w.citizens.family[c as usize], parents, "keeps the family name");
-    assert_eq!(w.residents.population, population - gone);
+    assert_eq!(
+        w.citizens.family[c as usize], parents,
+        "keeps the family name"
+    );
+    // Only the leaving household is gone; births in the meantime may add to it.
+    assert!(w.citizens.active[c as usize]);
+    assert!(w.residents.population >= population - gone);
     assert!(w.vacancies_hold());
 }
 
@@ -201,7 +231,11 @@ fn grown_children_with_no_home_in_time_leave_the_city() {
 fn families_save_and_hash_their_state() {
     let mut w = families();
     let c = grown_child(&mut w);
-    assert!(w.residents.movers.contains(&(w.citizens.move_by[c as usize], c)));
+    assert!(
+        w.residents
+            .movers
+            .contains(&(w.citizens.move_by[c as usize], c))
+    );
     let mut loaded = World::load(&w.save().unwrap()).unwrap();
     assert_eq!(loaded.state_hash(), w.state_hash());
     advance(&mut w, 300);

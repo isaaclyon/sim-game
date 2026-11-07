@@ -118,6 +118,8 @@ fn a_tower_fills_from_spare_output_and_drains_into_shortfalls() {
 #[test]
 fn water_goes_to_the_oldest_dense_buildings_first() {
     let mut w = zoned(Zone::ResidentialHigh, Zone::CommercialHigh);
+    // A fire would take buildings for its own reasons (ADR 0053).
+    assert!(w.apply(Command::SetFires { on: false }));
     assert!(place(&mut w, WaterKind::Pump, PUMP));
     advance(&mut w, 1500);
     let dense = dense_buildings(&w);
@@ -172,6 +174,8 @@ fn dense_lots_wait_for_water_and_remember_why() {
 #[test]
 fn dry_buildings_keep_people_for_a_day_then_slowly_empty() {
     let mut w = zoned(Zone::ResidentialHigh, Zone::CommercialHigh);
+    // A fire would take buildings for its own reasons (ADR 0053).
+    assert!(w.apply(Command::SetFires { on: false }));
     assert!(place(&mut w, WaterKind::Pump, PUMP));
     advance(&mut w, 1500);
     let dense = dense_buildings(&w);

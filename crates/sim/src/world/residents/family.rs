@@ -55,7 +55,12 @@ impl World {
 
     /// An arriving member of `household`. Members after the first may be children; everyone
     /// draws an age.
-    pub(in crate::world) fn arrive_member(&mut self, household: HouseholdId, b: BuildingId, first: bool) {
+    pub(in crate::world) fn arrive_member(
+        &mut self,
+        household: HouseholdId,
+        b: BuildingId,
+        first: bool,
+    ) {
         let childhood = self.days_to_ticks(CHILDHOOD_DAYS);
         let child = !first && self.residents.rng.below(100) < CHILD_PERCENT;
         let age = if child {
