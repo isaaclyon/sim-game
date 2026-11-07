@@ -319,13 +319,10 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
     case 'buildRoad': {
       // Capture the sim-guided control before the build changes the network.
       const draft =
-        msg.chain && sim && cities.ready
-          ? sim.road_draft(rawDraft(msg), false, msg.class)
-          : null;
+        msg.chain && sim && cities.ready ? sim.road_draft(rawDraft(msg), false, msg.class) : null;
       const control: [number, number] | undefined =
         draft?.[0] === 3 ? [draft[8], draft[9]] : undefined;
-      const built =
-        sim && cities.ready ? sim.build_draft(rawDraft(msg), msg.class) : null;
+      const built = sim && cities.ready ? sim.build_draft(rawDraft(msg), msg.class) : null;
       const end: [number, number] | null = built?.length === 2 ? [built[0], built[1]] : null;
       if (end && sim) {
         cities.changed();
