@@ -239,6 +239,8 @@ function sendCitizen(s: Sim) {
       onFoot: v.on_foot,
       age: v.age,
       child: v.child,
+      grewUp: v.grew_up,
+      wantsHome: v.wants_home,
     };
     v.free();
   }

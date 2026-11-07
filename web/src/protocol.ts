@@ -227,6 +227,10 @@ export interface Citizen {
   age: number;
   /** A child, who lives at home with their household. */
   child: boolean;
+  /** An adult who came of age in town rather than arriving grown up (ADR 0054). */
+  grewUp: boolean;
+  /** A grown child still living with their family, looking for a home of their own. */
+  wantsHome: boolean;
 }
 
 /** Sim-owned counts, not physical attendance. Original use persists during closure. */

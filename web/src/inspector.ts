@@ -45,10 +45,16 @@ export function describe(c: Citizen): Card {
       c.child
         ? { icon: 'people', text: `Age ${c.age}, a child: lives at home` }
         : { icon: 'work', text: c.job ? `Job: ${label(c.job)}` : 'Job: unemployed' },
-      ...(c.child ? [] : [{ icon: 'people', text: `Age ${c.age}` } as const]),
+      ...(c.child ? [] : [{ icon: 'people', text: `Age ${c.age}${grewUp(c)}` } as const]),
       now,
     ],
   };
+}
+
+/** Where a grown child of the town stands on finding a home (ADR 0054). */
+function grewUp(c: Citizen): string {
+  if (!c.grewUp) return '';
+  return `, grew up here: ${c.wantsHome ? 'looking for' : 'has'} a home of their own`;
 }
 
 /** Counts describe residency or assigned jobs, never physical attendance. */

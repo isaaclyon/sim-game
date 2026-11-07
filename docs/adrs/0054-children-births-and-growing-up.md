@@ -68,3 +68,6 @@ age yet. One clock day is about 80 real minutes at 1×.
 - Grown children draw car ownership when they move into their own home, not before.
 - Children have no travel slot yet, so the inspector reaches them only once ADR 0055 sends
   them to school.
+- The inspector marks an adult who grew up in town, and whether they are still looking for a
+  home of their own or have one, so a player can follow a grown child moving out. Both are
+  derived from the waiting deadline and the first household, not stored.

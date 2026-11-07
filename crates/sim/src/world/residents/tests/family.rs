@@ -67,6 +67,8 @@ fn arriving_families_bring_children_who_stay_home() {
     for hh in 0..w.households.active.len() {
         let first = w.households.members[hh][0] as usize;
         assert!(!w.citizens.child[first], "the first member is an adult");
+        let info = w.citizen_info(first as u32).unwrap();
+        assert!(!info.grew_up && !info.wants_home, "arrived grown up");
     }
     for &c in &kids {
         let i = c as usize;
@@ -153,6 +155,8 @@ fn a_child_who_comes_of_age_looks_for_work_and_a_home() {
         came_of_age as u64 + w.days_to_ticks(MOVE_OUT_DAYS)
     );
     assert!(w.residents.movers.contains(&(deadline, c)));
+    let info = w.citizen_info(c).unwrap();
+    assert!(!info.child && info.grew_up && info.wants_home);
     assert_ne!(w.citizens.job_due[i], u64::MAX, "a job search is due");
     // Free a job near home, in case every job is taken.
     let home = w.home_building(c);
@@ -195,6 +199,8 @@ fn grown_children_take_vacant_homes_before_arrivals() {
     assert!(!w.households.members[parents as usize].contains(&c));
     assert!(w.residents.movers.iter().all(|&(_, m)| m != c));
     assert_eq!(w.citizens.move_by[c as usize], u64::MAX);
+    let info = w.citizen_info(c).unwrap();
+    assert!(info.grew_up && !info.wants_home, "has a home of their own");
     assert_eq!(
         w.citizens.family[c as usize], parents,
         "keeps the family name"

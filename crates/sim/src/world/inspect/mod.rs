@@ -42,6 +42,10 @@ pub struct CitizenInfo {
     pub age: u32,
     /// A child, who lives at home with their household.
     pub child: bool,
+    /// An adult who came of age in town rather than arriving grown up.
+    pub grew_up: bool,
+    /// A grown child still living with their family, looking for a home of their own.
+    pub wants_home: bool,
 }
 
 /// Counts for one standing building. Occupancy means residents or assigned workers,
@@ -121,6 +125,10 @@ impl World {
                 && !self.citizens.car_out[i],
             age: self.age_years(c),
             child: self.citizens.child[i],
+            // Growing up starts the wait for a home; moving out founds a new household.
+            grew_up: self.citizens.move_by[i] != u64::MAX
+                || self.citizens.family[i] != self.citizens.household[i],
+            wants_home: self.citizens.move_by[i] != u64::MAX,
         })
     }
 }

@@ -92,6 +92,10 @@ pub struct CitizenView {
     pub age: u32,
     /// A child, who lives at home.
     pub child: bool,
+    /// An adult who came of age in town.
+    pub grew_up: bool,
+    /// A grown child still living with their family, looking for a home of their own.
+    pub wants_home: bool,
 }
 
 /// Sim-owned counts for one standing building; no attendance or visitor counts.
@@ -321,6 +325,8 @@ impl Sim {
             on_foot: c.on_foot,
             age: c.age,
             child: c.child,
+            grew_up: c.grew_up,
+            wants_home: c.wants_home,
         })
     }
 

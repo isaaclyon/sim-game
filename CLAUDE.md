@@ -123,7 +123,9 @@ What to build next and why lives in `docs/ROADMAP.md`. Work on the current miles
   to a citizen and answers `citizen` for that one citizen only, at once and after every frame
   and edit while selected (ADR 0022). Read-only, not hashed; names are derived from the seed and
   IDs, never stored or drawn from a gameplay RNG. Places are absent once their building is gone.
-  The answer carries `age` (years; a child until 18) and `child` (lives at home; ADR 0054).
+  The answer carries `age` (years; a child until 18), `child` (lives at home), `grewUp` (an
+  adult who came of age in town) and `wantsHome` (still with their family, looking for a home
+  of their own; ADR 0054).
 - Population: frame stats carry `population` (children included) and `children`;
   `unemployed` and its percentage count adults only (ADR 0054).
 - Building inspection: `inspectBuilding` selects a stable building ID from the geometry message's
