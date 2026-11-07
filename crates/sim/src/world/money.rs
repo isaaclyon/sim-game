@@ -1,5 +1,6 @@
-//! Money (ADR 0036): the city's balance, what roads cost to build and keep, the taxes
-//! residents and filled jobs pay, and a flat grant every city receives.
+//! Money (ADR 0036): the city's balance, what roads and utilities cost to build and keep, the
+//! taxes residents and filled jobs pay, and a flat grant every city receives. Power plants,
+//! pumps and towers cost money since ADR 0052; power lines stay free.
 //!
 //! Amounts are whole dollars in `i64`. Rates are per clock hour and settle every clock minute;
 //! the fraction of a dollar left over carries to the next minute, so nothing is lost to
@@ -11,8 +12,10 @@ use serde::{Deserialize, Serialize};
 use super::{Command, World};
 use crate::clock::clock_seconds;
 use crate::geometry::{Shape, dist};
+use crate::power::{PlantKind, Power};
 use crate::road::{RoadClass, RoadNetwork};
 use crate::snap::{Join, Plan};
+use crate::water::{Water, WaterKind};
 
 /// What a fresh city starts with.
 pub const START_FUNDS: i64 = 50_000;
@@ -42,13 +45,46 @@ fn upkeep_rate(class: RoadClass) -> f64 {
     }
 }
 
+/// What a power plant costs to build, and its upkeep per clock hour (ADR 0052).
+pub fn plant_price(kind: PlantKind) -> (i64, i64) {
+    match kind {
+        PlantKind::Coal => (20_000, 120),
+        PlantKind::Solar => (12_000, 40),
+        PlantKind::Wind => (4_000, 15),
+    }
+}
+
+/// What a pump or water tower costs to build, and its upkeep per clock hour (ADR 0052).
+pub fn water_price(kind: WaterKind) -> (i64, i64) {
+    match kind {
+        WaterKind::Pump => (6_000, 40),
+        WaterKind::Tower => (4_000, 20),
+    }
+}
+
+/// Upkeep per clock hour of every standing plant, pump and tower.
+fn utility_upkeep(power: &Power, water: &Water) -> i64 {
+    let plants: i64 = power
+        .active_plants()
+        .map(|p| plant_price(power.plant_kind[p as usize]).1)
+        .sum();
+    let pieces: i64 = water
+        .active_pieces()
+        .map(|p| water_price(water.kind[p as usize]).1)
+        .sum();
+    plants + pieces
+}
+
 /// The city's money as the HUD shows it. Rates are dollars per clock hour.
 #[derive(Clone, Copy, Default, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Money {
     pub balance: i64,
     pub taxes: i64,
     pub grant: i64,
+    /// Road upkeep.
     pub upkeep: i64,
+    /// Upkeep of plants, pumps and towers.
+    pub utilities: i64,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -59,6 +95,9 @@ pub(super) struct Treasury {
     /// Road upkeep per clock hour; derived from the roads, refreshed whenever they change.
     #[serde(skip)]
     pub(super) upkeep: i64,
+    /// Utility upkeep per clock hour; derived like `upkeep` from plants, pumps and towers.
+    #[serde(skip)]
+    pub(super) utilities: i64,
 }
 
 impl Default for Treasury {
@@ -67,6 +106,7 @@ impl Default for Treasury {
             balance: START_FUNDS,
             carry: 0,
             upkeep: 0,
+            utilities: 0,
         }
     }
 }
@@ -120,6 +160,7 @@ impl World {
                 + self.residents.employed as i64 * JOB_TAX,
             grant: GRANT,
             upkeep: self.treasury.upkeep,
+            utilities: self.treasury.utilities,
         }
     }
 
@@ -188,6 +229,7 @@ impl World {
 
     pub(super) fn refresh_upkeep(&mut self) {
         self.treasury.upkeep = road_upkeep(&self.roads);
+        self.treasury.utilities = utility_upkeep(&self.power, &self.water);
     }
 
     /// Pays taxes, the grant and upkeep for the clock minutes the last tick finished.
@@ -200,7 +242,7 @@ impl World {
         }
         let m = self.money();
         let t = &mut self.treasury;
-        let owed = (m.taxes + m.grant - m.upkeep) * minutes + t.carry;
+        let owed = (m.taxes + m.grant - m.upkeep - m.utilities) * minutes + t.carry;
         t.balance += owed.div_euclid(60);
         t.carry = owed.rem_euclid(60);
     }

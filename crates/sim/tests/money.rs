@@ -40,7 +40,8 @@ fn a_fresh_city_is_an_empty_map_with_starting_funds() {
             balance: START_FUNDS,
             taxes: 0,
             grant: GRANT,
-            upkeep: 0
+            upkeep: 0,
+            utilities: 0,
         }
     );
 }

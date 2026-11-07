@@ -4,11 +4,13 @@
 //! demand is open jobs plus a small base, minus residents and the room left in empty homes, so
 //! it equals job vacancies minus unemployment, less the households still on their way.
 //! Commercial and industrial demand want a share of residents as jobs, plus a small base, minus
-//! the jobs they already offer. A due lot needs demand above its land-value threshold and power.
+//! the jobs they already offer. A due lot needs demand above its land-value threshold, power and,
+//! when dense, water.
 
 use super::World;
 use super::power::power_demand;
-use crate::building::BuildingId;
+use super::water::water_demand;
+use crate::building::{BuildingId, Wait};
 use crate::zone::Zone;
 use serde::{Deserialize, Serialize};
 
@@ -100,8 +102,9 @@ impl World {
         }
     }
 
-    /// Due lots build while demand clears the land-value threshold (ADR 0037) and power is
-    /// available (ADR 0041); the rest wait and check again. Lots under a plant or line are
+    /// Due lots build while demand clears the land-value threshold (ADR 0037), power is
+    /// available (ADR 0041) and, for dense lots, pump water is (ADR 0052); the rest wait and
+    /// check again. Lots under a plant or line are
     /// dropped until it goes. Each new building is registered at once, so the next lot due
     /// this tick sees its homes, jobs and power use.
     pub(super) fn grow_buildings(&mut self) {
@@ -112,7 +115,8 @@ impl World {
                 continue;
             }
             if !self.cfg.ignore_demand && self.demand_for(zone) <= self.land_threshold(lot, zone) {
-                self.buildings.defer(lot, zone, tick, dt, seed, false);
+                self.buildings
+                    .defer(lot, zone, tick, dt, seed, Wait::Demand);
                 continue;
             }
             let Some(plan) = self
@@ -122,13 +126,19 @@ impl World {
                 continue;
             };
             let demand = power_demand(plan.zone, &plan.ring, plan.height);
-            if let Some(source) = self.power_for(lot, demand) {
-                self.buildings.commit(plan);
-                self.powered_new_building(demand, lot, source);
-                self.register_buildings();
-            } else {
-                self.buildings.defer(lot, zone, tick, dt, seed, true);
+            let water = water_demand(plan.zone, &plan.ring, plan.height);
+            let Some(source) = self.power_for(lot, demand) else {
+                self.buildings.defer(lot, zone, tick, dt, seed, Wait::Power);
+                continue;
+            };
+            if !self.water_for(lot, water) {
+                self.buildings.defer(lot, zone, tick, dt, seed, Wait::Water);
+                continue;
             }
+            self.buildings.commit(plan);
+            self.powered_new_building(demand, lot, source);
+            self.watered_new_building(water, lot);
+            self.register_buildings();
         }
     }
 

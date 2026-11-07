@@ -24,11 +24,13 @@ pub mod rng;
 pub mod road;
 pub mod snap;
 pub mod traffic;
+pub mod water;
 pub mod world;
 pub mod zone;
 
 pub use replay::CommandLog;
 pub use world::{
-    Command, Config, PLANT_STRIDE, POWER_BUILDING_STRIDE, PowerStats, SaveError, Stats, World,
+    Command, Config, PLANT_STRIDE, POWER_BUILDING_STRIDE, PowerStats, SaveError, Stats,
+    WATER_BUILDING_STRIDE, WATER_PIECE_STRIDE, WaterStats, World,
 };
 pub use zone::Zone;

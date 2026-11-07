@@ -17,6 +17,18 @@ use crate::zone::{Zone, ZoneGrid};
 
 pub type BuildingId = u32;
 
+/// Why a scheduled lot last waited instead of building.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[repr(u8)]
+pub enum Wait {
+    /// Not yet checked, or waiting for demand or land value (ADR 0025, 0037).
+    Demand = 0,
+    /// Its building would have no power (ADR 0041).
+    Power = 1,
+    /// Its dense building would have no water (ADR 0052).
+    Water = 2,
+}
+
 /// Sim seconds a due lot waits before checking demand again. Tuning, not configuration.
 const DEFER_MIN_S: f32 = 10.0;
 const DEFER_MAX_S: f32 = 30.0;
@@ -34,9 +46,9 @@ pub struct Buildings {
     /// Last building put up on each lot; it stands only while active. A lot's next building
     /// draws its design from this one, so a replacement differs from what stood before.
     owner: Vec<Option<BuildingId>>,
-    /// Scheduled construction per lot: (tick, zone, last deferred for power).
+    /// Scheduled construction per lot: (tick, zone, why it last waited).
     /// The waiting reason survives saves and disappears with the schedule on unzoning.
-    due: Vec<Option<(u64, Zone, bool)>>,
+    due: Vec<Option<(u64, Zone, Wait)>>,
     pending: BinaryHeap<Reverse<(u64, LotId)>>,
     pub version: u32,
 }
@@ -103,7 +115,7 @@ impl Buildings {
         let seconds = 2.0 + rng.below(580) as f32 / 10.0;
         let delay = (seconds / dt).ceil().max(1.0) as u64;
         let at = tick.saturating_add(delay);
-        self.due[l] = Some((at, zone, false));
+        self.due[l] = Some((at, zone, Wait::Demand));
         self.pending.push(Reverse((at, l as LotId)));
     }
 
@@ -149,7 +161,7 @@ impl Buildings {
         None
     }
 
-    /// Puts a due lot back to wait for demand or power (ADR 0025, 0041). The retry delay is
+    /// Puts a due lot back to wait for demand, power or water (ADR 0025, 0041, 0052). The retry delay is
     /// drawn from the lot and tick, independent of traffic RNG and edit order.
     pub(crate) fn defer(
         &mut self,
@@ -158,27 +170,36 @@ impl Buildings {
         tick: u64,
         dt: f32,
         seed: u64,
-        for_power: bool,
+        reason: Wait,
     ) {
         let mut rng = Rng::new(seed ^ (u64::from(lot) << 32) ^ tick.wrapping_mul(0x9E37_79B9));
         let seconds =
             DEFER_MIN_S + rng.below(((DEFER_MAX_S - DEFER_MIN_S) * 10.0) as u32) as f32 / 10.0;
         let at = tick.saturating_add((seconds / dt).ceil().max(1.0) as u64);
-        self.due[lot as usize] = Some((at, zone, for_power));
+        self.due[lot as usize] = Some((at, zone, reason));
         self.pending.push(Reverse((at, lot)));
     }
 
     /// Scheduled lots whose most recent growth check failed for lack of power.
     pub(crate) fn waiting_for_power(&self) -> u32 {
+        self.waiting_for(Wait::Power)
+    }
+
+    /// Scheduled lots whose most recent growth check failed for lack of water.
+    pub(crate) fn waiting_for_water(&self) -> u32 {
+        self.waiting_for(Wait::Water)
+    }
+
+    fn waiting_for(&self, reason: Wait) -> u32 {
         self.due
             .iter()
             .flatten()
-            .filter(|(_, _, power)| *power)
+            .filter(|(_, _, why)| *why == reason)
             .count() as u32
     }
 
     /// The building a lot that `next_due` returned would get; `None` if nothing fits.
-    /// Changes nothing, so the caller can check power first (ADR 0041).
+    /// Changes nothing, so the caller can check power and water first (ADR 0041, 0052).
     pub(crate) fn plan(
         &self,
         lot: LotId,
@@ -294,11 +315,11 @@ impl Buildings {
         mix(self.due.len() as u64);
         for due in &self.due {
             match due {
-                Some((tick, zone, for_power)) => {
+                Some((tick, zone, reason)) => {
                     mix(1);
                     mix(*tick);
                     mix(*zone as u64);
-                    mix(u64::from(*for_power));
+                    mix(*reason as u64);
                 }
                 None => mix(0),
             }

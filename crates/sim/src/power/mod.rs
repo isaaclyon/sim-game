@@ -150,6 +150,20 @@ impl Power {
         self.footprint(p).behind(TERMINAL_GAP)
     }
 
+    /// Footprints by plant ID; `None` for removed plants.
+    pub(crate) fn footprints(&self) -> Vec<Option<Footprint>> {
+        (0..self.plant_active.len())
+            .map(|p| self.plant_active[p].then(|| self.footprint(p as PlantId)))
+            .collect()
+    }
+
+    /// Ends by line ID; `None` for removed lines.
+    pub(crate) fn lines(&self) -> Vec<Option<(Point, Point)>> {
+        (0..self.line_active.len())
+            .map(|l| self.line_active[l].then(|| self.line(l as LineId)))
+            .collect()
+    }
+
     pub(crate) fn line(&self, l: LineId) -> (Point, Point) {
         let i = l as usize;
         (

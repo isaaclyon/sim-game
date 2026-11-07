@@ -20,7 +20,8 @@ fn built(w: &World, zones: [Zone; 2]) -> usize {
         .count()
 }
 
-/// Places a coal plant beside the town, so growth waits only on demand (ADR 0041).
+/// Places a coal plant and a pump beside the town, so growth waits only on demand
+/// (ADR 0041, 0052).
 fn power(w: &mut World) {
     let kind = sim::power::PlantKind::Coal;
     let spot = (0..400)
@@ -32,6 +33,12 @@ fn power(w: &mut World) {
         x: spot.0,
         y: spot.1,
     }));
+    let kind = sim::water::WaterKind::Pump;
+    let (x, y) = (0..400)
+        .map(|i| (-20.0 - (i % 20) as f32, (i / 20) as f32 * 10.0))
+        .find(|&(x, y)| w.water_fits(kind, x, y))
+        .expect("room for a pump west of the town");
+    assert!(w.apply(Command::PlaceWater { kind, x, y }));
 }
 
 const HOMES: [Zone; 2] = [Zone::ResidentialLow, Zone::ResidentialHigh];

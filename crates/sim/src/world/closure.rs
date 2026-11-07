@@ -11,7 +11,7 @@ use std::collections::BinaryHeap;
 
 use super::World;
 use crate::building::BuildingId;
-use crate::citizen::{Activity, HouseholdId};
+use crate::citizen::{Activity, CitizenId, HouseholdId};
 
 /// Sim seconds between closure steps, drawn uniformly per step. Tuning, not configuration.
 pub(crate) const STEP_MIN_S: f32 = 3.0;
@@ -88,17 +88,23 @@ impl World {
             if !self.citizens.active[i] || !self.building_closing(job) {
                 continue;
             }
-            let c = i as u32;
-            self.release_job(c);
-            self.schedule_search(c, 1.0);
-            let at = self.citizens.destination[i].unwrap_or(self.citizens.location[i]);
-            if self.citizens.activity[i] == Activity::Work && at == job {
-                self.cancel_citizen_trip(c);
-                let home = self.home_building(c);
-                self.citizens.activity[i] = Activity::Home;
-                self.citizens.destination[i] = (self.citizens.location[i] != home).then_some(home);
-                self.schedule_activity(c, LEAVE_AFTER_S);
-            }
+            self.dismiss(i as u32, job);
+        }
+    }
+
+    /// The citizen loses their job at `job` and looks for another. Anyone working there or
+    /// commuting there heads home instead.
+    pub(super) fn dismiss(&mut self, c: CitizenId, job: BuildingId) {
+        let i = c as usize;
+        self.release_job(c);
+        self.schedule_search(c, 1.0);
+        let at = self.citizens.destination[i].unwrap_or(self.citizens.location[i]);
+        if self.citizens.activity[i] == Activity::Work && at == job {
+            self.cancel_citizen_trip(c);
+            let home = self.home_building(c);
+            self.citizens.activity[i] = Activity::Home;
+            self.citizens.destination[i] = (self.citizens.location[i] != home).then_some(home);
+            self.schedule_activity(c, LEAVE_AFTER_S);
         }
     }
 
@@ -109,7 +115,7 @@ impl World {
         start..end
     }
 
-    fn next_household(&self, b: BuildingId) -> Option<HouseholdId> {
+    pub(super) fn next_household(&self, b: BuildingId) -> Option<HouseholdId> {
         self.homes_of(b).find_map(|h| self.homes.household[h])
     }
 

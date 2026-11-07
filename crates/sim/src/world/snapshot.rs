@@ -63,11 +63,11 @@ impl World {
     }
 
     /// Writes `[x, y]` per centreline sample of the bulldoze target, or nothing on a miss. A
-    /// plant's or building's target is its closed outline, a line's its two ends; plants,
-    /// lines and then buildings win over roads (ADR 0045).
+    /// plant's, pump's, tower's or building's target is its closed outline, a line's its two
+    /// ends; plants, lines, pumps and towers, and then buildings win over roads (ADR 0045).
     pub fn write_bulldoze_preview(&self, x: f32, y: f32, out: &mut Vec<f32>) {
         out.clear();
-        if self.write_power_bulldoze(x, y, out) {
+        if self.write_power_bulldoze(x, y, out) || self.write_water_bulldoze(x, y, out) {
             return;
         }
         if let Some(b) = self.building_at(x, y) {
@@ -275,6 +275,7 @@ impl World {
         self.junctions.hash_into(&mut mix);
         self.buildings.hash_into(&mut mix);
         self.power.hash_into(&mut mix);
+        self.water.hash_into(&mut mix);
         self.pollution.hash_into(&mut mix);
         for chunk in self.zones.cells.chunks(8) {
             let mut word = [0u8; 8];

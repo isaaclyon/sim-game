@@ -32,6 +32,12 @@ fn housing_only() -> World {
         y: 50.0,
         zone: Zone::ResidentialHigh,
     }));
+    // Apartments need water (ADR 0052).
+    assert!(w.apply(Command::PlaceWater {
+        kind: crate::water::WaterKind::Pump,
+        x: -20.0,
+        y: 60.0,
+    }));
     w
 }
 

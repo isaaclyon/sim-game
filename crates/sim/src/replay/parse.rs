@@ -1,6 +1,8 @@
 //! Reads the command log text format described in `replay/mod.rs`.
 
-use super::{CLASSES, CommandLog, LOG_VERSION, LogError, Outcome, PLANTS, Start, TITLE, ZONES};
+use super::{
+    CLASSES, CommandLog, LOG_VERSION, LogError, Outcome, PLANTS, Start, TITLE, WATER, ZONES,
+};
 use crate::Command;
 
 struct Line<'a> {
@@ -121,6 +123,11 @@ impl<'a> Line<'a> {
             "line" => {
                 let [ax, ay, bx, by] = self.coords()?;
                 Command::BuildLine { ax, ay, bx, by }
+            }
+            "water" => {
+                let [x, y] = self.coords()?;
+                let kind = self.named(&WATER, "water kind")?;
+                Command::PlaceWater { kind, x, y }
             }
             other => return self.fail(format!("unknown command `{other}`")),
         })
