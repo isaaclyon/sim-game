@@ -1,6 +1,6 @@
 // Words and numbers for the top bar, its detail panels and the debug panel. Display only: every
 // figure comes from the sim's stats or the worker's save status.
-import type { CityStatus, Demand, PowerStats, Stats } from '../protocol';
+import type { CityStatus, Demand, FireStats, PowerStats, Stats } from '../protocol';
 
 export const fmt = (n: number) => n.toLocaleString('en-US');
 /** Whole dollars with the sign in front: `$1,234`, `-$56`. */
@@ -42,6 +42,40 @@ export function powerAdvice(p: PowerStats) {
     return 'Some buildings are on a grid without enough power. Join it to a powered road with a power line.';
   if (p.waiting) return 'New buildings need more power to grow. Build a plant.';
   return 'Every building has power.';
+}
+
+/** The fire figure warns from this share of the fire threshold while the city has no station. */
+const FIRE_NEAR = 0.8;
+
+/**
+ * The top bar's fire figure (ADR 0053). `alarm` (red) while a fire burns with no truck on the
+ * way; `near` (amber) as a city without a station nears the population where fires start.
+ */
+export function fireFigures(f: FireStats, population: number) {
+  const alarm = f.enabled && f.unattended > 0;
+  const below = population < f.threshold;
+  const near = f.enabled && !alarm && f.stations === 0 && population >= f.threshold * FIRE_NEAR;
+  const text = !f.enabled
+    ? 'Off'
+    : f.burning > 0
+      ? `${fmt(f.burning)} burning`
+      : f.stations > 0
+        ? `${fmt(f.stations)} ${f.stations === 1 ? 'station' : 'stations'}`
+        : below
+          ? near
+            ? `Fires at ${fmt(f.threshold)}`
+            : 'No fires yet'
+          : 'No station';
+  const advice = !f.enabled
+    ? 'Fires are off for this city.'
+    : alarm
+      ? 'A fire burns with no truck on the way. Build a fire station near it, or clear the traffic in the way.'
+      : below
+        ? `Buildings start to catch fire once ${fmt(f.threshold)} people live here. Build a fire station beside a road before then.`
+        : f.stations === 0
+          ? 'Buildings can catch fire. Build a fire station beside a road.'
+          : 'Stations send trucks along the roads. Buildings they cannot reach in time burn down.';
+  return { alarm, near, text, advice };
 }
 
 /** Signed share of a bar's half-width for a demand in people; never overflows the track. */

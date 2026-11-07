@@ -1,8 +1,8 @@
 // Runs the WASM sim on a fixed-timestep clock, off the main thread.
 
 import { CitySession } from './city-session';
-import { FireSender, readFireStats } from './fire-worker';
 import { gridPreview, roadPreview } from './drafts';
+import { FireSender, readFireStats } from './fire-worker';
 import init, { type Sim } from './pkg/sim_wasm';
 import type {
   Activity,

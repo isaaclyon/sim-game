@@ -38,6 +38,11 @@
         <span id="power-value">0%</span>
       </button>
       <span class="divider" aria-hidden="true"></span>
+      <button type="button" id="fire" class="figure" aria-expanded="false" aria-controls="fire-panel" title="Fire details">
+        <svg viewBox="0 0 24 24" aria-hidden="true" class="solid"><path d="M12 2c.6 3.4-1.4 5.2-3.1 7.1C7.2 11 6 12.9 6 15.3 6 19 8.7 22 12 22s6-3 6-6.7c0-2.6-1.3-4.6-2.6-6-.2 1.6-.9 2.8-2 3.5.4-3.6-.4-7.6-1.4-10.8z" /></svg>
+        <span id="fire-value">No fires yet</span>
+      </button>
+      <span class="divider" aria-hidden="true"></span>
       <div id="demand" class="demand" role="img" aria-label="demand">
         <span class="use">R</span><span class="track"><span class="fill residential" id="demand-residential"></span></span>
         <span class="use">C</span><span class="track"><span class="fill commercial" id="demand-commercial"></span></span>
@@ -88,6 +93,24 @@
         <svg viewBox="0 0 24 24" aria-hidden="true" class="solid"><path d="M13.5 2 4.5 13.5h6.2L9.8 22l9.2-12h-6.3z" /></svg>
         Open Power
       </button>
+    </section>
+
+    <section id="fire-panel" class="glass panel" aria-label="Fire details" hidden>
+      <h2 id="fire-title">Fire</h2>
+      <dl class="rows">
+        <dt>Stations</dt><dd id="fire-stations">0</dd>
+        <dt>Trucks</dt><dd id="fire-trucks">0 of 0 free</dd>
+        <dt>Burning</dt><dd id="fire-burning">0</dd>
+        <dt>Buildings covered</dt><dd id="fire-covered">0</dd>
+        <dt>Saved</dt><dd id="fire-saved">0</dd>
+        <dt>Burnt down</dt><dd id="fire-destroyed">0</dd>
+      </dl>
+      <p id="fire-advice" class="advice"></p>
+      <div class="menu-actions">
+        <button type="button" id="show-fire" hidden>Show a fire</button>
+        <button type="button" id="fire-setting" aria-pressed="false">Turn fires off</button>
+      </div>
+      <button type="button" id="open-services" class="primary">Open Services</button>
     </section>
 
     <section id="menu" class="glass panel menu" aria-label="Menu" hidden>
