@@ -51,12 +51,14 @@ impl World {
                 .active_plants()
                 .map(|p| self.power.plant_kind[p as usize].jobs())
                 .sum::<u32>();
-        let jobs = (self.supply.commercial_jobs + industrial_jobs) as i32;
+        // Fire stations' jobs (ADR 0053) count as commerce.
+        let commercial_jobs = self.supply.commercial_jobs + self.fire_jobs();
+        let jobs = (commercial_jobs + industrial_jobs) as i32;
         let room = self.residents.vacant.len() as i32 * ROOM_PER_VACANT_HOME;
         Demand {
             residential: RESIDENTIAL_BASE + jobs - population - room,
             commercial: COMMERCIAL_BASE + population * COMMERCIAL_SHARE / 100
-                - self.supply.commercial_jobs as i32,
+                - commercial_jobs as i32,
             industrial: INDUSTRIAL_BASE + population * INDUSTRIAL_SHARE / 100
                 - industrial_jobs as i32,
         }
@@ -108,7 +110,12 @@ impl World {
         let tick = self.totals.tick;
         let (dt, seed) = (self.cfg.dt, self.cfg.seed);
         while let Some((lot, zone)) = self.buildings.next_due(tick) {
-            if self.lot_blocked(lot) {
+            if self.lot_blocked(lot) || self.station_blocks(lot) {
+                continue;
+            }
+            // Ruins hold the lot for a day (ADR 0053).
+            if self.fire.ruined(lot) {
+                self.buildings.defer(lot, zone, tick, dt, seed, false);
                 continue;
             }
             if !self.cfg.ignore_demand && self.demand_for(zone) <= self.land_threshold(lot, zone) {

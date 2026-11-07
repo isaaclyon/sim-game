@@ -45,6 +45,12 @@ fn saved_sessions_replay_to_their_expected_cities() {
             log.end / 2
         );
 
+        if name == "scripted-fire.cmdlog" {
+            let s = loaded.fire_stats();
+            assert!(s.saved >= 1 && s.destroyed >= 1, "{name}: {s:?}");
+            assert!(!s.enabled, "{name}: the log turns fires off");
+        }
+
         if bless {
             if log.expect != Some(reached) {
                 log.expect = Some(reached);

@@ -53,6 +53,8 @@ pub(crate) struct Sources {
     pub(crate) air: Vec<f32>,
     pub(crate) noise: Vec<f32>,
     pub(crate) ground: Vec<GroundSource>,
+    /// Land value added on top, as a share of full value: fire cover (ADR 0053).
+    pub(crate) boost: Vec<f32>,
 }
 
 /// One place's pollution, each kind and land value in `0..=1` (1 = clean, full land value).
@@ -160,6 +162,7 @@ impl Pollution {
             air: vec![0.0; n],
             noise: vec![0.0; n],
             ground: vec![GroundSource::None; n],
+            boost: vec![0.0; n],
         }
     }
 
@@ -198,7 +201,7 @@ impl Pollution {
             let (a, n) = (byte(air[c] / AIR_FULL), byte(noise[c] / NOISE_FULL));
             let ground = unit((g >> 8) as u8);
             let harm = AIR_WEIGHT * unit(a) + NOISE_WEIGHT * unit(n) + GROUND_WEIGHT * ground;
-            let land = byte(1.0 - harm);
+            let land = byte(1.0 - harm + src.boost[c]);
             changed |= a != self.air[c] || n != self.noise[c] || land != self.land[c];
             self.air[c] = a;
             self.noise[c] = n;

@@ -187,7 +187,7 @@ impl World {
     }
 
     pub(super) fn refresh_upkeep(&mut self) {
-        self.treasury.upkeep = road_upkeep(&self.roads);
+        self.treasury.upkeep = road_upkeep(&self.roads) + self.fire_upkeep();
     }
 
     /// Pays taxes, the grant and upkeep for the clock minutes the last tick finished.

@@ -29,6 +29,7 @@ pub mod zone;
 
 pub use replay::CommandLog;
 pub use world::{
-    Command, Config, PLANT_STRIDE, POWER_BUILDING_STRIDE, PowerStats, SaveError, Stats, World,
+    Command, Config, FIRE_STRIDE, FireStats, PLANT_STRIDE, POWER_BUILDING_STRIDE, PowerStats,
+    STATION_STRIDE, SaveError, Stats, World,
 };
 pub use zone::Zone;

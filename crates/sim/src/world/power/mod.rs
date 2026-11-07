@@ -72,7 +72,7 @@ impl World {
             .is_some_and(|at| self.spot_fits(kind, at))
     }
 
-    fn spot_fits(&self, kind: PlantKind, at: Footprint) -> bool {
+    pub(super) fn spot_fits(&self, kind: PlantKind, at: Footprint) -> bool {
         let near_road = |margin| {
             self.roads.active_roads().any(|road| {
                 self.roads
@@ -86,6 +86,7 @@ impl World {
             .active_plants()
             .any(|p| self.power.footprint(p).overlaps(at));
         !overlaps
+            && !self.station_overlaps(at)
             && !near_road(ROAD_CLEARANCE)
             && (kind != PlantKind::Coal || near_road(PLANT_REACH))
     }
@@ -100,6 +101,12 @@ impl World {
             return false;
         }
         self.power.add_plant(kind, at);
+        self.clear_footprint(at);
+        true
+    }
+
+    /// Unzones the land under a placed piece and removes the buildings it covers.
+    pub(super) fn clear_footprint(&mut self, at: Footprint) {
         self.clear_buildings(|ring| at.hits_ring(ring));
         let bounds = at.bounds();
         let under: Vec<u32> = self
@@ -111,7 +118,6 @@ impl World {
         if !changed.is_empty() {
             self.after_zoning(bounds as Rect, &changed);
         }
-        true
     }
 
     /// Where a line end at `(x, y)` goes: onto a line end, onto the terminal of a plant it

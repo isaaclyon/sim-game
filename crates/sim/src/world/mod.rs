@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 mod closure;
 mod demand;
 mod demolish;
+mod fire;
 mod inspect;
 mod money;
 mod persist;
@@ -34,6 +35,7 @@ use crate::traffic::Traffic;
 use crate::zone::{Zone, ZoneGrid};
 
 pub use demand::Demand;
+pub use fire::{FIRE_STRIDE, FireStats, STATION_STRIDE};
 pub use inspect::{BuildingInfo, CitizenInfo, Place};
 pub use money::{GRANT, JOB_TAX, Money, RESIDENT_TAX, START_FUNDS};
 pub use persist::{SAVE_VERSION, SaveError};
@@ -104,8 +106,9 @@ pub enum Command {
         by: f32,
         class: RoadClass,
     },
-    /// Removes the plant under the point, else the nearest line in reach, else the building
-    /// under the point (ADR 0045), else the nearest road.
+    /// Removes the fire station or plant under the point, else the nearest line in reach,
+    /// else the building under the point (ADR 0045), else ruins (ADR 0053), else the nearest
+    /// road.
     DeleteRoad {
         x: f32,
         y: f32,
@@ -123,6 +126,16 @@ pub enum Command {
         ay: f32,
         bx: f32,
         by: f32,
+    },
+    /// Places a fire station beside the nearest road, facing it (ADR 0053). Refused away from
+    /// roads, over roads, plants and stations, and when the city cannot pay.
+    PlaceStation {
+        x: f32,
+        y: f32,
+    },
+    /// Turns this city's fires on or off (ADR 0053).
+    SetFires {
+        on: bool,
     },
     /// Sets every zone cell whose centre is inside the rectangle with these corners. `Zone::None`
     /// unzones. See ADR 0014.
@@ -159,6 +172,8 @@ pub struct Stats {
     pub power: PowerStats,
     /// Balance, taxes, grant and upkeep (ADR 0036).
     pub money: Money,
+    /// Stations, trucks and fires (ADR 0053).
+    pub fire: FireStats,
     /// Synthetic vehicles waiting between random trips; dormant citizen slots are excluded.
     pub parked: u32,
     pub awaiting_path: u32,
@@ -227,12 +242,15 @@ pub struct World {
     totals: Stats,
     /// Air, ground, noise, traffic flow and land value (ADR 0037).
     pub pollution: Pollution,
+    /// Fire stations, trucks, fires and ruins (ADR 0053).
+    fire: fire::Fire,
 }
 
 impl World {
     pub fn new(cfg: Config, roads: RoadNetwork, rng: Rng) -> Self {
         let mut world = Self {
             residents: residents::Residents::new(cfg.seed),
+            fire: fire::Fire::new(cfg.seed),
             closures: Default::default(),
             supply: Default::default(),
             treasury: Default::default(),
@@ -304,6 +322,7 @@ impl World {
             self.zones.version,
             self.power.version,
             self.buildings.version,
+            self.fire.version,
         );
         let roads = self.roads.version;
         let changed = match cmd {
@@ -339,7 +358,11 @@ impl World {
                 class,
             ),
             Command::DeleteRoad { x, y } => {
-                self.bulldoze_power(x, y) || self.demolish(x, y) || self.delete_road(x, y)
+                self.bulldoze_station(x, y)
+                    || self.bulldoze_power(x, y)
+                    || self.demolish(x, y)
+                    || self.clear_ruin(x, y)
+                    || self.delete_road(x, y)
             }
             Command::PlacePlant { kind, x, y } => self.place_plant(kind, x, y),
             Command::BuildLine { ax, ay, bx, by } => self.build_line(ax, ay, bx, by),
@@ -358,12 +381,15 @@ impl World {
                 !changed.is_empty()
             }
             Command::FillBlock { x, y, zone } => self.fill_block(x, y, zone),
+            Command::PlaceStation { x, y } => self.place_station(x, y),
+            Command::SetFires { on } => self.set_fires(on),
         };
         let now = (
             self.lots.version,
             self.zones.version,
             self.power.version,
             self.buildings.version,
+            self.fire.version,
         );
         if versions != now {
             self.buildings.reconcile(
@@ -380,11 +406,13 @@ impl World {
         if roads != self.roads.version {
             self.refresh_upkeep();
         }
+        self.ensure_fire();
         changed
     }
 
     pub fn tick(&mut self) {
         self.sync_roads();
+        self.ensure_fire();
         self.tick_closures();
         self.ensure_power();
         self.tick_residents();
@@ -412,6 +440,7 @@ impl World {
         self.totals.tick += 1;
         self.tick_pollution();
         self.settle_money();
+        self.tick_fire();
         self.grow_buildings();
         // Current at every tick boundary, so a loaded world reads the same allocation.
         self.ensure_power();
@@ -425,6 +454,7 @@ impl World {
         s.demand = self.demand();
         s.power = self.power_stats();
         s.money = self.money();
+        s.fire = self.fire_stats();
         if s.population > 0 {
             s.unemployment_percent = s.unemployed as f32 * 100.0 / s.population as f32;
         }

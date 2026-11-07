@@ -69,6 +69,7 @@ impl World {
                 self.area_sources(at, COAL_AIR, COAL_NOISE, &mut src);
             }
         }
+        self.fire_boost(&mut src);
         src
     }
 

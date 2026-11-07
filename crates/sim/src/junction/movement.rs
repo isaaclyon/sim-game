@@ -213,7 +213,7 @@ impl Junctions {
 
     /// `exit_clear`, with room also kept for `ahead` cars already cleared into `lane` but not on
     /// it yet.
-    fn exit_clear_for(
+    pub(super) fn exit_clear_for(
         &self,
         net: &RoadNetwork,
         traffic: &Traffic,
