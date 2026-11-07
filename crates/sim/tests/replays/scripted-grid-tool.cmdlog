@@ -1,0 +1,14 @@
+# Written by hand (ADR 0049): a grid of streets dragged over a small town's east edge while
+# cars drive. Edges beside town streets are left out, the rest join and split them. Then a
+# grid of main roads is refused for money and an alley grid for its class.
+sim-game command log 1
+seed 1
+grid 4 4
+0 spawn 60
+50 fill 50 50 residential-low
+300 roadgrid 280 -40 1 0 80 4 5 street
+600 fill 460 80 commercial-low
+900 roadgrid 700 -40 1 0 112 20 20 main
+900 roadgrid 700 -40 1 0 80 2 2 alley
+end 3000
+expect hash a55e63101b9d1756 population 21 buildings 15 trips 103

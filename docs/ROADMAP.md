@@ -284,16 +284,23 @@ grid tool, upgrade and undo land in the new interface.
    the save format stay unchanged; freehand drag is not planned. Automated tests cover smooth
    joins, refused pieces, preview/build agreement and cancellation. The browser check passed.
    Done when: a winding road of five pieces has no visible kinks.
-3. **Grid tool.** Pick a cell size (60, 80 or 100 m), drag the first edge to set the angle,
-   then drag out the area in whole blocks. Each grid line is planned like a hand-drawn road:
+3. **Grid tool — implemented and approved in the browser.** Pick a cell size (48, 64, 80, 96 or
+   112 m), set the angle with the first edge, then stretch the area in whole blocks. Each grid
+   line is planned like a hand-drawn road:
    it joins and splits existing roads, and lines that would overlap are left out. The preview
-   shows exactly what will be built. **ADR** for the grid command.
+   shows exactly what will be built ([ADR 0049](adrs/0049-grid-tool.md)). The Grid option of
+   the road items takes three clicks (start, end of the first edge, area); Block size picks
+   the cell. Automated tests cover a grid over a town's edge with no slivers, the preview
+   matching the build, all-or-nothing money and the command log. Approved in the browser.
    Done when: a grid dragged across the edge of a town connects into it with no slivers.
 4. **Upgrade.** Click a road or drag along connected roads to switch between street and main
-   road; alleys can become streets. Cars reroute rather than despawn. Dragging is
+   road; alleys can become streets. Cars keep driving, except on two roads that a change
+   joins into one (ADR 0040), whose cars are removed; accepted for now. Dragging is
    implemented: drawing a road over whole roads gives them its class, in place, for the
-   difference in build cost ([ADR 0048](adrs/0048-drawing-over-roads-changes-their-class.md));
-   clicking a single road is not.
+   difference in build cost ([ADR 0048](adrs/0048-drawing-over-roads-changes-their-class.md)).
+   Clicking is implemented and approved in the browser: the Upgrade option of the road items gives
+   the clicked road the selected class, on the same terms
+   ([ADR 0050](adrs/0050-click-to-change-road-class.md)).
 5. **Undo and redo** for road edits only, many steps, Ctrl+Z and Ctrl+Shift+Z. Undo removes the
    roads an edit added and rejoins roads it split, as a new edit with new IDs; buildings it
    cleared stay gone. History lives in the sim and is saved with the city
@@ -428,8 +435,22 @@ Goals and consequences, kept light so they don't crowd out building.
   cross town and save a house, loses a building in an uncovered or jammed area, and can turn
   fires off.
 
-- Remaining services with coverage areas: water (in progress), roads maintenance, then
-  police, health and schools.
+- Remaining services with coverage areas: water, roads maintenance, then police, health and
+  schools.
+- **Children** ([ADR 0054](adrs/0054-children-births-and-growing-up.md)), after water and
+  fire merge. Families arrive with children and have babies when their home has room.
+  Children grow up in about 10 clock days, look for work, then move into a vacant home or
+  leave the city. No old age yet.
+  Done when: a town with spare housing grows without arrivals, and a grown child is seen
+  taking a job and moving into their own home.
+- **Schools and education** ([ADR 0055](adrs/0055-schools-and-education-levels.md)), after
+  children. Primary and high schools beside roads, with seats and an area along roads.
+  Children walk or are driven to school; schooled children grow up more educated. Dense
+  industry prefers primary-educated workers and dense commerce high school; less-educated
+  workers fill those jobs more slowly. Arrivals bring a mix. University comes with offices
+  in M6.
+  Done when: school runs fill the sidewalks at 8am, and a town that built schools early sees
+  its dense shops fill faster a childhood later.
 - Citizen happiness from services, traffic and pollution, feeding back into demand and growth.
   The citizen inspector shows each person's mood and complaints.
 - Data overlays: traffic, coverage, land value, happiness.

@@ -27,6 +27,13 @@ export type ToWorker =
   /** Builds the road through guided `points`, as in `previewRoad`. `chain` requests the
    * sim-guided control of a successful curve in `buildResult`, for its next continuation. */
   | { type: 'buildRoad'; id: number; points: number[]; class: RoadClass; chain?: boolean }
+  /** Gives the road nearest the point, in bulldoze reach, `class` in place, as drawing over
+   * the whole road would (ADR 0048, 0050). Refused for a road already of `class` or when the
+   * city cannot pay. */
+  | { type: 'setRoadClass'; x: number; y: number; class: RoadClass }
+  /** Asks which road `setRoadClass` would change and for what. Answered with
+   * `roadClassPreview`. Changes nothing. */
+  | { type: 'previewRoadClass'; x: number; y: number; class: RoadClass; revision: number }
   /** Removes the fire station or plant under the point, else the nearest line, else the
    * building under the point (ADR 0045), else ruins (ADR 0053), else the nearest road. */
   | { type: 'deleteRoad'; x: number; y: number }
@@ -68,6 +75,30 @@ export type ToWorker =
    * of the same class plans nothing. Changes nothing; answered with `roadPreview`.
    */
   | { type: 'previewRoad'; revision: number; class: RoadClass; points: number[]; plan: boolean }
+  /**
+   * Asks what a grid of `class` roads would build (ADR 0049). `points` is the first edge's two
+   * raw `[x, y, snap]` records, guided as a road's; `cursor` is `[x, y]` where the area is
+   * dragged to, rounded by the sim to whole blocks of `cell` metres (40 to 200), or absent
+   * while the first edge is drawn. Changes nothing; answered with `gridPreview`.
+   */
+  | {
+      type: 'previewGrid';
+      revision: number;
+      class: RoadClass;
+      cell: number;
+      points: number[];
+      cursor?: [number, number];
+    }
+  /** Builds the grid `previewGrid` with the same fields shows, all or nothing; answered with
+   * `buildResult` (`end` null). */
+  | {
+      type: 'buildGrid';
+      id: number;
+      class: RoadClass;
+      cell: number;
+      points: number[];
+      cursor?: [number, number];
+    }
   /**
    * Selects the resident who owns agent `agent` (a car or walker, an index into the `frame`
    * agents snapshot) for
@@ -323,6 +354,29 @@ export type FromWorker =
       affordable: boolean;
     }
   /**
+   * What a grid would build (ADR 0049). `points`, `guides`, `length`, `angle` and `angles`
+   * describe the guided first edge as in `roadPreview`. `cols` and `rows` are the signed block
+   * counts (0 when nothing is planned); `roads` is `[ax, ay, aJoin, bx, by, bJoin]` per new
+   * leg, joins as in `roadPreview`'s stops; `dropped` is `[ax, ay, bx, by]` per lattice edge
+   * left out. `cost` is dollars, null when nothing would be built; `affordable` false means the
+   * build would be refused for money.
+   */
+  | {
+      type: 'gridPreview';
+      revision: number;
+      points: Float32Array;
+      guides: Float32Array;
+      angles: Float32Array;
+      length: number;
+      angle: number;
+      cols: number;
+      rows: number;
+      roads: Float32Array;
+      dropped: Float32Array;
+      cost: number | null;
+      affordable: boolean;
+    }
+  /**
    * The whole zone grid: one `Zone` byte per cell, row-major from the origin. `layout` is
    * `[originX, originY, cellSize, cols, rows]`; cell (c, r) spans x from originX + c * cellSize.
    * Sent at start and whenever a paint changes a cell.
@@ -403,6 +457,17 @@ export type FromWorker =
    * A station's, plant's, building's or ruins' target is its closed outline and a line's its
    * two ends. */
   | { type: 'bulldozePreview'; segment: Float32Array; revision: number }
+  /** `[x, y]` centreline samples of the road `setRoadClass` would change, as for
+   * `bulldozePreview`; empty when it would change nothing (no road in reach, or already that
+   * class). `cost` is dollars, null when empty; `affordable` false means it would be refused
+   * for money (ADR 0050). */
+  | {
+      type: 'roadClassPreview';
+      segment: Float32Array;
+      cost: number | null;
+      affordable: boolean;
+      revision: number;
+    }
   /** The inspected citizen, or null if the selected agent has no resident. Answers `inspect`. */
   | { type: 'citizen'; selection: number; citizen: Citizen | null }
   /** Selected building, or null on a miss or after demolition. Answers inspectBuilding. */

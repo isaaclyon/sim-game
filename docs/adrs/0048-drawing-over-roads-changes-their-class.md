@@ -46,3 +46,10 @@ crossing anything was refused as an overlap.
   road than new buildings would.
 - Undo (ADR 0039, proposed) must record class changes as well as added and split roads.
 - Clicking a single road to switch it, without drawing, is not part of this decision.
+
+## Amendment (2026-11-06)
+
+"Cars keep their routes and are not removed" holds except where a class change makes two
+roads join (ADR 0040): cars on those two roads are removed, as with any join. The owner
+accepted this for now; [0050](0050-click-to-change-road-class.md) and
+[0051](0051-road-edit-history-revised.md) say the same.

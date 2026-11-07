@@ -4,7 +4,7 @@
 //! Amounts are whole dollars in `i64`. Rates are per clock hour and settle every clock minute;
 //! the fraction of a dollar left over carries to the next minute, so nothing is lost to
 //! rounding. Building a road the city cannot afford is refused. Upkeep keeps charging when
-//! the balance is negative; debt only stops new roads.
+//! the balance is negative; debt only stops edits that cost money.
 
 use serde::{Deserialize, Serialize};
 
@@ -123,9 +123,10 @@ impl World {
         }
     }
 
-    /// Whether the city can pay `cost` now. A city in debt can afford nothing.
+    /// Whether the city can pay `cost` now. Free edits, such as moving a road to a cheaper
+    /// class (ADR 0048), are always affordable; a city in debt can afford nothing else.
     pub fn can_afford(&self, cost: i64) -> bool {
-        cost <= self.treasury.balance
+        cost <= 0 || cost <= self.treasury.balance
     }
 
     /// What building the road through guided raw `[x, y, snap]` points (ADR 0038) would cost,
@@ -179,6 +180,13 @@ impl World {
             },
             class,
         )
+    }
+
+    /// What `SetRoadClass` at this point would cost (ADR 0050), or None if it would change
+    /// nothing. Changes nothing.
+    pub fn class_cost(&self, x: f32, y: f32, class: RoadClass) -> Option<i64> {
+        self.class_plan(x, y, class)
+            .map(|p| plan_cost(&self.roads, &p, class))
     }
 
     fn shape_cost(&self, shape: Shape, class: RoadClass) -> Option<i64> {

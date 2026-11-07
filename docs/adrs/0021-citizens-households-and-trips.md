@@ -1,6 +1,6 @@
 # 0021. Citizens, households, homes, jobs and trips
 
-- Status: Accepted; residents of repainted buildings superseded by [0023](0023-gradual-closure-of-rezoned-buildings.md); walking and vehicle-only travel slots by [0026](0026-walking-trips-and-household-cars.md); industrial job-capacity tuning by [0028](0028-industrial-employment-density.md); low-density commercial capacity by [0030](0030-small-workplace-capacity.md); first-activity timing by [0047](0047-move-ins-follow-daily-schedules.md)
+- Status: Accepted; residents of repainted buildings superseded by [0023](0023-gradual-closure-of-rezoned-buildings.md); walking and vehicle-only travel slots by [0026](0026-walking-trips-and-household-cars.md); industrial job-capacity tuning by [0028](0028-industrial-employment-density.md); low-density commercial capacity by [0030](0030-small-workplace-capacity.md); first-activity timing by [0047](0047-move-ins-follow-daily-schedules.md); adults-only and fixed households by [0054](0054-children-births-and-growing-up.md)
 - Date: 2026-11-01
 
 ## Context
