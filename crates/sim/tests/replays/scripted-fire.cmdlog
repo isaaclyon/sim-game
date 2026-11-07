@@ -1,6 +1,7 @@
 # Scripted: a generated grid zoned whole grows past the fire threshold (ADR 0053). The first
 # fire, with no station, destroys its building; a station placed right after saves the next.
-# Fires are turned off at the end. Two pumps water the dense zones (ADR 0052).
+# Fires are turned off at the end, late enough for fires after the station: children
+# (ADR 0054) changed when the first fires start. Two pumps water the dense zones (ADR 0052).
 sim-game command log 1
 seed 28
 grid 10 10
@@ -89,6 +90,6 @@ grid 10 10
 2 water 540 300 pump
 2 water 540 780 pump
 3400 station 60 60
-6800 fires off
-end 7000
-expect hash 97398d051557b001 population 1039 buildings 26 trips 789
+8800 fires off
+end 9000
+expect hash 10ccb4fef4933e2a population 1141 buildings 31 trips 781

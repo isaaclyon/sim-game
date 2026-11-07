@@ -11,4 +11,4 @@ grid 4 4
 900 roadgrid 700 -40 1 0 112 20 20 main
 900 roadgrid 700 -40 1 0 80 2 2 alley
 end 3000
-expect hash 1e4f9db9bb8573ff population 21 buildings 15 trips 103
+expect hash 796fd7d91b3fdf86 population 27 buildings 15 trips 105
