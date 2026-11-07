@@ -9,15 +9,17 @@ use crate::road::{RoadClass, RoadId};
 use crate::snap;
 
 impl World {
-    /// Guides raw `[x, y, snap]` points (ADR 0038). Extra trailing floats are ignored.
+    /// Guides raw `[x, y, snap]` points (ADR 0038). One trailing float is the snap reach in
+    /// metres (`guide::draft_within`); without it the default reaches apply. Two trailing
+    /// floats are ignored.
     pub(super) fn draft(&self, raw: &[f32]) -> guide::Draft {
-        let points: Vec<_> = raw
-            .as_chunks::<3>()
-            .0
-            .iter()
-            .map(|p| (p[0], p[1], p[2] as u8))
-            .collect();
-        guide::draft(&self.roads, &points)
+        let (records, rest) = raw.as_chunks::<3>();
+        let points: Vec<_> = records.iter().map(|p| (p[0], p[1], p[2] as u8)).collect();
+        let reach = match rest {
+            &[reach] => reach,
+            _ => 0.0,
+        };
+        guide::draft_within(&self.roads, &points, reach)
     }
 
     /// The command that builds the road through guided raw points: two for a straight road,

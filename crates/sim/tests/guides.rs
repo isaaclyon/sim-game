@@ -163,3 +163,65 @@ fn angle_marks_sit_where_the_road_joins_roads_at_either_end() {
     let free = draft(&w.roads, &[(40.0, 60.0, 0), (40.0, 90.0, 0)]);
     assert!(free.start_mark.is_none() && free.end_mark.is_none());
 }
+
+/// The guided end of a two-point raw draft, with an optional trailing reach in metres.
+fn guided_end(w: &World, raw: &[f32]) -> (f32, f32) {
+    let mut out = Vec::new();
+    w.write_road_draft(raw, true, RoadClass::Street, &mut out);
+    (out[8], out[9])
+}
+
+#[test]
+fn a_zoomed_out_reach_closes_a_square_from_clicks_well_off_the_corners() {
+    // Three sides of an 80 m square; the fourth corner is clicked 8 m off (0, 80), about one
+    // screen pixel at the default zoom.
+    let mut w = town(&[(0.0, 0.0, 80.0, 0.0), (80.0, 0.0, 80.0, 80.0)]);
+    let all = ALL as f32;
+    let raw = [80.0, 80.0, all, -8.0, 83.0, all];
+    let near = guided_end(&w, &raw);
+    assert!(
+        near.0.abs() > 1.0,
+        "the default 6 m guide reach misses: {near:?}"
+    );
+    let far = [80.0, 80.0, all, -8.0, 83.0, all, 75.0];
+    assert_eq!(
+        guided_end(&w, &far),
+        (0.0, 80.0),
+        "a 75 m reach lands on the corner"
+    );
+    assert!(w.apply(w.draft_command(&far, RoadClass::Street).expect("buildable")));
+    // The last click is 20 m from the first corner: past the 15 m junction reach, within 75 m.
+    let close_it = [0.0, 80.0, all, 14.0, 14.0, all];
+    assert_ne!(guided_end(&w, &close_it), (0.0, 0.0));
+    let close_it = [0.0, 80.0, all, 14.0, 14.0, all, 75.0];
+    assert_eq!(guided_end(&w, &close_it), (0.0, 0.0));
+    assert!(
+        w.apply(
+            w.draft_command(&close_it, RoadClass::Street)
+                .expect("buildable")
+        )
+    );
+    for corner in [(0.0, 0.0), (80.0, 0.0), (80.0, 80.0), (0.0, 80.0)] {
+        assert!(
+            w.roads.nearest_node(corner.0, corner.1, 1e-3).is_some(),
+            "{corner:?}"
+        );
+    }
+    assert_eq!(
+        w.roads.active_roads().count(),
+        4,
+        "a closed square of four roads"
+    );
+}
+
+#[test]
+fn a_zoomed_out_reach_snaps_short_roads_to_the_nearest_angle_step() {
+    let w = town(&[]);
+    let all = ALL as f32;
+    // 40 m long and 10° off the map axis: free at the default reach, a 15° step zoomed out.
+    let free = guided_end(&w, &[0.0, 0.0, all, 40.0, 7.0, ANGLE as f32]);
+    close(free, (40.0, 7.0));
+    let snapped = guided_end(&w, &[0.0, 0.0, all, 40.0, 7.0, ANGLE as f32, 75.0]);
+    let degrees = snapped.1.atan2(snapped.0).to_degrees();
+    assert!((degrees - 15.0).abs() < 0.01, "{degrees}");
+}
