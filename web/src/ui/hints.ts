@@ -1,5 +1,6 @@
 // The one-line hint in the build menu's options row, shown while a tool is in use.
-import { Zone } from '../protocol';
+import { type Price, type Prices, Zone } from '../protocol';
+import type { Tool } from './catalog';
 import { dollars } from './figures';
 
 /** The sim's quote for the previewed road (ADR 0036), and how many existing roads it would
@@ -61,4 +62,35 @@ export function zoneHelpText(zone: Zone | null) {
   if (zone === Zone.None)
     return 'Click a block or drag a rectangle to remove zoning. Esc or right-click stops.';
   return 'Click a block to fill it, or drag a rectangle to paint. Press the zone key again for the other density. Esc or right-click stops.';
+}
+
+/** What an item costs, for its tooltip: build cost and upkeep, or Free; null for roads and
+ * zones, whose cost depends on what is drawn. */
+export function priceText(price: Price | 'free' | null) {
+  if (price === null) return null;
+  if (price === 'free') return 'Free.';
+  return `Costs ${dollars(price.cost)} to build and ${dollars(price.upkeep)} an hour to keep.`;
+}
+
+/** The price of what an item builds; see `priceText`. */
+export function itemPrice(prices: Prices, tool: Tool): Price | 'free' | null {
+  switch (tool.kind) {
+    case 'plant':
+      return prices.plants[tool.plant];
+    case 'water':
+      return prices.water[tool.water];
+    case 'station':
+      return prices.station;
+    case 'line':
+      return 'free';
+    default:
+      return null;
+  }
+}
+
+/** The start of a placement tool's hint: its name and price, or that the city cannot pay. */
+export function placeText(name: string, price: Price | undefined, affordable: boolean) {
+  if (!price) return `${name}:`;
+  if (!affordable) return `Not enough money: a ${name.toLowerCase()} costs ${dollars(price.cost)}.`;
+  return `${name}: ${dollars(price.cost)}, then ${dollars(price.upkeep)} an hour.`;
 }

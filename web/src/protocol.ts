@@ -6,6 +6,7 @@ import type {
   FireStats,
   PlantKind,
   PowerStats,
+  Prices,
   ServiceMessage,
   WaterKind,
   WaterStats,
@@ -322,8 +323,9 @@ export type FromWorker =
   /** Command log text (ADR 0034), or null for a city that was loaded, not started fresh. */
   | { type: 'commandLog'; text: string | null }
   /** Sent before all geometry and the first frame of a newly installed world. Clears
-   * interpolation and transient selections/previews. Restored cities always resume paused. */
-  | { type: 'cityReset'; speed: number }
+   * interpolation and transient selections/previews. Restored cities always resume paused.
+   * `prices` lists what plants, pumps, towers and stations cost (ADR 0036). */
+  | { type: 'cityReset'; speed: number; prices: Prices }
   /**
    * `segments` is `[ax, ay, bx, by, class]` per active rendered segment (many per curve), not
    * per road ID. `class` is a `RoadClass`.

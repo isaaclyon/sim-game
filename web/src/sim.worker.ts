@@ -6,7 +6,7 @@ import { FireSender } from './fire-worker';
 import { historyCommand, readHistory } from './history-worker';
 import init, { type Sim } from './pkg/sim_wasm';
 import type { Activity, Building, Citizen, FromWorker, Place, ToWorker, Zone } from './protocol';
-import { readStats } from './stats-worker';
+import { readPrices, readStats } from './stats-worker';
 import { WaterSender } from './water-worker';
 
 /** If the sim falls this far behind, drop the backlog instead of spiralling. */
@@ -138,7 +138,7 @@ const cities = new CitySession(post, (next, initialSpeed) => {
   fire.reset();
   water.reset();
   inspected = null;
-  post({ type: 'cityReset', speed });
+  post({ type: 'cityReset', speed, prices: readPrices() });
   sendEdits(next);
 });
 let started = false;
@@ -356,9 +356,10 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
         (plant
           ? sim?.plant_preview(msg.kind, msg.x, msg.y)
           : sim?.water_preview(msg.kind, msg.x, msg.y)) ?? new Float32Array();
-      const outline = data.slice(1);
+      const outline = data.slice(2);
       const type = plant ? 'plantPreview' : 'waterPreview';
-      post({ type, outline, ok: data[0] === 1, revision: msg.revision }, [outline.buffer]);
+      const [ok, affordable] = [data[0] === 1, data[1] === 1];
+      post({ type, outline, ok, affordable, revision: msg.revision }, [outline.buffer]);
       break;
     }
     case 'previewLine': {

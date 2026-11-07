@@ -288,11 +288,11 @@ fn coal_snaps_beside_the_nearest_road_and_faces_it() {
     }
     let mut preview = Vec::new();
     w.write_plant_preview(PlantKind::Coal, 430.0, 60.0, &mut preview);
-    assert_eq!(preview[0], 1.0);
+    assert_eq!(preview[..2], [1.0, 1.0], "fits and affordable");
     assert!(plant(&mut w, PlantKind::Coal, 430.0, 60.0));
     let mut ring = Vec::new();
     w.write_bulldoze_preview(389.0, 60.0, &mut ring);
-    assert_eq!(ring, preview[1..], "it stands where the preview showed");
+    assert_eq!(ring, preview[2..], "it stands where the preview showed");
     assert!(
         w.plant_spot(PlantKind::Solar, 430.0, 60.0).unwrap().centre == (430.0, 60.0),
         "solar and wind stand where asked"
@@ -335,8 +335,8 @@ fn coal_with_no_road_in_reach_is_refused() {
     let w = lattice();
     let mut preview = Vec::new();
     w.write_plant_preview(PlantKind::Coal, 500.0, 60.0, &mut preview);
-    assert_eq!(preview[0], 0.0);
-    assert_eq!(&preview[1..3], [478.0, 38.0], "shown unsnapped where asked");
+    assert_eq!(preview[..2], [0.0, 1.0], "affordable but no road");
+    assert_eq!(&preview[2..4], [478.0, 38.0], "shown unsnapped where asked");
 }
 
 #[test]
@@ -441,6 +441,13 @@ fn plants_are_refused_when_the_city_cannot_pay() {
         };
         w.treasury.balance = plant_price(kind).0 - 1;
         let hash = w.state_hash();
+        let mut preview = Vec::new();
+        w.write_plant_preview(kind, x, y, &mut preview);
+        assert_eq!(
+            preview[..2],
+            [0.0, 0.0],
+            "{kind:?} fits but is unaffordable"
+        );
         assert!(!plant(&mut w, kind, x, y), "{kind:?}");
         assert_eq!(w.state_hash(), hash, "a refused plant changes nothing");
         w.treasury.balance = plant_price(kind).0;

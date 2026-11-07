@@ -16,11 +16,20 @@ impl Sim {
         self.apply(Command::PlacePlant { kind, x, y })
     }
 
+    /// `[cost, upkeep]` per placeable, in dollars and dollars per clock hour, in
+    /// `sim::world::price_list` order: coal, solar, wind, pump, tower, fire station.
+    pub fn prices() -> Vec<f64> {
+        sim::world::price_list()
+            .into_iter()
+            .flat_map(|(cost, upkeep)| [cost as f64, upkeep as f64])
+            .collect()
+    }
+
     pub fn build_line(&mut self, ax: f32, ay: f32, bx: f32, by: f32) -> bool {
         self.apply(Command::BuildLine { ax, ay, bx, by })
     }
 
-    /// `[ok, x0, y0, …]`; see `World::write_plant_preview`. Empty for an unknown kind.
+    /// `[ok, affordable, x0, y0, …]`; see `World::write_plant_preview`. Empty for an unknown kind.
     pub fn plant_preview(&mut self, kind: u8, x: f32, y: f32) -> Vec<f32> {
         self.buf.clear();
         if let Some(kind) = PlantKind::from_u8(kind) {
@@ -66,7 +75,7 @@ impl Sim {
         self.apply(Command::PlaceWater { kind, x, y })
     }
 
-    /// `[ok, x0, y0, …]`; see `World::write_water_preview`. Empty for an unknown kind.
+    /// `[ok, affordable, x0, y0, …]`; see `World::write_water_preview`. Empty for an unknown kind.
     pub fn water_preview(&mut self, kind: u8, x: f32, y: f32) -> Vec<f32> {
         self.buf.clear();
         if let Some(kind) = WaterKind::from_u8(kind) {

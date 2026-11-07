@@ -24,8 +24,8 @@ pub const RESIDENT_TAX: i64 = 2;
 /// Tax each filled job pays per clock hour, on top of its worker's resident tax.
 pub const JOB_TAX: i64 = 1;
 /// Grant every city receives per clock hour, whatever its size. It pays for the
-/// first roads before taxes can, and covers the upkeep of about 10 km of street.
-pub const GRANT: i64 = 1_000;
+/// first roads before taxes can, and covers the upkeep of about 20 km of street.
+pub const GRANT: i64 = 2_000;
 
 /// Dollars per metre of new road.
 fn build_rate(class: RoadClass) -> f64 {
@@ -60,6 +60,20 @@ pub fn water_price(kind: WaterKind) -> (i64, i64) {
         WaterKind::Pump => (6_000, 40),
         WaterKind::Tower => (4_000, 20),
     }
+}
+
+/// Build cost and upkeep per clock hour of each placeable the build menu sells, in this
+/// order: coal, solar and wind plants, pump, water tower, fire station. Lines are free.
+pub fn price_list() -> [(i64, i64); 6] {
+    use super::fire::{STATION_COST, STATION_UPKEEP};
+    [
+        plant_price(PlantKind::Coal),
+        plant_price(PlantKind::Solar),
+        plant_price(PlantKind::Wind),
+        water_price(WaterKind::Pump),
+        water_price(WaterKind::Tower),
+        (STATION_COST, STATION_UPKEEP),
+    ]
 }
 
 /// Upkeep per clock hour of every standing plant, pump and tower.
@@ -177,6 +191,13 @@ impl World {
     /// class (ADR 0048), are always affordable; a city in debt can afford nothing else.
     pub fn can_afford(&self, cost: i64) -> bool {
         cost <= 0 || cost <= self.treasury.balance
+    }
+
+    /// Starts a placement preview: `ok` (it fits and the city can pay `cost`, so a click would
+    /// place it), then `affordable`, each 1 or 0.
+    pub(in crate::world) fn push_placement(&self, fits: bool, cost: i64, out: &mut Vec<f32>) {
+        let affordable = self.can_afford(cost);
+        out.extend([fits && affordable, affordable].map(|b| f32::from(u8::from(b))));
     }
 
     /// What building the road through guided raw `[x, y, snap]` points (ADR 0038) would cost,

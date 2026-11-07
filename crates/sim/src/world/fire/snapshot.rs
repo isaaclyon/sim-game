@@ -75,16 +75,15 @@ impl World {
         }
     }
 
-    /// Writes the closed footprint where a station asked for at the cursor would stand and
-    /// returns whether it would be placed (fits and is affordable); nothing and false where no
-    /// road is in reach.
-    pub fn write_station_preview(&self, x: f32, y: f32, out: &mut Vec<f32>) -> bool {
+    /// `[ok, affordable, x0, y0, …]` (see `push_placement`), then the closed footprint where a
+    /// station asked for at the cursor would stand; empty where no road is in reach.
+    pub fn write_station_preview(&self, x: f32, y: f32, out: &mut Vec<f32>) {
         out.clear();
         let Some(at) = self.station_spot(x, y) else {
-            return false;
+            return;
         };
+        self.push_placement(self.station_fits(x, y), super::STATION_COST, out);
         closed_ring(&at.ring(), out);
-        self.station_fits(x, y) && self.can_afford(super::STATION_COST)
     }
 
     /// Writes the bulldoze outline of the station under the point; true if there is one.

@@ -52,10 +52,10 @@ export class FireSender {
   command(s: Sim | undefined, msg: FireCommand, ready: boolean): boolean {
     if (msg.type === 'previewStation') {
       const data = s?.station_preview(msg.x, msg.y) ?? new Float32Array();
-      const outline = data.slice(1);
-      this.post({ type: 'stationPreview', outline, ok: data[0] === 1, revision: msg.revision }, [
-        outline.buffer,
-      ]);
+      const outline = data.slice(2);
+      const [ok, affordable] = [data[0] === 1, data[1] === 1];
+      const revision = msg.revision;
+      this.post({ type: 'stationPreview', outline, ok, affordable, revision }, [outline.buffer]);
       return false;
     }
     if (!ready || !s) return false;

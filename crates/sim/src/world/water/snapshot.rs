@@ -60,14 +60,15 @@ impl World {
         }
     }
 
-    /// `[ok, x0, y0, …]`: whether a pump or tower asked for here fits, then the footprint it
-    /// would take (`water_spot`, beside a road) as a closed ring.
+    /// `[ok, affordable, x0, y0, …]` (see `push_placement`) for a pump or tower asked for
+    /// here, then the footprint it would take (`water_spot`, beside a road) as a closed ring.
     pub fn write_water_preview(&self, kind: WaterKind, x: f32, y: f32, out: &mut Vec<f32>) {
         out.clear();
         let Some(at) = self.water_spot(kind, x, y) else {
             return;
         };
-        out.push(f32::from(u8::from(self.water_fits(kind, x, y))));
+        let fits = self.water_fits(kind, x, y);
+        self.push_placement(fits, crate::world::water_price(kind).0, out);
         let ring = at.ring();
         for p in ring.iter().chain(&ring[..1]) {
             out.extend([p.0, p.1]);

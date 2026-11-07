@@ -53,9 +53,10 @@ fn stations_are_refused_off_road_over_pieces_and_without_money() {
     poor.treasury.balance = STATION_COST - 1;
     assert!(!station(&mut poor, WEST.0, WEST.1), "cannot pay");
     let mut preview = Vec::new();
-    assert!(!poor.write_station_preview(WEST.0, WEST.1, &mut preview));
+    poor.write_station_preview(WEST.0, WEST.1, &mut preview);
+    assert_eq!(preview[..2], [0.0, 0.0], "fits but cannot pay");
     assert!(
-        !preview.is_empty(),
+        preview.len() > 2,
         "the footprint still shows where it would stand"
     );
     assert_eq!(poor.treasury.balance, STATION_COST - 1);

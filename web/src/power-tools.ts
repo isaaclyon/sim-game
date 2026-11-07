@@ -2,7 +2,8 @@
 // tools, they ask the sim what a click would do and draw its answer; they never decide it
 // themselves. The build menu owns their buttons and the Views list owns the power and water
 // views.
-import { type FromWorker, PlantKind, type ToWorker, type WaterKind } from './protocol';
+import { type FromWorker, PlantKind, type Prices, type ToWorker, type WaterKind } from './protocol';
+import { placeText } from './ui/hints';
 
 const PLANT_NAMES = ['Coal plant', 'Solar farm', 'Wind turbine'];
 const PLANT_HELP = [
@@ -13,9 +14,10 @@ const PLANT_HELP = [
 /** Water tools by `WaterKind`. */
 export const WATER_TOOLS = ['pump', 'tower'] as const;
 export type WaterTool = (typeof WATER_TOOLS)[number];
+const WATER_NAMES: Record<WaterTool, string> = { pump: 'Pump', tower: 'Water tower' };
 const WATER_HELP: Record<WaterTool, string> = {
-  pump: 'Pump: click beside a road. It gives less water on polluted ground.',
-  tower: 'Water tower: click beside a road. It stores spare water for shortages.',
+  pump: 'Click beside a road. It gives less water on polluted ground.',
+  tower: 'Click beside a road. It stores spare water for shortages.',
 };
 
 /** A placement tool: a plant kind, a power line, or a water piece. */
@@ -52,6 +54,10 @@ export class PowerTools {
   /** The sim's latest line answer, so a click can chain from the snapped end. */
   private ends: Float32Array | null = null;
   private refused = false;
+  /** The latest placement preview said the city cannot pay. */
+  private short = false;
+  /** The sim's prices, for the hint; null until the first city starts. */
+  prices: Prices | null = null;
 
   private readonly send: (msg: ToWorker) => void;
   private readonly draw: PowerView;
@@ -76,7 +82,7 @@ export class PowerTools {
     const was = this.tool;
     this.tool = tool;
     this.start = this.ends = null;
-    this.refused = this.inFlight = false;
+    this.refused = this.inFlight = this.short = false;
     this.clearPreview();
     if (tool !== null || was !== null) this.showHelp();
   }
@@ -149,7 +155,13 @@ export class PowerTools {
     if (msg.revision === this.revision && this.at) {
       const t = this.tool;
       const wanted = msg.type === 'plantPreview' ? typeof t === 'number' : isWater(t);
-      if (placed && wanted) this.draw.setPlantPreview(msg.outline, msg.ok);
+      if (placed && wanted) {
+        this.draw.setPlantPreview(msg.outline, msg.ok);
+        if (this.short === msg.affordable) {
+          this.short = !msg.affordable;
+          this.showHelp();
+        }
+      }
       if (msg.type === 'linePreview' && this.tool === 'line') {
         this.ends = msg.ends;
         this.draw.setLinePreview(msg.ends, this.start, this.at);
@@ -196,7 +208,7 @@ export class PowerTools {
         : t === 'line'
           ? `${no}${this.start ? 'Click the line end.' : 'Click where the line starts: a plant, road or line.'} Esc stops.`
           : isWater(t)
-            ? `${WATER_HELP[t]} Esc stops.`
-            : `${PLANT_NAMES[t]}: click to place. ${PLANT_HELP[t]} Esc stops.`;
+            ? `${placeText(WATER_NAMES[t], this.prices?.water[waterKind(t)], !this.short)} ${WATER_HELP[t]} Esc stops.`
+            : `${placeText(PLANT_NAMES[t], this.prices?.plants[t], !this.short)} Click to place. ${PLANT_HELP[t]} Esc stops.`;
   }
 }

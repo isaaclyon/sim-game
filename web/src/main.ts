@@ -101,6 +101,8 @@ worker.onmessage = (e: MessageEvent<FromWorker>) => {
   } else if (msg.type === 'cityFile' || msg.type === 'commandLog') {
     void cityControls.receiveFile(msg);
   } else if (msg.type === 'cityReset') {
+    menu.setPrices(msg.prices);
+    tools.setPrices(msg.prices);
     tools.use(null);
     menu.closeCategory();
     inspector.select(null);

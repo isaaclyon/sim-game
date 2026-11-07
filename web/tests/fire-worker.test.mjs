@@ -35,6 +35,7 @@ test('a fire station is previewed, placed, paid for and drawn with its coverage'
   const preview = last(w, 'stationPreview');
   assert.equal(preview.revision, 7);
   assert.equal(preview.ok, true);
+  assert.equal(preview.affordable, true);
   assert.ok(preview.outline.length >= 10, 'a closed square');
   await w.send({ type: 'previewStation', x: 5000, y: 5000, revision: 8 });
   assert.equal(last(w, 'stationPreview').outline.length, 0, 'no road in reach');

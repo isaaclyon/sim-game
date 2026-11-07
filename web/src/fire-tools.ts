@@ -1,7 +1,8 @@
 // The fire station tool and the fire messages (ADR 0053). Like the plant tool, it asks the sim
 // where a station would stand and draws its answer; it never decides that itself.
 import type { Spot } from './power-tools';
-import type { FromWorker, ToWorker } from './protocol';
+import type { FromWorker, Prices, ToWorker } from './protocol';
+import { placeText } from './ui/hints';
 
 type FireMessage = Extract<FromWorker, { type: 'fire' }>;
 
@@ -18,6 +19,10 @@ export class FireTools {
   private wanted = false;
   private inFlight = false;
   private revision = 0;
+  /** The latest preview said the city cannot pay. */
+  private short = false;
+  /** The sim's prices, for the hint; null until the first city starts. */
+  prices: Prices | null = null;
   private readonly send: (msg: ToWorker) => void;
   private readonly draw: FireView;
   private readonly help: HTMLElement;
@@ -34,9 +39,9 @@ export class FireTools {
   set(on: boolean) {
     const was = this.active;
     this.active = on;
-    this.inFlight = false;
+    this.inFlight = this.short = false;
     this.clearPreview();
-    if (on) this.help.textContent = 'Fire station: click beside a road to place. Esc stops.';
+    if (on) this.showHelp();
     else if (was) this.help.textContent = '';
   }
 
@@ -68,6 +73,10 @@ export class FireTools {
     this.inFlight = false;
     if (msg.revision === this.revision && this.at && this.active) {
       this.draw.setPlantPreview(msg.outline, msg.ok);
+      if (this.short === msg.affordable) {
+        this.short = !msg.affordable;
+        this.showHelp();
+      }
     }
     this.ask();
     return true;
@@ -80,6 +89,11 @@ export class FireTools {
     this.wanted = false;
     this.inFlight = true;
     this.send({ type: 'previewStation', x: p.x, y: p.z, revision: this.revision });
+  }
+
+  private showHelp() {
+    const price = placeText('Fire station', this.prices?.station, !this.short);
+    this.help.textContent = `${price} Click beside a road to place. Esc stops.`;
   }
 
   private clearPreview() {

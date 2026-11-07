@@ -16,6 +16,23 @@ export const WaterKind = {
 } as const;
 export type WaterKind = (typeof WaterKind)[keyof typeof WaterKind];
 
+/** What a placeable costs, from the sim (ADR 0036, 0052, 0053): dollars to build, and dollars
+ * per clock hour to keep. */
+export interface Price {
+  cost: number;
+  upkeep: number;
+}
+
+/** Prices of what the build menu sells besides roads, which are quoted while drawn. Power
+ * lines are free. */
+export interface Prices {
+  /** By `PlantKind`. */
+  plants: Price[];
+  /** By `WaterKind`. */
+  water: Price[];
+  station: Price;
+}
+
 /** Floats per piece in `water.pieces`. */
 export const WATER_PIECE_STRIDE = 9;
 /** Floats per building in `water.buildings`. */
@@ -108,11 +125,12 @@ export type ServiceMessage =
    */
   | { type: 'water'; pieces: Float32Array; buildings: Float32Array }
   /** `outline` is the closed `[x, y]` footprint the pump or tower asked about would take,
-   * snapped beside a road; `ok` if it fits. */
-  | { type: 'waterPreview'; outline: Float32Array; ok: boolean; revision: number }
+   * snapped beside a road; `ok` if a click would place it (it fits and the city can pay),
+   * `affordable` false when the city cannot pay. */
+  | PlacementPreview<'waterPreview'>
   /** `outline` is the closed `[x, y]` footprint the plant asked about would take, snapped
-   * beside a road for coal (ADR 0042); `ok` if it fits. */
-  | { type: 'plantPreview'; outline: Float32Array; ok: boolean; revision: number }
+   * beside a road for coal (ADR 0042); `ok` and `affordable` as for `waterPreview`. */
+  | PlacementPreview<'plantPreview'>
   /**
    * Fire (ADR 0053), sent whole when stations, fires, ruins, the fire setting, roads or
    * buildings change; growth is coalesced like `buildings`. `stations` is `[x, y, halfSize,
@@ -131,8 +149,17 @@ export type ServiceMessage =
       coverBuildings: Float32Array;
     }
   /** `outline` is the closed `[x, y]` footprint a station asked about would take, beside its
-   * road, empty where no road is in reach; `ok` if it would be placed. */
-  | { type: 'stationPreview'; outline: Float32Array; ok: boolean; revision: number }
+   * road, empty where no road is in reach; `ok` and `affordable` as for `waterPreview`. */
+  | PlacementPreview<'stationPreview'>
   /** `[ax, ay, aJoin, bx, by, bJoin]`, join 1 where an end meets a line, plant or road and 0
    * where it stands free; empty means refused. */
   | { type: 'linePreview'; ends: Float32Array; revision: number };
+
+/** Where a plant, pump, tower or station asked about would stand, and whether it would. */
+export interface PlacementPreview<T> {
+  type: T;
+  outline: Float32Array;
+  ok: boolean;
+  affordable: boolean;
+  revision: number;
+}

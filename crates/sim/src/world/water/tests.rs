@@ -253,6 +253,13 @@ fn pumps_and_towers_cost_money_and_upkeep_and_need_a_road() {
         assert!(!place(&mut w, kind, (2000.0, 2000.0)), "no road in reach");
         w.treasury.balance = cost - 1;
         let hash = w.state_hash();
+        let mut preview = Vec::new();
+        w.write_water_preview(kind, PUMP.0, PUMP.1, &mut preview);
+        assert_eq!(
+            preview[..2],
+            [0.0, 0.0],
+            "{kind:?} fits but is unaffordable"
+        );
         assert!(
             !place(&mut w, kind, PUMP),
             "{kind:?} refused when unaffordable"

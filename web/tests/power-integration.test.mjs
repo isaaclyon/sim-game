@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { tools } from './main-harness.mjs';
+import { PRICES, tools } from './main-harness.mjs';
 
 const last = (t, type) => t.messages.findLast((m) => m.type === type);
 const pressed = (t, id) => t.elements[id].attributes['aria-pressed'] === 'true';
@@ -67,7 +67,7 @@ test('replacing a city cancels power construction and ignores its in-flight prev
   t.click(10, 20);
   t.move(100, 20);
   const pending = last(t, 'previewLine');
-  t.reply({ type: 'cityReset', speed: 0 });
+  t.reply({ type: 'cityReset', speed: 0, prices: PRICES });
   assert.ok(!pressed(t, 'power-line'));
   assert.equal(t.canvas.style.cursor, '');
   t.reply({

@@ -1,6 +1,8 @@
 // The build menu (M4.6): the category bar, the item row and the options row, built from the
 // list in `catalog.ts`. It owns which button is selected; the tools keep their canvas handling
 // and sim commands, and report what is in use through `show`.
+
+import type { Prices } from '../protocol';
 import {
   type Category,
   type Item,
@@ -11,6 +13,8 @@ import {
   type Tool,
 } from './catalog';
 import { h, press, tooltip } from './dom';
+import { dollars } from './figures';
+import { itemPrice, priceText } from './hints';
 import type { Popovers } from './popover';
 
 /** What is in use, for marking the selected buttons. */
@@ -234,6 +238,20 @@ export class BuildMenu {
     this.closeCategory();
   }
 
+  /** Shows the sim's prices on the items that place things, and in their tooltips. */
+  setPrices(prices: Prices) {
+    for (const [item, button] of this.items) {
+      const price = itemPrice(prices, item.tool);
+      if (price === null) continue;
+      button.title = tooltip(item.label, `${item.tip} ${priceText(price)}`, item.key);
+      const tag = this.priceTags.get(button);
+      if (tag) tag.textContent = price === 'free' ? 'Free' : dollars(price.cost);
+    }
+  }
+
+  /** Each item's price line, empty (and hidden) for roads and zones. */
+  private readonly priceTags = new Map<HTMLElement, HTMLElement>();
+
   private itemRow(c: Category) {
     const row = h('div', {
       id: `items-${c.id}`,
@@ -257,6 +275,9 @@ export class BuildMenu {
         h('span', { class: 'frame' }, this.picture(item.picture, item.label)),
         h('span', { class: 'label' }, item.label),
       );
+      const tag = h('span', { class: 'price' });
+      this.priceTags.set(b, tag);
+      b.append(tag);
       if (item.stripe) {
         const stripe = h('span', { class: 'stripe', 'aria-hidden': 'true' });
         stripe.style.background = item.stripe;

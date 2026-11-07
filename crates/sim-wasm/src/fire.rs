@@ -35,16 +35,10 @@ impl Sim {
         self.apply(Command::SetFires { on })
     }
 
-    /// `[ok, x0, y0, …]`: whether a station asked for here would be placed, then its closed
-    /// footprint; empty where no road is in reach. See `World::write_station_preview`.
+    /// `[ok, affordable, x0, y0, …]`; see `World::write_station_preview`.
     pub fn station_preview(&mut self, x: f32, y: f32) -> Vec<f32> {
-        let ok = self.world.write_station_preview(x, y, &mut self.buf);
-        let mut out = Vec::with_capacity(self.buf.len() + 1);
-        if !self.buf.is_empty() {
-            out.push(f32::from(u8::from(ok)));
-            out.extend_from_slice(&self.buf);
-        }
-        out
+        self.world.write_station_preview(x, y, &mut self.buf);
+        self.buf.clone()
     }
 
     pub fn fire_version(&self) -> u32 {

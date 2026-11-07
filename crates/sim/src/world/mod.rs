@@ -47,7 +47,9 @@ pub use history::{
     History, HistoryView, MAX_RECORDS, MAX_STEPS, Record, RoadRecord, Step, StepKind,
 };
 pub use inspect::{BuildingInfo, CitizenInfo, Place};
-pub use money::{GRANT, JOB_TAX, Money, RESIDENT_TAX, START_FUNDS, plant_price, water_price};
+pub use money::{
+    GRANT, JOB_TAX, Money, RESIDENT_TAX, START_FUNDS, plant_price, price_list, water_price,
+};
 pub use persist::{SAVE_VERSION, SaveError};
 pub use power::{PLANT_STRIDE, POWER_BUILDING_STRIDE, PowerStats};
 pub use water::{WATER_BUILDING_STRIDE, WATER_PIECE_STRIDE, WaterStats};

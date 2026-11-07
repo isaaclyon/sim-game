@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { tools } from './main-harness.mjs';
+import { PRICES, tools } from './main-harness.mjs';
 
 const status = (overrides = {}) => ({
   type: 'cityStatus',
@@ -131,7 +131,7 @@ test('city reset clears tools, follow and interpolation, and synchronizes pause 
   t.pressId('category-roads');
   t.pressId('street');
   assert.equal(t.canvas.style.cursor, 'crosshair');
-  t.reply({ type: 'cityReset', speed: 0 });
+  t.reply({ type: 'cityReset', speed: 0, prices: PRICES });
   assert.equal(t.canvas.style.cursor, '');
   assert.equal(t.elements['items-roads'].hidden, true, 'the build menu closes');
   assert.deepEqual({ ...t.messages.at(-1) }, { type: 'setSpeed', speed: 0 });

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { ZoneOverlay } from '../src/zone-overlay.ts';
-import { tools } from './main-harness.mjs';
+import { PRICES, tools } from './main-harness.mjs';
 
 test('zone colors and lot lines start hidden, even when new snapshots arrive', () => {
   const overlay = new ZoneOverlay();
@@ -43,7 +43,7 @@ test("a city's first zones and buildings appear at once; later snapshots flash a
   t.reply(buildings);
   assert.equal(latest('zones').flash, true);
   assert.equal(latest('buildings').rise, true);
-  t.reply({ type: 'cityReset', speed: 1 });
+  t.reply({ type: 'cityReset', speed: 1, prices: PRICES });
   t.reply(zones);
   t.reply(buildings);
   assert.equal(latest('zones').flash, false, 'a loaded or new city does not flash');

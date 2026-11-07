@@ -378,7 +378,7 @@ Goals and consequences, kept light so they don't crowd out building.
 - Money: build costs, taxes, upkeep (implemented, [ADR 0036](adrs/0036-money-build-costs-taxes-upkeep.md)).
   A fresh city starts on an empty map with $150,000. Roads cost money to build by length and
   class and refuse to build when the city cannot pay; the road tool quotes the cost. Every road
-  costs upkeep, and residents and filled jobs pay taxes, per clock hour. A flat $1,000 grant per
+  costs upkeep, and residents and filled jobs pay taxes, per clock hour. A flat $2,000 grant per
   clock hour pays for early roads before taxes can. Upkeep beyond income can push the
   balance into debt, which only stops new roads. The top bar shows the balance and net income;
   its money panel shows taxes, grant and upkeep.

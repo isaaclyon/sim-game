@@ -8,6 +8,20 @@ import { fakeDocument } from './fake-dom.mjs';
 
 // Exercise main.ts's event handlers without a WebGL context or a running clock. `catalog`, if
 // given, may change the build menu's list (`src/ui/catalog.ts`) before the menu is built.
+/** A price list like the sim's, for `cityReset` replies. */
+export const PRICES = {
+  plants: [
+    { cost: 20000, upkeep: 120 },
+    { cost: 12000, upkeep: 40 },
+    { cost: 4000, upkeep: 15 },
+  ],
+  water: [
+    { cost: 6000, upkeep: 40 },
+    { cost: 4000, upkeep: 20 },
+  ],
+  station: { cost: 6000, upkeep: 120 },
+};
+
 export async function tools({ hash = '', clipboard = true, catalog } = {}) {
   const document = fakeDocument(new URL('../index.html', import.meta.url));
   const createElement = document.createElement;

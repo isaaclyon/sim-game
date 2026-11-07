@@ -137,6 +137,10 @@ test('the worker places plants and lines, answers previews and reports power', a
   await w.send({ type: 'previewPlant', kind: PlantKind.Solar, x: 120, y: 0, revision: 3 });
   const refused = w.messages.at(-1);
   assert.deepEqual([refused.type, refused.ok, refused.revision], ['plantPreview', false, 3]);
+  assert.equal(refused.affordable, true, 'refused for its place, not for money');
+  const { prices } = last(w, 'cityReset');
+  assert.deepEqual({ ...prices.plants[0] }, { cost: 20000, upkeep: 120 }, 'the sim prices coal');
+  assert.deepEqual({ ...prices.station }, { cost: 6000, upkeep: 120 });
   assert.equal(refused.outline.length, 10, 'a closed square outline');
 
   await w.power();

@@ -107,6 +107,17 @@
 .item .label {
   white-space: nowrap;
 }
+/* What the item costs to build, from the sim; empty for roads and zones. */
+.item .price {
+  margin-top: -3px;
+  color: var(--text-dim);
+  font-size: 12px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.item .price:empty {
+  display: none;
+}
 .item .stripe {
   position: absolute;
   left: 8px;

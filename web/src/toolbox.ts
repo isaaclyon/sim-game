@@ -5,7 +5,7 @@
 // view until it is put away.
 import { FireTools } from './fire-tools';
 import { PowerTools, WATER_TOOLS } from './power-tools';
-import { RoadClass, type ToWorker, type WaterKind, Zone } from './protocol';
+import { type Prices, RoadClass, type ToWorker, type WaterKind, Zone } from './protocol';
 import type { Renderer } from './renderer';
 import { RoadTool } from './road-tool';
 import type { Selection } from './ui/build-menu';
@@ -108,6 +108,11 @@ export class Toolbox {
     this.showView('fire', this.fire.active);
     this.renderer.renderer.domElement.style.cursor = tool ? 'crosshair' : '';
     this.changed();
+  }
+
+  /** The sim's prices, for the placement tools' hints. */
+  setPrices(prices: Prices) {
+    this.power.prices = this.fire.prices = prices;
   }
 
   /** Undo or redo changed the map under a road or line being drawn: start it again. */

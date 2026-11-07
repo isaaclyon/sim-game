@@ -1,6 +1,6 @@
 # 0036. Money: build costs, taxes and upkeep on an empty starting map
 
-- Status: Accepted; implemented; free followed legs superseded by [0048](0048-drawing-over-roads-changes-their-class.md); starting funds amended 2026-11-07
+- Status: Accepted; implemented; free followed legs superseded by [0048](0048-drawing-over-roads-changes-their-class.md); starting funds and grant amended 2026-11-07
 - Date: 2026-11-04
 - Extends: [0033](0033-single-city-state-saves.md) (save version 2) and
   [0034](0034-command-log-replay-tests.md) (`map` start line)
@@ -54,9 +54,10 @@ player-set rate would add a command then.
 
 Records what shipped after acceptance; the decision above stands.
 
-- **A flat grant is a second income.** Every city receives $1,000 per clock hour (`GRANT`),
-  whatever its size, settled each clock minute with taxes and upkeep. It pays for the first
-  roads before there are residents to tax, and covers the upkeep of about 10 km of street.
+- **A flat grant is a second income.** Every city receives $2,000 per clock hour (`GRANT`;
+  amended 2026-11-07, was $1,000), whatever its size, settled each clock minute with taxes
+  and upkeep. It pays for the first
+  roads before there are residents to tax, and covers the upkeep of about 20 km of street.
   Frames carry it as `grant`. The amount is a tuning value. Adding it changed every city's
   balance, which is hashed, so the replay fixtures' `expect` hashes were re-blessed.
 - **Free edits are always affordable.** `can_afford` accepts any cost of $0, so a city in debt

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { tools } from './main-harness.mjs';
+import { PRICES, tools } from './main-harness.mjs';
 
 const roads = () => ({ type: 'roads', segments: new Float32Array(), bounds: [0, 0, 100, 100] });
 const answer = (request) => ({
@@ -14,7 +14,7 @@ test('city replacement cancels a pending zone preview and allows fresh requests'
   t.key('z');
   t.move(10, 20);
   const old = t.messages.at(-1);
-  t.reply({ type: 'cityReset', speed: 0 });
+  t.reply({ type: 'cityReset', speed: 0, prices: PRICES });
   t.key('z');
   t.move(30, 40);
   const fresh = t.messages.at(-1);
