@@ -213,7 +213,8 @@ export interface Demand {
 
 /** The town's power from the sim (ADR 0041), in the units of a building's demand. */
 export interface PowerStats {
-  /** What all plants produce now, not counting starter power. */
+  /** What plants produce now on grids with at least one standing building, not counting
+   * starter power. A plant no building can draw from adds nothing. */
   supply: number;
   /** The small supply every city starts with, given to its oldest buildings. */
   starter: number;

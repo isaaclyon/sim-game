@@ -15,7 +15,8 @@ use crate::zone::Zone;
 /// The town's power, for the readout beside the demand bars.
 #[derive(Clone, Copy, Default, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PowerStats {
-    /// What all plants produce now, not counting starter power.
+    /// What plants produce now on grids with at least one standing building, not counting
+    /// starter power. A plant no building can draw from adds nothing.
     pub supply: u32,
     pub starter: u32,
     /// Demand of the powered buildings.
@@ -213,12 +214,15 @@ impl World {
     pub fn power_stats(&self) -> PowerStats {
         let c = &self.power_cache;
         let mut s = PowerStats {
-            supply: c.supply.iter().sum(),
             starter: STARTER_POWER,
             ..Default::default()
         };
+        let mut served = vec![false; c.supply.len()];
         for b in self.buildings.active_buildings() {
             let i = b as usize;
+            if let Some(g) = c.grid.get(i).and_then(|&g| served.get_mut(g as usize)) {
+                *g = true;
+            }
             let d = c.demand.get(i).copied().unwrap_or(0);
             s.demand += d;
             if c.powered.get(i) == Some(&true) {
@@ -227,6 +231,10 @@ impl World {
                 s.unpowered += 1;
             }
         }
+        s.supply = (c.supply.iter().zip(&served))
+            .filter(|(_, served)| **served)
+            .map(|(supply, _)| supply)
+            .sum();
         s.waiting = self.buildings.waiting_for_power();
         s
     }

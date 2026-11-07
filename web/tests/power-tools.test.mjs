@@ -145,7 +145,8 @@ test('the worker places plants and lines, answers previews and reports power', a
   assert.equal(power.plants[0], PlantKind.Coal);
   const [fx, fy] = power.plants.subarray(4, 6);
   assert.ok(Math.abs(Math.hypot(fx, fy) - 1) < 1e-5, 'faces its street along a unit direction');
-  assert.ok(last(w, 'frame').stats.power.supply > 0);
+  assert.ok(power.plants[8] > 0, 'the plant produces power');
+  assert.equal(last(w, 'frame').stats.power.supply, 0, 'but serves no building yet');
   assert.equal(last(w, 'frame').stats.balance, balance, 'plants remain free');
   assert.equal(last(w, 'frame').stats.upkeep, upkeep, 'plants add no upkeep');
 

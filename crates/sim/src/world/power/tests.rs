@@ -107,6 +107,22 @@ fn loading_preserves_power_waiting_and_subsequent_growth_checks() {
 }
 
 #[test]
+fn supply_counts_only_grids_that_serve_a_building() {
+    let mut w = zoned();
+    assert!(plant(&mut w, PlantKind::Coal, COAL.0, COAL.1));
+    advance(&mut w, 900);
+    assert!(w.buildings.active_buildings().count() > 0);
+    let coal = w.power_stats().supply;
+    assert_eq!(coal, w.power_cache.output[0]);
+
+    assert!(plant(&mut w, PlantKind::Wind, 500.0, 60.0));
+    assert!(w.power_cache.output[1] > 0, "the turbine is turning");
+    assert_eq!(w.power_stats().supply, coal, "a lone turbine powers no one");
+    assert!(line(&mut w, (500.0, 60.0), (362.0, 60.0)));
+    assert_eq!(w.power_stats().supply, coal + w.power_cache.output[1]);
+}
+
+#[test]
 fn plants_keep_clear_of_roads_and_each_other() {
     let mut w = lattice();
     assert!(!plant(&mut w, PlantKind::Solar, 120.0, 60.0), "over a road");
@@ -357,7 +373,7 @@ fn powered_homes_still_wait_for_the_land_value_threshold() {
     w.pollution.derive(&w.pollution.sources());
     let lot = w.lots.active_lots().next().unwrap();
     assert!(w.land_threshold(lot, Zone::ResidentialLow) > w.demand().residential);
-    assert!(w.power_stats().supply > STARTER_POWER);
+    assert!(w.power_cache.supply.iter().sum::<u32>() > STARTER_POWER);
     advance(&mut w, 300);
     assert_eq!(w.buildings.active_buildings().count(), 0);
     assert_eq!(
