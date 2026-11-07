@@ -9,6 +9,9 @@ export const PREVIEW_COLOR = new THREE.Color(0x4a8bd0);
 export const PREVIEW_REFUSED_COLOR = new THREE.Color(0xe5484d);
 /** Snap markers, indexed by join: new end (not drawn), existing node, split road. */
 const JOIN_COLORS = [null, new THREE.Color(0xffffff), new THREE.Color(0xf5c542)];
+/** Existing roads a draft would change to its class (ADR 0048): the split marker's yellow, as
+ * both change a road that is already there. */
+const RECLASS_COLOR = JOIN_COLORS[2] as THREE.Color;
 /** The hover marker before a road has a start: new ends get one too, so the start is visible. */
 const JOIN_MARKER = [PREVIEW_COLOR, JOIN_COLORS[1], JOIN_COLORS[2]];
 const MARKER_PX = 10;
@@ -39,6 +42,8 @@ export class ToolPreview {
   readonly group = new THREE.Group();
   readonly line: THREE.Line;
   readonly ribbon: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
+  /** Roads a drawn road would change to its class, over the draft's own ribbon. */
+  readonly reclass: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
   readonly markers: THREE.Points;
   readonly zoneDrag: THREE.LineLoop;
   /** Dashed guide lines a drawn point snapped to, from each line's origin to the point. */
@@ -57,20 +62,11 @@ export class ToolPreview {
       new THREE.LineBasicMaterial({ color: PREVIEW_COLOR }),
     );
     this.line.visible = false;
-    this.ribbon = new THREE.Mesh(
-      new THREE.BufferGeometry(),
-      new THREE.MeshBasicMaterial({
-        color: PREVIEW_COLOR,
-        transparent: true,
-        opacity: RIBBON_OPACITY,
-        // Overlapping pads and ribbons sit at one height; Less rejects the second layer, so
-        // joints are not darker. Buildings still hide what is behind them.
-        depthFunc: THREE.LessDepth,
-      }),
-    );
-    this.ribbon.position.y = RIBBON_Y;
-    this.ribbon.renderOrder = 6;
-    this.ribbon.visible = false;
+    this.ribbon = ribbonMesh();
+    this.reclass = ribbonMesh();
+    this.reclass.material.color.copy(RECLASS_COLOR);
+    // Just above the draft's ribbon, so the changing roads show through it.
+    this.reclass.position.y = RIBBON_Y + 0.05;
     this.markers = new THREE.Points(
       new THREE.BufferGeometry(),
       new THREE.PointsMaterial({ size: MARKER_PX, sizeAttenuation: false, vertexColors: true }),
@@ -108,7 +104,15 @@ export class ToolPreview {
       new THREE.BufferGeometry(),
       new THREE.LineBasicMaterial({ vertexColors: true }),
     );
-    const parts = [this.line, this.ribbon, this.markers, this.zoneDrag, this.guides, this.dropped];
+    const parts = [
+      this.line,
+      this.ribbon,
+      this.reclass,
+      this.markers,
+      this.zoneDrag,
+      this.guides,
+      this.dropped,
+    ];
     for (const o of [...parts, this.angleFill, this.angleEdge]) {
       o.frustumCulled = false;
       this.group.add(o);
@@ -116,7 +120,13 @@ export class ToolPreview {
   }
 
   /** See `Renderer.setPreview`. `roadClass` sets the ribbon width. */
-  setRoad(stops: Float32Array | null, a: Ground | null, b: Ground | null, roadClass = 0) {
+  setRoad(
+    stops: Float32Array | null,
+    a: Ground | null,
+    b: Ground | null,
+    roadClass = 0,
+    reclass = new Float32Array(),
+  ) {
     const line: number[] = [];
     const markers: number[] = [];
     const colors: number[] = [];
@@ -137,6 +147,14 @@ export class ToolPreview {
     const road = !!stops && (stops.length === 0 || stops[stops.length - 1] >= 0);
     this.setPath(line, color, road ? roadClass : null);
     this.setMarkers(markers, colors);
+    // Each changing road at its new class's width, as the upgrade click draws one.
+    const pieces: number[] = [];
+    for (let i = 0; i < reclass.length; i += 1 + 2 * reclass[i])
+      for (let j = i + 3; j < i + 1 + 2 * reclass[i]; j += 2)
+        pieces.push(reclass[j - 2], reclass[j - 1], reclass[j], reclass[j + 1], roadClass);
+    this.reclass.visible = pieces.length > 0;
+    this.reclass.geometry.dispose();
+    this.reclass.geometry = buildRoadGeometry(new Float32Array(pieces));
   }
 
   /** `[x0, y0, x1, y1]` per guide line; null or empty hides them. */
@@ -299,7 +317,7 @@ export class ToolPreview {
   }
 
   /** `xy` is `[x, y]` per centreline point; `roadClass` null draws no ribbon. Hides a grid's
-   * left-out edges, which only `setGrid` draws. */
+   * left-out edges and a draft's changing roads, which only `setGrid` and `setRoad` draw. */
   private setPath(xy: number[], color: THREE.Color, roadClass: number | null) {
     const points: THREE.Vector3[] = [];
     const segments: number[] = [];
@@ -314,6 +332,7 @@ export class ToolPreview {
     this.line.geometry = new THREE.BufferGeometry().setFromPoints(points);
     this.setRibbon(segments, color);
     this.dropped.visible = false;
+    this.reclass.visible = false;
   }
 
   /** `[ax, ay, bx, by, class]` per road-wide piece. */
@@ -345,6 +364,25 @@ export class ToolPreview {
     this.zoneDrag.geometry = new THREE.BufferGeometry().setFromPoints(points);
     (this.zoneDrag.material as THREE.LineBasicMaterial).color.set(ZONE_OUTLINE[zone] ?? 0xffffff);
   }
+}
+
+/** A road-wide translucent ribbon, hidden until given pieces. */
+function ribbonMesh() {
+  const mesh = new THREE.Mesh(
+    new THREE.BufferGeometry(),
+    new THREE.MeshBasicMaterial({
+      color: PREVIEW_COLOR,
+      transparent: true,
+      opacity: RIBBON_OPACITY,
+      // Overlapping pads and ribbons sit at one height; Less rejects the second layer, so
+      // joints are not darker. Buildings still hide what is behind them.
+      depthFunc: THREE.LessDepth,
+    }),
+  );
+  mesh.position.y = RIBBON_Y;
+  mesh.renderOrder = 6;
+  mesh.visible = false;
+  return mesh;
 }
 
 /** Dashed lines, `[x0, y0, x1, y1]` each; null or empty hides them. */

@@ -307,6 +307,8 @@ export type FromWorker =
    * `cost` is what building the guided road would charge in dollars, null when no road is
    * planned (one point, a control point, or refused);
    * `affordable` is false when the city cannot pay it, and building would be refused (ADR 0036).
+   * `reclass` is `[n, x0, y0, …]` per existing road the build would change to the drawn class
+   * (ADR 0048): its centreline sample count, then the samples; empty when none would change.
    */
   | {
       type: 'roadPreview';
@@ -319,6 +321,7 @@ export type FromWorker =
       revision: number;
       cost: number | null;
       affordable: boolean;
+      reclass: Float32Array;
     }
   /**
    * What a grid would build (ADR 0049). `points`, `guides`, `length`, `angle` and `angles`

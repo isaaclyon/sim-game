@@ -5,20 +5,21 @@ import type { FromWorker, ToWorker } from './protocol';
 
 type Answer = { msg: FromWorker; transfer: Transferable[] };
 
-/** Answers `previewRoad`: `[n, m, length, angle, k]`, guided points, guide lines, angle marks,
- * then stops. */
+/** Answers `previewRoad`: `[n, m, length, angle, k, r]`, guided points, guide lines, angle
+ * marks, `r` floats of roads the draft would change to its class, then stops. */
 export function roadPreview(
   sim: Sim | undefined,
   msg: Extract<ToWorker, { type: 'previewRoad' }>,
 ): Answer {
   const raw = new Float32Array(msg.points);
-  const d = sim?.road_draft(raw, msg.plan, msg.class) ?? new Float32Array(5);
-  const [n, m, length, angle, k] = d;
-  const at = 5 + 2 * n;
-  const points = d.slice(5, at);
+  const d = sim?.road_draft(raw, msg.plan, msg.class) ?? new Float32Array(6);
+  const [n, m, length, angle, k, r] = d;
+  const at = 6 + 2 * n;
+  const points = d.slice(6, at);
   const guides = d.slice(at, at + 4 * m);
   const angles = d.slice(at + 4 * m, at + 4 * m + 6 * k);
-  const stops = d.slice(at + 4 * m + 6 * k);
+  const reclass = d.slice(at + 4 * m + 6 * k, at + 4 * m + 6 * k + r);
+  const stops = d.slice(at + 4 * m + 6 * k + r);
   // What the guided road would charge (ADR 0036); nothing when no road is planned.
   const cost = msg.plan && stops.length > 0 ? (sim?.draft_cost(raw, msg.class) ?? null) : null;
   const affordable = cost !== null && !!sim?.can_afford(cost);
@@ -26,9 +27,9 @@ export function roadPreview(
     msg: {
       type: 'roadPreview',
       ...{ revision: msg.revision, stops, points, guides, angles, length, angle },
-      ...{ cost, affordable },
+      ...{ cost, affordable, reclass },
     },
-    transfer: [stops.buffer, points.buffer, guides.buffer, angles.buffer],
+    transfer: [stops.buffer, points.buffer, guides.buffer, angles.buffer, reclass.buffer],
   };
 }
 

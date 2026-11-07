@@ -46,8 +46,48 @@ fn raw(points: &[(f32, f32)]) -> Vec<f32> {
 fn preview_stops(w: &World, points: &[(f32, f32)], class: RoadClass) -> Vec<f32> {
     let mut out = Vec::new();
     w.write_road_draft(&raw(points), true, class, &mut out);
-    let (n, m, k) = (out[0] as usize, out[1] as usize, out[4] as usize);
-    out[5 + 2 * n + 4 * m + 6 * k..].to_vec()
+    let (n, m, k, r) = (
+        out[0] as usize,
+        out[1] as usize,
+        out[4] as usize,
+        out[5] as usize,
+    );
+    out[6 + 2 * n + 4 * m + 6 * k + r..].to_vec()
+}
+
+/// The `reclass` part of `write_road_draft`'s answer: `[x, y]` centreline samples per road
+/// the draft would change to the drawn class.
+fn preview_reclass(w: &World, points: &[(f32, f32)], class: RoadClass) -> Vec<Vec<(f32, f32)>> {
+    let mut out = Vec::new();
+    w.write_road_draft(&raw(points), true, class, &mut out);
+    let (n, m, k, r) = (
+        out[0] as usize,
+        out[1] as usize,
+        out[4] as usize,
+        out[5] as usize,
+    );
+    let at = 6 + 2 * n + 4 * m + 6 * k;
+    let mut section = &out[at..at + r];
+    let mut roads = Vec::new();
+    while let [count, rest @ ..] = section {
+        let (samples, next) = rest.split_at(2 * *count as usize);
+        roads.push(samples.chunks(2).map(|p| (p[0], p[1])).collect());
+        section = next;
+    }
+    roads
+}
+
+#[test]
+fn the_preview_lists_the_roads_a_draft_would_change() {
+    let w = world(&[(0.0, 0.0, 200.0, 0.0, RoadClass::Main)]);
+    // A street drawn along the main road would quietly turn it into a street.
+    let along = preview_reclass(&w, &[(0.0, 0.0), (200.0, 0.0)], RoadClass::Street);
+    assert_eq!(along, [vec![(0.0, 0.0), (200.0, 0.0)]]);
+    // Crossing it adds a road and changes no class; open ground changes nothing either.
+    assert!(preview_reclass(&w, &[(100.0, -80.0), (100.0, 80.0)], RoadClass::Street).is_empty());
+    assert!(preview_reclass(&w, &[(0.0, 300.0), (200.0, 300.0)], RoadClass::Street).is_empty());
+    // A main road drawn on past it upgrades nothing, since the road is already main.
+    assert!(preview_reclass(&w, &[(0.0, 0.0), (300.0, 0.0)], RoadClass::Main).is_empty());
 }
 
 #[test]

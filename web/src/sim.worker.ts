@@ -323,7 +323,7 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
           ? sim.road_draft(new Float32Array(msg.points), false, msg.class)
           : null;
       const control: [number, number] | undefined =
-        draft?.[0] === 3 ? [draft[7], draft[8]] : undefined;
+        draft?.[0] === 3 ? [draft[8], draft[9]] : undefined;
       const built =
         sim && cities.ready ? sim.build_draft(new Float32Array(msg.points), msg.class) : null;
       const end: [number, number] | null = built?.length === 2 ? [built[0], built[1]] : null;

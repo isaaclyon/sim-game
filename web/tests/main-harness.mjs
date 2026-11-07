@@ -134,8 +134,8 @@ export async function tools({ hash = '', clipboard = true, catalog } = {}) {
     pick(x, z) {
       return { x, z };
     }
-    setPreview(stops, a, b, roadClass) {
-      previews.push({ type: 'road', stops, a, b, roadClass });
+    setPreview(stops, a, b, roadClass, reclass) {
+      previews.push({ type: 'road', stops, a, b, roadClass, reclass });
     }
     setGuides(lines) {
       previews.push({ type: 'guides', lines });

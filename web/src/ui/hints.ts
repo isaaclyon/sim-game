@@ -2,8 +2,17 @@
 import { Zone } from '../protocol';
 import { dollars } from './figures';
 
-/** The sim's quote for the previewed road (ADR 0036). */
-export type Quote = { cost: number | null; affordable: boolean } | null;
+/** The sim's quote for the previewed road (ADR 0036), and how many existing roads it would
+ * change to the drawn class (ADR 0048). */
+export type Quote = { cost: number | null; affordable: boolean; changes?: number } | null;
+
+/** Names the roads a draft would change to its class; drawing a main road only upgrades. */
+function changeText(quote: Quote, main: boolean) {
+  const n = quote?.changes ?? 0;
+  if (!n) return '';
+  const roads = n === 1 ? '1 road' : `${n} roads`;
+  return `${main ? 'Upgrades' : 'Changes'} ${roads} to ${main ? 'main road' : 'street'}. `;
+}
 
 function costText(quote: Quote) {
   if (!quote || quote.cost === null) return '';
@@ -42,7 +51,7 @@ export function roadHelpText(
       : tool === 'grid'
         ? 'Nothing to build here. Move the grid off the roads in its way. '
         : 'Cannot build here. Move the end away from overlaps or short joins. '
-    : costText(quote);
+    : `${changeText(quote, main)}${costText(quote)}`;
   return `${main ? 'Main road. ' : ''}${problem}${STAGES[stage]} Hold Shift to place freely. Esc or right-click cancels.`;
 }
 

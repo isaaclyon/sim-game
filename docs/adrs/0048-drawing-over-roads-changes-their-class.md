@@ -53,3 +53,11 @@ crossing anything was refused as an overlap.
 roads join (ADR 0040): cars on those two roads are removed, as with any join. The owner
 accepted this for now; [0050](0050-click-to-change-road-class.md) and
 [0051](0051-road-edit-history-revised.md) say the same.
+
+## Amendment (preview names class changes)
+
+A review found that a draft along a road changed its class with no warning: a street drawn
+along a main road downgraded it for $0. The road draft preview now lists the roads the build
+would change (`reclass` in `write_road_draft`'s answer and the worker's `roadPreview`). The
+road tool says how many change and to which class in its hint, and highlights them at the new
+class's width. The sim decides which roads change; the frontend only counts and draws them.
