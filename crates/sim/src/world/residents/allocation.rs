@@ -131,19 +131,14 @@ impl World {
                     .push(Reverse((self.totals.tick + self.secs_to_ticks(30.0), home)));
                 continue;
             }
-            let household = self.households.active.len() as u32;
-            self.households.active.push(true);
-            self.households.home.push(home);
-            self.households.members.push(Vec::new());
-            self.homes.household[h] = Some(household);
-            self.residents.vacant.remove(&home);
+            // Grown children of the town come first (ADR 0054).
+            if self.move_in_grown_child(home) {
+                continue;
+            }
+            let household = self.found_household(home);
             let size = household_size(self.homes.capacity[h], &mut self.residents.rng);
-            for _ in 0..size {
-                let c = self.citizens.push(household, b, &mut self.residents.rng);
-                self.households.members[household as usize].push(c);
-                self.residents.population += 1;
-                self.schedule_day(c);
-                self.schedule_search(c, 1.0);
+            for k in 0..size {
+                self.arrive_member(household, b, k == 0);
             }
         }
     }

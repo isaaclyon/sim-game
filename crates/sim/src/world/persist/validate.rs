@@ -154,10 +154,15 @@ impl World {
             c.car_out.len(),
             c.walk_limit.len(),
             c.walk_speed.len(),
+            c.born.len(),
+            c.child.len(),
+            c.family.len(),
+            c.move_by.len(),
         ];
         lens(&fields, n, "citizen fields")?;
         finite(c.walk_limit.iter().chain(&c.walk_speed), "citizen walking")?;
         below(&c.household, hh.active.len(), "citizen households")?;
+        below(&c.family, hh.active.len(), "citizen families")?;
         let places = c.job.iter().chain(&c.destination).flatten();
         below(places.chain(&c.location), buildings, "citizen places")?;
         below(
@@ -207,7 +212,22 @@ impl World {
         )?;
         below(&r.vacant, homes, "vacant homes")?;
         let citizens = self.citizens.active.len();
-        let people = r.activities.iter().chain(&r.searches);
+        below(
+            r.births.iter().map(|Reverse((_, h))| h),
+            self.households.active.len(),
+            "birth checks",
+        )?;
+        // Exactly the active grown children still waiting for a home, at their deadlines.
+        let c = &self.citizens;
+        let waiting = (0..citizens).filter(|&i| c.active[i] && c.move_by[i] != u64::MAX);
+        ensure(
+            waiting.count() == r.movers.len()
+                && r.movers.iter().all(|&(at, m)| {
+                    (m as usize) < citizens && c.active[m as usize] && c.move_by[m as usize] == at
+                }),
+            "grown children waiting",
+        )?;
+        let people = r.activities.iter().chain(&r.searches).chain(&r.grown);
         below(
             people.map(|Reverse((_, c))| c),
             citizens,
@@ -228,6 +248,12 @@ impl World {
         let (r, c) = (&self.residents, &self.citizens);
         let active = || (0..c.active.len()).filter(|&i| c.active[i]);
         ensure(r.population as usize == active().count(), "population")?;
+        let children = active().filter(|&i| c.child[i]).count();
+        ensure(r.children as usize == children, "children")?;
+        ensure(
+            active().all(|i| !c.child[i] || (c.job[i].is_none() && !c.owns_car[i])),
+            "children without jobs or cars",
+        )?;
         let employed = active().filter(|&i| c.job[i].is_some()).count();
         ensure(r.employed as usize == employed, "employment")?;
         let mut workers = vec![0u32; r.registered];

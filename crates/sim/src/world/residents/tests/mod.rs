@@ -5,6 +5,7 @@ use crate::{Command, Config, Zone};
 mod allocation;
 mod closure;
 mod employment;
+mod family;
 mod occupancy;
 mod schedules;
 mod trips;

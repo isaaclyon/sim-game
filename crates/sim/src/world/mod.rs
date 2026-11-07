@@ -95,11 +95,13 @@ pub struct Stats {
     pub tick: u64,
     /// Allocated travel slots, including dormant citizen reservations and departed tombstones.
     pub agents: u32,
-    /// Resident individuals, including those not travelling.
+    /// Resident individuals, children included, including those not travelling.
     pub population: u32,
-    /// Resident individuals without an assigned job. Disconnected jobs still count as jobs.
+    /// Residents who are children (ADR 0054); the rest are adults.
+    pub children: u32,
+    /// Adult residents without an assigned job. Disconnected jobs still count as jobs.
     pub unemployed: u32,
-    /// `unemployed` as a percentage of `population`; 0 when nobody lives in town.
+    /// `unemployed` as a percentage of adults; 0 when no adult lives in town.
     pub unemployment_percent: f32,
     /// What the town wants built next (ADR 0025).
     pub demand: Demand,
@@ -406,14 +408,16 @@ impl World {
         let mut s = self.totals;
         s.agents = self.agents.len() as u32;
         s.population = self.residents.population;
-        s.unemployed = self.residents.population - self.residents.employed;
+        s.children = self.residents.children;
+        let adults = s.population - s.children;
+        s.unemployed = adults - self.residents.employed;
         s.demand = self.demand();
         s.power = self.power_stats();
         s.water = self.water_stats();
         s.money = self.money();
         s.fire = self.fire_stats();
-        if s.population > 0 {
-            s.unemployment_percent = s.unemployed as f32 * 100.0 / s.population as f32;
+        if adults > 0 {
+            s.unemployment_percent = s.unemployed as f32 * 100.0 / adults as f32;
         }
         for state in &self.agents.state {
             match state {

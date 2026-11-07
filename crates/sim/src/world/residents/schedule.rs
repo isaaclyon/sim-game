@@ -18,6 +18,7 @@ impl World {
     pub(in crate::world) fn tick_residents(&mut self) {
         self.register_buildings();
         self.admit_households();
+        self.tick_families();
         for _ in 0..8 {
             let Some(&Reverse((at, c))) = self.residents.searches.peek() else {
                 break;
@@ -98,7 +99,11 @@ impl World {
         }
     }
 
+    /// Children stay home (ADR 0054): they have no day to schedule.
     pub(in crate::world) fn schedule_day(&mut self, c: CitizenId) {
+        if self.citizens.child[c as usize] {
+            return;
+        }
         let now = clock_at(self.totals.tick, self.cfg.dt).second_of_day;
         let target = if self.citizens.job[c as usize].is_some() {
             self.citizens.departure[c as usize]

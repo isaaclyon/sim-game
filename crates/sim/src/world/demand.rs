@@ -46,6 +46,8 @@ pub(super) struct Supply {
 impl World {
     pub fn demand(&self) -> Demand {
         let population = self.residents.population as i32;
+        // Only adults fill jobs (ADR 0054); everyone shops through their household.
+        let adults = population - self.residents.children as i32;
         // Coal plants' jobs (ADR 0041) count as industry.
         let industrial_jobs = self.supply.industrial_jobs
             + self
@@ -58,7 +60,7 @@ impl World {
         let jobs = (commercial_jobs + industrial_jobs) as i32;
         let room = self.residents.vacant.len() as i32 * ROOM_PER_VACANT_HOME;
         Demand {
-            residential: RESIDENTIAL_BASE + jobs - population - room,
+            residential: RESIDENTIAL_BASE + jobs - adults - room,
             commercial: COMMERCIAL_BASE + population * COMMERCIAL_SHARE / 100
                 - commercial_jobs as i32,
             industrial: INDUSTRIAL_BASE + population * INDUSTRIAL_SHARE / 100

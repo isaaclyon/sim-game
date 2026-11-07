@@ -83,8 +83,8 @@ fn mix(seed: u64, salt: u64, id: u32) -> usize {
     crate::rng::mix(seed ^ salt, u64::from(id)) as usize
 }
 
-/// Given name from the citizen, surname from the household. A shared surname is a display
-/// convention for people who live together, not a family relationship.
+/// Given name from the citizen, surname from the household they first belonged to, so grown
+/// children who move out keep it (ADR 0054).
 pub(super) fn display_name(seed: u64, citizen: u32, household: u32) -> String {
     let given = GIVEN[mix(seed, 0x6769_7665, citizen) % GIVEN.len()];
     let surname = SURNAMES[mix(seed, 0x7375_726e, household) % SURNAMES.len()];

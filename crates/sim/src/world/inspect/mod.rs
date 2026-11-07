@@ -38,6 +38,10 @@ pub struct CitizenInfo {
     pub driving: bool,
     /// The current trip is on foot (ADR 0026); the walker is drawn once it sets off.
     pub on_foot: bool,
+    /// Age in years; childhood lasts `ADULT_YEARS` (ADR 0054).
+    pub age: u32,
+    /// A child, who lives at home with their household.
+    pub child: bool,
 }
 
 /// Counts for one standing building. Occupancy means residents or assigned workers,
@@ -93,7 +97,7 @@ impl World {
     /// their building stands, so a removed building never shows as a current place.
     pub fn citizen_info(&self, c: CitizenId) -> Option<CitizenInfo> {
         let i = c as usize;
-        let household = *self.citizens.household.get(i)?;
+        let family = *self.citizens.family.get(i)?;
         let resident = self.citizens.active[i];
         let place = |b: BuildingId| {
             (resident && self.buildings.active.get(b as usize) == Some(&true)).then(|| Place {
@@ -103,7 +107,7 @@ impl World {
         };
         let agent = self.citizens.agent[i].filter(|_| resident);
         Some(CitizenInfo {
-            name: names::display_name(self.cfg.seed, c, household),
+            name: names::display_name(self.cfg.seed, c, family),
             resident,
             home: place(self.home_building(c)),
             job: self.citizens.job[i].and_then(place),
@@ -115,6 +119,8 @@ impl World {
             on_foot: resident
                 && self.citizens.destination[i].is_some()
                 && !self.citizens.car_out[i],
+            age: self.age_years(c),
+            child: self.citizens.child[i],
         })
     }
 }

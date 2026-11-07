@@ -179,7 +179,7 @@ fn walkers_wait_at_red_signals_and_call_for_green() {
         assert!(roads.add_road(n, centre, class));
     }
     let mut w = World::new(Config::default(), roads, crate::rng::Rng::new(1));
-    let c = w.citizens.push(0, 0, &mut crate::rng::Rng::new(3));
+    let c = w.citizens.push(0, 0, 0, false, &mut crate::rng::Rng::new(3));
     // No household: only the walk itself runs.
     w.citizens.active[c as usize] = false;
     let out: Vec<_> = w.roads.out_lanes(centre).to_vec();

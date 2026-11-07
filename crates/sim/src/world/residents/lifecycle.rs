@@ -78,6 +78,7 @@ impl World {
                 self.schedule_day(c);
             } else {
                 self.release_job(c);
+                self.member_left(c);
                 self.citizens.active[i] = false;
                 self.citizens.job_due[i] = u64::MAX;
                 self.residents.population -= 1;

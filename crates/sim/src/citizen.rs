@@ -51,12 +51,25 @@ pub struct Citizens {
     pub walk_limit: Vec<f32>,
     /// Metres per second on foot.
     pub walk_speed: Vec<f32>,
+    /// Tick of birth; negative for people older than the city (ADR 0054).
+    pub born: Vec<i64>,
+    /// Under age: never works, shops or owns a car, and stays home (ADR 0054).
+    pub child: Vec<bool>,
+    /// The household the citizen first belonged to; names its surname, so a grown child who
+    /// moves out keeps their family name.
+    pub family: Vec<HouseholdId>,
+    /// Tick by which a grown child who has not found a home of their own leaves the city;
+    /// `u64::MAX` for everyone else.
+    pub move_by: Vec<u64>,
 }
 impl Citizens {
+    /// A new resident of `household`, born at tick `born`. Children own no car.
     pub(crate) fn push(
         &mut self,
         household: HouseholdId,
         home: BuildingId,
+        born: i64,
+        child: bool,
         rng: &mut Rng,
     ) -> CitizenId {
         let id = self.active.len() as CitizenId;
@@ -72,17 +85,30 @@ impl Citizens {
         self.departure.push(7 * 3600 + rng.below(2 * 3600));
         self.work_duration
             .push((6 * 3600 + rng.below(3 * 3600)) / CLOCK_SECONDS_PER_SIM_SECOND as u32);
-        let owns_car = rng.below(100) < CAR_OWNERSHIP_PERCENT;
+        self.owns_car.push(false);
+        self.car_out.push(false);
+        self.walk_limit.push(0.0);
+        self.walk_speed.push(rng.range(WALK_SPEED.0, WALK_SPEED.1));
+        self.born.push(born);
+        self.child.push(child);
+        self.family.push(household);
+        self.move_by.push(u64::MAX);
+        self.draw_car(id, !child, rng);
+        id
+    }
+
+    /// Whether `c` brings a car on moving in (never without `may_own`), and the walking limit
+    /// that goes with it (ADR 0026).
+    pub(crate) fn draw_car(&mut self, c: CitizenId, may_own: bool, rng: &mut Rng) {
+        let i = c as usize;
+        let owns_car = may_own && rng.below(100) < CAR_OWNERSHIP_PERCENT;
         let (lo, hi) = if owns_car {
             OWNER_WALK_M
         } else {
             CARLESS_WALK_M
         };
-        self.owns_car.push(owns_car);
-        self.car_out.push(false);
-        self.walk_limit.push(rng.range(lo, hi));
-        self.walk_speed.push(rng.range(WALK_SPEED.0, WALK_SPEED.1));
-        id
+        self.owns_car[i] = owns_car;
+        self.walk_limit[i] = rng.range(lo, hi);
     }
 }
 

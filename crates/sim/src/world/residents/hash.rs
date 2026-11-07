@@ -3,6 +3,8 @@ impl World {
     pub(in crate::world) fn hash_residents(&self, mix: &mut impl FnMut(u64)) {
         mix(self.residents.rng.state());
         mix(self.residents.population as u64);
+        mix(self.residents.children as u64);
+        mix(self.residents.birth_rng.state());
         mix(self.residents.employed as u64);
         mix(self.residents.registered as u64);
         mix(self
@@ -45,6 +47,10 @@ impl World {
             mix(c.owns_car[i] as u64 | (c.car_out[i] as u64) << 1);
             mix(c.walk_limit[i].to_bits() as u64);
             mix(c.walk_speed[i].to_bits() as u64);
+            mix(c.born[i] as u64);
+            mix(c.child[i] as u64);
+            mix(c.family[i] as u64);
+            mix(c.move_by[i]);
         }
         for (&jobs, &workers) in self.residents.jobs.iter().zip(&self.residents.workers) {
             mix(jobs as u64);
@@ -54,12 +60,19 @@ impl World {
             &self.residents.activities,
             &self.residents.searches,
             &self.residents.arrivals,
+            &self.residents.births,
+            &self.residents.grown,
         ] {
             mix(heap.len() as u64);
             for entry in heap.clone().into_sorted_vec() {
                 mix(entry.0.0);
                 mix(entry.0.1 as u64);
             }
+        }
+        mix(self.residents.movers.len() as u64);
+        for &(at, c) in &self.residents.movers {
+            mix(at);
+            mix(c as u64);
         }
     }
 }
