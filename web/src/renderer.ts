@@ -26,12 +26,14 @@ import type { Listener } from './ambience';
 import { BuildingLayer } from './building-kit/layer.ts';
 import { followPoint, KeyCamera } from './camera';
 import { carPosition, nearestCar } from './car-pick';
+import { FireLayer } from './fire-layer.ts';
 import { Lighting, nightMaterial } from './lighting.ts';
 import { LotLayer } from './lot-scenery/layer.ts';
 import { ROADS, SIDEWALK, SKY } from './palette';
 import { PollutionOverlay } from './pollution-overlay.ts';
 import { PowerLayer } from './power-layer.ts';
 import type { Spot } from './power-tools.ts';
+import type { FromWorker } from './protocol.ts';
 import { buildRoadGeometry } from './road-geometry';
 import { buildRoadMarkings } from './road-markings.ts';
 import { createSimScene } from './scene';
@@ -79,6 +81,7 @@ export class Renderer {
   private readonly streetlights = new StreetlightLayer(nightMaterial(this.lighting.streetlights));
   private readonly tools = new ToolPreview();
   private readonly power = new PowerLayer();
+  private readonly fire = new FireLayer();
   private readonly up = new THREE.Vector3(0, 1, 0);
   private readonly look = new THREE.Vector3();
   /** Called when a mouse or touch drag pans the camera, so follow can let go. */
@@ -98,6 +101,7 @@ export class Renderer {
       this.pollution.group,
       this.buildings.group,
       this.power.group,
+      this.fire.group,
       this.smoke.group,
       this.streetlights.group,
       this.tools.group,
@@ -284,6 +288,13 @@ export class Renderer {
     return true;
   }
 
+  /** Moves the camera, smoothly, to look at sim point (x, y). */
+  showPoint(x: number, y: number) {
+    this.look.set(x, 0, y);
+    this.scene.localToWorld(this.look);
+    void this.controls.moveTo(this.look.x, this.look.y, this.look.z, true);
+  }
+
   /** While following, the wheel zooms toward the followed car instead of the cursor. */
   setFollowing(on: boolean) {
     this.controls.dollyToCursor = !on;
@@ -389,6 +400,16 @@ export class Renderer {
     this.power.setView(on);
   }
 
+  /** Draws stations, fires, ruins and coverage; see `fire` in protocol.ts. */
+  setFire(fire: Extract<FromWorker, { type: 'fire' }>) {
+    this.fire.set(fire);
+  }
+
+  /** The fire view shows the roads and buildings stations reach (ADR 0053). */
+  setFireView(on: boolean) {
+    this.fire.setView(on);
+  }
+
   /** See `ToolPreview.setPlant`. */
   setPlantPreview(outline: Float32Array, ok: boolean) {
     this.tools.setPlant(outline, ok);
@@ -417,6 +438,7 @@ export class Renderer {
     this.buildings.animate(now);
     this.overlay.animate(now);
     this.power.animate(now);
+    this.fire.animate(reducedMotion() ? 0 : now);
     // Reduced motion holds the smoke still, at a moment when every chimney has puffs out.
     const target = this.scene.worldToLocal(this.controls.getTarget(this.look, false));
     this.smoke.animate(reducedMotion() ? 1000 : now, [target.x, target.z]);
