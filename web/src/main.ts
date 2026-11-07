@@ -189,7 +189,7 @@ canvas.addEventListener('pointerup', (e) => {
   if (e.button === 2) return tools.use(null);
   if (e.button !== 0 || !still) return;
   const p = renderer.pick(e.clientX, e.clientY);
-  if (p) roads.click(p, e.shiftKey);
+  if (p) roads.click(p, e.shiftKey, e);
 });
 // The last cursor position over the canvas, so previews can follow a moving camera.
 let pointer: { clientX: number; clientY: number } | null = null;

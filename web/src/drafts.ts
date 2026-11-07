@@ -5,13 +5,19 @@ import type { FromWorker, ToWorker } from './protocol';
 
 type Answer = { msg: FromWorker; transfer: Transferable[] };
 
+/** A draft request's points for the sim: `[x, y, snap]` records, then the snap reach in metres
+ * as one trailing float when the request has one (ADR 0038). */
+export function rawDraft(msg: { points: number[]; reach?: number }) {
+  return new Float32Array(msg.reach === undefined ? msg.points : [...msg.points, msg.reach]);
+}
+
 /** Answers `previewRoad`: `[n, m, length, angle, k, r]`, guided points, guide lines, angle
  * marks, `r` floats of roads the draft would change to its class, then stops. */
 export function roadPreview(
   sim: Sim | undefined,
   msg: Extract<ToWorker, { type: 'previewRoad' }>,
 ): Answer {
-  const raw = new Float32Array(msg.points);
+  const raw = rawDraft(msg);
   const d = sim?.road_draft(raw, msg.plan, msg.class) ?? new Float32Array(6);
   const [n, m, length, angle, k, r] = d;
   const at = 6 + 2 * n;
@@ -41,7 +47,7 @@ export function gridPreview(
 ): Answer {
   const cursor = new Float32Array(msg.cursor ?? []);
   const d =
-    sim?.grid_draft(new Float32Array(msg.points), cursor, msg.cell, msg.class) ??
+    sim?.grid_draft(rawDraft(msg), cursor, msg.cell, msg.class) ??
     new Float32Array([0, 0, 0, Number.NaN, 0, 0, 0, Number.NaN, 0]);
   const [n, m, length, angle, k, cols, rows, price, r] = d;
   let at = 9;

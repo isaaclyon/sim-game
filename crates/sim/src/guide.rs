@@ -19,7 +19,8 @@ pub const ALL: u8 = ANGLE | GUIDES | LENGTH;
 
 /// Road ends further than this from the cursor offer no guide lines, metres.
 const GUIDE_RANGE: f32 = 400.0;
-/// A guide line captures the cursor within this distance, metres.
+/// A guide line captures the cursor within this distance, metres, unless the request asks for
+/// more (a zoomed-out view; see `draft_within`).
 const GUIDE_SNAP: f32 = 6.0;
 /// Lengths snap to whole zone cells.
 const LENGTH_STEP: f32 = ZONE_CELL;
@@ -74,6 +75,20 @@ struct Line {
 /// point, the three inputs are start, end and previous control. The result is start, new
 /// control and end, or no points if the source direction or projection is invalid.
 pub fn draft(net: &RoadNetwork, raw: &[(f32, f32, u8)]) -> Draft {
+    draft_within(net, raw, 0.0)
+}
+
+/// `draft` with a snap `reach` in metres: about ten screen pixels at the player's zoom. Guide
+/// lines and junctions capture the cursor within it (never less than their own 6 m and 15 m),
+/// and an angle step within it, scaled down for steps other than right angles, even where the
+/// road is too short for the angle tolerance. Non-finite or nonpositive reaches add nothing;
+/// reaches past `GUIDE_RANGE` count as that.
+pub fn draft_within(net: &RoadNetwork, raw: &[(f32, f32, u8)], reach: f32) -> Draft {
+    let reach = if reach.is_finite() {
+        reach.clamp(0.0, GUIDE_RANGE)
+    } else {
+        0.0
+    };
     let continuation = raw.first().is_some_and(|p| p.2 & CONTINUE != 0);
     if continuation && raw.len() != 3 {
         return Draft::default();
@@ -82,7 +97,7 @@ pub fn draft(net: &RoadNetwork, raw: &[(f32, f32, u8)]) -> Draft {
     let mut lines = Vec::new();
     let guided = if continuation { &raw[..2] } else { raw };
     for &(x, y, snap) in guided {
-        let (p, l) = guide(net, &points, (x, y), snap);
+        let (p, l) = guide(net, &points, (x, y), snap, reach);
         points.push(p);
         lines = l;
     }
@@ -167,12 +182,18 @@ pub fn draft(net: &RoadNetwork, raw: &[(f32, f32, u8)]) -> Draft {
     }
 }
 
-fn guide(net: &RoadNetwork, before: &[Point], cursor: Point, snap: u8) -> (Point, Vec<[f32; 4]>) {
+fn guide(
+    net: &RoadNetwork,
+    before: &[Point],
+    cursor: Point,
+    snap: u8,
+    reach: f32,
+) -> (Point, Vec<[f32; 4]>) {
     if !cursor.0.is_finite() || !cursor.1.is_finite() {
         return (cursor, Vec::new());
     }
     // A cursor on a junction keeps it, as without guides.
-    if let Some(n) = net.nearest_junction(cursor.0, cursor.1, SNAP_RADIUS) {
+    if let Some(n) = net.nearest_junction(cursor.0, cursor.1, SNAP_RADIUS.max(reach)) {
         return ((net.node_x[n as usize], net.node_y[n as usize]), Vec::new());
     }
     let anchor = before.last().copied();
@@ -189,10 +210,10 @@ fn guide(net: &RoadNetwork, before: &[Point], cursor: Point, snap: u8) -> (Point
         } else {
             refs
         };
-        lines.extend(angle_line(a, &refs, cursor));
+        lines.extend(angle_line(a, &refs, cursor, reach));
     }
     if snap & GUIDES != 0 {
-        alignment_lines(net, anchor, cursor, &mut lines);
+        alignment_lines(net, anchor, cursor, GUIDE_SNAP.max(reach), &mut lines);
     }
     // Stable, so equal candidates keep road order.
     lines.sort_by(|l, m| (l.off / l.reach).total_cmp(&(m.off / m.reach)));
@@ -258,8 +279,9 @@ fn guide(net: &RoadNetwork, before: &[Point], cursor: Point, snap: u8) -> (Point
     (point, drawn)
 }
 
-/// The 15° step from `a` closest to the cursor, within its tolerance.
-fn angle_line(a: Point, refs: &[Point], cursor: Point) -> Option<Line> {
+/// The 15° step from `a` closest to the cursor, within its tolerance: an angle, or `floor`
+/// metres for right angles, less for other steps in the same proportion.
+fn angle_line(a: Point, refs: &[Point], cursor: Point, floor: f32) -> Option<Line> {
     let v = (cursor.0 - a.0, cursor.1 - a.1);
     let len = dist(a, cursor);
     if len < 1.0 {
@@ -273,14 +295,14 @@ fn angle_line(a: Point, refs: &[Point], cursor: Point) -> Option<Line> {
                 continue;
             }
             let off = cross(v, d).abs();
-            let reach = len
-                * TOLERANCE[if k % 6 == 0 {
-                    0
-                } else if k % 3 == 0 {
-                    1
-                } else {
-                    2
-                }];
+            let tolerance = TOLERANCE[if k % 6 == 0 {
+                0
+            } else if k % 3 == 0 {
+                1
+            } else {
+                2
+            }];
+            let reach = (len * tolerance).max(floor * tolerance / TOLERANCE[0]);
             if off <= reach && best.is_none_or(|b| off < b.off) {
                 best = Some(Line {
                     origin: a,
@@ -295,7 +317,13 @@ fn angle_line(a: Point, refs: &[Point], cursor: Point) -> Option<Line> {
 }
 
 /// Extensions of road ends past their junction, and lines square to them, near the cursor.
-fn alignment_lines(net: &RoadNetwork, anchor: Option<Point>, cursor: Point, out: &mut Vec<Line>) {
+fn alignment_lines(
+    net: &RoadNetwork,
+    anchor: Option<Point>,
+    cursor: Point,
+    snap: f32,
+    out: &mut Vec<Line>,
+) {
     for road in net.active_roads() {
         let shape = net.shape(road);
         let t0 = shape.tangent(0.0);
@@ -308,12 +336,12 @@ fn alignment_lines(net: &RoadNetwork, anchor: Option<Point>, cursor: Point, out:
             let square = (-outward.1, outward.0);
             for (dir, ahead_only) in [(outward, true), (square, false)] {
                 let off = cross(v, dir).abs();
-                if off < GUIDE_SNAP && (!ahead_only || dot(v, dir) > 0.0) {
+                if off < snap && (!ahead_only || dot(v, dir) > 0.0) {
                     out.push(Line {
                         origin: end,
                         dir,
                         off,
-                        reach: GUIDE_SNAP,
+                        reach: snap,
                     });
                 }
             }

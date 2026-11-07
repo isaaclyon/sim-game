@@ -304,6 +304,15 @@ export class Renderer {
     return point ? this.scene.worldToLocal(point) : null;
   }
 
+  /** Ground metres one screen pixel spans at the point, across or down, whichever is more;
+   * 0 where the view misses the ground. */
+  metresPerPixel(clientX: number, clientY: number): number {
+    const p = this.pick(clientX, clientY);
+    const right = this.pick(clientX + 1, clientY);
+    const down = this.pick(clientX, clientY + 1);
+    return p && right && down ? Math.max(p.distanceTo(right), p.distanceTo(down)) : 0;
+  }
+
   /**
    * Draws the road the sim would build from `a` to `b`. `stops` is `[x, y, join]` per stop
    * (see `roadPreview` in protocol.ts): the line follows the stops, with a marker where it joins

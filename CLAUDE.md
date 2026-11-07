@@ -41,6 +41,10 @@ What to build next and why lives in `docs/ROADMAP.md`. Work on the current miles
   bit 8 on the start means the remaining records are end and the previous sim-guided control;
   the sim derives the new control, or returns no points if refused (ADR 0046). The sim guides
   them (ADR 0038) and builds with the guided coordinates, so command logs record final positions.
+  `previewRoad`, `buildRoad`, `previewGrid` and `buildGrid` carry an optional `reach`: ten
+  screen pixels in ground metres at the cursor; guide lines, junctions and angle steps capture
+  within it, never less than the sim's 6 m / 15 m / angle tolerance (absent = those). The worker
+  appends it to the raw points as one trailing float for WASM (ADR 0038, amended).
   The preview answer has `points` (`[x, y]` per guided point), `guides` (`[x0, y0, x1, y1]` per
   guide line), `length`, `angle` (NaN = none), `angles` (`[x, y, rx, ry, dx, dy]` per junction
   the road joins: the point, then unit directions along the road measured from and the new

@@ -24,9 +24,16 @@ export type ToWorker =
   | { type: 'commandLog' }
   /** Explicit synthetic benchmark traffic, not normal play. */
   | { type: 'spawn'; count: number }
-  /** Builds the road through guided `points`, as in `previewRoad`. `chain` requests the
-   * sim-guided control of a successful curve in `buildResult`, for its next continuation. */
-  | { type: 'buildRoad'; id: number; points: number[]; class: RoadClass; chain?: boolean }
+  /** Builds the road through guided `points` and `reach`, as in `previewRoad`. `chain` requests
+   * the sim-guided control of a successful curve in `buildResult`, for its next continuation. */
+  | {
+      type: 'buildRoad';
+      id: number;
+      points: number[];
+      reach?: number;
+      class: RoadClass;
+      chain?: boolean;
+    }
   /** Gives the road nearest the point, in bulldoze reach, `class` in place, as drawing over
    * the whole road would (ADR 0048, 0050). Refused for a road already of `class` or when the
    * city cannot pay. */
@@ -63,14 +70,23 @@ export type ToWorker =
    * one point asks where a road would start, two a straight road, three a curve (start,
    * control, end). For a continuation, the first point has `Snap.Continue`, followed by the
    * end and the previous curve's sim-guided control; the sim derives the new control. `snap`
-   * otherwise selects drawing guides. `plan` false only guides the points (a curve's control
-   * point). Roads the draft follows take `class` when built (ADR 0048), so a draft over roads
+   * otherwise selects drawing guides. `reach` is the snap reach in metres, about ten screen
+   * pixels at the current zoom: guide lines, junctions and angle steps capture points within it,
+   * never less than the sim's own reaches, which also apply when it is absent. `plan` false only
+   * guides the points (a curve's control point). Roads the draft follows take `class` when built (ADR 0048), so a draft over roads
    * of the same class plans nothing. Changes nothing; answered with `roadPreview`.
    */
-  | { type: 'previewRoad'; revision: number; class: RoadClass; points: number[]; plan: boolean }
+  | {
+      type: 'previewRoad';
+      revision: number;
+      class: RoadClass;
+      points: number[];
+      reach?: number;
+      plan: boolean;
+    }
   /**
    * Asks what a grid of `class` roads would build (ADR 0049). `points` is the first edge's two
-   * raw `[x, y, snap]` records, guided as a road's; `cursor` is `[x, y]` where the area is
+   * raw `[x, y, snap]` records, guided as a road's with `reach`; `cursor` is `[x, y]` where the area is
    * dragged to, rounded by the sim to whole blocks of `cell` metres (40 to 200), or absent
    * while the first edge is drawn. Changes nothing; answered with `gridPreview`.
    */
@@ -80,6 +96,7 @@ export type ToWorker =
       class: RoadClass;
       cell: number;
       points: number[];
+      reach?: number;
       cursor?: [number, number];
     }
   /** Builds the grid `previewGrid` with the same fields shows, all or nothing; answered with
@@ -90,6 +107,7 @@ export type ToWorker =
       class: RoadClass;
       cell: number;
       points: number[];
+      reach?: number;
       cursor?: [number, number];
     }
   /**

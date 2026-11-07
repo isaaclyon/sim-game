@@ -12,8 +12,11 @@ export type RoadMode = 'straight' | 'curve' | 'continuous' | 'grid' | 'upgrade' 
 type Ground = { x: number; z: number };
 /** A clicked point with the snap flags it was clicked with. */
 type Clicked = Ground & { snap: number };
+type Screen = { clientX: number; clientY: number };
 
 interface Drawing {
+  /** Ground metres one screen pixel spans at the point; 0 off the ground. */
+  metresPerPixel(clientX: number, clientY: number): number;
   setPreview(
     stops: Float32Array | null,
     a: Ground | null,
@@ -41,6 +44,9 @@ interface Elements {
 }
 
 const SNAP_ALL = Snap.Angle | Snap.Guides | Snap.Length;
+/** Guide lines, junctions and angle steps capture the cursor within this many screen pixels,
+ * so snapping feels the same at any zoom; the sim sets a floor in metres (ADR 0038). */
+const SNAP_REACH_PX = 10;
 /** The grid's starting block size in metres, one of the menu's (ADR 0049). */
 const GRID_CELL = 80;
 const READOUT_OFFSET_PX = 16;
@@ -65,7 +71,7 @@ export class RoadTool {
   // One sim-owned preview in flight, using only the latest cursor position.
   private revision = 0;
   private cursor: Ground | null = null;
-  private screen: { clientX: number; clientY: number } | null = null;
+  private screen: Screen | null = null;
   private wanted = false;
   private inFlight = false;
   /** Whether the question in flight plans a road, or only guides a curve's control point. */
@@ -138,7 +144,7 @@ export class RoadTool {
     this.ask();
   }
 
-  hover(p: Ground | null, screen: { clientX: number; clientY: number }) {
+  hover(p: Ground | null, screen: Screen) {
     if (!this.mode || this.pendingBuild !== null) return;
     // Keep the latest completed preview visible during movement. Only a change of tool or
     // construction stage invalidates an in-flight response; cursor updates queue the next one.
@@ -152,9 +158,10 @@ export class RoadTool {
     this.invalidate();
   }
 
-  click(p: Ground, shift: boolean) {
+  click(p: Ground, shift: boolean, screen: Screen) {
     if (this.pendingBuild !== null || !this.mode) return;
     this.shift = shift;
+    this.screen = screen;
     if (this.mode === 'bulldoze') this.send({ type: 'deleteRoad', x: p.x, y: p.z });
     else if (this.mode === 'upgrade')
       this.send({ type: 'setRoadClass', x: p.x, y: p.z, class: this.roadClass });
@@ -173,6 +180,7 @@ export class RoadTool {
         type: 'buildRoad',
         id,
         points: this.points(p),
+        reach: this.reach(),
         class: this.roadClass,
         ...(this.mode === 'continuous' ? { chain: true } : {}),
       });
@@ -330,6 +338,12 @@ export class RoadTool {
     return points;
   }
 
+  /** The snap reach in metres at the cursor: `SNAP_REACH_PX` at the current zoom. */
+  private reach() {
+    const s = this.screen;
+    return s ? SNAP_REACH_PX * this.draw.metresPerPixel(s.clientX, s.clientY) : 0;
+  }
+
   /** The grid question for the cursor `b`: the first edge's two raw records, then the area
    * cursor once the edge is clicked. */
   private gridQuestion(b: Ground) {
@@ -338,6 +352,7 @@ export class RoadTool {
       class: this.roadClass,
       cell: this.cell,
       points: edge ? this.clicked.flatMap((p) => [p.x, p.z, p.snap]) : this.points(b),
+      reach: this.reach(),
       ...(edge ? { cursor: [b.x, b.z] as [number, number] } : {}),
     };
   }
@@ -372,6 +387,7 @@ export class RoadTool {
       revision,
       class: this.roadClass,
       points: this.points(b),
+      reach: this.reach(),
       plan: this.planAsked,
     });
   }
