@@ -95,8 +95,9 @@ fn downgrading_is_free_and_alleys_become_streets_for_the_difference() {
 #[test]
 fn a_click_the_city_cannot_afford_is_refused() {
     let mut w = world(&[(0.0, 0.0, 4_000.0, 0.0, RoadClass::Street)]);
+    w.add_funds_for_bench(50_000 - START_FUNDS);
     let hash = w.state_hash();
-    // 4 km at $15/m is $60,000, more than a fresh city has.
+    // 4 km at $15/m is $60,000, more than the city's $50,000.
     assert_eq!(w.class_cost(2_000.0, 0.0, RoadClass::Main), Some(60_000));
     assert!(!w.can_afford(60_000));
     assert!(!click(&mut w, 2_000.0, 0.0, RoadClass::Main));

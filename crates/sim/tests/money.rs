@@ -89,7 +89,12 @@ fn a_crossing_pays_for_its_whole_length_and_a_duplicate_is_refused() {
 fn a_road_the_city_cannot_afford_is_refused_and_changes_nothing() {
     let mut w = World::empty(Config::default(), 60, 60);
     let hash = w.state_hash();
-    assert!(!road(&mut w, 0.0, 0.0, 5000.0, 0.0, RoadClass::Main));
+    // 7 km of main road at $25/m is $175,000, more than a fresh city has.
+    assert_eq!(
+        w.road_cost(0.0, 0.0, 7000.0, 0.0, RoadClass::Main),
+        Some(175_000)
+    );
+    assert!(!road(&mut w, 0.0, 0.0, 7000.0, 0.0, RoadClass::Main));
     assert_eq!(w.roads.road_count(), 0);
     assert_eq!(w.state_hash(), hash);
     assert!(w.can_afford(START_FUNDS) && !w.can_afford(START_FUNDS + 1));

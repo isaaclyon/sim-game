@@ -1,6 +1,6 @@
 # 0036. Money: build costs, taxes and upkeep on an empty starting map
 
-- Status: Accepted; implemented; free followed legs superseded by [0048](0048-drawing-over-roads-changes-their-class.md)
+- Status: Accepted; implemented; free followed legs superseded by [0048](0048-drawing-over-roads-changes-their-class.md); starting funds amended 2026-11-07
 - Date: 2026-11-04
 - Extends: [0033](0033-single-city-state-saves.md) (save version 2) and
   [0034](0034-command-log-replay-tests.md) (`map` start line)
@@ -21,7 +21,9 @@ debt means; this decision only has to give them a balance that can run low.
   The command log version does not change; older logs still read as grid logs.
 - **The sim owns the money** in a treasury inside `World`: a balance in whole dollars (`i64`)
   and a carry of dollar-minutes below one dollar. Both are saved and hashed. Fresh cities
-  start with $50,000.
+  start with $150,000 (amended 2026-11-07, was $50,000: plants, pumps and fire stations
+  cost $4,000 to $20,000 each since ADR 0052 and 0053, and a first town needs several beside
+  its roads).
 - **Build costs:** `BuildRoad` and `BuildCurve` pay for the length of their new legs by class
   ($10/m street, $25/m main road, $5/m alley). Legs that follow an existing road cost nothing.
   A road whose cost exceeds the balance is refused like an invalid road and changes nothing.

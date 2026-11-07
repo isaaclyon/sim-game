@@ -65,9 +65,9 @@ impl PlantKind {
     /// Output at full sun or full wind, in the units of a building's power demand.
     pub fn peak(self) -> u32 {
         match self {
-            Self::Coal => 3000,
-            Self::Solar => 800,
-            Self::Wind => 500,
+            Self::Coal => 9000,
+            Self::Solar => 1600,
+            Self::Wind => 1000,
         }
     }
 
@@ -273,10 +273,10 @@ mod tests {
     fn solar_follows_the_sun() {
         let at = |h: u64| PlantKind::Solar.output(1, h * 3600);
         assert_eq!(at(3), 0);
-        assert_eq!(at(12), 800);
+        assert_eq!(at(12), 1600);
         assert!(at(8) > 0 && at(8) < at(10));
         assert_eq!(at(20), 0);
-        assert_eq!(PlantKind::Solar.output(1, 86_400 + 12 * 3600), 800);
+        assert_eq!(PlantKind::Solar.output(1, 86_400 + 12 * 3600), 1600);
     }
 
     #[test]
@@ -285,9 +285,9 @@ mod tests {
         let mut seen = std::collections::BTreeSet::new();
         for step in 1..=(48 * 6) {
             let out = PlantKind::Wind.output(7, step * OUTPUT_STEP_S);
-            assert!((100..=500).contains(&out));
-            assert!(out.abs_diff(last) <= 100, "jumped from {last} to {out}");
-            seen.insert(out / 50);
+            assert!((200..=1000).contains(&out));
+            assert!(out.abs_diff(last) <= 200, "jumped from {last} to {out}");
+            seen.insert(out / 100);
             last = out;
         }
         assert!(seen.len() > 3, "wind should change over two days");
@@ -299,7 +299,7 @@ mod tests {
 
     #[test]
     fn coal_is_steady() {
-        assert_eq!(PlantKind::Coal.output(1, 0), 3000);
-        assert_eq!(PlantKind::Coal.output(1, 3 * 3600), 3000);
+        assert_eq!(PlantKind::Coal.output(1, 0), 9000);
+        assert_eq!(PlantKind::Coal.output(1, 3 * 3600), 9000);
     }
 }

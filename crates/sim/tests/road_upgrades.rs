@@ -189,10 +189,11 @@ fn a_street_drawn_over_an_alley_turns_it_into_a_street() {
 #[test]
 fn an_upgrade_the_city_cannot_afford_is_refused() {
     let mut w = world(&[(0.0, 0.0, 4_000.0, 0.0, RoadClass::Street)]);
-    // 4 km at $15/m is $60,000, more than a fresh city has.
+    w.add_funds_for_bench(50_000 - START_FUNDS);
+    // 4 km at $15/m is $60,000, more than the city's $50,000.
     assert!(!road(&mut w, 0.0, 0.0, 4_000.0, 0.0, RoadClass::Main));
     assert_eq!(classes(&w), [RoadClass::Street]);
-    assert_eq!(w.stats().money.balance, START_FUNDS);
+    assert_eq!(w.stats().money.balance, 50_000);
 }
 
 #[test]

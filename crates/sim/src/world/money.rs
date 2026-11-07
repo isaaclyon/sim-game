@@ -18,7 +18,7 @@ use crate::snap::{Join, Plan};
 use crate::water::{Water, WaterKind};
 
 /// What a fresh city starts with.
-pub const START_FUNDS: i64 = 50_000;
+pub const START_FUNDS: i64 = 150_000;
 /// Tax each resident pays per clock hour.
 pub const RESIDENT_TAX: i64 = 2;
 /// Tax each filled job pays per clock hour, on top of its worker's resident tax.
