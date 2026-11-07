@@ -308,6 +308,43 @@ export const VEHICLES: VehicleModel[] = [
   },
 ];
 
+/** Red, for the fire truck's paint. */
+export const FIRE_RED = new THREE.Color(0xc0281f);
+const CHROME = new THREE.Color(0xd5d8db);
+const BEACON = new THREE.Color(0x3d7dff);
+
+/** A fire truck (ADR 0053): a cab and a long locker body with a ladder on top. Not in the
+ * citizens' mix (weight 0); the sim's fire-truck agents always draw with it. */
+export const FIRE_TRUCK: VehicleModel = {
+  name: 'fire truck',
+  weight: 0,
+  length: 6,
+  body: () => {
+    const mb = new MeshBuilder();
+    lowerBody(mb, 1.2, 3, 2.1, 0.45, 1.5);
+    box(1.75, 0, 1.5, 1.1, 0.75, 2.1)(mb, WHITE);
+    box(-0.85, 0, 0.45, 4.3, 1.95, 2.2)(mb, WHITE);
+    return mb.geometry();
+  },
+  trim: () => {
+    const mb = new MeshBuilder();
+    pane(mb, [2.98, 1.55], [2.6, 2.2], 0.9);
+    box(1.75, 0, 1.65, 0.9, 0.45, 2.14)(mb, GLASS);
+    for (const z of [-1.11, 1.11]) box(-0.85, z, 1.1, 4.1, 0.08, 0.02)(mb, CHROME);
+    // The ladder: two rails and rungs along the roof.
+    for (const z of [-0.45, 0.45]) box(-0.9, z, 2.42, 4.2, 0.1, 0.08)(mb, CHROME);
+    for (let x = -2.8; x <= 1.1; x += 0.55) box(x, 0, 2.42, 0.06, 0.08, 0.9)(mb, CHROME);
+    mb.glow.copy(BEACON);
+    box(1.75, 0, 2.25, 0.25, 0.14, 1.4)(mb, BEACON);
+    mb.glow.set(0x000000);
+    box(0, 0, 0.42, 5.8, 0.14, 1.9)(mb, TYRE);
+    wheels(mb, [-1.9, 2.1], 2, 0.45);
+    lights(mb, 6.02, 2.1, 0.9);
+    return mb.geometry();
+  },
+  far: far(6, 2.2, 1.5, 2.4, [-3, 1.3]),
+};
+
 /** Integer hash of an agent id to [0, 1); `salt` picks an independent choice. */
 export function agentHash(agent: number, salt: number): number {
   let n = Math.imul(agent ^ (salt * 0x9e3779b9), 0x85ebca6b);
