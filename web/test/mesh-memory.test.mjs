@@ -22,17 +22,24 @@ function bytesPerVertex(g) {
   return bytes / g.getAttribute('position').count;
 }
 
-test('lit buildings keep at most 32 bytes per vertex in memory', () => {
-  // Position 12, normal 4, colour 8, night glow 4, light schedule 4.
+/** Bytes per triangle, vertices and index together. */
+const bytesPerTriangle = (g) =>
+  (bytesPerVertex(g) * g.getAttribute('position').count + g.index.array.byteLength) /
+  (g.index.count / 3);
+
+test('lit buildings keep at most 32 bytes per vertex and 80 per triangle in memory', () => {
+  // Position 12, normal 4, colour 8, night glow 4, light schedule 4. A triangle soup takes 96
+  // bytes per triangle; sharing each quad's corners through a 4-byte index saves a fifth.
   const data = [];
   for (let zone = 1; zone <= 6; zone++) data.push(...record(zone, rect(zone * 40, 0, 18, 14)));
   const g = buildBuildingGeometry(new Float32Array(data));
   assert.ok(g.getAttribute('nightEmission'), 'some windows glow');
   assert.ok(g.getAttribute('lightSchedule'), 'some buildings keep evening hours');
   assert.ok(bytesPerVertex(g) <= 32, `${bytesPerVertex(g)} bytes per vertex`);
+  assert.ok(bytesPerTriangle(g) <= 80, `${bytesPerTriangle(g)} bytes per triangle`);
 });
 
-test('unlit outdoor scenery keeps 24 bytes per vertex and no night attributes', () => {
+test('unlit outdoor scenery keeps 24 bytes per vertex, 64 per triangle, no night attributes', () => {
   const mb = new MeshBuilder();
   for (let zone = 1; zone <= 6; zone++) {
     const lot = rect(zone * 40, 0, 28, 40);
@@ -43,6 +50,8 @@ test('unlit outdoor scenery keeps 24 bytes per vertex and no night attributes', 
   assert.equal(g.getAttribute('nightEmission'), undefined);
   assert.equal(g.getAttribute('lightSchedule'), undefined);
   assert.equal(bytesPerVertex(g), 24);
+  // A triangle soup takes 72.
+  assert.ok(bytesPerTriangle(g) <= 64, `${bytesPerTriangle(g)} bytes per triangle`);
 });
 
 test('compact attributes keep colours, normals and glow within a step of the source', () => {
@@ -56,7 +65,8 @@ test('compact attributes keep colours, normals and glow within a step of the sou
     g.getAttribute(a),
   );
   const glow = new THREE.Color(0xffcf83);
-  for (let i = 0; i < 6; i++) {
+  assert.deepEqual([n.count, g.index.count], [4, 6], 'two triangles share four corners');
+  for (let i = 0; i < n.count; i++) {
     assert.deepEqual([n.getX(i), n.getY(i), n.getZ(i)], [0, 0, 1]);
     // Colours round-trip to their palette hex; glow keeps byte precision.
     assert.equal(new THREE.Color(c.getX(i), c.getY(i), c.getZ(i)).getHex(), 0x56794d);

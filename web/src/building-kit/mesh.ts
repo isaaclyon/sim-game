@@ -1,8 +1,10 @@
-// Flat-shaded, vertex-coloured triangle soup in scene-local space (x, height, z).
+// Flat-shaded, vertex-coloured triangles in scene-local space (x, height, z).
 import * as THREE from 'three';
 import type { Pt } from './polygon.ts';
 
 export type V3 = [number, number, number];
+
+const UP: V3 = [0, 1, 0];
 
 /** Unit float in [0, 1] to a normalized integer up to `max`; three.js's own conversion wraps. */
 const unit = (v: number, max: number) => Math.round(Math.min(Math.max(v, 0), 1) * max);
@@ -18,7 +20,8 @@ function packed(array: Int8Array | Uint8Array | Uint16Array): THREE.InterleavedB
  * context its owner must rebuild it. Bounding spheres, computed beforehand, still cull it.
  */
 export function dropArraysOnUpload(geometry: THREE.BufferGeometry) {
-  for (const attribute of Object.values(geometry.attributes))
+  const { attributes, index } = geometry;
+  for (const attribute of [...Object.values(attributes), ...(index ? [index] : [])])
     ('data' in attribute ? attribute.data : attribute).onUpload(function (this: {
       array: unknown;
     }) {
@@ -27,21 +30,36 @@ export function dropArraysOnUpload(geometry: THREE.BufferGeometry) {
 }
 
 /**
- * Vertices are stored compactly, since a city holds tens of millions of them twice (here and on
- * the GPU): float positions, byte normals and glow, 16-bit colours (bytes would lose dark
- * palette colours, which are linear here) and half-float light hours. Glow and hours are left
- * out when no face has any; the night shader then reads zeros.
+ * Vertices are stored compactly, since a city holds tens of millions of them: float positions,
+ * byte normals and glow, 16-bit colours (bytes would lose dark palette colours, which are linear
+ * here) and half-float light hours. Glow and hours are left out when no face has any; the night
+ * shader then reads zeros. Faces are flat, so vertices are shared only within one quad or
+ * polygon, through a 32-bit index: a quad keeps four corners instead of six.
  */
 export class MeshBuilder {
-  private capacity = 3 * 1024;
+  private capacity = 2 * 1024;
   private count = 0;
   private positions = new Float32Array(this.capacity * 3);
   private normals = new Int8Array(this.capacity * 4);
   private colors = new Uint16Array(this.capacity * 4);
   private glows = new Uint8Array(this.capacity * 4);
   private hours = new Uint16Array(this.capacity * 2);
+  private indices = new Uint32Array(3 * 1024);
+  private length = 0;
   private glowing = false;
   private scheduled = false;
+  // The face being written: packed normal, colour, glow and light hours.
+  private qx = 0;
+  private qy = 0;
+  private qz = 0;
+  private cr = 0;
+  private cg = 0;
+  private cb = 0;
+  private er = 0;
+  private eg = 0;
+  private eb = 0;
+  private h0 = 0;
+  private h1 = 0;
   /** Emission colour for subsequently added faces; black means unlit. */
   readonly glow = new THREE.Color(0x000000);
   /** Daily on/off hours for subsequently added faces; zero duration stays dark. */
@@ -49,6 +67,11 @@ export class MeshBuilder {
 
   get vertexCount(): number {
     return this.count;
+  }
+
+  /** Index entries so far, three per triangle; geometry groups count in these. */
+  get indexCount(): number {
+    return this.length;
   }
 
   private grow() {
@@ -68,10 +91,14 @@ export class MeshBuilder {
     this.hours = grown(this.hours, 2);
   }
 
-  /** One triangle. If `dir` is given, the winding is flipped so its normal points along `dir`. */
-  // Scalars only: this runs for every triangle of every rebuilt tile, so temporary arrays here
-  // were the page's largest source of garbage while the city grows.
-  tri(a: V3, b: V3, c: V3, col: THREE.Color, dir?: V3) {
+  // Scalars only below: this runs for every triangle of every rebuilt tile, so temporary arrays
+  // here were the page's largest source of garbage while the city grows.
+
+  /**
+   * Packs the normal of triangle `a b c` for the face being written. Returns 0 if the triangle
+   * is degenerate, -1 if its winding must flip so the normal points along `dir`, else 1.
+   */
+  private facing(a: V3, b: V3, c: V3, dir?: V3): number {
     const ux = b[0] - a[0];
     const uy = b[1] - a[1];
     const uz = b[2] - a[2];
@@ -82,57 +109,98 @@ export class MeshBuilder {
     let ny = uz * vx - ux * vz;
     let nz = ux * vy - uy * vx;
     const len = Math.hypot(nx, ny, nz);
-    if (len < 1e-9) return;
-    let second = b;
-    let third = c;
+    if (len < 1e-9) return 0;
+    let side = 1;
     if (dir && nx * dir[0] + ny * dir[1] + nz * dir[2] < 0) {
-      second = c;
-      third = b;
+      side = -1;
       nx = -nx;
       ny = -ny;
       nz = -nz;
     }
-    if (this.count + 3 > this.capacity) this.grow();
-    const on = this.lightSchedule[0];
-    const off = this.lightSchedule[1];
-    const er = unit(this.glow.r, 255);
-    const eg = unit(this.glow.g, 255);
-    const eb = unit(this.glow.b, 255);
-    this.glowing ||= er + eg + eb > 0;
-    this.scheduled ||= on !== 0 || off !== 0;
     const scale = 127 / len;
-    const qx = Math.round(nx * scale);
-    const qy = Math.round(ny * scale);
-    const qz = Math.round(nz * scale);
-    const cr = unit(col.r, 65535);
-    const cg = unit(col.g, 65535);
-    const cb = unit(col.b, 65535);
-    const h0 = THREE.DataUtils.toHalfFloat(on);
-    const h1 = THREE.DataUtils.toHalfFloat(off);
-    const { positions, normals, colors, glows, hours } = this;
-    for (let v = 0; v < 3; v++) {
-      const p = v === 0 ? a : v === 1 ? second : third;
-      const i = this.count++;
-      positions[i * 3] = p[0];
-      positions[i * 3 + 1] = p[1];
-      positions[i * 3 + 2] = p[2];
-      normals[i * 4] = qx;
-      normals[i * 4 + 1] = qy;
-      normals[i * 4 + 2] = qz;
-      colors[i * 4] = cr;
-      colors[i * 4 + 1] = cg;
-      colors[i * 4 + 2] = cb;
-      glows[i * 4] = er;
-      glows[i * 4 + 1] = eg;
-      glows[i * 4 + 2] = eb;
-      hours[i * 2] = h0;
-      hours[i * 2 + 1] = h1;
-    }
+    this.qx = Math.round(nx * scale);
+    this.qy = Math.round(ny * scale);
+    this.qz = Math.round(nz * scale);
+    return side;
   }
 
+  /** Sets the colour, glow and light hours of the face being written. */
+  private paint(col: THREE.Color) {
+    const on = this.lightSchedule[0];
+    const off = this.lightSchedule[1];
+    this.er = unit(this.glow.r, 255);
+    this.eg = unit(this.glow.g, 255);
+    this.eb = unit(this.glow.b, 255);
+    this.glowing ||= this.er + this.eg + this.eb > 0;
+    this.scheduled ||= on !== 0 || off !== 0;
+    this.cr = unit(col.r, 65535);
+    this.cg = unit(col.g, 65535);
+    this.cb = unit(col.b, 65535);
+    this.h0 = THREE.DataUtils.toHalfFloat(on);
+    this.h1 = THREE.DataUtils.toHalfFloat(off);
+  }
+
+  /** Appends a vertex at `p` with the face being written and returns its index. */
+  private vertex(p: V3): number {
+    if (this.count === this.capacity) this.grow();
+    const i = this.count++;
+    const { positions, normals, colors, glows, hours } = this;
+    positions[i * 3] = p[0];
+    positions[i * 3 + 1] = p[1];
+    positions[i * 3 + 2] = p[2];
+    normals[i * 4] = this.qx;
+    normals[i * 4 + 1] = this.qy;
+    normals[i * 4 + 2] = this.qz;
+    colors[i * 4] = this.cr;
+    colors[i * 4 + 1] = this.cg;
+    colors[i * 4 + 2] = this.cb;
+    glows[i * 4] = this.er;
+    glows[i * 4 + 1] = this.eg;
+    glows[i * 4 + 2] = this.eb;
+    hours[i * 2] = this.h0;
+    hours[i * 2 + 1] = this.h1;
+    return i;
+  }
+
+  /** Appends triangle `i j k`, wound `i k j` when `side` is negative. */
+  private triangle(i: number, j: number, k: number, side: number) {
+    if (this.length + 3 > this.indices.length) {
+      const next = new Uint32Array(this.indices.length * 2);
+      next.set(this.indices);
+      this.indices = next;
+    }
+    this.indices[this.length++] = i;
+    this.indices[this.length++] = side < 0 ? k : j;
+    this.indices[this.length++] = side < 0 ? j : k;
+  }
+
+  /** One triangle. If `dir` is given, the winding is flipped so its normal points along `dir`. */
+  tri(a: V3, b: V3, c: V3, col: THREE.Color, dir?: V3) {
+    const side = this.facing(a, b, c, dir);
+    if (side === 0) return;
+    this.paint(col);
+    this.triangle(this.vertex(a), this.vertex(b), this.vertex(c), side);
+  }
+
+  /** Triangles `a b c` and `a c d`, sharing their diagonal's vertices when they share a normal. */
   quad(a: V3, b: V3, c: V3, d: V3, col: THREE.Color, dir?: V3) {
-    this.tri(a, b, c, col, dir);
-    this.tri(a, c, d, col, dir);
+    const first = this.facing(a, b, c, dir);
+    const qx = this.qx;
+    const qy = this.qy;
+    const qz = this.qz;
+    const second = this.facing(a, c, d, dir);
+    if (first === 0 || first !== second || qx !== this.qx || qy !== this.qy || qz !== this.qz) {
+      this.tri(a, b, c, col, dir);
+      this.tri(a, c, d, col, dir);
+      return;
+    }
+    this.paint(col);
+    const i = this.vertex(a);
+    const j = this.vertex(b);
+    const k = this.vertex(c);
+    const l = this.vertex(d);
+    this.triangle(i, j, k, first);
+    this.triangle(i, k, l, first);
   }
 
   /** An upward-facing polygon at height `y`, or at `y(p)` for sloped roof faces. */
@@ -140,9 +208,23 @@ export class MeshBuilder {
     if (pts.length < 3) return;
     const shape = pts.map((p) => new THREE.Vector2(p[0], p[1]));
     const h = typeof y === 'number' ? () => y : y;
-    for (const t of THREE.ShapeUtils.triangulateShape(shape, [])) {
-      const [a, b, c] = t.map((i): V3 => [pts[i][0], h(pts[i]), pts[i][1]]);
-      this.tri(a, b, c, col, [0, 1, 0]);
+    const corners = pts.map((p): V3 => [p[0], h(p), p[1]]);
+    // Each corner's latest vertex and its packed normal, reused by triangles in the same plane.
+    const vertex = new Int32Array(pts.length).fill(-1);
+    const normal = new Int32Array(pts.length);
+    const at = (i: number, key: number) => {
+      if (vertex[i] < 0 || normal[i] !== key) {
+        vertex[i] = this.vertex(corners[i]);
+        normal[i] = key;
+      }
+      return vertex[i];
+    };
+    for (const [a, b, c] of THREE.ShapeUtils.triangulateShape(shape, [])) {
+      const side = this.facing(corners[a], corners[b], corners[c], UP);
+      if (side === 0) continue;
+      this.paint(col);
+      const key = ((this.qx & 255) << 16) | ((this.qy & 255) << 8) | (this.qz & 255);
+      this.triangle(at(a, key), at(b, key), at(c, key), side);
     }
   }
 
@@ -245,6 +327,7 @@ export class MeshBuilder {
         'lightSchedule',
         new THREE.Float16BufferAttribute(this.hours.subarray(0, n * 2), 2),
       );
+    g.setIndex(new THREE.BufferAttribute(this.indices.slice(0, this.length), 1));
     g.computeBoundingSphere();
     return g;
   }

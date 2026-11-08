@@ -10,7 +10,7 @@ const near = (c, i, col) =>
 
 test('small shops have individual front doors and no oversized rooftop machinery', () => {
   for (let x = 0; x < 240; x += 30) {
-    const g = buildBuildingGeometry(new Float32Array(record(x)));
+    const g = buildBuildingGeometry(new Float32Array(record(x))).toNonIndexed();
     const p = g.getAttribute('position');
     const c = g.getAttribute('color');
     const door = new THREE.Color(PRESENT_DAY.door);
@@ -41,7 +41,7 @@ test('small shops have individual front doors and no oversized rooftop machinery
 test('small-shop roof forms vary without changing sim footprints or heights', () => {
   const sloped = [];
   for (let x = 0; x < 240; x += 30) {
-    const g = buildBuildingGeometry(new Float32Array(record(x)));
+    const g = buildBuildingGeometry(new Float32Array(record(x))).toNonIndexed();
     const n = g.getAttribute('normal');
     const p = g.getAttribute('position');
     sloped.push(

@@ -19,11 +19,11 @@ export function buildBuildingGeometry(
     const ring: Pt[] = [];
     for (let i = 0; i < count; i++, o += 2) ring.push([data[o], data[o + 1]]);
     // Keep one triangle range per snapshot record for picking, including empty ranges.
-    const start = mb.vertexCount;
+    const start = mb.indexCount;
     // The sim sends counter-clockwise rings; reversing would move the front edge.
     if (ring.length >= 3 && ring === ccw(ring))
       building(mb, { zone, height, roof, front, ring }, style);
-    groups.push({ start, count: mb.vertexCount - start });
+    groups.push({ start, count: mb.indexCount - start });
   }
   const geometry = mb.geometry();
   for (const { start, count } of groups) geometry.addGroup(start, count, 0);

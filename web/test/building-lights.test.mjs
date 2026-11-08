@@ -97,7 +97,8 @@ test('all faces in a building share its schedule, including storefronts, across 
   assert.equal(schedule.count, g.getAttribute('position').count);
   for (const [index, group] of g.groups.entries()) {
     const expected = lightSchedule(index === 0 ? 3 : 2, seeded(ring(index + 7), LIGHT_SEED));
-    for (let i = group.start; i < group.start + group.count; i++) {
+    for (let k = group.start; k < group.start + group.count; k++) {
+      const i = g.index.getX(k);
       // Hours are stored as half floats: within one clock minute.
       assert.ok(Math.abs(schedule.getX(i) - expected[0]) < 1 / 60);
       assert.ok(Math.abs(schedule.getY(i) - expected[1]) < 1 / 60);

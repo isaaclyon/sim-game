@@ -23,7 +23,8 @@ const draw = ({ lot, b }, roads = new Clearance()) => {
   const props = new MeshBuilder();
   const surface = new MeshBuilder();
   lotGeometry(props, lot, b, roads, surface);
-  return { props: props.geometry(), surface: surface.geometry() };
+  // Shared corners expanded, so checks can read triangles as runs of three vertices.
+  return { props: props.geometry().toNonIndexed(), surface: surface.geometry().toNonIndexed() };
 };
 const near = (colors, i, color) =>
   Math.abs(colors.getX(i) - color.r) +

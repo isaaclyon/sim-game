@@ -16,7 +16,9 @@ const record = (zone, height, roof, front, ring) => [
   ring.length,
   ...ring.flat(),
 ];
-const build = (...records) => buildBuildingGeometry(new Float32Array(records.flat()));
+// Shared corners expanded, so checks can read triangles as runs of three vertices.
+const build = (...records) =>
+  buildBuildingGeometry(new Float32Array(records.flat())).toNonIndexed();
 
 test('an empty snapshot clears every building', () => {
   const g = build();
