@@ -26,7 +26,8 @@ function validGeometry(object, calls, budget) {
     triangles += p.count / 3;
     for (let i = 0; i < p.count; i++) {
       assert.ok([p.getX(i), p.getY(i), p.getZ(i)].every(Number.isFinite));
-      assert.ok(Math.abs(Math.hypot(n.getX(i), n.getY(i), n.getZ(i)) - 1) < 1e-5);
+      // Normals are stored as bytes: unit length to within 1%.
+      assert.ok(Math.abs(Math.hypot(n.getX(i), n.getY(i), n.getZ(i)) - 1) < 0.01);
     }
   }
   assert.ok(triangles < budget, `${triangles} triangles must stay under ${budget}`);

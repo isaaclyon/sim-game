@@ -197,12 +197,18 @@ test('yard choices survive rebuilds and props clear walls, streets and irregular
     const first = draw(site, roads);
     const again = draw(structuredClone(site), roads);
     assert.deepEqual(
-      first.props.getAttribute('position').data.array,
-      again.props.getAttribute('position').data.array,
+      [...first.props.getAttribute('position').array, ...first.props.getAttribute('color').array],
+      [...again.props.getAttribute('position').array, ...again.props.getAttribute('color').array],
     );
     assert.deepEqual(
-      first.surface.getAttribute('position').data.array,
-      again.surface.getAttribute('position').data.array,
+      [
+        ...first.surface.getAttribute('position').array,
+        ...first.surface.getAttribute('color').array,
+      ],
+      [
+        ...again.surface.getAttribute('position').array,
+        ...again.surface.getAttribute('color').array,
+      ],
     );
     const p = first.props.getAttribute('position');
     assert.ok(p.count < 18000, 'fences remain modest batched geometry');

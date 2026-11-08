@@ -38,8 +38,12 @@ test('outdoor geometry is stable, varied by use, and stays inside its lot', () =
       assert.ok(p.getZ(i) >= 0 && p.getZ(i) <= 40);
     }
     const again = buildLotGeometry(lot, b, new Clearance());
-    assert.deepEqual(p.data.array, again.getAttribute('position').data.array);
-    signatures.add([...p.data.array].join(','));
+    const vertices = (geometry) => [
+      ...geometry.getAttribute('position').array,
+      ...geometry.getAttribute('color').array,
+    ];
+    assert.deepEqual(vertices(g), vertices(again));
+    signatures.add(vertices(g).join(','));
   }
   assert.ok(signatures.size >= 3, 'homes, commerce and industry have distinct treatments');
 });

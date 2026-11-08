@@ -171,7 +171,7 @@ export class BuildingLayer {
     for (let i = 0; i < color.count; i++)
       colors.set([color.getX(i), color.getY(i), color.getZ(i)], 3 * i);
     // Nobody lives there yet: no lit windows until it joins its tile.
-    (geometry.getAttribute('nightEmission').array as Float32Array).fill(0);
+    geometry.deleteAttribute('nightEmission');
     const mesh = new THREE.Mesh(geometry, this.material);
     mesh.castShadow = true;
     mesh.receiveShadow = true;

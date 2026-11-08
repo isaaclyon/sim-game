@@ -98,8 +98,9 @@ test('all faces in a building share its schedule, including storefronts, across 
   for (const [index, group] of g.groups.entries()) {
     const expected = lightSchedule(index === 0 ? 3 : 2, seeded(ring(index + 7), LIGHT_SEED));
     for (let i = group.start; i < group.start + group.count; i++) {
-      assert.ok(Math.abs(schedule.getX(i) - expected[0]) < 0.00001);
-      assert.ok(Math.abs(schedule.getY(i) - expected[1]) < 0.00001);
+      // Hours are stored as half floats: within one clock minute.
+      assert.ok(Math.abs(schedule.getX(i) - expected[0]) < 1 / 60);
+      assert.ok(Math.abs(schedule.getY(i) - expected[1]) < 1 / 60);
     }
   }
   assert.deepEqual(schedule.array, buildBuildingGeometry(data).getAttribute('lightSchedule').array);

@@ -4,52 +4,115 @@ import type { Pt } from './polygon.ts';
 
 export type V3 = [number, number, number];
 
+/** Unit float in [0, 1] to a normalized integer up to `max`; three.js's own conversion wraps. */
+const unit = (v: number, max: number) => Math.round(Math.min(Math.max(v, 0), 1) * max);
+
+/** Three values per vertex, padded to four so GPUs read them without converting the buffer. */
+function packed(array: Int8Array | Uint8Array | Uint16Array): THREE.InterleavedBufferAttribute {
+  return new THREE.InterleavedBufferAttribute(new THREE.InterleavedBuffer(array, 4), 3, 0, true);
+}
+
+/**
+ * Vertices are stored compactly, since a city holds tens of millions of them twice (here and on
+ * the GPU): float positions, byte normals and glow, 16-bit colours (bytes would lose dark
+ * palette colours, which are linear here) and half-float light hours. Glow and hours are left
+ * out when no face has any; the night shader then reads zeros.
+ */
 export class MeshBuilder {
-  /** Interleaved per vertex: position (3), normal (3), colour (3). Grows by doubling. */
-  private data = new Float32Array(9 * 3 * 1024);
-  private size = 0;
+  private capacity = 3 * 1024;
+  private count = 0;
+  private positions = new Float32Array(this.capacity * 3);
+  private normals = new Int8Array(this.capacity * 4);
+  private colors = new Uint16Array(this.capacity * 4);
+  private glows = new Uint8Array(this.capacity * 4);
+  private hours = new Uint16Array(this.capacity * 2);
+  private glowing = false;
+  private scheduled = false;
   /** Emission colour for subsequently added faces; black means unlit. */
   readonly glow = new THREE.Color(0x000000);
-  private readonly emissions: number[] = [];
   /** Daily on/off hours for subsequently added faces; zero duration stays dark. */
   lightSchedule: [number, number] = [0, 0];
-  private readonly schedules: number[] = [];
 
   get vertexCount(): number {
-    return this.size / 9;
+    return this.count;
+  }
+
+  private grow() {
+    this.capacity *= 2;
+    const grown = <T extends Float32Array | Int8Array | Uint8Array | Uint16Array>(
+      old: T,
+      per: number,
+    ) => {
+      const next = new (old.constructor as new (n: number) => T)(this.capacity * per);
+      next.set(old);
+      return next;
+    };
+    this.positions = grown(this.positions, 3);
+    this.normals = grown(this.normals, 4);
+    this.colors = grown(this.colors, 4);
+    this.glows = grown(this.glows, 4);
+    this.hours = grown(this.hours, 2);
   }
 
   /** One triangle. If `dir` is given, the winding is flipped so its normal points along `dir`. */
+  // Scalars only: this runs for every triangle of every rebuilt tile, so temporary arrays here
+  // were the page's largest source of garbage while the city grows.
   tri(a: V3, b: V3, c: V3, col: THREE.Color, dir?: V3) {
-    const [ux, uy, uz] = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
-    const [vx, vy, vz] = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
-    let [nx, ny, nz] = [uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx];
+    const ux = b[0] - a[0];
+    const uy = b[1] - a[1];
+    const uz = b[2] - a[2];
+    const vx = c[0] - a[0];
+    const vy = c[1] - a[1];
+    const vz = c[2] - a[2];
+    let nx = uy * vz - uz * vy;
+    let ny = uz * vx - ux * vz;
+    let nz = ux * vy - uy * vx;
     const len = Math.hypot(nx, ny, nz);
     if (len < 1e-9) return;
+    let second = b;
+    let third = c;
     if (dir && nx * dir[0] + ny * dir[1] + nz * dir[2] < 0) {
-      [b, c] = [c, b];
-      [nx, ny, nz] = [-nx, -ny, -nz];
+      second = c;
+      third = b;
+      nx = -nx;
+      ny = -ny;
+      nz = -nz;
     }
-    if (this.size + 27 > this.data.length) {
-      const grown = new Float32Array(this.data.length * 2);
-      grown.set(this.data);
-      this.data = grown;
-    }
-    const d = this.data;
-    for (const p of [a, b, c]) {
-      this.emissions.push(this.glow.r, this.glow.g, this.glow.b);
-      this.schedules.push(...this.lightSchedule);
-      const o = this.size;
-      d[o] = p[0];
-      d[o + 1] = p[1];
-      d[o + 2] = p[2];
-      d[o + 3] = nx / len;
-      d[o + 4] = ny / len;
-      d[o + 5] = nz / len;
-      d[o + 6] = col.r;
-      d[o + 7] = col.g;
-      d[o + 8] = col.b;
-      this.size += 9;
+    if (this.count + 3 > this.capacity) this.grow();
+    const on = this.lightSchedule[0];
+    const off = this.lightSchedule[1];
+    const er = unit(this.glow.r, 255);
+    const eg = unit(this.glow.g, 255);
+    const eb = unit(this.glow.b, 255);
+    this.glowing ||= er + eg + eb > 0;
+    this.scheduled ||= on !== 0 || off !== 0;
+    const scale = 127 / len;
+    const qx = Math.round(nx * scale);
+    const qy = Math.round(ny * scale);
+    const qz = Math.round(nz * scale);
+    const cr = unit(col.r, 65535);
+    const cg = unit(col.g, 65535);
+    const cb = unit(col.b, 65535);
+    const h0 = THREE.DataUtils.toHalfFloat(on);
+    const h1 = THREE.DataUtils.toHalfFloat(off);
+    const { positions, normals, colors, glows, hours } = this;
+    for (let v = 0; v < 3; v++) {
+      const p = v === 0 ? a : v === 1 ? second : third;
+      const i = this.count++;
+      positions[i * 3] = p[0];
+      positions[i * 3 + 1] = p[1];
+      positions[i * 3 + 2] = p[2];
+      normals[i * 4] = qx;
+      normals[i * 4 + 1] = qy;
+      normals[i * 4 + 2] = qz;
+      colors[i * 4] = cr;
+      colors[i * 4 + 1] = cg;
+      colors[i * 4 + 2] = cb;
+      glows[i * 4] = er;
+      glows[i * 4 + 1] = eg;
+      glows[i * 4 + 2] = eb;
+      hours[i * 2] = h0;
+      hours[i * 2 + 1] = h1;
     }
   }
 
@@ -156,13 +219,18 @@ export class MeshBuilder {
   }
 
   geometry(): THREE.BufferGeometry {
-    const buffer = new THREE.InterleavedBuffer(this.data.slice(0, this.size), 9);
+    const n = this.count;
     const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.InterleavedBufferAttribute(buffer, 3, 0));
-    g.setAttribute('normal', new THREE.InterleavedBufferAttribute(buffer, 3, 3));
-    g.setAttribute('color', new THREE.InterleavedBufferAttribute(buffer, 3, 6));
-    g.setAttribute('nightEmission', new THREE.Float32BufferAttribute(this.emissions, 3));
-    g.setAttribute('lightSchedule', new THREE.Float32BufferAttribute(this.schedules, 2));
+    g.setAttribute('position', new THREE.BufferAttribute(this.positions.slice(0, n * 3), 3));
+    g.setAttribute('normal', packed(this.normals.slice(0, n * 4)));
+    g.setAttribute('color', packed(this.colors.slice(0, n * 4)));
+    if (this.glowing) g.setAttribute('nightEmission', packed(this.glows.slice(0, n * 4)));
+    // Float16BufferAttribute copies its array, so a view avoids copying twice.
+    if (this.scheduled)
+      g.setAttribute(
+        'lightSchedule',
+        new THREE.Float16BufferAttribute(this.hours.subarray(0, n * 2), 2),
+      );
     g.computeBoundingSphere();
     return g;
   }

@@ -117,8 +117,8 @@ test('yard choices survive rebuilds and props clear walls, streets and lot edges
     const first = draw(site, roads);
     const again = draw(structuredClone(site), roads);
     assert.deepEqual(
-      first.props.getAttribute('position').data.array,
-      again.props.getAttribute('position').data.array,
+      [...first.props.getAttribute('position').array, ...first.props.getAttribute('color').array],
+      [...again.props.getAttribute('position').array, ...again.props.getAttribute('color').array],
     );
     const p = first.props.getAttribute('position');
     for (let k = 0; k < p.count; k++) {

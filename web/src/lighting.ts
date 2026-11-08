@@ -21,6 +21,12 @@ export function nightMaterial(
   lightHour?: { value: number },
 ): THREE.MeshLambertMaterial {
   const material = new THREE.MeshLambertMaterial({ vertexColors: true });
+  // Meshes without any glow leave these attributes out (see MeshBuilder), so WebGL reads the
+  // constant value of their slot. It starts at zero; this keeps it there if a later material
+  // (such as a ShaderMaterial, whose colour default is white) shares the slot.
+  Object.assign(material, {
+    defaultAttributeValues: { nightEmission: [0, 0, 0], lightSchedule: [0, 0] },
+  });
   material.customProgramCacheKey = () => (lightHour ? 'scheduled-night' : 'night');
   material.onBeforeCompile = (shader) => {
     shader.uniforms.night = night;

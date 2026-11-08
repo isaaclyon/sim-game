@@ -25,7 +25,8 @@ test('the coal model fits its reserved land and remains inexpensive to draw', ()
     assert.equal(positions.count, colors.count);
     for (let i = 0; i < positions.count; i++) {
       assert.ok([positions.getX(i), positions.getY(i), positions.getZ(i)].every(Number.isFinite));
-      assert.ok(Math.abs(Math.hypot(normals.getX(i), normals.getY(i), normals.getZ(i)) - 1) < 1e-5);
+      // Normals are stored as bytes: unit length to within 1%.
+      assert.ok(Math.abs(Math.hypot(normals.getX(i), normals.getY(i), normals.getZ(i)) - 1) < 0.01);
     }
     triangles += positions.count / 3;
     assert.ok(object.castShadow && object.receiveShadow);
