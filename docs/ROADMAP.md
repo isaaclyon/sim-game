@@ -168,10 +168,12 @@ building it.
   drops the fragment after reading it, so a reload resumes the local copy.
 - **Replay tests.** `sim::replay` reads and writes versioned text command logs; fresh cities
   record every command in the WASM wrapper, and development builds download them with the
-  Command log button. `crates/sim/tests/replays/` holds a browser-recorded session and a
-  scripted one covering every command kind. The test replays each, compares hash, population,
-  buildings and trips with its `expect` line, and checks that a save and load halfway through
-  ends the same. `BLESS_REPLAYS=1` refreshes expectations after an intended change.
+  Command log button. `crates/sim/tests/replays/` holds a browser-recorded session and
+  scripted ones; together they use every command kind and every plant, water piece, zone, road
+  class and fires setting, which a test enforces. The test replays each, compares hash,
+  population, buildings and trips with its `expect` line, and checks that a save and load
+  halfway through ends the same. `BLESS_REPLAYS=1` refreshes expectations after an intended
+  change.
 - **Verification.** Rust, WASM-worker and frontend tests cover export, forked opening, refused
   files, opening over an unreadable save, link encoding, confirmation rules, clipboard refusal
   and command logs. `scripts/check.sh` and the production build pass. A scripted Chrome session
@@ -475,8 +477,20 @@ Goals and consequences, kept light so they don't crowd out building.
   in M6.
   Done when: school runs fill the sidewalks at 8am, and a town that built schools early sees
   its dense shops fill faster a childhood later.
+- **Money follows city quality** ([ADR 0056](adrs/0056-taxes-follow-city-quality-and-services-have-budgets.md)),
+  after schools. Three slices:
+  1. Taxes: each resident's tax scales with their home's land value and each filled job's with
+     its worker's education. A typical home and worker pay today's $2 and $1.
+  2. Service budgets: each fire station and school sets its trucks or seat blocks; upkeep and
+     staff follow. Cuts take effect gradually.
+  3. Tax rates for residential, commercial and industry, after happiness: higher rates raise
+     money and cost happiness.
+
+  Done when: two otherwise equal towns, one clean and schooled, one polluted and unschooled,
+  show a clear gap in taxes; a player trims an idle station to save money and adds a truck
+  to a busy one.
 - Citizen happiness from services, traffic and pollution, feeding back into demand and growth.
-  The citizen inspector shows each person's mood and complaints.
+  The citizen inspector shows each person's mood and complaints. Tax rates follow it.
 - **Data overlays** ([ADR 0057](adrs/0057-data-overlays-for-traffic-and-services.md)):
   implemented. Views gains Traffic (roads with cars, green flowing to red jammed, eased over
   readings) and Services (lots green with power, water and fire cover, amber missing one, red

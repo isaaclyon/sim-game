@@ -5,11 +5,15 @@
 //! After an intended gameplay change, review the differences and then refresh the expectations:
 //! `BLESS_REPLAYS=1 cargo test -p sim --test replay`.
 
+mod coverage;
+
 use std::fs;
 use std::path::PathBuf;
 
 use sim::CommandLog;
 use sim::World;
+use sim::Zone;
+use sim::power::PlantKind;
 use sim::replay::Outcome;
 
 fn logs() -> Vec<PathBuf> {
@@ -49,6 +53,17 @@ fn saved_sessions_replay_to_their_expected_cities() {
             let s = loaded.fire_stats();
             assert!(s.saved >= 1 && s.destroyed >= 1, "{name}: {s:?}");
             assert!(!s.enabled, "{name}: the log turns fires off");
+        }
+
+        if name == "scripted-solar-unzone-fires.cmdlog" {
+            let p = &loaded.power;
+            let solar = p.active_plants().map(|i| p.plant_kind[i as usize]);
+            assert_eq!(solar.collect::<Vec<_>>(), [PlantKind::Solar], "{name}");
+            assert_eq!(loaded.zones.zone_at(30.0, 30.0), Some(Zone::None), "{name}");
+            assert!(
+                loaded.fire_stats().enabled,
+                "{name}: the log turns fires back on"
+            );
         }
 
         if name == "scripted-undo-redo.cmdlog" {
