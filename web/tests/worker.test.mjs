@@ -158,10 +158,12 @@ test('every preview request gets a reply even during WASM initialization', async
   assert.equal(w.messages.at(-1).segment.length, 4);
   await w.send({ type: 'setSpeed', speed: 0 });
   await w.send({ type: 'deleteRoad', x, y });
-  assert.equal(w.messages.at(-4).type, 'roads');
-  assert.equal(w.messages.at(-4).segments.length, roads.length - 5);
-  assert.equal(w.messages.at(-3).type, 'power', 'grids follow roads (ADR 0041)');
-  assert.equal(w.messages.at(-2).type, 'water', 'so do water networks (ADR 0052)');
+  assert.equal(w.messages.at(-6).type, 'roads');
+  assert.equal(w.messages.at(-6).segments.length, roads.length - 5);
+  assert.equal(w.messages.at(-5).type, 'power', 'grids follow roads (ADR 0041)');
+  assert.equal(w.messages.at(-4).type, 'water', 'so do water networks (ADR 0052)');
+  assert.equal(w.messages.at(-3).type, 'traffic', 'the traffic view drops the road (ADR 0057)');
+  assert.equal(w.messages.at(-2).type, 'services', 'and service gaps follow power');
   assert.equal(w.messages.at(-1).type, 'frame', 'paused edits refresh cars and signals');
   assert.equal(w.messages.at(-1).stats.tick, 0, 'deletion does not advance time');
 });

@@ -5,6 +5,9 @@ import * as THREE from 'three';
 import { POLLUTION, POLLUTION_ALPHA } from './palette.ts';
 import type { PollutionView } from './ui/views.ts';
 
+/** The views this layer draws; the data views (ADR 0057) show the plain haze under them. */
+export type PollutionLayerView = Exclude<PollutionView, 'traffic' | 'services'>;
+
 const color = (hex: number) => new THREE.Color(hex);
 const KIND = {
   air: color(POLLUTION.air),
@@ -26,7 +29,7 @@ const CLEAR = 8;
  * protocol.ts).
  */
 export function pollutionColor(
-  view: PollutionView,
+  view: PollutionLayerView,
   [air, ground, noise, land]: Uint8Array | readonly number[],
 ): [number, number, number, number] {
   const out = new THREE.Color();
@@ -60,7 +63,7 @@ export class PollutionOverlay {
   private readonly flat = new THREE.MeshBasicMaterial({ ...SHARED, fog: false });
   private cells?: Uint8Array;
   private layout?: [number, number, number, number, number];
-  private view: PollutionView = 'plain';
+  private view: PollutionLayerView = 'plain';
 
   /** `cells` and `layout` as in the `pollution` message. */
   setCells(cells: Uint8Array, layout: [number, number, number, number, number]) {
@@ -69,7 +72,7 @@ export class PollutionOverlay {
     this.draw();
   }
 
-  setView(view: PollutionView) {
+  setView(view: PollutionLayerView) {
     this.view = view;
     this.draw();
   }

@@ -135,6 +135,10 @@ worker.onmessage = (e: MessageEvent<FromWorker>) => {
     zonesSeen = true;
   } else if (msg.type === 'pollution') {
     renderer.setPollution(msg.cells, msg.layout);
+  } else if (msg.type === 'traffic') {
+    renderer.ground.setTraffic(msg.segments);
+  } else if (msg.type === 'services') {
+    renderer.ground.setServices(msg.lots);
   } else if (msg.type === 'lots') {
     renderer.setLots(msg.rings);
   } else if (msg.type === 'buildings') {

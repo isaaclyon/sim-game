@@ -70,5 +70,8 @@ export const POLLUTION = {
 };
 export const POLLUTION_ALPHA = 0.75;
 
+/** Services view (ADR 0057): lots with every service, one missing, or more missing. */
+export const SERVICES = { served: 0x3fae5a, short: 0xf2a541, without: 0xd9483b };
+
 /** Chimney smoke: pale grey puffs, slightly see-through. */
 export const SMOKE = { puff: 0xeceae4, glow: 0x5a5854, opacity: 0.55 };
