@@ -489,12 +489,19 @@ Goals and consequences, kept light so they don't crowd out building.
   Done when: two otherwise equal towns, one clean and schooled, one polluted and unschooled,
   show a clear gap in taxes; a player trims an idle station to save money and adds a truck
   to a busy one.
-- Citizen happiness from services, traffic and pollution, feeding back into demand and growth.
-  The citizen inspector shows each person's mood and complaints. Tax rates follow it.
+- **Citizen happiness** ([ADR 0058](adrs/0058-citizen-happiness-steers-demand-and-move-outs.md)):
+  implemented. Mood comes from power, water, fire cover, air, noise, a job and the commute.
+  A happy city draws people in; a household that stays miserable for a clock day may leave.
+  The citizen card shows mood, complaints and commute minutes; the population panel shows the
+  city's mood and top complaints; Views has a happiness overlay. Tax rates that cost
+  happiness come later (ADR 0056, slice 3).
+  Done when: cutting power to a district turns its homes red in the happiness view, residential
+  demand falls, and some of those households move out until power returns.
 - **Data overlays** ([ADR 0057](adrs/0057-data-overlays-for-traffic-and-services.md)):
   implemented. Views gains Traffic (roads with cars, green flowing to red jammed, eased over
   readings) and Services (lots green with power, water and fire cover, amber missing one, red
-  missing more) beside land value. The happiness overlay comes with citizen happiness.
+  missing more) beside land value.
+  Happiness has its own view (ADR 0058).
 - Two modes:
   - **Sandbox:** never fails. Problems slow growth or make people move away, but there is no game
     over.

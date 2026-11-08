@@ -61,6 +61,11 @@ pub struct Citizens {
     /// Tick by which a grown child who has not found a home of their own leaves the city;
     /// `u64::MAX` for everyone else.
     pub move_by: Vec<u64>,
+    /// Tick the current or latest trip to work set out (ADR 0058); `u64::MAX` before the first.
+    pub trip_start: Vec<u64>,
+    /// Clock minutes the last trip to work took, waiting for a route included; 0 = none yet
+    /// or no job (ADR 0058).
+    pub commute: Vec<u16>,
 }
 impl Citizens {
     /// A new resident of `household`, born at tick `born`. Children own no car.
@@ -93,6 +98,8 @@ impl Citizens {
         self.child.push(child);
         self.family.push(household);
         self.move_by.push(u64::MAX);
+        self.trip_start.push(u64::MAX);
+        self.commute.push(0);
         self.draw_car(id, !child, rng);
         id
     }

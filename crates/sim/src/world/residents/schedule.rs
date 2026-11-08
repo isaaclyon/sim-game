@@ -90,6 +90,9 @@ impl World {
                 Activity::Shop => Some((self.home_building(c), Activity::Home)),
             };
             if let Some((b, activity)) = next {
+                if activity == Activity::Work {
+                    self.citizens.trip_start[i] = self.totals.tick;
+                }
                 self.citizens.destination[i] = Some(b);
                 self.citizens.activity[i] = activity;
                 self.start_citizen_trip(c);
@@ -176,7 +179,10 @@ impl World {
                 self.citizens.car_out[i] = false;
                 self.schedule_day(c);
             }
-            Activity::Work => self.schedule_activity(c, self.citizens.work_duration[i] as f32),
+            Activity::Work => {
+                self.note_commute(c);
+                self.schedule_activity(c, self.citizens.work_duration[i] as f32);
+            }
             Activity::Shop => {
                 // 6 to 30 clock minutes.
                 let seconds = 20 + self.residents.rng.below(81);

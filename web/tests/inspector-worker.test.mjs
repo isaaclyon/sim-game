@@ -49,6 +49,9 @@ test('selecting a car answers at once with its resident, and keeps answering whi
   assert.ok(c.home && c.home.zone === 1, 'lives in a house');
   assert.ok(c.destination, 'driving somewhere');
   assert.ok([0, 1, 2].includes(c.activity));
+  assert.ok(c.mood >= 0 && c.mood <= 100, 'mood from the sim (ADR 0058)');
+  assert.ok(Array.isArray(c.complaints) && c.complaints.every((k) => k >= 0 && k <= 6));
+  assert.ok(Number.isInteger(c.commute));
   const before = replies(w).length;
   w.advance(101);
   assert.equal(w.messages.at(-1).type, 'citizen', 'details follow each frame');

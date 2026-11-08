@@ -1,6 +1,15 @@
 // Words and numbers for the top bar, its detail panels and the debug panel. Display only: every
 // figure comes from the sim's stats or the worker's save status.
-import type { CityStatus, Demand, FireStats, PowerStats, Stats, WaterStats } from '../protocol';
+import type {
+  CityStatus,
+  Complaint,
+  Demand,
+  FireStats,
+  HappinessStats,
+  PowerStats,
+  Stats,
+  WaterStats,
+} from '../protocol';
 
 export const fmt = (n: number) => n.toLocaleString('en-US');
 /** Whole dollars with the sign in front: `$1,234`, `-$56`. */
@@ -15,6 +24,34 @@ export function clockText(s: Pick<Stats, 'day' | 'secondOfDay'>) {
   return `Day ${s.day} · ${hh}:${mm}`;
 }
 
+/** A mood from the sim, 0 to 100, in a word with its number: `Content (62)` (ADR 0058). */
+export function moodText(mood: number) {
+  const word = mood >= 70 ? 'Happy' : mood >= 50 ? 'Content' : mood >= 30 ? 'Unhappy' : 'Miserable';
+  return `${word} (${mood})`;
+}
+
+/** What each `Complaint` code means, in words that follow "Complaints:". */
+export const COMPLAINT_WORDS: Record<Complaint, string> = {
+  0: 'no power',
+  1: 'no water',
+  2: 'no fire station nearby',
+  3: 'dirty air',
+  4: 'noise',
+  5: 'no job',
+  6: 'long commute',
+};
+
+/** The city's most common complaints, at most three, with how many residents have each. */
+export function topComplaints(h: HappinessStats) {
+  const top = h.complaints
+    .map((n, code) => ({ n, code: code as Complaint }))
+    .filter(({ n, code }) => n > 0 && code in COMPLAINT_WORDS)
+    .sort((a, b) => b.n - a.n || a.code - b.code)
+    .slice(0, 3)
+    .map(({ n, code }) => `${COMPLAINT_WORDS[code]} (${fmt(n)})`);
+  return top.length ? top.join(', ') : 'none';
+}
+
 /** The population panel's rows, in the order the page lists them. */
 export function populationRows(s: Stats): Record<string, string> {
   return {
@@ -22,6 +59,8 @@ export function populationRows(s: Stats): Record<string, string> {
     'pop-adults': fmt(s.population - s.children),
     'pop-children': fmt(s.children),
     'pop-unemployed': `${fmt(s.unemployed)} (${s.unemploymentPercent.toFixed(1)}%)`,
+    'pop-happiness': s.population ? moodText(s.happiness.average) : 'nobody yet',
+    'pop-complaints': topComplaints(s.happiness),
     'pop-driving': fmt(s.driving),
     'pop-walking': fmt(s.walking),
     'pop-parked': fmt(s.parked),

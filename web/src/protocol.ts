@@ -4,7 +4,9 @@
 import type { HistoryCommand, HistoryMessage, HistoryStatus } from './protocol-history.ts';
 import type { OverlayMessage } from './protocol-overlays.ts';
 import type {
+  Complaint,
   FireStats,
+  HappinessStats,
   PlantKind,
   PowerStats,
   Prices,
@@ -239,6 +241,12 @@ export interface Citizen {
   grewUp: boolean;
   /** A grown child still living with their family, looking for a home of their own. */
   wantsHome: boolean;
+  /** Mood 0 to 100 from the sim (ADR 0058); 0 once they have left town. */
+  mood: number;
+  /** `Complaint` codes, in code order. */
+  complaints: Complaint[];
+  /** Clock minutes their last trip to work took; 0 = none yet or no job. */
+  commute: number;
 }
 
 /** Sim-owned counts, not physical attendance. Original use persists during closure. */
@@ -308,6 +316,7 @@ export interface Stats {
   /** Upkeep of plants, pumps and towers, dollars per clock hour (ADR 0052). */
   utilities: number;
   fire: FireStats;
+  happiness: HappinessStats;
 }
 
 /** Persistence metadata only. A commit acknowledges the captured revision, not later edits. */
@@ -398,10 +407,17 @@ export type FromWorker =
   /**
    * The whole pollution grid (ADR 0037): `[air, ground, noise, landValue]` bytes per cell,
    * row-major from the origin, 0 = none (for land value: worthless) to 255 = full. `layout` is
-   * as for `zones`; cells are 4×4 zone cells. Sent at start, after edits and pauses, and at
-   * most once a real second while it changes.
+   * as for `zones`; cells are 4×4 zone cells. `mood` has one byte per cell (ADR 0058): 0 =
+   * nobody lives there, else 1 + residents' mean mood × 254 / 100; empty before the sim's
+   * first happiness update. Sent at start, after edits and pauses, and at most once a real
+   * second while either changes.
    */
-  | { type: 'pollution'; cells: Uint8Array; layout: [number, number, number, number, number] }
+  | {
+      type: 'pollution';
+      cells: Uint8Array;
+      mood: Uint8Array;
+      layout: [number, number, number, number, number];
+    }
   /**
    * `rings` is `[n, x0, y0, …, x(n-1), y(n-1)]` per lot: its outline's point count, then its
    * points (ADR 0018). Sent at start and whenever lots change.

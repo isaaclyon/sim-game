@@ -130,7 +130,9 @@ test('Views shows one ground overlay at a time, with traffic and power as switch
   assert.ok(pressed(t, 'traffic') && pressed(t, 'power-view') && pressed(t, 'view-land'));
   assert.equal(latest('powerView').on, true);
   t.key('p');
-  assert.ok(pressed(t, 'view-traffic'), 'P carries on from the overlay picked in the list');
+  assert.ok(pressed(t, 'view-happiness'), 'P carries on from the overlay picked in the list');
+  t.key('p');
+  assert.ok(pressed(t, 'view-traffic'), 'then the data overlays');
   t.key('p');
   assert.equal(latest('pollutionView').view, 'services');
   t.key('p');

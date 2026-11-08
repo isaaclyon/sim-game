@@ -251,11 +251,6 @@ export class Renderer {
     return this.agents.trafficView;
   }
 
-  /** `cells` and `layout` as in the `pollution` message (ADR 0037). */
-  setPollution(cells: Uint8Array, layout: [number, number, number, number, number]) {
-    this.ground.setPollution(cells, layout);
-  }
-
   /** Plain shows haze and stains; the others tint the ground, roads or lots by one measure. */
   setPollutionView(view: PollutionView) {
     this.ground.setView(view);

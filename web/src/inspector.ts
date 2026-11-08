@@ -2,6 +2,7 @@
 // shown as a card with a title and one small icon per line (M4.6).
 
 import type { Building, Citizen, Place, ToWorker } from './protocol';
+import { COMPLAINT_WORDS, moodText } from './ui/figures';
 import { type IconName, iconSvg } from './ui/icons';
 
 /** Words for a building by its original use, indexed by `Zone`. */
@@ -19,7 +20,7 @@ export interface Card {
   lines: CardLine[];
 }
 
-/** The card for `c`: name, then home, job and what they are doing now. */
+/** The card for `c`: name, then home, job, mood and complaints, and what they are doing now. */
 export function describe(c: Citizen): Card {
   if (!c.resident) return { title: c.name, lines: [{ icon: 'leave', text: 'Left town' }] };
   const there = (p: Place | null) => (p ? ` at ${label(p)}` : '');
@@ -44,11 +45,25 @@ export function describe(c: Citizen): Card {
       { icon: 'home', text: `Home: ${c.home ? label(c.home) : 'none'}` },
       c.child
         ? { icon: 'people', text: `Age ${c.age}, a child: lives at home` }
-        : { icon: 'work', text: c.job ? `Job: ${label(c.job)}` : 'Job: unemployed' },
+        : { icon: 'work', text: c.job ? `Job: ${label(c.job)}${commute(c)}` : 'Job: unemployed' },
       ...(c.child ? [] : [{ icon: 'people', text: `Age ${c.age}${grewUp(c)}` } as const]),
+      { icon: 'mood', text: `Mood: ${moodText(c.mood)}` },
+      ...(c.complaints.length
+        ? [
+            {
+              icon: 'warning',
+              text: `Complaints: ${c.complaints.map((k) => COMPLAINT_WORDS[k]).join(', ')}`,
+            } as const,
+          ]
+        : []),
       now,
     ],
   };
+}
+
+/** How long the last trip to work took, once there has been one (ADR 0058). */
+function commute(c: Citizen): string {
+  return c.commute > 0 ? `, ${c.commute} min commute` : '';
 }
 
 /** Where a grown child of the town stands on finding a home (ADR 0054). */
