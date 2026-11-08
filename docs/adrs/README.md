@@ -8,7 +8,7 @@ rewriting history; mark the old one `Superseded by NNNN`.
 |---|---|---|
 | [0001](0001-record-architecture-decisions.md) | Record architecture decisions | Accepted |
 | [0002](0002-rust-sim-with-browser-frontend.md) | Rust sim compiled to WASM, browser frontend | Accepted |
-| [0003](0003-sim-and-rendering-are-separate.md) | Sim and rendering are separate: commands in, snapshots out | Road snapshot cardinality superseded by 0015, its speed field by 0017; agent format by 0026; otherwise accepted |
+| [0003](0003-sim-and-rendering-are-separate.md) | Sim and rendering are separate: commands in, snapshots out | Road snapshot cardinality superseded by 0015, its speed field by 0017; agent format by 0026; frame pacing and buffer reuse amended; otherwise accepted |
 | [0004](0004-deterministic-fixed-timestep-sim.md) | Deterministic fixed-timestep sim | Accepted |
 | [0005](0005-data-oriented-storage.md) | Data-oriented storage with append-only ids | Accepted; agent removal completed by 0021 |
 | [0006](0006-agents-pathfinding-and-traffic-model.md) | Agents, pathfinding and traffic model | Accepted; pathfinding superseded by 0010; citizen lifecycle and recovery by 0021 |

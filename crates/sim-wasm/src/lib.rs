@@ -331,10 +331,15 @@ impl Sim {
         })
     }
 
-    /// `[x, y, heading, speed_ratio, kind]` per agent; see `World::write_agent_snapshot`.
-    pub fn agent_snapshot(&mut self) -> Vec<f32> {
+    /// `[x, y, heading, speed_ratio, kind]` per agent (see `World::write_agent_snapshot`),
+    /// written into the front of `out` when it fits, so the caller can reuse one buffer for
+    /// every frame. Returns the snapshot's length in floats; a longer one leaves `out` alone.
+    pub fn agent_snapshot_into(&mut self, out: &mut [f32]) -> usize {
         self.world.write_agent_snapshot(&mut self.buf);
-        self.buf.clone()
+        if let Some(front) = out.get_mut(..self.buf.len()) {
+            front.copy_from_slice(&self.buf);
+        }
+        self.buf.len()
     }
 
     /// `[x, y, heading, state]` per signalised approach; see `World::write_signal_snapshot`.

@@ -31,3 +31,16 @@ want the option to swap the frontend (ADR 0002) without touching the sim.
   `protocol.ts` doc comment and the `renderer.ts` reader together.
 - Snapshots currently send every agent every tick. At much larger counts we'll need culling or
   delta snapshots.
+
+## Amendment (2026-11-07): frames follow the screen, and agent buffers come back
+
+Where this section and the text above disagree, this section wins.
+
+- The worker no longer sends a `frame` after every step that ran ticks. It sends at most one
+  about every 1/60 of a real second, always with the newest state, and one after every edit.
+  Ticks between frames only change the next frame. At high speeds this stops the page from
+  receiving, and throwing away, snapshots it never draws.
+- The page hands each agents buffer it stops drawing back to the worker (`spareAgents`,
+  transferred). The worker refills a returned buffer when it is big enough and otherwise makes
+  one a quarter larger than needed, so steady play allocates no agent snapshots. A `frame`'s
+  agents may therefore be a view into a larger buffer.

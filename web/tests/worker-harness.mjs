@@ -64,6 +64,8 @@ export async function worker(agents = 100, size = 3, storage, grid = true) {
     self,
     performance: { now: () => now },
     Date,
+    // A browser clones messages into the page's realm; sharing the type keeps them comparable.
+    Float32Array,
     setTimeout: (fn) => {
       nextStep = fn;
     },

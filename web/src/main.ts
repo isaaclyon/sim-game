@@ -152,6 +152,9 @@ worker.onmessage = (e: MessageEvent<FromWorker>) => {
   } else {
     const now = performance.now();
     if (curr) frameGap = frameGap * 0.8 + (now - currAt) * 0.2;
+    // Hand the frame no longer drawn back for refilling, so frames allocate nothing.
+    if (prev)
+      worker.postMessage({ type: 'spareAgents', agents: prev } satisfies ToWorker, [prev.buffer]);
     prev = curr;
     curr = msg.agents;
     currAt = now;

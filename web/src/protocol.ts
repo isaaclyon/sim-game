@@ -149,7 +149,9 @@ export type ToWorker =
   | { type: 'inspect'; agent: number | null; selection: number }
   /** Selects a stable building ID, replacing any citizen selection. Same refresh and
    * selection-counter contract as inspect; null clears either kind of selection. */
-  | { type: 'inspectBuilding'; building: number | null; selection: number };
+  | { type: 'inspectBuilding'; building: number | null; selection: number }
+  /** A `frame`'s agents the page no longer draws, transferred back for the worker to refill. */
+  | { type: 'spareAgents'; agents: Float32Array };
 
 /** Road classes, matching the sim's `RoadClass` (ADR 0017). Main roads carry long
  * trips; the sim lays alleys to reach deep lots. */
@@ -451,7 +453,8 @@ export type FromWorker =
    * < 0 means hidden; kind is an `AgentKind` (ADR 0026, 0053).
    * `signals` is `[x, y, heading, state]` per signalised approach, at its stop line; state is
    * 0 = red, 1 = green, 2 = protected-left green. `history` is what undo and redo would do
-   * (ADR 0051).
+   * (ADR 0051). Sent after ticks at most about 60 times a real second, and after edits. The
+   * agents view may sit in a larger reused buffer; return it with `spareAgents` once replaced.
    */
   | {
       type: 'frame';

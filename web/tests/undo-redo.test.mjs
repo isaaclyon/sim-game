@@ -118,9 +118,10 @@ test('a refused undo is marked, and hovering previews what would change', async 
   assert.equal(t.previews.at(-1).remove.length, 0, 'leaving hides it');
   // Undoing the last step disables the button, which ends its preview without a leave.
   t.elements.undo.events.pointerenter();
-  const asked = t.messages.length;
+  const asks = () => t.messages.filter((m) => m.type === 'previewHistory').length;
+  const asked = asks();
   show(t, NONE);
   assert.equal(t.previews.at(-1).remove.length, 0);
   show(t, { ...NONE, undo: 'line', undoRefund: 10 });
-  assert.equal(t.messages.length, asked, 'a later step does not preview without a hover');
+  assert.equal(asks(), asked, 'a later step does not preview without a hover');
 });

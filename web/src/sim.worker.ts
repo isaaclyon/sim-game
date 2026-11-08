@@ -32,6 +32,13 @@ let inspected: { selection: number; kind: 'citizen' | 'building'; id: number } |
 const BUILDING_SNAPSHOT_INTERVAL_MS = 250;
 /** Pollution changes slowly (every 10 sim seconds) and its grid can be large. */
 const POLLUTION_SNAPSHOT_INTERVAL_MS = 1000;
+/** Screens draw about 60 frames a second; ticks between frames only change the next one. */
+const FRAME_INTERVAL_MS = 1000 / 60;
+let frameSentAt = -Infinity;
+let frameDue = false;
+let lastTickMs = 0;
+/** Agent buffers the page has returned (`spareAgents`), refilled instead of allocating. */
+const spareAgents: ArrayBuffer[] = [];
 
 function post(msg: FromWorker, transfer: Transferable[] = []) {
   self.postMessage(msg, { transfer });
@@ -143,8 +150,22 @@ const cities = new CitySession(post, (next, initialSpeed) => {
 });
 let started = false;
 
+/** The agent snapshot in a returned buffer when one is big enough, else in a roomier new one. */
+function agentSnapshot(s: Sim): Float32Array {
+  const spare = spareAgents.pop();
+  let out = spare ? new Float32Array(spare) : new Float32Array();
+  let n = s.agent_snapshot_into(out);
+  if (n > out.length) {
+    out = new Float32Array(Math.ceil(n * 1.25));
+    n = s.agent_snapshot_into(out);
+  }
+  return out.subarray(0, n);
+}
+
 function sendFrame(s: Sim, perTick = 0) {
-  const agents = s.agent_snapshot();
+  frameSentAt = performance.now();
+  frameDue = false;
+  const agents = agentSnapshot(s);
   const signals = s.signal_snapshot();
   const frame = { agents, signals, stats: readStats(s), history: readHistory(s) };
   post({ type: 'frame', ...frame, tickMs: perTick }, [agents.buffer, signals.buffer]);
@@ -222,15 +243,16 @@ function step() {
       const t0 = performance.now();
       sim.tick(n);
       cities.changed();
-      const perTick = (performance.now() - t0) / n;
+      lastTickMs = (performance.now() - t0) / n;
+      frameDue = true;
       sendRoadsIfChanged(sim);
       sendBuildingsIfChanged(sim);
       sendPowerIfChanged(sim);
       water.sendIfChanged(sim);
       sendPollutionIfChanged(sim);
       fire.sendIfChanged(sim);
-      sendFrame(sim, perTick);
     }
+    if (frameDue && now - frameSentAt >= FRAME_INTERVAL_MS) sendFrame(sim, lastTickMs);
   }
   setTimeout(step, 4);
 }
@@ -248,6 +270,10 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
       break;
     case 'saveCity':
       await cities.save();
+      break;
+    case 'spareAgents':
+      // Two cover the page's previous and current frames; more would only hold memory.
+      if (spareAgents.length < 2) spareAgents.push(msg.agents.buffer as ArrayBuffer);
       break;
     case 'newCity':
       await cities.newCity();

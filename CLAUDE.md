@@ -21,7 +21,9 @@ What to build next and why lives in `docs/ROADMAP.md`. Work on the current miles
 ## Snapshot formats
 - Agents: `[x, y, heading, speed_ratio, kind]` per agent (`SNAPSHOT_STRIDE`, `AGENT_STRIDE`),
   speed_ratio < 0 = hidden, kind 0 = car, 1 = walker on the sidewalk (ADR 0026), 2 = fire
-  truck (ADR 0053; not a citizen, so inspecting one answers null).
+  truck (ADR 0053; not a citizen, so inspecting one answers null). Frames go out at most
+  ~60 a real second; the page returns drawn agent buffers with `spareAgents` for the worker
+  to refill, so a frame's agents may view a larger buffer (ADR 0003, amended).
 - Roads: `[ax, ay, bx, by, class]` per active rendered segment, class 0 = street, 1 = main road,
   2 = alley; curves emit multiple segments. Packed in road ID order, not indexed by road ID
   (ADR 0015, 0017).
