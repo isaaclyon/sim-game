@@ -72,13 +72,19 @@ impl World {
     /// The complete simulation state as save bytes. Changes nothing.
     pub fn save(&self) -> Result<Vec<u8>, SaveError> {
         let encode = |e: postcard::Error| SaveError::Encode(e.to_string());
-        let payload = postcard::to_allocvec(self).map_err(encode)?;
-        let mut out = Vec::with_capacity(HEADER + payload.len());
+        // Measured first so the payload is encoded once, straight into an exact buffer behind
+        // the header. Encoding into a growing buffer and copying it here needed about three
+        // times the save's size on top of the world, and WASM memory never shrinks back.
+        let len = postcard::experimental::serialized_size(self).map_err(encode)?;
+        let mut out = Vec::with_capacity(HEADER + len);
         out.extend_from_slice(MAGIC);
         out.extend_from_slice(&SAVE_VERSION.to_le_bytes());
-        out.extend_from_slice(&(payload.len() as u64).to_le_bytes());
-        out.extend_from_slice(&checksum(&payload).to_le_bytes());
-        out.extend_from_slice(&payload);
+        out.extend_from_slice(&(len as u64).to_le_bytes());
+        out.extend_from_slice(&[0; 8]); // The checksum, once the payload is written.
+        let mut out = postcard::to_extend(self, out).map_err(encode)?;
+        debug_assert_eq!(out.len(), HEADER + len);
+        let sum = checksum(&out[HEADER..]);
+        out[HEADER - 8..HEADER].copy_from_slice(&sum.to_le_bytes());
         Ok(out)
     }
 
