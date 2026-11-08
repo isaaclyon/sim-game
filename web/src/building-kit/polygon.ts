@@ -21,15 +21,16 @@ export function norm(v: Pt): Pt {
   return [v[0] / l, v[1] / l];
 }
 
+/** Whether a ray from `pt` toward +x passes the side from `a` to `b`; see `inside`. */
+export function rayCrosses(pt: Pt, a: Pt, b: Pt): boolean {
+  return (
+    b[1] > pt[1] !== a[1] > pt[1] && pt[0] < ((a[0] - b[0]) * (pt[1] - b[1])) / (a[1] - b[1]) + b[0]
+  );
+}
+
 export function inside(pt: Pt, p: Pt[]): boolean {
   let c = false;
-  for (let i = 0, j = p.length - 1; i < p.length; j = i++) {
-    if (
-      p[i][1] > pt[1] !== p[j][1] > pt[1] &&
-      pt[0] < ((p[j][0] - p[i][0]) * (pt[1] - p[i][1])) / (p[j][1] - p[i][1]) + p[i][0]
-    )
-      c = !c;
-  }
+  for (let i = 0, j = p.length - 1; i < p.length; j = i++) if (rayCrosses(pt, p[j], p[i])) c = !c;
   return c;
 }
 

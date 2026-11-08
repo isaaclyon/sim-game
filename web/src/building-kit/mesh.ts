@@ -6,6 +6,25 @@ export type V3 = [number, number, number];
 
 const UP: V3 = [0, 1, 0];
 
+const circles = new Map<number, { corners: Pt[]; faces: V3[] }>();
+
+/** Directions of an n-sided cylinder's corners and the middles of its faces, computed once. */
+function circle(sides: number) {
+  let found = circles.get(sides);
+  if (!found) {
+    const at = (k: number) => (k / sides) * Math.PI * 2;
+    found = {
+      corners: Array.from({ length: sides }, (_, i): Pt => [Math.cos(at(i)), Math.sin(at(i))]),
+      faces: Array.from(
+        { length: sides },
+        (_, i): V3 => [Math.cos(at(i + 0.5)), 0, Math.sin(at(i + 0.5))],
+      ),
+    };
+    circles.set(sides, found);
+  }
+  return found;
+}
+
 /** Unit float in [0, 1] to a normalized integer up to `max`; three.js's own conversion wraps. */
 const unit = (v: number, max: number) => Math.round(Math.min(Math.max(v, 0), 1) * max);
 
@@ -339,19 +358,13 @@ export class MeshBuilder {
 
   /** An n-sided upright prism (a low-poly cylinder) or, with `top` radius 0, a cone. */
   cylinder(c: Pt, y0: number, r: number, h: number, sides: number, col: THREE.Color, top = r) {
+    const { corners, faces } = circle(sides);
     const ring = (radius: number): Pt[] =>
-      Array.from({ length: sides }, (_, i) => {
-        const a = (i / sides) * Math.PI * 2;
-        return [c[0] + Math.cos(a) * radius, c[1] + Math.sin(a) * radius];
-      });
+      corners.map(([x, z]) => [c[0] + x * radius, c[1] + z * radius]);
     const [bottom, upper] = [ring(r), ring(top)];
     for (let i = 0; i < sides; i++) {
       const j = (i + 1) % sides;
-      const out: V3 = [
-        Math.cos(((i + 0.5) / sides) * Math.PI * 2),
-        0,
-        Math.sin(((i + 0.5) / sides) * Math.PI * 2),
-      ];
+      const out = faces[i];
       const [a, b] = [bottom[i], bottom[j]];
       const [d, e] = [upper[i], upper[j]];
       if (top > 0)

@@ -2,9 +2,9 @@
 // (buildings, roads and the entrance) cut openings; random choice never removes a side.
 import * as THREE from 'three';
 import type { MeshBuilder } from '../building-kit/mesh.ts';
-import { convex, inside, offset, type Pt } from '../building-kit/polygon.ts';
+import { inside, offset, type Pt } from '../building-kit/polygon.ts';
 import type { Clearance } from '../scenery/clearance.ts';
-import { fits } from './placement.ts';
+import { fitter, meetsAny, ROAD_GAP, sides } from './placement.ts';
 
 const hedge = new THREE.Color(0x56794d);
 const steel = new THREE.Color(0x737d80);
@@ -25,6 +25,14 @@ export function boundary(
   const outer = offset(lot, -0.2);
   const inner = offset(lot, -0.65);
   const reserved: Pt[][] = [];
+  // When a strip's long side lies wholly on one road or inside an obstacle, no smaller piece of
+  // that strip could fit either. An obstacle holds the whole side if it holds both ends and the
+  // side meets none of its walls; even a touch counts, since a side may leave a concave
+  // obstacle through one corner and return through another.
+  const walls = obstacles.map(sides);
+  const blocked = (p: Pt, q: Pt) =>
+    roads.holds(p, q, ROAD_GAP) ||
+    obstacles.some((ring, k) => inside(p, ring) && inside(q, ring) && !meetsAny(p, q, walls[k]));
   for (let i = 0; i < lot.length; i++) {
     const j = (i + 1) % lot.length;
     const length = Math.hypot(lot[j][0] - lot[i][0], lot[j][1] - lot[i][1]);
@@ -35,16 +43,18 @@ export function boundary(
       mix(inner[i], inner[j], a),
     ];
     const runs: [number, number][] = [];
+    // Every piece lies within the whole strip, so what it could touch is found once.
+    const fits = fitter(strip(0, 1), lot, obstacles, roads);
     const cut = (a: number, b: number) => {
       const shape = strip(a, b);
-      if (fits(shape, lot, obstacles, roads)) {
+      if (fits(shape)) {
         const last = runs.at(-1);
         if (last && Math.abs(last[1] - a) < 1e-8) last[1] = b;
         else runs.push([a, b]);
         return;
       }
       if ((b - a) * length < 0.2) return;
-      if (obstacles.some((ring) => convex(ring) && shape.every((p) => inside(p, ring)))) return;
+      if (blocked(shape[0], shape[1]) || blocked(shape[3], shape[2])) return;
       const middle = (a + b) / 2;
       cut(a, middle);
       cut(middle, b);
