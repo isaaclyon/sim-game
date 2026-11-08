@@ -96,6 +96,11 @@ export class Renderer {
     container.appendChild(this.renderer.domElement);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
+    // Building and lot tiles keep their vertices only on the GPU; rebuild them if it loses them.
+    this.renderer.domElement.addEventListener('webglcontextrestored', () => {
+      this.buildings.restore();
+      this.lotScenery.restore();
+    });
     this.scene.add(
       this.scenery.group,
       this.lotScenery.group,

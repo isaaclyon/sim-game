@@ -13,6 +13,20 @@ function packed(array: Int8Array | Uint8Array | Uint16Array): THREE.InterleavedB
 }
 
 /**
+ * Lets the page drop `geometry`'s vertex arrays once the renderer has copied them to the GPU, so
+ * a city's tiles are not held twice. Raycasting such a mesh then fails, and after a lost WebGL
+ * context its owner must rebuild it. Bounding spheres, computed beforehand, still cull it.
+ */
+export function dropArraysOnUpload(geometry: THREE.BufferGeometry) {
+  for (const attribute of Object.values(geometry.attributes))
+    ('data' in attribute ? attribute.data : attribute).onUpload(function (this: {
+      array: unknown;
+    }) {
+      this.array = null;
+    });
+}
+
+/**
  * Vertices are stored compactly, since a city holds tens of millions of them twice (here and on
  * the GPU): float positions, byte normals and glow, 16-bit colours (bytes would lose dark
  * palette colours, which are linear here) and half-float light hours. Glow and hours are left

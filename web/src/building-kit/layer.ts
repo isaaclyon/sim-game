@@ -3,6 +3,7 @@
 // then joins its tile. The rise is display only: the sim placed the building whole (ADR 0027).
 import * as THREE from 'three';
 import { buildBuildingGeometry } from './index.ts';
+import { dropArraysOnUpload } from './mesh.ts';
 import type { Pt } from './polygon.ts';
 import { buildScaffoldGeometry } from './scaffold.ts';
 import type { Style } from './style.ts';
@@ -40,6 +41,29 @@ interface Tile {
   hash: number;
   mesh: THREE.Mesh;
   ids: number[];
+  /** The tile's snapshot records, kept to rebuild one building at a time for picking. */
+  records: Float32Array;
+  /** Per building, in `ids` order: where its record starts in `records`. */
+  starts: number[];
+  /** Per building: drawn bounds `[min x, y, z, max x, y, z]`, NaN when nothing is drawn. */
+  bounds: Float32Array;
+}
+
+/** Each building's drawn bounds, from its triangle range, read before the GPU takes them. */
+function drawnBounds(geometry: THREE.BufferGeometry): Float32Array {
+  const p = geometry.getAttribute('position').array as Float32Array;
+  const out = new Float32Array(geometry.groups.length * 6).fill(Number.NaN);
+  geometry.groups.forEach(({ start, count }, b) => {
+    if (count === 0) return;
+    const box = out.subarray(b * 6, b * 6 + 6);
+    box.set([Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity]);
+    for (let i = start * 3; i < (start + count) * 3; i += 3)
+      for (let k = 0; k < 3; k++) {
+        box[k] = Math.min(box[k], p[i + k]);
+        box[k + 3] = Math.max(box[k + 3], p[i + k]);
+      }
+  });
+  return out;
 }
 
 export class BuildingLayer {
@@ -60,17 +84,53 @@ export class BuildingLayer {
   /** Picks actual roof and facade triangles, not their projection onto the ground. */
   pick(ray: THREE.Raycaster): number | null {
     this.group.updateWorldMatrix(true, true);
-    const hit = ray.intersectObject(this.group, true)[0];
-    if (hit?.faceIndex == null) return null;
-    for (const [id, r] of this.rising)
-      if (r.mesh === hit.object || r.scaffold === hit.object) return id;
-    const tile = [...this.tiles.values()].find((t) => t.mesh === hit.object);
-    if (!tile) return null;
-    const vertex = hit.faceIndex * 3;
-    const index = tile.mesh.geometry.groups.findIndex(
-      (g) => vertex >= g.start && vertex < g.start + g.count,
-    );
-    return tile.ids[index] ?? null;
+    let best: { distance: number; id: number } | null = null;
+    for (const [id, r] of this.rising) {
+      const hit = ray.intersectObjects([r.mesh, r.scaffold], false)[0];
+      if (hit && (!best || hit.distance < best.distance)) best = { distance: hit.distance, id };
+    }
+    // Drawn tiles keep no vertices, so rebuild only the buildings whose bounds the ray enters,
+    // nearest first, until the next one starts beyond the closest hit.
+    const world = this.group.matrixWorld;
+    const local = ray.ray.clone().applyMatrix4(world.clone().invert());
+    const [box, at] = [new THREE.Box3(), new THREE.Vector3()];
+    const candidates: { distance: number; tile: Tile; b: number }[] = [];
+    for (const tile of this.tiles.values()) {
+      const sphere = tile.mesh.geometry.boundingSphere;
+      if (sphere && !local.intersectsSphere(sphere)) continue;
+      for (let b = 0; b < tile.starts.length; b++) {
+        if (Number.isNaN(tile.bounds[b * 6])) continue;
+        // A centimetre of slack keeps rays grazing a box edge.
+        box.min.fromArray(tile.bounds, b * 6).subScalar(0.01);
+        box.max.fromArray(tile.bounds, b * 6 + 3).addScalar(0.01);
+        if (local.intersectBox(box, at))
+          candidates.push({ distance: at.applyMatrix4(world).distanceTo(ray.ray.origin), tile, b });
+      }
+    }
+    candidates.sort((x, y) => x.distance - y.distance);
+    const probe = new THREE.Mesh(undefined, this.material);
+    probe.matrixWorld.copy(world);
+    for (const { distance, tile, b } of candidates) {
+      if (best && distance > best.distance) break;
+      const o = tile.starts[b];
+      const record = tile.records.subarray(o, o + 5 + 2 * tile.records[o + 4]);
+      probe.geometry = buildBuildingGeometry(record, this.style);
+      const hit = ray.intersectObject(probe, false)[0];
+      probe.geometry.dispose();
+      if (hit && (!best || hit.distance < best.distance))
+        best = { distance: hit.distance, id: tile.ids[b] };
+    }
+    return best?.id ?? null;
+  }
+
+  /** Rebuilds every tile, whose vertices only the GPU held, after a lost WebGL context. */
+  restore() {
+    for (const tile of this.tiles.values()) {
+      this.group.remove(tile.mesh);
+      tile.mesh.geometry.dispose();
+    }
+    this.tiles.clear();
+    if (this.last) this.update(this.last.data, this.last.ids);
   }
 
   /**
@@ -114,24 +174,28 @@ export class BuildingLayer {
       const tileIds = starts.map((r) => r.id);
       if (tile) tile.ids = tileIds;
       if (tile?.hash === hash) continue;
-      const subset = new Float32Array(length);
+      const records = new Float32Array(length);
+      const offsets: number[] = [];
       let at = 0;
       for (const { offset: o } of starts) {
         const record = data.subarray(o, o + 5 + 2 * data[o + 4]);
-        subset.set(record, at);
+        offsets.push(at);
+        records.set(record, at);
         at += record.length;
       }
-      const geometry = buildBuildingGeometry(subset, this.style);
+      const geometry = buildBuildingGeometry(records, this.style);
+      const bounds = drawnBounds(geometry);
+      dropArraysOnUpload(geometry);
       if (tile) {
         tile.mesh.geometry.dispose();
         tile.mesh.geometry = geometry;
-        tile.hash = hash;
+        Object.assign(tile, { hash, records, starts: offsets, bounds });
       } else {
         const mesh = new THREE.Mesh(geometry, this.material);
         mesh.castShadow = true;
         mesh.receiveShadow = true;
         this.group.add(mesh);
-        this.tiles.set(key, { hash, mesh, ids: tileIds });
+        this.tiles.set(key, { hash, mesh, ids: tileIds, records, starts: offsets, bounds });
       }
     }
     this.known = present;

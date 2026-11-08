@@ -255,3 +255,25 @@ test('lots and buildings match by location, not packed snapshot order', () => {
   layer.update();
   assert.equal(layer.group.children.length, 1, 'removed lots leave no stale scenery');
 });
+
+test('lot tiles drop their vertices once drawn and rebuild them when the GPU loses them', () => {
+  const layer = new LotLayer();
+  layer.setLots(packedLots(lot));
+  layer.setBuildings(packedBuildings(building()));
+  layer.update();
+  const meshes = () => layer.group.children.flatMap((tile) => tile.children);
+  const arrays = () =>
+    meshes().flatMap((m) => Object.values(m.geometry.attributes).map((a) => (a.data ?? a).array));
+  // What the renderer does when it first draws a mesh: hands each vertex array to the GPU.
+  for (const m of meshes())
+    for (const a of Object.values(m.geometry.attributes)) (a.data ?? a).onUploadCallback();
+  assert.ok(arrays().every((a) => a === null));
+  const before = meshes();
+  layer.restore();
+  assert.equal(meshes().length, before.length);
+  assert.ok(meshes().every((m, i) => m !== before[i] && m.geometry.getAttribute('position').count));
+  assert.ok(
+    arrays().every((a) => a !== null),
+    'arrays to upload again',
+  );
+});

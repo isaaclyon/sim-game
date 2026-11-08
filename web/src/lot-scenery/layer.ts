@@ -1,7 +1,7 @@
 // Match packed snapshots spatially (neither is indexed by ID), then cache 256 m tiles.
 import * as THREE from 'three';
 import type { Building } from '../building-kit/kit.ts';
-import { MeshBuilder } from '../building-kit/mesh.ts';
+import { dropArraysOnUpload, MeshBuilder } from '../building-kit/mesh.ts';
 import { along, ccw, edge, inside, type Pt } from '../building-kit/polygon.ts';
 import { Clearance } from '../scenery/clearance.ts';
 import { lotGeometry } from './geometry.ts';
@@ -101,12 +101,24 @@ export class LotLayer {
       const ground = new MeshBuilder();
       for (const { lot, building } of list) lotGeometry(props, lot, building, this.roads, ground);
       const group = new THREE.Group();
-      const surface = new THREE.Mesh(ground.geometry(), this.groundMaterial);
+      const [below, above] = [ground.geometry(), props.geometry()];
+      // Nothing reads lot scenery back, and restore() rebuilds it.
+      dropArraysOnUpload(below);
+      dropArraysOnUpload(above);
+      const surface = new THREE.Mesh(below, this.groundMaterial);
       surface.renderOrder = -5; // Above terrain, below zones, sidewalks and roads.
-      group.add(surface, new THREE.Mesh(props.geometry(), this.material));
+      group.add(surface, new THREE.Mesh(above, this.material));
       this.group.add(group);
       this.tiles.set(key, { signature, group });
     }
+  }
+
+  /** Rebuilds every tile, whose vertices only the GPU held, after a lost WebGL context. */
+  restore() {
+    for (const tile of this.tiles.values()) this.dispose(tile);
+    this.tiles.clear();
+    this.dirty = true;
+    this.update();
   }
 
   private dispose(tile: Tile) {
