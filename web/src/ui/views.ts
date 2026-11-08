@@ -1,10 +1,18 @@
-// The Views list (M4.6): one ground overlay at a time, plus traffic colours and power, water
+// The Views list (M4.6): one ground overlay at a time (ADR 0037, 0057), plus traffic colours and power, water
 // and fire markers as separate switches, combining as before. Display only. P, T and O work as they always have.
 import { h, press, tooltip } from './dom';
 import type { Popovers } from './popover';
 
 /** `plain` is the everyday look; the rest are the overlays P cycles through. */
-export const POLLUTION_VIEWS = ['plain', 'air', 'ground', 'noise', 'land'] as const;
+export const POLLUTION_VIEWS = [
+  'plain',
+  'air',
+  'ground',
+  'noise',
+  'land',
+  'traffic',
+  'services',
+] as const;
 export type PollutionView = (typeof POLLUTION_VIEWS)[number];
 
 const OVERLAY_NAMES: Record<PollutionView, string> = {
@@ -13,6 +21,15 @@ const OVERLAY_NAMES: Record<PollutionView, string> = {
   ground: 'Ground pollution',
   noise: 'Noise',
   land: 'Land value',
+  traffic: 'Traffic',
+  services: 'Services',
+};
+
+/** What the data overlays mean (ADR 0057); the pollution views explain themselves. */
+const OVERLAY_TIPS: Partial<Record<PollutionView, string>> = {
+  traffic: 'Roads with cars: green flows, yellow is slow, red is jammed.',
+  services:
+    'Lots by what their building lacks: green has everything, amber misses power, water or fire cover, red misses more.',
 };
 
 export function nextPollutionView(view: PollutionView): PollutionView {
@@ -69,9 +86,15 @@ export class Views {
     this.draw = draw;
     this.button = button;
     this.overlayButtons = POLLUTION_VIEWS.map((view) => {
+      const tip = OVERLAY_TIPS[view];
       const b = h(
         'button',
-        { type: 'button', id: `view-${view}`, 'aria-pressed': String(view === 'plain') },
+        {
+          type: 'button',
+          id: `view-${view}`,
+          'aria-pressed': String(view === 'plain'),
+          ...(tip ? { title: tooltip(OVERLAY_NAMES[view], tip) } : {}),
+        },
         OVERLAY_NAMES[view],
       );
       b.onclick = () => this.setOverlay(view);

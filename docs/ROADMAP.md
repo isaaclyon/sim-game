@@ -491,7 +491,10 @@ Goals and consequences, kept light so they don't crowd out building.
   to a busy one.
 - Citizen happiness from services, traffic and pollution, feeding back into demand and growth.
   The citizen inspector shows each person's mood and complaints. Tax rates follow it.
-- Data overlays: traffic, coverage, land value, happiness.
+- **Data overlays** ([ADR 0057](adrs/0057-data-overlays-for-traffic-and-services.md)):
+  implemented. Views gains Traffic (roads with cars, green flowing to red jammed, eased over
+  readings) and Services (lots green with power, water and fire cover, amber missing one, red
+  missing more) beside land value. The happiness overlay comes with citizen happiness.
 - Two modes:
   - **Sandbox:** never fails. Problems slow growth or make people move away, but there is no game
     over.

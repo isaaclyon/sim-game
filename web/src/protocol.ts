@@ -2,6 +2,7 @@
 // thread only sends commands and draws snapshots.
 
 import type { HistoryCommand, HistoryMessage, HistoryStatus } from './protocol-history.ts';
+import type { OverlayMessage } from './protocol-overlays.ts';
 import type {
   FireStats,
   PlantKind,
@@ -13,6 +14,7 @@ import type {
 } from './protocol-services.ts';
 
 export * from './protocol-history.ts';
+export * from './protocol-overlays.ts';
 export * from './protocol-services.ts';
 
 export type ToWorker =
@@ -419,6 +421,7 @@ export type FromWorker =
   | { type: 'buildings'; data: Float32Array; ids: Uint32Array }
   | ServiceMessage
   | HistoryMessage
+  | OverlayMessage
   /** `[x, y]` per outline sample of the block under the cursor, closed; empty outside blocks. */
   | { type: 'blockPreview'; outline: Float32Array; revision: number }
   /** `end` is the built road's guided end, where a chained road starts; null when refused. */

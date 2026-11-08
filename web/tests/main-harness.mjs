@@ -225,6 +225,10 @@ export async function tools({ hash = '', clipboard = true, catalog } = {}) {
     setPollutionView(view) {
       previews.push({ type: 'pollutionView', view });
     }
+    ground = {
+      setTraffic: (segments) => previews.push({ type: 'traffic', segments }),
+      setServices: (lots) => previews.push({ type: 'services', lots }),
+    };
   }
   const context = createContext({
     innerWidth: 1000,

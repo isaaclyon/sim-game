@@ -4,6 +4,7 @@ import { CitySession } from './city-session';
 import { gridPreview, rawDraft, roadPreview } from './drafts';
 import { FireSender } from './fire-worker';
 import { historyCommand, readHistory } from './history-worker';
+import { OverlaySender } from './overlay-worker';
 import init, { type Sim } from './pkg/sim_wasm';
 import type { Activity, Building, Citizen, FromWorker, Place, ToWorker, Zone } from './protocol';
 import { readPrices, readStats } from './stats-worker';
@@ -114,6 +115,7 @@ function sendPollutionIfChanged(s: Sim, force = false) {
 
 const fire = new FireSender(post);
 const water = new WaterSender(post);
+const overlays = new OverlaySender(post);
 
 /** After an edit: zoning can add alleys, and road edits can recut lots (ADR 0016). */
 function sendEdits(s: Sim) {
@@ -125,6 +127,7 @@ function sendEdits(s: Sim) {
   sendPowerIfChanged(s, true);
   water.sendIfChanged(s, true);
   sendPollutionIfChanged(s, true);
+  overlays.send(s, true);
   sendFrame(s); // Cars and signals also change while paused.
 }
 
@@ -144,6 +147,7 @@ const cities = new CitySession(post, (next, initialSpeed) => {
   buildingsSentAt = powerSentAt = pollutionSentAt = -Infinity;
   fire.reset();
   water.reset();
+  overlays.reset();
   inspected = null;
   post({ type: 'cityReset', speed, prices: readPrices() });
   sendEdits(next);
@@ -251,6 +255,7 @@ function step() {
       water.sendIfChanged(sim);
       sendPollutionIfChanged(sim);
       fire.sendIfChanged(sim);
+      overlays.send(sim);
     }
     if (frameDue && now - frameSentAt >= FRAME_INTERVAL_MS) sendFrame(sim, lastTickMs);
   }
@@ -304,6 +309,7 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
         water.sendIfChanged(sim, true);
         sendPollutionIfChanged(sim, true);
         fire.sendIfChanged(sim, true);
+        overlays.send(sim, true);
       }
       break;
     case 'spawn':
