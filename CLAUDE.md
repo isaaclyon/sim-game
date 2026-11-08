@@ -121,6 +121,14 @@ What to build next and why lives in `docs/ROADMAP.md`. Work on the current miles
   capped like buildings. Station preview: closed `[x, y]` footprint plus `ok`. `setFires`
   turns the city's fires on or off (`fires on|off` in command logs; `station x y` places one).
   Frames carry `stats.fire` (`FireStats`). Flames, smoke and rubble are display only.
+- Data overlays (ADR 0057): `traffic` carries `segments`, `[ax, ay, bx, by, class, road, jam]`
+  per rendered segment of each road with a car on it (`TRAFFIC_STRIDE`), road = stable road ID,
+  jam 0 = flowing at the limit to 1 = lanes full of stopped cars; sent at most once a real
+  second while running, at once on start, edits and pause. `services` carries `lots`,
+  `[gaps, n, x0, y0, …]` per standing building: `Gap` bits 1 = no power, 2 = no water (dense),
+  4 = no fire cover (only while fires are on past the threshold), then its lot outline; sent
+  whole when power, water, fire, lots, buildings or that rule change, capped like buildings.
+  Read-only, not hashed. The page eases traffic colours per road ID; display only.
 - Undo and redo (ADR 0051): the sim keeps the history and saves it with the city. `undo` and
   `redo` answer `historyResult` (`ok` false = refused); command logs write them as `undo` and
   `redo`, and continuous curves after the first as `curve … chain`. Frames carry `history`: the

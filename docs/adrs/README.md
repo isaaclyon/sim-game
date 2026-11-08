@@ -61,6 +61,7 @@ rewriting history; mark the old one `Superseded by NNNN`.
 | [0053](0053-fire-stations-send-trucks-through-traffic.md) | Fire stations send real trucks through traffic | Accepted; implemented |
 | [0054](0054-children-births-and-growing-up.md) | Children are citizens who are born, grow up and move out | Accepted; implemented |
 | [0055](0055-schools-and-education-levels.md) | Schools teach children, and education shapes who fills jobs | Accepted |
+| [0057](0057-data-overlays-for-traffic-and-services.md) | Data overlays show road congestion and service gaps | Accepted; implemented |
 
 ADRs are only for decisions that are hard to reverse. See [AGENTS.md](AGENTS.md) for when to
 write one and how.
