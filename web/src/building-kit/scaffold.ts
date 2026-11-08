@@ -15,7 +15,8 @@ const POLE = 0.12;
 
 /** Scaffolding for a counter-clockwise footprint `ring` (sim x, y) up to `height` metres. */
 export function buildScaffoldGeometry(ring: Pt[], height: number): THREE.BufferGeometry {
-  const mb = new MeshBuilder();
+  // Drawn with the building tiles' material.
+  const mb = new MeshBuilder({ compact: true });
   if (ring.length < 3 || ring !== ccw(ring)) return mb.geometry();
   const top = height + 1;
   for (let i = 0; i < ring.length; i++) {

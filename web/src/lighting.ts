@@ -1,5 +1,6 @@
 // Display-only lighting: the simulation's secondOfDay is the only time input.
 import * as THREE from 'three';
+import { HOUR_STEPS } from './building-kit/mesh.ts';
 import { LIGHT, SKY } from './palette.ts';
 
 const NIGHT_SKY = new THREE.Color(0x101c35);
@@ -15,7 +16,10 @@ export function daylight(secondOfDay: number): number {
   return THREE.MathUtils.smoothstep(hour, 5, 7) * (1 - THREE.MathUtils.smoothstep(hour, 17, 19));
 }
 
-/** Per-face emission shared by tiled buildings and instanced vehicle lamps. */
+/**
+ * Per-face emission shared by tiled buildings and instanced vehicle lamps. With `lightHour`,
+ * faces light only between their `lightOn` and `lightOff` hours, which compact meshes store.
+ */
 export function nightMaterial(
   night: { value: number },
   lightHour?: { value: number },
@@ -25,7 +29,7 @@ export function nightMaterial(
   // constant value of their slot. It starts at zero; this keeps it there if a later material
   // (such as a ShaderMaterial, whose colour default is white) shares the slot.
   Object.assign(material, {
-    defaultAttributeValues: { nightEmission: [0, 0, 0], lightSchedule: [0, 0] },
+    defaultAttributeValues: { nightEmission: [0, 0, 0], lightOn: [0], lightOff: [0] },
   });
   material.customProgramCacheKey = () => (lightHour ? 'scheduled-night' : 'night');
   material.onBeforeCompile = (shader) => {
@@ -38,10 +42,11 @@ export function nightMaterial(
     if (lightHour) {
       shader.uniforms.lightHour = lightHour;
       shader.vertexShader =
-        `attribute vec2 lightSchedule;\nuniform float lightHour;\n${shader.vertexShader}`.replace(
+        `attribute float lightOn;\nattribute float lightOff;\nuniform float lightHour;\n${shader.vertexShader}`.replace(
           'vNightEmission = nightEmission;',
-          `float elapsed = mod(lightHour - lightSchedule.x + 24.0, 24.0);
-        float duration = lightSchedule.y - lightSchedule.x;
+          `float on = lightOn * ${(255 / HOUR_STEPS).toFixed(3)};
+        float elapsed = mod(lightHour - on + 24.0, 24.0);
+        float duration = lightOff * ${(255 / HOUR_STEPS).toFixed(3)} - on;
         float lit = step(0.3, duration) * smoothstep(0.0, 0.15, elapsed)
           * (1.0 - smoothstep(max(0.0, duration - 0.15), max(0.15, duration), elapsed));
         vNightEmission = nightEmission * lit;`,
@@ -57,18 +62,28 @@ export function nightMaterial(
 }
 
 /**
- * Shades `material` per face from screen-space derivatives, for geometry stored without normals
- * (MeshBuilder's `shareCorners`). three.js offsets sun shadow lookups along vertex normals
- * (`normalBias`) in the vertex shader, so without them the fragment shader redoes that lookup
- * along the face's own normal; otherwise faces would shadow themselves in stripes.
+ * Adapts `material` to MeshBuilder's compact format: decodes its sRGB byte colours, and shades
+ * per face from screen-space derivatives, as there are no normals. three.js offsets sun shadow
+ * lookups along vertex normals (`normalBias`) in the vertex shader, so without them the
+ * fragment shader redoes that lookup along the face's own normal; otherwise faces would shadow
+ * themselves in stripes.
  */
-export function flatShaded<T extends THREE.MeshLambertMaterial>(material: T): T {
+export function compactMaterial<T extends THREE.MeshLambertMaterial>(material: T): T {
   const { onBeforeCompile } = material;
   const key = material.customProgramCacheKey.bind(material);
   material.flatShading = true;
-  material.customProgramCacheKey = () => `${key()}-flat`;
+  material.customProgramCacheKey = () => `${key()}-compact`;
   material.onBeforeCompile = (shader, renderer) => {
     onBeforeCompile.call(material, shader, renderer);
+    // Faces are evenly coloured, so decoding per vertex matches decoding per pixel.
+    shader.vertexShader = shader.vertexShader.replace(
+      '#include <color_vertex>',
+      `#include <color_vertex>
+      #ifdef USE_COLOR
+        vColor.rgb = mix( vColor.rgb / 12.92, pow( ( vColor.rgb + 0.055 ) / 1.055, vec3( 2.4 ) ),
+          step( 0.04045, vColor.rgb ) );
+      #endif`,
+    );
     const lights = THREE.ShaderChunk.lights_fragment_begin.replace(
       'vDirectionalShadowCoord[ i ]',
       '( directionalShadowMatrix[ i ] * vec4( flatWorldPosition + flatWorldNormal * directionalLightShadow.shadowNormalBias, 1.0 ) )',

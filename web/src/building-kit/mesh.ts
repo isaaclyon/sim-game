@@ -9,6 +9,11 @@ const UP: V3 = [0, 1, 0];
 /** Unit float in [0, 1] to a normalized integer up to `max`; three.js's own conversion wraps. */
 const unit = (v: number, max: number) => Math.round(Math.min(Math.max(v, 0), 1) * max);
 
+/** Compact meshes store light hours in bytes of this many steps an hour, up to 31 h 52 min. */
+export const HOUR_STEPS = 8;
+const hourByte = (h: number) => Math.min(Math.max(Math.round(h * HOUR_STEPS), 0), 255);
+const srgb = { r: 0, g: 0, b: 0 };
+
 /** Three values per vertex, padded to four so GPUs read them without converting the buffer. */
 function packed(array: Int8Array | Uint8Array | Uint16Array): THREE.InterleavedBufferAttribute {
   return new THREE.InterleavedBufferAttribute(new THREE.InterleavedBuffer(array, 4), 3, 0, true);
@@ -31,18 +36,21 @@ export function dropArraysOnUpload(geometry: THREE.BufferGeometry) {
 
 /**
  * Vertices are stored compactly, since a city holds tens of millions of them: float positions,
- * byte normals and glow, 16-bit colours (bytes would lose dark palette colours, which are linear
- * here) and half-float light hours. Glow and hours are left out when no face has any; the night
- * shader then reads zeros. Faces are flat, so vertices are shared only within one quad or
- * polygon, through an index (16-bit when it can be): a quad keeps four corners instead of six.
+ * byte normals and glow, and 16-bit colours (bytes would lose dark palette colours, which are
+ * linear here). Glow is left out when no face has any; the night shader then reads zeros. Faces
+ * are flat, so vertices are shared only within one quad or polygon, through an index (16-bit
+ * when it can be): a quad keeps four corners instead of six.
  *
- * With `shareCorners`, the geometry has no normals and every corner with the same position,
- * colour, glow and hours is stored once, across faces. Its material must take each face's
- * normal from the screen instead (`flatShaded` in lighting.ts).
+ * The `compact` format, for city tiles, goes further. It has no normals, so every corner with
+ * the same position and paint is stored once, across faces. Colours are bytes on the palette's
+ * sRGB scale, which keeps its hex colours exact. Light hours (`lightOn`, `lightOff`) ride in
+ * the colour's and glow's spare fourth bytes, and are kept only in this format. Its material
+ * must take each face's normal from the screen and decode the colours (`compactMaterial` in
+ * lighting.ts).
  */
 export class MeshBuilder {
-  private readonly shared: boolean;
-  /** Open-addressed vertex index plus one per slot, 0 = empty; only with `shareCorners`. */
+  private readonly compact: boolean;
+  /** Open-addressed vertex index plus one per slot, 0 = empty; only when compact. */
   private slots = new Int32Array(0);
   private capacity = 2 * 1024;
   private count = 0;
@@ -50,9 +58,8 @@ export class MeshBuilder {
   /** Positions as raw bits, compared and hashed exactly. */
   private bits = new Uint32Array(this.positions.buffer);
   private normals = new Int8Array(this.capacity * 4);
-  private colors = new Uint16Array(this.capacity * 4);
+  private colors: Uint16Array | Uint8Array = new Uint16Array(this.capacity * 4);
   private glows = new Uint8Array(this.capacity * 4);
-  private hours = new Uint16Array(this.capacity * 2);
   private indices = new Uint32Array(3 * 1024);
   private length = 0;
   private glowing = false;
@@ -69,14 +76,20 @@ export class MeshBuilder {
   private eb = 0;
   private h0 = 0;
   private h1 = 0;
+  // The linear colour last converted to compact sRGB bytes.
+  private lr = Number.NaN;
+  private lg = Number.NaN;
+  private lb = Number.NaN;
   /** Emission colour for subsequently added faces; black means unlit. */
   readonly glow = new THREE.Color(0x000000);
-  /** Daily on/off hours for subsequently added faces; zero duration stays dark. */
+  /** Daily on/off hours for subsequently added faces, kept when compact; zero stays dark. */
   lightSchedule: [number, number] = [0, 0];
 
-  constructor({ shareCorners = false } = {}) {
-    this.shared = shareCorners;
-    if (shareCorners) this.slots = new Int32Array(2 * this.capacity);
+  constructor({ compact = false } = {}) {
+    this.compact = compact;
+    if (!compact) return;
+    this.slots = new Int32Array(2 * this.capacity);
+    this.colors = new Uint8Array(this.capacity * 4);
   }
 
   get vertexCount(): number {
@@ -103,7 +116,6 @@ export class MeshBuilder {
     this.normals = grown(this.normals, 4);
     this.colors = grown(this.colors, 4);
     this.glows = grown(this.glows, 4);
-    this.hours = grown(this.hours, 2);
   }
 
   // Scalars only below: this runs for every triangle of every rebuilt tile, so temporary arrays
@@ -148,11 +160,21 @@ export class MeshBuilder {
     this.eb = unit(this.glow.b, 255);
     this.glowing ||= this.er + this.eg + this.eb > 0;
     this.scheduled ||= on !== 0 || off !== 0;
-    this.cr = unit(col.r, 65535);
-    this.cg = unit(col.g, 65535);
-    this.cb = unit(col.b, 65535);
-    this.h0 = THREE.DataUtils.toHalfFloat(on);
-    this.h1 = THREE.DataUtils.toHalfFloat(off);
+    if (!this.compact) {
+      this.cr = unit(col.r, 65535);
+      this.cg = unit(col.g, 65535);
+      this.cb = unit(col.b, 65535);
+      return;
+    }
+    if (col.r !== this.lr || col.g !== this.lg || col.b !== this.lb) {
+      [this.lr, this.lg, this.lb] = [col.r, col.g, col.b];
+      col.getRGB(srgb, THREE.SRGBColorSpace);
+      this.cr = unit(srgb.r, 255);
+      this.cg = unit(srgb.g, 255);
+      this.cb = unit(srgb.b, 255);
+    }
+    this.h0 = hourByte(on);
+    this.h1 = hourByte(off);
   }
 
   /**
@@ -162,7 +184,7 @@ export class MeshBuilder {
   private vertex(p: V3): number {
     if (this.count === this.capacity) this.grow();
     const i = this.count;
-    const { positions, normals, colors, glows, hours } = this;
+    const { positions, normals, colors, glows } = this;
     positions[i * 3] = p[0];
     positions[i * 3 + 1] = p[1];
     positions[i * 3 + 2] = p[2];
@@ -172,12 +194,12 @@ export class MeshBuilder {
     colors[i * 4] = this.cr;
     colors[i * 4 + 1] = this.cg;
     colors[i * 4 + 2] = this.cb;
+    colors[i * 4 + 3] = this.h0;
     glows[i * 4] = this.er;
     glows[i * 4 + 1] = this.eg;
     glows[i * 4 + 2] = this.eb;
-    hours[i * 2] = this.h0;
-    hours[i * 2 + 1] = this.h1;
-    if (this.shared) {
+    glows[i * 4 + 3] = this.h1;
+    if (this.compact) {
       const j = this.find(i);
       if (j !== i) return j;
     }
@@ -187,7 +209,7 @@ export class MeshBuilder {
   /** The stored corner equal to just-written corner `i`, else `i`, entered in the table. */
   private find(i: number): number {
     if (2 * (i + 1) > this.slots.length) this.rehash(this.slots.length * 2);
-    const { bits, colors, glows, hours, slots } = this;
+    const { bits, colors, glows, slots } = this;
     const mask = slots.length - 1;
     let s = this.hash(i) & mask;
     for (; slots[s] !== 0; s = (s + 1) & mask) {
@@ -199,11 +221,11 @@ export class MeshBuilder {
         colors[j * 4] === colors[i * 4] &&
         colors[j * 4 + 1] === colors[i * 4 + 1] &&
         colors[j * 4 + 2] === colors[i * 4 + 2] &&
+        colors[j * 4 + 3] === colors[i * 4 + 3] &&
         glows[j * 4] === glows[i * 4] &&
         glows[j * 4 + 1] === glows[i * 4 + 1] &&
         glows[j * 4 + 2] === glows[i * 4 + 2] &&
-        hours[j * 2] === hours[i * 2] &&
-        hours[j * 2 + 1] === hours[i * 2 + 1]
+        glows[j * 4 + 3] === glows[i * 4 + 3]
       )
         return j;
     }
@@ -388,15 +410,18 @@ export class MeshBuilder {
     const n = this.count;
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(this.positions.slice(0, n * 3), 3));
-    if (!this.shared) g.setAttribute('normal', packed(this.normals.slice(0, n * 4)));
-    g.setAttribute('color', packed(this.colors.slice(0, n * 4)));
-    if (this.glowing) g.setAttribute('nightEmission', packed(this.glows.slice(0, n * 4)));
-    // Float16BufferAttribute copies its array, so a view avoids copying twice.
-    if (this.scheduled)
-      g.setAttribute(
-        'lightSchedule',
-        new THREE.Float16BufferAttribute(this.hours.subarray(0, n * 2), 2),
-      );
+    if (!this.compact) g.setAttribute('normal', packed(this.normals.slice(0, n * 4)));
+    const color = packed(this.colors.slice(0, n * 4));
+    g.setAttribute('color', color);
+    const hours = this.compact && this.scheduled;
+    if (hours)
+      g.setAttribute('lightOn', new THREE.InterleavedBufferAttribute(color.data, 1, 3, true));
+    if (this.glowing) {
+      const glow = packed(this.glows.slice(0, n * 4));
+      g.setAttribute('nightEmission', glow);
+      if (hours)
+        g.setAttribute('lightOff', new THREE.InterleavedBufferAttribute(glow.data, 1, 3, true));
+    }
     const index = this.indices.subarray(0, this.length);
     // Most tiles have few enough corners for 16-bit entries, which halve the index.
     g.setIndex(new THREE.BufferAttribute(n <= 65536 ? Uint16Array.from(index) : index.slice(), 1));

@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import type { Building } from '../building-kit/kit.ts';
 import { dropArraysOnUpload, MeshBuilder } from '../building-kit/mesh.ts';
 import { along, ccw, edge, inside, type Pt } from '../building-kit/polygon.ts';
-import { flatShaded } from '../lighting.ts';
+import { compactMaterial } from '../lighting.ts';
 import { Clearance } from '../scenery/clearance.ts';
 import { lotGeometry } from './geometry.ts';
 
@@ -23,9 +23,11 @@ export class LotLayer {
   private readonly lots = new Map<string, Pt[][]>();
   private readonly tiles = new Map<string, Tile>();
   private readonly roads = new Clearance();
-  // Tiles share corners across faces and store no normals (see MeshBuilder).
-  private readonly material = flatShaded(new THREE.MeshLambertMaterial({ vertexColors: true }));
-  private readonly groundMaterial = flatShaded(
+  // Tiles use MeshBuilder's compact format.
+  private readonly material = compactMaterial(
+    new THREE.MeshLambertMaterial({ vertexColors: true }),
+  );
+  private readonly groundMaterial = compactMaterial(
     new THREE.MeshLambertMaterial({ vertexColors: true, transparent: true, depthWrite: false }),
   );
   private buildings: Float32Array = new Float32Array();
@@ -97,8 +99,8 @@ export class LotLayer {
       const old = this.tiles.get(key);
       if (old?.signature === signature) continue;
       if (old) this.dispose(old);
-      const props = new MeshBuilder({ shareCorners: true });
-      const ground = new MeshBuilder({ shareCorners: true });
+      const props = new MeshBuilder({ compact: true });
+      const ground = new MeshBuilder({ compact: true });
       for (const { lot, building } of list) lotGeometry(props, lot, building, this.roads, ground);
       const group = new THREE.Group();
       const [below, above] = [ground.geometry(), props.geometry()];

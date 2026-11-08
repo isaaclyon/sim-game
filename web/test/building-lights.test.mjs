@@ -92,19 +92,22 @@ test('all faces in a building share its schedule, including storefronts, across 
     4,
     ...ring(8).flat(),
   ]);
-  const g = buildBuildingGeometry(data);
-  const schedule = g.getAttribute('lightSchedule');
-  assert.equal(schedule.count, g.getAttribute('position').count);
+  const g = buildBuildingGeometry(data, undefined, { compact: true });
+  const [on, off] = [g.getAttribute('lightOn'), g.getAttribute('lightOff')];
+  assert.equal(on.count, g.getAttribute('position').count);
+  // Bytes in eighths of an hour: within four clock minutes.
+  const hours = (v) => v * (255 / 8);
   for (const [index, group] of g.groups.entries()) {
     const expected = lightSchedule(index === 0 ? 3 : 2, seeded(ring(index + 7), LIGHT_SEED));
     for (let k = group.start; k < group.start + group.count; k++) {
       const i = g.index.getX(k);
-      // Hours are stored as half floats: within one clock minute.
-      assert.ok(Math.abs(schedule.getX(i) - expected[0]) < 1 / 60);
-      assert.ok(Math.abs(schedule.getY(i) - expected[1]) < 1 / 60);
+      assert.ok(Math.abs(hours(on.getX(i)) - expected[0]) < 1 / 15);
+      assert.ok(Math.abs(hours(off.getX(i)) - expected[1]) < 1 / 15);
     }
   }
-  assert.deepEqual(schedule.array, buildBuildingGeometry(data).getAttribute('lightSchedule').array);
+  const again = buildBuildingGeometry(data, undefined, { compact: true });
+  assert.deepEqual(on.data.array, again.getAttribute('lightOn').data.array);
+  assert.deepEqual(off.data.array, again.getAttribute('lightOff').data.array);
 });
 
 test('scheduled buildings use a separate shader program without changing vehicle lamps', () => {
@@ -120,7 +123,7 @@ test('scheduled buildings use a separate shader program without changing vehicle
   };
   buildings.onBeforeCompile(shader);
   assert.equal(shader.uniforms.lightHour, clock);
-  assert.match(shader.vertexShader, /mod\(lightHour - lightSchedule.x \+ 24.0, 24.0\)/);
+  assert.match(shader.vertexShader, /mod\(lightHour - on \+ 24.0, 24.0\)/);
   assert.match(shader.vertexShader, /smoothstep/);
   clock.value = 0;
   assert.equal(shader.uniforms.lightHour.value, 0);

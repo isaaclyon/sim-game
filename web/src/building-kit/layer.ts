@@ -11,8 +11,8 @@ import type { Style } from './style.ts';
 const TILE = 256;
 /** How long a new building takes to rise, in seconds. */
 export const RISE_SECONDS = 9.6;
-/** Fresh concrete and render, blended out as the building tops out. */
-const UNFINISHED = new THREE.Color(0xe6dccb);
+/** Fresh concrete and render, blended out as the building tops out, on the bytes' sRGB scale. */
+const UNFINISHED = new THREE.Color(0xe6dccb).getRGB({ r: 0, g: 0, b: 0 }, THREE.SRGBColorSpace);
 
 const clamp01 = (x: number) => Math.min(Math.max(x, 0), 1);
 /**
@@ -32,7 +32,7 @@ export function risePhase(p: number): { scaffold: number; building: number; pain
 interface Rising {
   mesh: THREE.Mesh;
   scaffold: THREE.Mesh;
-  /** The kit's colours, restored as the scaffold tint fades. */
+  /** The kit's sRGB colours, restored as the scaffold tint fades. */
   colors: Float32Array;
   start: number;
 }
@@ -56,13 +56,20 @@ function drawnBounds(geometry: THREE.BufferGeometry): Float32Array {
   const out = new Float32Array(geometry.groups.length * 6).fill(Number.NaN);
   geometry.groups.forEach(({ start, count }, b) => {
     if (count === 0) return;
-    const box = out.subarray(b * 6, b * 6 + 6);
-    box.set([Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity]);
-    for (let i = start; i < start + count; i++)
-      for (let k = 0; k < 3; k++) {
-        box[k] = Math.min(box[k], p[index[i] * 3 + k]);
-        box[k + 3] = Math.max(box[k + 3], p[index[i] * 3 + k]);
-      }
+    let [x0, y0, z0, x1, y1, z1] = [Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity];
+    for (let i = start; i < start + count; i++) {
+      const v = index[i] * 3;
+      const x = p[v];
+      const y = p[v + 1];
+      const z = p[v + 2];
+      if (x < x0) x0 = x;
+      if (x > x1) x1 = x;
+      if (y < y0) y0 = y;
+      if (y > y1) y1 = y;
+      if (z < z0) z0 = z;
+      if (z > z1) z1 = z;
+    }
+    out.set([x0, y0, z0, x1, y1, z1], b * 6);
   });
   return out;
 }
@@ -77,7 +84,7 @@ export class BuildingLayer {
   private readonly material: THREE.Material;
   private readonly style?: Style;
 
-  /** Tiles store no normals, so a lit `material` must shade flat (`flatShaded` in lighting.ts). */
+  /** Draws MeshBuilder's compact format, so a lit `material` needs `compactMaterial`. */
   constructor(material: THREE.Material, style?: Style) {
     this.material = material;
     this.style = style;
@@ -185,7 +192,7 @@ export class BuildingLayer {
         records.set(record, at);
         at += record.length;
       }
-      const geometry = buildBuildingGeometry(records, this.style, { shareCorners: true });
+      const geometry = buildBuildingGeometry(records, this.style, { compact: true });
       const bounds = drawnBounds(geometry);
       dropArraysOnUpload(geometry);
       if (tile) {
@@ -231,13 +238,14 @@ export class BuildingLayer {
   }
 
   private rise(id: number, record: Float32Array, now: number) {
-    const geometry = buildBuildingGeometry(record, this.style);
+    const geometry = buildBuildingGeometry(record, this.style, { compact: true });
     const color = geometry.getAttribute('color');
     const colors = new Float32Array(color.count * 3);
     for (let i = 0; i < color.count; i++)
       colors.set([color.getX(i), color.getY(i), color.getZ(i)], 3 * i);
     // Nobody lives there yet: no lit windows until it joins its tile.
     geometry.deleteAttribute('nightEmission');
+    geometry.deleteAttribute('lightOff');
     const mesh = new THREE.Mesh(geometry, this.material);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
