@@ -145,6 +145,15 @@ _Avoid_: maintenance (a later service), running cost
 What residents and filled jobs pay per clock hour, at fixed rates.
 _Avoid_: income (taxes minus upkeep is the net change)
 
+**Service budget**:
+How many units a service building runs: trucks for a fire station, seat blocks for a school.
+Upkeep and staff jobs are per unit (ADR 0056).
+_Avoid_: funding, spending (when you mean one building's units)
+
+**Tax rate**:
+A player-set level for residential, commercial or industry taxes; higher rates raise money
+and cost happiness (ADR 0056, not yet built).
+
 **Debt**:
 A balance below zero. Upkeep keeps charging; no new roads can be built until taxes bring the
 balance back.

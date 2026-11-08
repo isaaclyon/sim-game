@@ -477,8 +477,20 @@ Goals and consequences, kept light so they don't crowd out building.
   in M6.
   Done when: school runs fill the sidewalks at 8am, and a town that built schools early sees
   its dense shops fill faster a childhood later.
+- **Money follows city quality** ([ADR 0056](adrs/0056-taxes-follow-city-quality-and-services-have-budgets.md)),
+  after schools. Three slices:
+  1. Taxes: each resident's tax scales with their home's land value and each filled job's with
+     its worker's education. A typical home and worker pay today's $2 and $1.
+  2. Service budgets: each fire station and school sets its trucks or seat blocks; upkeep and
+     staff follow. Cuts take effect gradually.
+  3. Tax rates for residential, commercial and industry, after happiness: higher rates raise
+     money and cost happiness.
+
+  Done when: two otherwise equal towns, one clean and schooled, one polluted and unschooled,
+  show a clear gap in taxes; a player trims an idle station to save money and adds a truck
+  to a busy one.
 - Citizen happiness from services, traffic and pollution, feeding back into demand and growth.
-  The citizen inspector shows each person's mood and complaints.
+  The citizen inspector shows each person's mood and complaints. Tax rates follow it.
 - Data overlays: traffic, coverage, land value, happiness.
 - Two modes:
   - **Sandbox:** never fails. Problems slow growth or make people move away, but there is no game
