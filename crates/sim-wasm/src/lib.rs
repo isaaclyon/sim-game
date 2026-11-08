@@ -5,6 +5,7 @@ use wasm_bindgen::prelude::*;
 
 mod fire;
 mod history;
+mod overlays;
 mod roads;
 mod utilities;
 

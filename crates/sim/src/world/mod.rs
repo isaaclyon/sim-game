@@ -10,6 +10,7 @@ mod grid;
 mod history;
 mod inspect;
 mod money;
+mod overlays;
 mod persist;
 mod pollution;
 mod power;
@@ -50,6 +51,7 @@ pub use inspect::{BuildingInfo, CitizenInfo, Place};
 pub use money::{
     GRANT, JOB_TAX, Money, RESIDENT_TAX, START_FUNDS, plant_price, price_list, water_price,
 };
+pub use overlays::{GAP_FIRE, GAP_POWER, GAP_WATER, TRAFFIC_STRIDE};
 pub use persist::{SAVE_VERSION, SaveError};
 pub use power::{PLANT_STRIDE, POWER_BUILDING_STRIDE, PowerStats};
 pub use water::{WATER_BUILDING_STRIDE, WATER_PIECE_STRIDE, WaterStats};
