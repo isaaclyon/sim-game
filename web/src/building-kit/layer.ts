@@ -52,7 +52,7 @@ interface Tile {
 /** Each building's drawn bounds, from its triangle range, read before the GPU takes them. */
 function drawnBounds(geometry: THREE.BufferGeometry): Float32Array {
   const p = geometry.getAttribute('position').array as Float32Array;
-  const index = geometry.index?.array as Uint32Array;
+  const index = geometry.index?.array as Uint16Array | Uint32Array;
   const out = new Float32Array(geometry.groups.length * 6).fill(Number.NaN);
   geometry.groups.forEach(({ start, count }, b) => {
     if (count === 0) return;

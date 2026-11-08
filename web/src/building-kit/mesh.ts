@@ -34,7 +34,7 @@ export function dropArraysOnUpload(geometry: THREE.BufferGeometry) {
  * byte normals and glow, 16-bit colours (bytes would lose dark palette colours, which are linear
  * here) and half-float light hours. Glow and hours are left out when no face has any; the night
  * shader then reads zeros. Faces are flat, so vertices are shared only within one quad or
- * polygon, through a 32-bit index: a quad keeps four corners instead of six.
+ * polygon, through an index (16-bit when it can be): a quad keeps four corners instead of six.
  *
  * With `shareCorners`, the geometry has no normals and every corner with the same position,
  * colour, glow and hours is stored once, across faces. Its material must take each face's
@@ -397,7 +397,9 @@ export class MeshBuilder {
         'lightSchedule',
         new THREE.Float16BufferAttribute(this.hours.subarray(0, n * 2), 2),
       );
-    g.setIndex(new THREE.BufferAttribute(this.indices.slice(0, this.length), 1));
+    const index = this.indices.subarray(0, this.length);
+    // Most tiles have few enough corners for 16-bit entries, which halve the index.
+    g.setIndex(new THREE.BufferAttribute(n <= 65536 ? Uint16Array.from(index) : index.slice(), 1));
     g.computeBoundingSphere();
     return g;
   }

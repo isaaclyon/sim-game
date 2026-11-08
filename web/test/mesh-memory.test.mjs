@@ -132,3 +132,16 @@ test('shared-corner buildings and lots fit tighter memory budgets', () => {
   assert.ok(bytesPerVertex(lots) <= 20, `${bytesPerVertex(lots)} bytes per lot vertex`);
   assert.ok(bytesPerTriangle(lots) <= 40, `${bytesPerTriangle(lots)} bytes per lot triangle`);
 });
+
+test('meshes with at most 65,536 corners index them with 16-bit entries', () => {
+  const small = new MeshBuilder();
+  small.quad([0, 0, 0], [4, 0, 0], [4, 3, 0], [0, 3, 0], new THREE.Color(0x56794d), [0, 0, 1]);
+  assert.ok(small.geometry().index.array instanceof Uint16Array);
+  const large = new MeshBuilder();
+  for (let i = 0; i < 16385; i++)
+    large.quad([i, 0, 0], [i + 0.5, 0, 0], [i + 0.5, 1, 0], [i, 1, 0], new THREE.Color(0xffffff));
+  assert.equal(large.vertexCount, 65540);
+  const index = large.geometry().index.array;
+  assert.ok(index instanceof Uint32Array);
+  assert.equal(index.at(-1), 65539, 'the last corner keeps its full index');
+});
