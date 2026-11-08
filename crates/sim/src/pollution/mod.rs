@@ -146,6 +146,11 @@ impl Pollution {
         })
     }
 
+    /// Air and noise of cell `c`, `0..=255`, as the last update left them.
+    pub(crate) fn air_noise(&self, c: usize) -> (u8, u8) {
+        (self.air[c], self.noise[c])
+    }
+
     /// Mean land value of the cells, `0..=255`; 255 for no cells.
     pub(crate) fn land_of(&self, cells: impl Iterator<Item = usize>) -> u8 {
         let (mut sum, mut n) = (0u32, 0u32);

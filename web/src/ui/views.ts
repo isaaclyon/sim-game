@@ -10,6 +10,7 @@ export const POLLUTION_VIEWS = [
   'ground',
   'noise',
   'land',
+  'happiness',
   'traffic',
   'services',
 ] as const;
@@ -21,6 +22,7 @@ const OVERLAY_NAMES: Record<PollutionView, string> = {
   ground: 'Ground pollution',
   noise: 'Noise',
   land: 'Land value',
+  happiness: 'Happiness',
   traffic: 'Traffic',
   services: 'Services',
 };

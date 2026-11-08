@@ -31,6 +31,7 @@ const STATS = {
     saved: 0,
     destroyed: 0,
   },
+  happiness: { average: 50, complaints: [0, 0, 0, 0, 0, 0, 0] },
   agents: 0,
   parked: 0,
   awaitingPath: 0,

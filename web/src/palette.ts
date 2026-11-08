@@ -67,6 +67,9 @@ export const POLLUTION = {
   landHigh: 0x3fae5a,
   haze: 0x9a9488,
   stain: 0x5e4a30,
+  /** Happiness view (ADR 0058): miserable to happy. */
+  moodLow: 0xc0392b,
+  moodHigh: 0x2e9fd0,
 };
 export const POLLUTION_ALPHA = 0.75;
 

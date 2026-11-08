@@ -101,6 +101,20 @@ export interface FireStats {
   destroyed: number;
 }
 
+/**
+ * What makes a citizen unhappy (ADR 0058), as `sim::world::Complaint` codes: 0 no power,
+ * 1 no water, 2 no fire station nearby, 3 dirty air, 4 noise, 5 no job, 6 long commute.
+ */
+export type Complaint = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+
+/** The city's mood from the sim (ADR 0058). */
+export interface HappinessStats {
+  /** Residents' mean mood, 0 to 100; 50 with nobody in town. */
+  average: number;
+  /** Residents with each complaint, indexed by `Complaint` code. */
+  complaints: number[];
+}
+
 /** Worker messages for power, water and fire, part of `FromWorker`. */
 export type ServiceMessage =
   /**

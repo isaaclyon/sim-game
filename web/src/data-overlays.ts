@@ -83,9 +83,13 @@ export class DataOverlays {
     this.group.add(this.pollution.group, this.traffic, this.services);
   }
 
-  /** `cells` and `layout` as in the `pollution` message (ADR 0037). */
-  setPollution(cells: Uint8Array, layout: [number, number, number, number, number]) {
-    this.pollution.setCells(cells, layout);
+  /** `cells`, `layout` and `mood` as in the `pollution` message (ADR 0037, 0058). */
+  setPollution(
+    cells: Uint8Array,
+    layout: [number, number, number, number, number],
+    mood: Uint8Array,
+  ) {
+    this.pollution.setCells(cells, layout, mood);
   }
 
   /** The traffic and services views keep the plain view's haze and stains under them. */

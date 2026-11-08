@@ -6,7 +6,16 @@ import { FireSender } from './fire-worker';
 import { historyCommand, readHistory } from './history-worker';
 import { OverlaySender } from './overlay-worker';
 import init, { type Sim } from './pkg/sim_wasm';
-import type { Activity, Building, Citizen, FromWorker, Place, ToWorker, Zone } from './protocol';
+import type {
+  Activity,
+  Building,
+  Citizen,
+  Complaint,
+  FromWorker,
+  Place,
+  ToWorker,
+  Zone,
+} from './protocol';
 import { readPrices, readStats } from './stats-worker';
 import { WaterSender } from './water-worker';
 
@@ -102,15 +111,19 @@ function sendPowerIfChanged(s: Sim, force = false) {
 }
 
 function sendPollutionIfChanged(s: Sim, force = false) {
-  const version = s.pollution_version();
+  const version = s.ground_version();
   if (version === pollutionVersion) return;
   const now = performance.now();
   if (!force && now - pollutionSentAt < POLLUTION_SNAPSHOT_INTERVAL_MS) return;
   pollutionVersion = version;
   pollutionSentAt = now;
   const cells = s.pollution_cells();
+  const mood = s.mood_cells();
   const [x0, y0, cell, cols, rows] = s.pollution_layout();
-  post({ type: 'pollution', cells, layout: [x0, y0, cell, cols, rows] }, [cells.buffer]);
+  post({ type: 'pollution', cells, mood, layout: [x0, y0, cell, cols, rows] }, [
+    cells.buffer,
+    mood.buffer,
+  ]);
 }
 
 const fire = new FireSender(post);
@@ -203,6 +216,9 @@ function sendCitizen(s: Sim) {
       child: v.child,
       grewUp: v.grew_up,
       wantsHome: v.wants_home,
+      mood: v.mood,
+      complaints: Array.from(v.complaints) as Complaint[],
+      commute: v.commute,
     };
     v.free();
   }
