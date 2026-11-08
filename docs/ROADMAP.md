@@ -168,10 +168,12 @@ building it.
   drops the fragment after reading it, so a reload resumes the local copy.
 - **Replay tests.** `sim::replay` reads and writes versioned text command logs; fresh cities
   record every command in the WASM wrapper, and development builds download them with the
-  Command log button. `crates/sim/tests/replays/` holds a browser-recorded session and a
-  scripted one covering every command kind. The test replays each, compares hash, population,
-  buildings and trips with its `expect` line, and checks that a save and load halfway through
-  ends the same. `BLESS_REPLAYS=1` refreshes expectations after an intended change.
+  Command log button. `crates/sim/tests/replays/` holds a browser-recorded session and
+  scripted ones; together they use every command kind and every plant, water piece, zone, road
+  class and fires setting, which a test enforces. The test replays each, compares hash,
+  population, buildings and trips with its `expect` line, and checks that a save and load
+  halfway through ends the same. `BLESS_REPLAYS=1` refreshes expectations after an intended
+  change.
 - **Verification.** Rust, WASM-worker and frontend tests cover export, forked opening, refused
   files, opening over an unreadable save, link encoding, confirmation rules, clipboard refusal
   and command logs. `scripts/check.sh` and the production build pass. A scripted Chrome session
