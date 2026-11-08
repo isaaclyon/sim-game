@@ -6,6 +6,7 @@ import { smokestack } from './building-kit/kit.ts';
 import { RISE_SECONDS } from './building-kit/layer.ts';
 import type { Pt } from './building-kit/polygon.ts';
 import { COAL_CHIMNEY } from './coal-plant.ts';
+import { drawFirst } from './instances.ts';
 import { SMOKE } from './palette.ts';
 import { PLANT_STRIDE, PlantKind } from './protocol.ts';
 
@@ -170,8 +171,7 @@ export class SmokeLayer {
         this.matrix.compose(this.position.set(x, y, z), this.turn, this.scale.set(s, s * 0.85, s));
         mesh.setMatrixAt(i, this.matrix);
       }
-    mesh.count = i;
-    mesh.instanceMatrix.needsUpdate = true;
+    drawFirst(mesh, i);
     (mesh.material as THREE.MeshLambertMaterial).emissive
       .copy(this.glow)
       .multiplyScalar(1 - this.night.value);

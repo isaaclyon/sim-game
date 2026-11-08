@@ -1,6 +1,7 @@
 // Tree placement and instanced drawing. Wild trees come from the land; street trees line
 // roads in residential and commercial zones. All of it is decoration (issue #27).
 import * as THREE from 'three';
+import { drawFirst } from '../instances.ts';
 import { TREES } from '../palette.ts';
 import type { Clearance } from './clearance.ts';
 import type { Land } from './land.ts';
@@ -138,10 +139,7 @@ export class TreeLayer {
       [this.trunks, 'trunks'],
       [this.canopies, 'canopies'],
       [this.cones, 'cones'],
-    ] as const) {
-      mesh.count = n[key];
-      mesh.instanceMatrix.needsUpdate = true;
-      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-    }
+    ] as const)
+      drawFirst(mesh, n[key]);
   }
 }

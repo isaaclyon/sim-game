@@ -6,7 +6,7 @@
 // Models face the direction of travel (+x); +z is the driver's left; they stand on y = 0.
 import * as THREE from 'three';
 import { MeshBuilder } from './building-kit/mesh.ts';
-import { ensureInstances } from './instances.ts';
+import { drawFirst, ensureInstances } from './instances.ts';
 
 const SIGNAL_STRIDE = 4;
 const STEEL = new THREE.Color(0x8d9196);
@@ -125,10 +125,7 @@ export class SignalLayer {
       }
     }
     for (const mesh of [this.poles, ...kinds.map((k) => this.lamps[k])]) {
-      if (!mesh) continue;
-      mesh.count = count;
-      mesh.instanceMatrix.needsUpdate = true;
-      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+      if (mesh) drawFirst(mesh, count);
     }
   }
 }

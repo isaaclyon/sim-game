@@ -4,7 +4,7 @@
 // Models stand on y = 0 with the arm along +x, toward the road; the scene reflects z.
 import * as THREE from 'three';
 import { MeshBuilder } from './building-kit/mesh.ts';
-import { ensureInstances } from './instances.ts';
+import { drawFirst, ensureInstances } from './instances.ts';
 import { Clearance } from './scenery/clearance.ts';
 
 /** Metres between lamps along a road, alternating sides, by class: street, main road, alley. */
@@ -157,10 +157,7 @@ export class StreetlightLayer {
       this.posts.setMatrixAt(i, m);
       this.pools.setMatrixAt(i, m);
     }
-    for (const mesh of [this.posts, this.pools]) {
-      mesh.count = count;
-      mesh.instanceMatrix.needsUpdate = true;
-    }
+    for (const mesh of [this.posts, this.pools]) drawFirst(mesh, count);
   }
 
   /** `on` runs from 0 (off) to 1 (fully lit); see `Lighting.streetlights`. */

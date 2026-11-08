@@ -5,8 +5,8 @@
 
 import * as THREE from 'three';
 import { CAR_DETAIL_PX, Detail, detail, WALKER_DETAIL_PX, WALKER_HIDE_PX } from './agent-lod.ts';
-import { ensureInstances } from './instances';
-import { AGENT_STRIDE, AgentKind } from './protocol';
+import { drawFirst, ensureInstances } from './instances.ts';
+import { AGENT_STRIDE, AgentKind } from './protocol.ts';
 import { FIRE_RED, FIRE_TRUCK, VEHICLES, vehicleModel, vehiclePaint } from './vehicle-models.ts';
 import {
   FAR_WALKER,
@@ -50,6 +50,9 @@ export class AgentLayer {
   private farWalkers?: THREE.InstancedMesh;
   private readonly frustum = new THREE.Frustum();
   private readonly view = new THREE.Matrix4();
+  /** What the last draw showed, so a paused, still view is not drawn and uploaded again. */
+  private readonly lastView = new THREE.Matrix4();
+  private last: unknown[] = [];
   private readonly sphere = new THREE.Sphere();
   private readonly eye = new THREE.Vector3();
   private readonly figure: Partial<Record<Part, THREE.InstancedMesh>> = {};
@@ -84,7 +87,8 @@ export class AgentLayer {
    * Draws agents interpolated between two snapshots. `t` in [0, 1] blends prev → curr.
    * Agents hidden in either snapshot snap to the visible one so spawns don't streak. Agent
    * `selected`, an agent id, is drawn in the highlight colour. Agents outside `camera`'s view
-   * are skipped; `pxPerMetre` (see `pixelsPerMetre`) sets how far away detail drops.
+   * are skipped; `pxPerMetre` (see `pixelsPerMetre`) sets how far away detail drops. Draws
+   * nothing new when the snapshots, inputs and view all match the last call.
    */
   draw(
     prev: Float32Array | undefined,
@@ -94,6 +98,16 @@ export class AgentLayer {
     camera: THREE.Camera,
     pxPerMetre: number,
   ) {
+    // The camera may move again before this frame renders, so the view test keeps a margin.
+    camera.updateMatrixWorld();
+    // In the scene's own coordinates, which reflect z, so agent positions need no conversion.
+    this.view
+      .multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse)
+      .multiply(this.scene.matrixWorld);
+    const inputs = [prev, curr, t, selected, pxPerMetre, this.trafficView];
+    if (inputs.every((v, i) => v === this.last[i]) && this.view.equals(this.lastView)) return;
+    this.last = inputs;
+    this.lastView.copy(this.view);
     const count = curr.length / AGENT_STRIDE;
     if (this.models.length < count) {
       const models = new Uint8Array(Math.ceil(count * 1.5));
@@ -133,12 +147,6 @@ export class AgentLayer {
       FAR_WALKER,
       this.material,
     );
-    // The camera may move again before this frame renders, so the view test keeps a margin.
-    camera.updateMatrixWorld();
-    // In the scene's own coordinates, which reflect z, so agent positions need no conversion.
-    this.view
-      .multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse)
-      .multiply(this.scene.matrixWorld);
     this.frustum.setFromProjectionMatrix(this.view);
     const eye = this.scene.worldToLocal(this.eye.copy(camera.position));
     for (const p of PARTS) {
@@ -256,8 +264,5 @@ export class AgentLayer {
 }
 
 function finish(mesh: THREE.InstancedMesh | undefined, count: number) {
-  if (!mesh) return;
-  mesh.count = count;
-  mesh.instanceMatrix.needsUpdate = true;
-  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  if (mesh) drawFirst(mesh, count);
 }
