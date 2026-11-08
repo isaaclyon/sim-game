@@ -4,6 +4,7 @@ use crate::{Command, Config, Zone};
 
 mod allocation;
 mod closure;
+mod education;
 mod employment;
 mod family;
 mod occupancy;

@@ -477,6 +477,10 @@ Goals and consequences, kept light so they don't crowd out building.
   in M6.
   Done when: school runs fill the sidewalks at 8am, and a town that built schools early sees
   its dense shops fill faster a childhood later.
+  - Slice 1, education levels — implemented. Arriving adults bring 60% primary, 30% high
+    school and 10% university; children and grown children have none until schools exist.
+    Dense industry prefers primary and dense commerce high school; a less-educated seeker
+    takes such a job only after waiting a quarter to half a clock day. Save version 9.
 - **Money follows city quality** ([ADR 0056](adrs/0056-taxes-follow-city-quality-and-services-have-budgets.md)),
   after schools. Three slices:
   1. Taxes: each resident's tax scales with their home's land value and each filled job's with

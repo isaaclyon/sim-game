@@ -1,6 +1,7 @@
 //! Event-driven residents. No idle citizen scan on the traffic tick.
 use serde::{Deserialize, Serialize};
 mod allocation;
+pub(super) mod education;
 pub(super) mod family;
 mod hash;
 mod lifecycle;
@@ -35,6 +36,8 @@ pub(super) struct Residents {
     pub vacant: BTreeSet<HomeId>,
     /// Draws for births only, so families growing never shift other residents' draws.
     pub birth_rng: Rng,
+    /// Draws for education only (ADR 0055): arrivals' levels and job seekers' waits.
+    pub education_rng: Rng,
     /// Next birth check of each active household.
     pub births: BinaryHeap<Reverse<(u64, HouseholdId)>>,
     /// When each child comes of age.
@@ -59,6 +62,7 @@ impl Residents {
             searches: BinaryHeap::new(),
             vacant: BTreeSet::new(),
             birth_rng: Rng::new(seed ^ 0xb127_4d5e),
+            education_rng: Rng::new(seed ^ 0xed0c_a7e5),
             births: BinaryHeap::new(),
             grown: BinaryHeap::new(),
             movers: BTreeSet::new(),
