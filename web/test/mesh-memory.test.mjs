@@ -80,3 +80,55 @@ test('compact attributes keep colours, normals and glow within a step of the sou
     assert.ok(Math.abs(s.getX(i) - 17.3) < 1 / 60 && Math.abs(s.getY(i) - 29.6) < 1 / 60);
   }
 });
+
+/** Each triangle's corner positions and colours in draw order, however corners are stored. */
+const triangles = (g) => {
+  const flat = g.toNonIndexed();
+  return ['position', 'color'].map((a) => Array.from(flat.getAttribute(a).array));
+};
+
+test('shared corners leave out normals and reuse corners of the same paint', () => {
+  const mb = new MeshBuilder({ shareCorners: true });
+  mb.box([0, 0], 0, 4, 3, 2, 0.3, new THREE.Color(0x56794d));
+  const g = mb.geometry();
+  assert.equal(g.getAttribute('normal'), undefined);
+  assert.deepEqual(
+    [g.getAttribute('position').count, g.index.count],
+    [8, 30],
+    'four walls and a lid',
+  );
+  const two = new MeshBuilder({ shareCorners: true });
+  two.quad([0, 0, 0], [4, 0, 0], [4, 3, 0], [0, 3, 0], new THREE.Color(0x56794d), [0, 0, 1]);
+  two.quad([4, 0, 0], [8, 0, 0], [8, 3, 0], [4, 3, 0], new THREE.Color(0x56794d), [0, 0, 1]);
+  two.glow.set(0xffcf83);
+  two.quad([8, 0, 0], [12, 0, 0], [12, 3, 0], [8, 3, 0], new THREE.Color(0x56794d), [0, 0, 1]);
+  assert.equal(two.vertexCount, 10, 'a glowing face keeps its own corners');
+});
+
+test('shared corners draw the same triangles in the same order', () => {
+  for (let zone = 1; zone <= 6; zone++) {
+    const lot = rect(0, 0, 28, 40);
+    const building = { zone, height: 12, roof: zone % 4, front: 0, ring: rect(7, 6, 14, 14) };
+    const [plain, shared] = [new MeshBuilder(), new MeshBuilder({ shareCorners: true })];
+    for (const mb of [plain, shared]) lotGeometry(mb, lot, building, new Clearance());
+    assert.deepEqual(triangles(shared.geometry()), triangles(plain.geometry()), `zone ${zone}`);
+    assert.ok(shared.vertexCount < plain.vertexCount * 0.75, `zone ${zone} shares corners`);
+  }
+});
+
+test('shared-corner buildings and lots fit tighter memory budgets', () => {
+  const data = [];
+  for (let zone = 1; zone <= 6; zone++) data.push(...record(zone, rect(zone * 40, 0, 18, 14)));
+  const g = buildBuildingGeometry(new Float32Array(data), undefined, { shareCorners: true });
+  assert.equal(g.getAttribute('normal'), undefined);
+  assert.ok(bytesPerVertex(g) <= 28, `${bytesPerVertex(g)} bytes per building vertex`);
+  const mb = new MeshBuilder({ shareCorners: true });
+  for (let zone = 1; zone <= 6; zone++) {
+    const lot = rect(zone * 40, 0, 28, 40);
+    const building = { zone, height: 6, roof: 0, front: 0, ring: rect(zone * 40 + 7, 6, 14, 14) };
+    lotGeometry(mb, lot, building, new Clearance());
+  }
+  const lots = mb.geometry();
+  assert.ok(bytesPerVertex(lots) <= 20, `${bytesPerVertex(lots)} bytes per lot vertex`);
+  assert.ok(bytesPerTriangle(lots) <= 40, `${bytesPerTriangle(lots)} bytes per lot triangle`);
+});

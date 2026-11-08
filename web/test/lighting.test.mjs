@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as THREE from 'three';
 import { buildBuildingGeometry } from '../src/building-kit/index.ts';
-import { daylight, Lighting, nightMaterial } from '../src/lighting.ts';
+import { daylight, flatShaded, Lighting, nightMaterial } from '../src/lighting.ts';
 import { createSimScene } from '../src/scene.ts';
 import { VEHICLES } from '../src/vehicle-models.ts';
 
@@ -88,4 +88,22 @@ test('emission shader keeps the shared clock uniform for later updates', () => {
   assert.equal(shader.uniforms.night.value, 1);
   assert.match(shader.vertexShader, /vNightEmission = nightEmission/);
   assert.match(shader.fragmentShader, /vNightEmission \* night/);
+});
+
+test('flat-shaded materials offset sun shadows along each face, without vertex normals', () => {
+  const night = nightMaterial({ value: 0 }, { value: 6 });
+  const before = night.customProgramCacheKey();
+  const material = flatShaded(night);
+  assert.equal(material.flatShading, true);
+  assert.notEqual(material.customProgramCacheKey(), before, 'never shares an unpatched program');
+  const shader = {
+    uniforms: {},
+    vertexShader: THREE.ShaderLib.lambert.vertexShader,
+    fragmentShader: THREE.ShaderLib.lambert.fragmentShader,
+  };
+  material.onBeforeCompile(shader);
+  assert.match(shader.vertexShader, /vNightEmission = nightEmission/, 'keeps the night shader');
+  assert.doesNotMatch(shader.fragmentShader, /#include <lights_fragment_begin>/);
+  assert.match(shader.fragmentShader, /uniform mat4 directionalShadowMatrix/);
+  assert.match(shader.fragmentShader, /directionalShadowMatrix\[ i \] \* vec4\(/);
 });

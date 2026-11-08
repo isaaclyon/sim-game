@@ -35,11 +35,20 @@ export function dropArraysOnUpload(geometry: THREE.BufferGeometry) {
  * here) and half-float light hours. Glow and hours are left out when no face has any; the night
  * shader then reads zeros. Faces are flat, so vertices are shared only within one quad or
  * polygon, through a 32-bit index: a quad keeps four corners instead of six.
+ *
+ * With `shareCorners`, the geometry has no normals and every corner with the same position,
+ * colour, glow and hours is stored once, across faces. Its material must take each face's
+ * normal from the screen instead (`flatShaded` in lighting.ts).
  */
 export class MeshBuilder {
+  private readonly shared: boolean;
+  /** Open-addressed vertex index plus one per slot, 0 = empty; only with `shareCorners`. */
+  private slots = new Int32Array(0);
   private capacity = 2 * 1024;
   private count = 0;
   private positions = new Float32Array(this.capacity * 3);
+  /** Positions as raw bits, compared and hashed exactly. */
+  private bits = new Uint32Array(this.positions.buffer);
   private normals = new Int8Array(this.capacity * 4);
   private colors = new Uint16Array(this.capacity * 4);
   private glows = new Uint8Array(this.capacity * 4);
@@ -65,6 +74,11 @@ export class MeshBuilder {
   /** Daily on/off hours for subsequently added faces; zero duration stays dark. */
   lightSchedule: [number, number] = [0, 0];
 
+  constructor({ shareCorners = false } = {}) {
+    this.shared = shareCorners;
+    if (shareCorners) this.slots = new Int32Array(2 * this.capacity);
+  }
+
   get vertexCount(): number {
     return this.count;
   }
@@ -85,6 +99,7 @@ export class MeshBuilder {
       return next;
     };
     this.positions = grown(this.positions, 3);
+    this.bits = new Uint32Array(this.positions.buffer);
     this.normals = grown(this.normals, 4);
     this.colors = grown(this.colors, 4);
     this.glows = grown(this.glows, 4);
@@ -140,10 +155,13 @@ export class MeshBuilder {
     this.h1 = THREE.DataUtils.toHalfFloat(off);
   }
 
-  /** Appends a vertex at `p` with the face being written and returns its index. */
+  /**
+   * Appends a vertex at `p` with the face being written and returns its index, or the index of
+   * an equal corner already stored when sharing corners.
+   */
   private vertex(p: V3): number {
     if (this.count === this.capacity) this.grow();
-    const i = this.count++;
+    const i = this.count;
     const { positions, normals, colors, glows, hours } = this;
     positions[i * 3] = p[0];
     positions[i * 3 + 1] = p[1];
@@ -159,7 +177,59 @@ export class MeshBuilder {
     glows[i * 4 + 2] = this.eb;
     hours[i * 2] = this.h0;
     hours[i * 2 + 1] = this.h1;
+    if (this.shared) {
+      const j = this.find(i);
+      if (j !== i) return j;
+    }
+    return this.count++;
+  }
+
+  /** The stored corner equal to just-written corner `i`, else `i`, entered in the table. */
+  private find(i: number): number {
+    if (2 * (i + 1) > this.slots.length) this.rehash(this.slots.length * 2);
+    const { bits, colors, glows, hours, slots } = this;
+    const mask = slots.length - 1;
+    let s = this.hash(i) & mask;
+    for (; slots[s] !== 0; s = (s + 1) & mask) {
+      const j = slots[s] - 1;
+      if (
+        bits[j * 3] === bits[i * 3] &&
+        bits[j * 3 + 1] === bits[i * 3 + 1] &&
+        bits[j * 3 + 2] === bits[i * 3 + 2] &&
+        colors[j * 4] === colors[i * 4] &&
+        colors[j * 4 + 1] === colors[i * 4 + 1] &&
+        colors[j * 4 + 2] === colors[i * 4 + 2] &&
+        glows[j * 4] === glows[i * 4] &&
+        glows[j * 4 + 1] === glows[i * 4 + 1] &&
+        glows[j * 4 + 2] === glows[i * 4 + 2] &&
+        hours[j * 2] === hours[i * 2] &&
+        hours[j * 2 + 1] === hours[i * 2 + 1]
+      )
+        return j;
+    }
+    slots[s] = i + 1;
     return i;
+  }
+
+  /** Table hash of stored corner `i`'s position; corners there differ only in paint. */
+  private hash(i: number): number {
+    const { bits } = this;
+    let h = Math.imul(bits[i * 3] ^ (bits[i * 3 + 1] >>> 7), 0x9e3779b1);
+    h = Math.imul(h ^ (h >>> 15) ^ bits[i * 3 + 2], 0x85ebca6b);
+    h = Math.imul(h ^ (h >>> 13) ^ bits[i * 3 + 1], 0xc2b2ae35);
+    return (h ^ (h >>> 16)) >>> 0;
+  }
+
+  /** Rebuilds the corner table with `size` slots, a power of two. */
+  private rehash(size: number) {
+    const slots = new Int32Array(size);
+    const mask = size - 1;
+    for (let j = 0; j < this.count; j++) {
+      let s = this.hash(j) & mask;
+      while (slots[s] !== 0) s = (s + 1) & mask;
+      slots[s] = j + 1;
+    }
+    this.slots = slots;
   }
 
   /** Appends triangle `i j k`, wound `i k j` when `side` is negative. */
@@ -318,7 +388,7 @@ export class MeshBuilder {
     const n = this.count;
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(this.positions.slice(0, n * 3), 3));
-    g.setAttribute('normal', packed(this.normals.slice(0, n * 4)));
+    if (!this.shared) g.setAttribute('normal', packed(this.normals.slice(0, n * 4)));
     g.setAttribute('color', packed(this.colors.slice(0, n * 4)));
     if (this.glowing) g.setAttribute('nightEmission', packed(this.glows.slice(0, n * 4)));
     // Float16BufferAttribute copies its array, so a view avoids copying twice.

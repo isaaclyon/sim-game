@@ -9,8 +9,9 @@ import { PRESENT_DAY, type Style } from './style.ts';
 export function buildBuildingGeometry(
   data: Float32Array,
   style: Style = PRESENT_DAY,
+  options?: { shareCorners?: boolean },
 ): THREE.BufferGeometry {
-  const mb = new MeshBuilder();
+  const mb = new MeshBuilder(options);
   const groups: { start: number; count: number }[] = [];
   let o = 0;
   while (o < data.length) {

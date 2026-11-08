@@ -56,6 +56,37 @@ export function nightMaterial(
   return material;
 }
 
+/**
+ * Shades `material` per face from screen-space derivatives, for geometry stored without normals
+ * (MeshBuilder's `shareCorners`). three.js offsets sun shadow lookups along vertex normals
+ * (`normalBias`) in the vertex shader, so without them the fragment shader redoes that lookup
+ * along the face's own normal; otherwise faces would shadow themselves in stripes.
+ */
+export function flatShaded<T extends THREE.MeshLambertMaterial>(material: T): T {
+  const { onBeforeCompile } = material;
+  const key = material.customProgramCacheKey.bind(material);
+  material.flatShading = true;
+  material.customProgramCacheKey = () => `${key()}-flat`;
+  material.onBeforeCompile = (shader, renderer) => {
+    onBeforeCompile.call(material, shader, renderer);
+    const lights = THREE.ShaderChunk.lights_fragment_begin.replace(
+      'vDirectionalShadowCoord[ i ]',
+      '( directionalShadowMatrix[ i ] * vec4( flatWorldPosition + flatWorldNormal * directionalLightShadow.shadowNormalBias, 1.0 ) )',
+    );
+    shader.fragmentShader = `#if defined( USE_SHADOWMAP ) && NUM_DIR_LIGHT_SHADOWS > 0
+      uniform mat4 directionalShadowMatrix[ NUM_DIR_LIGHT_SHADOWS ];
+    #endif
+    ${shader.fragmentShader}`.replace(
+      '#include <lights_fragment_begin>',
+      `// The view matrix is a rotation plus a translation, so its transpose undoes the rotation.
+      vec3 flatWorldNormal = ( vec4( normal, 0.0 ) * viewMatrix ).xyz;
+      vec3 flatWorldPosition = cameraPosition + ( vec4( - vViewPosition, 0.0 ) * viewMatrix ).xyz;
+      ${lights}`,
+    );
+  };
+  return material;
+}
+
 export class Lighting {
   readonly night = { value: 0 };
   /** Streetlights switch on together as dusk deepens, rather than fading in with the sky. */

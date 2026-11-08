@@ -77,6 +77,7 @@ export class BuildingLayer {
   private readonly material: THREE.Material;
   private readonly style?: Style;
 
+  /** Tiles store no normals, so a lit `material` must shade flat (`flatShaded` in lighting.ts). */
   constructor(material: THREE.Material, style?: Style) {
     this.material = material;
     this.style = style;
@@ -184,7 +185,7 @@ export class BuildingLayer {
         records.set(record, at);
         at += record.length;
       }
-      const geometry = buildBuildingGeometry(records, this.style);
+      const geometry = buildBuildingGeometry(records, this.style, { shareCorners: true });
       const bounds = drawnBounds(geometry);
       dropArraysOnUpload(geometry);
       if (tile) {

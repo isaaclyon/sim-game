@@ -27,7 +27,7 @@ import { BuildingLayer } from './building-kit/layer.ts';
 import { followPoint, KeyCamera } from './camera';
 import { carPosition, nearestCar } from './car-pick';
 import { FireLayer } from './fire-layer.ts';
-import { Lighting, nightMaterial } from './lighting.ts';
+import { flatShaded, Lighting, nightMaterial } from './lighting.ts';
 import { LotLayer } from './lot-scenery/layer.ts';
 import { ROADS, SIDEWALK, SKY } from './palette';
 import { PollutionOverlay } from './pollution-overlay.ts';
@@ -70,7 +70,7 @@ export class Renderer {
   private markings?: THREE.Mesh;
   private readonly lighting = new Lighting(this.scene);
   private readonly buildings = new BuildingLayer(
-    nightMaterial(this.lighting.night, this.lighting.lightHour),
+    flatShaded(nightMaterial(this.lighting.night, this.lighting.lightHour)),
   );
   private readonly scenery = new Scenery();
   private readonly lotScenery = new LotLayer();
