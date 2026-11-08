@@ -152,7 +152,8 @@ What to build next and why lives in `docs/ROADMAP.md`. Work on the current miles
   empty map (`World::empty`); the generated grid is for tests and benchmarks.
 - Command logs: versioned text owned by `sim::replay` (ADR 0034); the third line is `map` (empty
   map, as the game starts) or `grid` (generated streets); fixtures live in
-  `crates/sim/tests/replays/*.cmdlog`. Refresh `expect` lines only for intended gameplay changes
+  `crates/sim/tests/replays/*.cmdlog`; together they must use every command kind and option
+  (`tests/replay/coverage.rs`), so a new command needs a fixture line. Refresh `expect` lines only for intended gameplay changes
   with `BLESS_REPLAYS=1 cargo test -p sim --test replay`.
 Change both sides (Rust writer, `protocol.ts` doc, `renderer.ts` reader) together.
 

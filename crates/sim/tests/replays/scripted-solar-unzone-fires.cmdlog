@@ -1,0 +1,15 @@
+# Written by hand: the pieces no other log uses. A solar plant (ADR 0041), a corner of a
+# zoned block painted back to no zone (ADR 0014), and fires turned off and then on again
+# (ADR 0053).
+sim-game command log 1
+seed 4
+grid 4 4
+0 spawn 40
+50 fill 50 50 residential-low
+50 fill 170 50 commercial-low
+100 plant 440 300 solar
+400 fires off
+800 paint 10 10 60 60 none
+1200 fires on
+end 3000
+expect hash d5ca5037b60eca1d population 25 buildings 13 trips 73
