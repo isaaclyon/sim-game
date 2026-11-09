@@ -73,6 +73,7 @@ const stats = {
     saved: 0,
     destroyed: 0,
   },
+  happiness: { average: 50, complaints: [0, 0, 0, 0, 0, 0, 0] },
   balance: 12_345,
   taxes: 300,
   grant: 1_000,

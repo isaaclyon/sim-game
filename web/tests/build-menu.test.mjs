@@ -130,13 +130,29 @@ test('Views shows one ground overlay at a time, with traffic and power as switch
   assert.ok(pressed(t, 'traffic') && pressed(t, 'power-view') && pressed(t, 'view-land'));
   assert.equal(latest('powerView').on, true);
   t.key('p');
-  assert.ok(pressed(t, 'view-plain'), 'P carries on from the overlay picked in the list');
+  assert.ok(pressed(t, 'view-happiness'), 'P carries on from the overlay picked in the list');
+  t.key('p');
+  assert.ok(pressed(t, 'view-traffic'), 'then the data overlays');
+  t.key('p');
+  assert.equal(latest('pollutionView').view, 'services');
+  t.key('p');
+  assert.ok(pressed(t, 'view-plain'), 'P wraps back to none');
   assert.ok(el.views.classList.contains('on'), 'traffic and power still show');
   t.key('Escape');
   assert.equal(el['views-panel'].hidden, true);
   t.key('t');
   t.key('o');
   assert.ok(!el.views.classList.contains('on'));
+});
+
+test('Traffic and services messages reach the data overlays', async () => {
+  const t = await tools();
+  const segments = new Float32Array([0, 0, 100, 0, 0, 3, 0.5]);
+  const lots = new Float32Array([1, 3, 0, 0, 10, 0, 0, 10]);
+  t.reply({ type: 'traffic', segments });
+  t.reply({ type: 'services', lots });
+  assert.equal(t.previews.findLast((p) => p.type === 'traffic').segments, segments);
+  assert.equal(t.previews.findLast((p) => p.type === 'services').lots, lots);
 });
 
 test('every control has an accessible name, is a native control, and shows its picture', async () => {

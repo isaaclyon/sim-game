@@ -78,6 +78,11 @@ pub struct Citizens {
     /// Tick from which this job seeker may take a job that asks for more education than they
     /// have; `u64::MAX` while not looking for work.
     pub any_job_at: Vec<u64>,
+    /// Tick the current or latest trip to work set out (ADR 0058); `u64::MAX` before the first.
+    pub trip_start: Vec<u64>,
+    /// Clock minutes the last trip to work took, waiting for a route included; 0 = none yet
+    /// or no job (ADR 0058).
+    pub commute: Vec<u16>,
 }
 impl Citizens {
     /// A new resident of `household`, born at tick `born`. Children own no car.
@@ -112,6 +117,8 @@ impl Citizens {
         self.move_by.push(u64::MAX);
         self.education.push(Education::None);
         self.any_job_at.push(u64::MAX);
+        self.trip_start.push(u64::MAX);
+        self.commute.push(0);
         self.draw_car(id, !child, rng);
         id
     }

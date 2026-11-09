@@ -54,6 +54,8 @@ impl World {
             mix(c.move_by[i]);
             mix(c.education[i] as u64);
             mix(c.any_job_at[i]);
+            mix(c.trip_start[i]);
+            mix(c.commute[i] as u64);
         }
         for (&jobs, &workers) in self.residents.jobs.iter().zip(&self.residents.workers) {
             mix(jobs as u64);

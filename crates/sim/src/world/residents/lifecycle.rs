@@ -117,6 +117,7 @@ impl World {
             self.residents.workers[job as usize] -= 1;
             self.residents.employed -= 1;
         }
+        self.citizens.commute[c as usize] = 0;
     }
 
     /// Run after building removal, not each tick. Loss of access alone never evicts residents

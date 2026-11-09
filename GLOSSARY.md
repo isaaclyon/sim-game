@@ -38,6 +38,20 @@ _Avoid_: route (when you mean the journey rather than its path)
 The panel that shows one selected citizen's name, home, job and current trip, and can make the camera follow their car.
 _Avoid_: car inspector, agent inspector
 
+**Mood**:
+How content one citizen is, 0 to 100, derived from their home's services and pollution, their
+job and their commute. Each thing that lowers it is a complaint (ADR 0058).
+_Avoid_: satisfaction, approval
+
+**Happiness**:
+The city's mood: residents' average. A happy city draws new residents; a household that stays
+miserable for a clock day may leave (ADR 0058).
+_Avoid_: land value (how good a place is to build, not how people feel)
+
+**Commute**:
+How many clock minutes a worker's last trip to work took, waiting included.
+_Avoid_: travel time (when you mean any trip)
+
 ## Zoning
 
 **Zone**:

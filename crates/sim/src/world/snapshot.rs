@@ -321,6 +321,7 @@ impl World {
         self.water.hash_into(&mut mix);
         self.pollution.hash_into(&mut mix);
         self.fire.hash_into(self.cfg.seed, &mut mix);
+        self.happiness.hash_into(&mut mix);
         for chunk in self.zones.cells.chunks(8) {
             let mut word = [0u8; 8];
             word[..chunk.len()].copy_from_slice(chunk);

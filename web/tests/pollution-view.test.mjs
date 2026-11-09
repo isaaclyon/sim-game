@@ -21,6 +21,16 @@ test('each view shows only its own kind, stronger where it is worse', () => {
   assert.ok(pollutionColor('noise', noisy)[3] > pollutionColor('noise', [0, 0, 100, 100])[3]);
 });
 
+test('the happiness view shows nothing where nobody lives, blue where residents are happy', () => {
+  const clean = [0, 0, 0, 255];
+  assert.equal(pollutionColor('happiness', clean, 0)[3], 0, 'empty cell');
+  const [hr, , hb, ha] = pollutionColor('happiness', clean, 255);
+  const [sr, , sb] = pollutionColor('happiness', clean, 1);
+  assert.ok(ha > 0 && hb > hr, 'happy is blue');
+  assert.ok(sr > sb, 'miserable is red');
+  assert.equal(pollutionColor('air', [0, 0, 0, 255], 255)[3], 0, 'mood shows only in its view');
+});
+
 test('the plain view keeps old factory ground visible under clean air', () => {
   const stained = pollutionColor('plain', [0, 255, 0, 50]);
   const hazy = pollutionColor('plain', [255, 0, 0, 50]);
@@ -55,15 +65,29 @@ test('plain haze darkens with the ground at night; the pollution views stay read
   assert.equal(material().type, 'MeshLambertMaterial');
 });
 
-test('P cycles air, ground, noise and land value, then back to the plain view', async () => {
+test('P cycles the pollution views, land value, happiness, traffic and services, then back to plain', async () => {
   const t = await tools();
   const views = [];
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 8; i++) {
     t.key('p');
     views.push(t.previews.findLast((p) => p.type === 'pollutionView').view);
   }
-  assert.deepEqual(views, ['air', 'ground', 'noise', 'land', 'plain']);
-  t.reply({ type: 'pollution', cells: new Uint8Array(4), layout: [0, 0, 32, 1, 1] });
+  assert.deepEqual(views, [
+    'air',
+    'ground',
+    'noise',
+    'land',
+    'happiness',
+    'traffic',
+    'services',
+    'plain',
+  ]);
+  t.reply({
+    type: 'pollution',
+    cells: new Uint8Array(4),
+    mood: new Uint8Array(1),
+    layout: [0, 0, 32, 1, 1],
+  });
   assert.equal(t.previews.findLast((p) => p.type === 'pollution').layout[2], 32);
 });
 
@@ -91,4 +115,5 @@ test('the worker sends the pollution grid at start and again as factories pollut
     latest.some((v, i) => i % 4 === 3 && v < 255),
     'and lower land value',
   );
+  assert.equal(first.mood.length, 0, 'no mood before anyone lives here');
 });

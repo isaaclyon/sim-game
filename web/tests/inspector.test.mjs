@@ -20,6 +20,9 @@ const resident = {
   child: false,
   grewUp: false,
   wantsHome: false,
+  mood: 62,
+  complaints: [],
+  commute: 0,
 };
 const inspects = (t) => t.messages.filter((m) => m.type === 'inspect');
 /** Clicks car `agent` in idle mode and answers as the worker would. */
@@ -59,6 +62,7 @@ const showCars = (t) =>
         saved: 0,
         destroyed: 0,
       },
+      happiness: { average: 50, complaints: [0, 0, 0, 0, 0, 0, 0] },
       balance: 100_000,
       taxes: 0,
       grant: 0,
@@ -108,6 +112,12 @@ test('the panel tells the truth about each state', async () => {
   };
   assert.match(show({ job: null }), /^Job: unemployed$/m);
   assert.match(show({}), /^Age 34$/m);
+  assert.match(show({}), /^Mood: Content \(62\)$/m);
+  assert.doesNotMatch(show({}), /Complaints/, 'nothing to complain about');
+  const unhappy = show({ mood: 21, complaints: [0, 3, 6], commute: 75 });
+  assert.match(unhappy, /^Mood: Miserable \(21\)$/m);
+  assert.match(unhappy, /^Complaints: no power, dirty air, long commute$/m);
+  assert.match(unhappy, /^Job: factory #40, 75 min commute$/m);
   assert.match(
     show({ age: 19, grewUp: true, wantsHome: true }),
     /^Age 19, grew up here: looking for a home of their own$/m,

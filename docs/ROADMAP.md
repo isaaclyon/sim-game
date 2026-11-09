@@ -480,7 +480,7 @@ Goals and consequences, kept light so they don't crowd out building.
   - Slice 1, education levels — implemented. Arriving adults bring 60% primary, 30% high
     school and 10% university; children and grown children have none until schools exist.
     Dense industry prefers primary and dense commerce high school; a less-educated seeker
-    takes such a job only after waiting a quarter to half a clock day. Save version 9.
+    takes such a job only after waiting a quarter to half a clock day. Save version 10.
 - **Money follows city quality** ([ADR 0056](adrs/0056-taxes-follow-city-quality-and-services-have-budgets.md)),
   after schools. Three slices:
   1. Taxes: each resident's tax scales with their home's land value and each filled job's with
@@ -493,9 +493,19 @@ Goals and consequences, kept light so they don't crowd out building.
   Done when: two otherwise equal towns, one clean and schooled, one polluted and unschooled,
   show a clear gap in taxes; a player trims an idle station to save money and adds a truck
   to a busy one.
-- Citizen happiness from services, traffic and pollution, feeding back into demand and growth.
-  The citizen inspector shows each person's mood and complaints. Tax rates follow it.
-- Data overlays: traffic, coverage, land value, happiness.
+- **Citizen happiness** ([ADR 0058](adrs/0058-citizen-happiness-steers-demand-and-move-outs.md)):
+  implemented. Mood comes from power, water, fire cover, air, noise, a job and the commute.
+  A happy city draws people in; a household that stays miserable for a clock day may leave.
+  The citizen card shows mood, complaints and commute minutes; the population panel shows the
+  city's mood and top complaints; Views has a happiness overlay. Tax rates that cost
+  happiness come later (ADR 0056, slice 3).
+  Done when: cutting power to a district turns its homes red in the happiness view, residential
+  demand falls, and some of those households move out until power returns.
+- **Data overlays** ([ADR 0057](adrs/0057-data-overlays-for-traffic-and-services.md)):
+  implemented. Views gains Traffic (roads with cars, green flowing to red jammed, eased over
+  readings) and Services (lots green with power, water and fire cover, amber missing one, red
+  missing more) beside land value.
+  Happiness has its own view (ADR 0058).
 - Two modes:
   - **Sandbox:** never fails. Problems slow growth or make people move away, but there is no game
     over.
