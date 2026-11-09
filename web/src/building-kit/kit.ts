@@ -2,7 +2,7 @@
 // Each use has several designs; a hash of the footprint picks one, never sim randomness, so a
 // building keeps its look and the sim stays deterministic (ADR 0027). The designs live in one
 // file per use: houses, flats, shops, stores, industry (workshops) and factories. Village
-// buildings draw from their own cottage, shop and workshop lists (ADR 0056).
+// buildings draw from their own cottage, shop and workshop lists (ADR 0059).
 import * as THREE from 'three';
 import { Era } from '../protocol.ts';
 import { FACTORIES } from './factories.ts';

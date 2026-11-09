@@ -1,9 +1,13 @@
 // Pollution and land value over the ground (ADR 0037). The plain view shows faint haze where
 // the air is dirty and stained ground where industry left its mark; the pollution views tint
-// each cell by one kind, or by land value. Display only: the sim owns every number.
+// each cell by one kind, by land value, or by residents' mood (ADR 0058). Display only: the
+// sim owns every number.
 import * as THREE from 'three';
 import { POLLUTION, POLLUTION_ALPHA } from './palette.ts';
 import type { PollutionView } from './ui/views.ts';
+
+/** The views this layer draws; the data views (ADR 0057) show the plain haze under them. */
+export type PollutionLayerView = Exclude<PollutionView, 'traffic' | 'services'>;
 
 const color = (hex: number) => new THREE.Color(hex);
 const KIND = {
@@ -13,6 +17,8 @@ const KIND = {
 };
 const LAND_LOW = color(POLLUTION.landLow);
 const LAND_HIGH = color(POLLUTION.landHigh);
+const MOOD_LOW = color(POLLUTION.moodLow);
+const MOOD_HIGH = color(POLLUTION.moodHigh);
 const HAZE = color(POLLUTION.haze);
 const STAIN = color(POLLUTION.stain);
 /** Strongest haze and stain in the plain view, so dirty places read without an overlay. */
@@ -22,16 +28,22 @@ const STAIN_ALPHA = 0.45;
 const CLEAR = 8;
 
 /**
- * RGBA for one cell, from its `[air, ground, noise, landValue]` bytes (see `pollution` in
- * protocol.ts).
+ * RGBA for one cell, from its `[air, ground, noise, landValue]` bytes and its `mood` byte (see
+ * `pollution` in protocol.ts).
  */
 export function pollutionColor(
-  view: PollutionView,
+  view: PollutionLayerView,
   [air, ground, noise, land]: Uint8Array | readonly number[],
+  mood = 0,
 ): [number, number, number, number] {
   const out = new THREE.Color();
   let alpha: number;
-  if (view === 'land') {
+  if (view === 'happiness') {
+    // Nobody lives here: show the ground.
+    if (mood === 0) return [0, 0, 0, 0];
+    out.copy(MOOD_LOW).lerp(MOOD_HIGH, (mood - 1) / 254);
+    alpha = POLLUTION_ALPHA;
+  } else if (view === 'land') {
     out.copy(LAND_LOW).lerp(LAND_HIGH, land / 255);
     alpha = POLLUTION_ALPHA;
   } else if (view === 'plain') {
@@ -59,28 +71,34 @@ export class PollutionOverlay {
   private readonly lit = new THREE.MeshLambertMaterial(SHARED);
   private readonly flat = new THREE.MeshBasicMaterial({ ...SHARED, fog: false });
   private cells?: Uint8Array;
+  private mood?: Uint8Array;
   private layout?: [number, number, number, number, number];
-  private view: PollutionView = 'plain';
+  private view: PollutionLayerView = 'plain';
 
-  /** `cells` and `layout` as in the `pollution` message. */
-  setCells(cells: Uint8Array, layout: [number, number, number, number, number]) {
+  /** `cells`, `layout` and `mood` as in the `pollution` message. */
+  setCells(
+    cells: Uint8Array,
+    layout: [number, number, number, number, number],
+    mood: Uint8Array = new Uint8Array(),
+  ) {
     this.cells = cells;
+    this.mood = mood;
     this.layout = layout;
     this.draw();
   }
 
-  setView(view: PollutionView) {
+  setView(view: PollutionLayerView) {
     this.view = view;
     this.draw();
   }
 
   private draw() {
-    const { cells, layout } = this;
+    const { cells, layout, mood } = this;
     if (!cells || !layout) return;
     const [x0, y0, size, cols, rows] = layout;
     const rgba = new Uint8Array(cols * rows * 4);
     for (let i = 0; i < cols * rows; i++)
-      rgba.set(pollutionColor(this.view, cells.subarray(i * 4, i * 4 + 4)), i * 4);
+      rgba.set(pollutionColor(this.view, cells.subarray(i * 4, i * 4 + 4), mood?.[i]), i * 4);
     // Smooth between cells: pollution is a gradient, unlike zoning.
     const texture = new THREE.DataTexture(rgba, cols, rows);
     texture.magFilter = THREE.LinearFilter;

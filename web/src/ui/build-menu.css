@@ -99,7 +99,7 @@
   width: 112px;
   height: 76px;
 }
-/* Waits for a later era (ADR 0056): still focusable, so its tooltip can say why. */
+/* Waits for a later era (ADR 0059): still focusable, so its tooltip can say why. */
 .item[aria-disabled="true"] .frame {
   opacity: 0.45;
   filter: grayscale(0.8);

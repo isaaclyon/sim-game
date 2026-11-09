@@ -1,4 +1,4 @@
-//! The city's era (ADR 0056): what it unlocks, and when the village becomes a town.
+//! The city's era (ADR 0059): what it unlocks, and when the village becomes a town.
 
 use super::{Command, World};
 use crate::era::{Era, TOWN_POPULATION};

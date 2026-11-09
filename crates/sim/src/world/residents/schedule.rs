@@ -11,6 +11,7 @@ impl World {
         self.residents.activities.push(Reverse((at, c)));
     }
     pub(in crate::world) fn schedule_search(&mut self, c: CitizenId, seconds: f32) {
+        self.start_seeking(c);
         let at = self.totals.tick + self.secs_to_ticks(seconds);
         self.citizens.job_due[c as usize] = at;
         self.residents.searches.push(Reverse((at, c)));
@@ -37,6 +38,7 @@ impl World {
             }
             if let Some(b) = self.choose_destination(c, true) {
                 self.citizens.job[i] = Some(b);
+                self.citizens.any_job_at[i] = u64::MAX;
                 self.residents.workers[b as usize] += 1;
                 self.residents.employed += 1;
                 // Employment changes the next departure, not the current activity.
@@ -90,6 +92,9 @@ impl World {
                 Activity::Shop => Some((self.home_building(c), Activity::Home)),
             };
             if let Some((b, activity)) = next {
+                if activity == Activity::Work {
+                    self.citizens.trip_start[i] = self.totals.tick;
+                }
                 self.citizens.destination[i] = Some(b);
                 self.citizens.activity[i] = activity;
                 self.start_citizen_trip(c);
@@ -176,7 +181,10 @@ impl World {
                 self.citizens.car_out[i] = false;
                 self.schedule_day(c);
             }
-            Activity::Work => self.schedule_activity(c, self.citizens.work_duration[i] as f32),
+            Activity::Work => {
+                self.note_commute(c);
+                self.schedule_activity(c, self.citizens.work_duration[i] as f32);
+            }
             Activity::Shop => {
                 // 6 to 30 clock minutes.
                 let seconds = 20 + self.residents.rng.below(81);

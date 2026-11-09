@@ -1,7 +1,7 @@
 # Written by hand (ADR 0051): undo and redo while cars drive. A street crossing the town is
 # undone and redone, a bulldozed street is brought back, a curve chain is undone and redone
 # as one step, and a station, pump and line are undone and redone. The empty map is a
-# village (ADR 0056), so it has no main roads; scripted-road-class undoes a class change.
+# village (ADR 0059), so it has no main roads; scripted-road-class undoes a class change.
 # The halfway save and load falls between steps, so history is saved too.
 sim-game command log 1
 seed 3
@@ -35,4 +35,4 @@ map 12 12
 2200 redo
 2400 redo
 end 3000
-expect hash 04694b4a456a281a population 44 buildings 22 trips 120
+expect hash 6f4d2c70ab0b0f76 population 44 buildings 22 trips 120

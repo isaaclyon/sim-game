@@ -193,5 +193,5 @@ export const SHOPS: Archetype[] = [
   { name: 'cafe', draw: cafe },
 ];
 
-/** Village shops (ADR 0056): pitched roofs and false fronts, no diners or chrome canopies. */
+/** Village shops (ADR 0059): pitched roofs and false fronts, no diners or chrome canopies. */
 export const VILLAGE_SHOPS: Archetype[] = [hipped, falseFronted, gableFronted, gableFronted];

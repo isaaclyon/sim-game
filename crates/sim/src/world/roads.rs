@@ -72,7 +72,7 @@ impl World {
     }
 
     /// The plan `set_road_class` would build, or None if it would change nothing or the era
-    /// has not unlocked `class` (ADR 0056).
+    /// has not unlocked `class` (ADR 0059).
     pub(super) fn class_plan(&self, x: f32, y: f32, class: RoadClass) -> Option<snap::Plan> {
         if !self.allows_road(class) {
             return None;

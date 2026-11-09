@@ -25,6 +25,11 @@ _Avoid_: population, occupancy
 The number of citizens who live in the city, including those who are not travelling.
 _Avoid_: vehicle count, agent count
 
+**Education**:
+The highest school level a citizen has finished: none, primary, high school or university.
+Dense jobs prefer more of it and fill more slowly without it (ADR 0055).
+_Avoid_: skill, qualification
+
 **Trip**:
 A citizen's journey from one place to another for an activity, such as work, shopping or returning home.
 _Avoid_: route (when you mean the journey rather than its path)
@@ -32,6 +37,20 @@ _Avoid_: route (when you mean the journey rather than its path)
 **Citizen inspector**:
 The panel that shows one selected citizen's name, home, job and current trip, and can make the camera follow their car.
 _Avoid_: car inspector, agent inspector
+
+**Mood**:
+How content one citizen is, 0 to 100, derived from their home's services and pollution, their
+job and their commute. Each thing that lowers it is a complaint (ADR 0058).
+_Avoid_: satisfaction, approval
+
+**Happiness**:
+The city's mood: residents' average. A happy city draws new residents; a household that stays
+miserable for a clock day may leave (ADR 0058).
+_Avoid_: land value (how good a place is to build, not how people feel)
+
+**Commute**:
+How many clock minutes a worker's last trip to work took, waiting included.
+_Avoid_: travel time (when you mean any trip)
 
 ## Zoning
 
@@ -42,7 +61,7 @@ _Avoid_: land use, zone type (when you mean the full zone including density)
 
 **Density**:
 The low or high level of a zone, chosen by the player: houses vs. apartments, corner shops vs.
-stores. It never changes on its own. High density waits for the town era (ADR 0056).
+stores. It never changes on its own. High density waits for the town era (ADR 0059).
 _Avoid_: level, tier
 
 **Zone cell**:
@@ -133,18 +152,27 @@ _Avoid_: funds (except the starting funds), cash
 
 **Build cost**:
 What a new road costs, by length and road class, paid from the balance when it is built. A
-village pays half (ADR 0056). A road that costs more than the balance is refused. Bulldozing, zoning, sim-built alleys,
+village pays half (ADR 0059). A road that costs more than the balance is refused. Bulldozing, zoning, sim-built alleys,
 power plants and transmission lines are free.
 _Avoid_: price
 
 **Upkeep**:
 What every road costs per clock hour to keep, by length and class. Half in a village; the
-town's arrival raises it to the full rate (ADR 0056).
+town's arrival raises it to the full rate (ADR 0059).
 _Avoid_: maintenance (a later service), running cost
 
 **Taxes**:
 What residents and filled jobs pay per clock hour, at fixed rates.
 _Avoid_: income (taxes minus upkeep is the net change)
+
+**Service budget**:
+How many units a service building runs: trucks for a fire station, seat blocks for a school.
+Upkeep and staff jobs are per unit (ADR 0056).
+_Avoid_: funding, spending (when you mean one building's units)
+
+**Tax rate**:
+A player-set level for residential, commercial or industry taxes; higher rates raise money
+and cost happiness (ADR 0056, not yet built).
 
 **Debt**:
 A balance below zero. Upkeep keeps charging; no new roads can be built until taxes bring the
@@ -205,7 +233,7 @@ _Avoid_: save, history, undo log
 
 **Era**:
 The city's stage of growth, sim state that only moves forward: village, then town. Population
-unlocks the next era, which unlocks tools (ADR 0056).
+unlocks the next era, which unlocks tools (ADR 0059).
 _Avoid_: age, level, tier
 
 **Village**:
@@ -218,5 +246,5 @@ unlock. "Town" also stays fine as a loose word for the player's city.
 
 **Building era**:
 The city's era when a building went up, kept for life. It picks the building's look, nothing
-else (ADR 0056).
+else (ADR 0059).
 _Avoid_: style (that is the kit's palette)

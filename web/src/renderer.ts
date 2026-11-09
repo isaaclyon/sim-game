@@ -11,8 +11,9 @@
 // - Roads share one static mesh, rebuilt only when the road snapshot changes.
 // - Ground, water, fields and trees are decoration from `scenery/`, never sim state. So are
 //   streetlights (`streetlights.ts`), placed along the roads snapshot and lit at night.
-// - Flat layers share y = 0 without depth writes. Ground draws first; the zone overlay, pollution, lots,
-//   sidewalks, roads and lane paint draw in the transparent pass, after buildings and cars, in that order.
+// - Flat layers share y = 0 without depth writes. Ground draws first; the zone overlay, pollution
+//   or services, lots, sidewalks, roads, lane paint and the traffic view draw in the transparent
+//   pass, after buildings and cars, in that order.
 //   Chimney smoke draws after them (`SMOKE_ORDER`), so roads never show through it.
 // - Curve sampling belongs to the sim. Tool previews (`tool-preview.ts`) draw the sim's answers.
 // - Rising buildings, zone paint flashes and gliding markers are display-only motion, skipped
@@ -26,11 +27,11 @@ import type { Listener } from './ambience';
 import { BuildingLayer } from './building-kit/layer.ts';
 import { followPoint, KeyCamera } from './camera';
 import { carPosition, nearestCar } from './car-pick';
+import { DataOverlays } from './data-overlays.ts';
 import { FireLayer } from './fire-layer.ts';
 import { compactMaterial, Lighting, nightMaterial } from './lighting.ts';
 import { LotLayer } from './lot-scenery/layer.ts';
 import { SKY } from './palette';
-import { PollutionOverlay } from './pollution-overlay.ts';
 import { PowerLayer } from './power-layer.ts';
 import type { Spot } from './power-tools.ts';
 import type { Era, FromWorker } from './protocol.ts';
@@ -70,7 +71,8 @@ export class Renderer {
   private readonly scenery = new Scenery();
   private readonly lotScenery = new LotLayer();
   private readonly overlay = new ZoneOverlay();
-  private readonly pollution = new PollutionOverlay();
+  /** Pollution, traffic and services views (ADR 0037, 0057); main.ts feeds the latter two. */
+  readonly ground = new DataOverlays();
   private readonly smoke = new SmokeLayer(this.lighting.night);
   private readonly agents = new AgentLayer(this.scene, nightMaterial(this.lighting.night));
   private readonly signals = new SignalLayer(this.scene);
@@ -101,7 +103,7 @@ export class Renderer {
       this.roads.group,
       this.lotScenery.group,
       this.overlay.group,
-      this.pollution.group,
+      this.ground.group,
       this.buildings.group,
       this.power.group,
       this.water.group,
@@ -207,14 +209,9 @@ export class Renderer {
     return this.agents.trafficView;
   }
 
-  /** `cells` and `layout` as in the `pollution` message (ADR 0037). */
-  setPollution(cells: Uint8Array, layout: [number, number, number, number, number]) {
-    this.pollution.setCells(cells, layout);
-  }
-
-  /** Plain shows faint haze and stains; the others tint the ground by one measure. */
+  /** Plain shows haze and stains; the others tint the ground, roads or lots by one measure. */
   setPollutionView(view: PollutionView) {
-    this.pollution.setView(view);
+    this.ground.setView(view);
   }
 
   /** Left drag pans the camera, unless a tool needs the drag (the zone brush). */
@@ -422,7 +419,7 @@ export class Renderer {
     return drawPictures(this.renderer, pictures);
   }
 
-  /** The city's era from frame stats: dirt village roads or paved town ones (ADR 0056). */
+  /** The city's era from frame stats: dirt village roads or paved town ones (ADR 0059). */
   setEra(era: Era) {
     this.roads.setEra(era);
   }

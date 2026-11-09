@@ -3,7 +3,7 @@
 // The build menu and the keys both start tools here (M4.6); each tool keeps its own canvas
 // handling and sim commands. Picking a power, water or fire station tool shows that service's
 // view until it is put away. Tools the city's era has not unlocked are refused with a hint
-// (ADR 0056).
+// (ADR 0059).
 import { FireTools } from './fire-tools';
 import { PowerTools, WATER_TOOLS } from './power-tools';
 import { Era, type Prices, RoadClass, type ToWorker, type WaterKind, Zone } from './protocol';

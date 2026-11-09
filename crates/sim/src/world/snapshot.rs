@@ -177,7 +177,7 @@ impl World {
     /// (ADR 0048; its centreline samples, as the class preview), then, if `plan`, the road
     /// preview of the guided points as `class`: one stop for one point (where a road would
     /// start), as `write_road_preview` for two, `write_curve_preview` for three. A class the
-    /// era has not unlocked plans nothing (ADR 0056). Changes nothing.
+    /// era has not unlocked plans nothing (ADR 0059). Changes nothing.
     pub fn write_road_draft(&self, raw: &[f32], plan: bool, class: RoadClass, out: &mut Vec<f32>) {
         out.clear();
         let d = self.draft(raw);
@@ -323,6 +323,7 @@ impl World {
         self.water.hash_into(&mut mix);
         self.pollution.hash_into(&mut mix);
         self.fire.hash_into(self.cfg.seed, &mut mix);
+        self.happiness.hash_into(&mut mix);
         for chunk in self.zones.cells.chunks(8) {
             let mut word = [0u8; 8];
             word[..chunk.len()].copy_from_slice(chunk);

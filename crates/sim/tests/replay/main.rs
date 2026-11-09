@@ -72,7 +72,7 @@ fn saved_sessions_replay_to_their_expected_cities() {
         }
 
         if name == "scripted-empty-map-money.cmdlog" {
-            // A village refuses apartments and main roads (ADR 0056).
+            // A village refuses apartments and main roads (ADR 0059).
             assert_eq!(loaded.era(), sim::Era::Village, "{name}");
             assert!(
                 loaded

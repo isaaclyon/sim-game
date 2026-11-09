@@ -302,5 +302,5 @@ export const WORKSHOPS: Works[] = [
   works('silos', silos),
 ];
 
-/** Village workshops (ADR 0056): the classic shed and brick works, no modern units. */
+/** Village workshops (ADR 0059): the classic shed and brick works, no modern units. */
 export const VILLAGE_WORKSHOPS: Works[] = [classic, classic, brickWorks];

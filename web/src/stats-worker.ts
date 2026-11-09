@@ -1,7 +1,7 @@
 // The sim's figures for the frame's `stats`: the worker converts names, nothing more.
 import { readFireStats } from './fire-worker';
 import { Sim } from './pkg/sim_wasm';
-import type { Price, Prices, Stats } from './protocol';
+import type { HappinessStats, Price, Prices, Stats } from './protocol';
 
 /** The sim's price list (`Sim.prices`): `[cost, upkeep]` for coal, solar, wind, pump, tower
  * and fire station. */
@@ -9,6 +9,12 @@ export function readPrices(): Prices {
   const d = Sim.prices();
   const at = (i: number): Price => ({ cost: d[2 * i], upkeep: d[2 * i + 1] });
   return { plants: [at(0), at(1), at(2)], water: [at(3), at(4)], station: at(5) };
+}
+
+/** `Sim.happiness_stats`: the average, then one count per complaint code. */
+function readHappiness(s: Sim): HappinessStats {
+  const [average, ...complaints] = s.happiness_stats();
+  return { average, complaints };
 }
 
 /** The sim's figures now; see `Stats`. */
@@ -63,6 +69,7 @@ export function readStats(s: Sim): Stats {
     upkeep: st.upkeep,
     utilities: st.utilities,
     fire: readFireStats(s),
+    happiness: readHappiness(s),
   };
   st.free();
   return out;

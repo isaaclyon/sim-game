@@ -2,8 +2,11 @@
 // thread only sends commands and draws snapshots.
 
 import type { HistoryCommand, HistoryMessage, HistoryStatus } from './protocol-history.ts';
+import type { OverlayMessage } from './protocol-overlays.ts';
 import type {
+  Complaint,
   FireStats,
+  HappinessStats,
   PlantKind,
   PowerStats,
   Prices,
@@ -13,6 +16,7 @@ import type {
 } from './protocol-services.ts';
 
 export * from './protocol-history.ts';
+export * from './protocol-overlays.ts';
 export * from './protocol-services.ts';
 
 export type ToWorker =
@@ -182,7 +186,7 @@ export const Zone = {
 } as const;
 export type Zone = (typeof Zone)[keyof typeof Zone];
 
-/** The city's era, matching the sim's `Era` (ADR 0056): a village becomes a town at
+/** The city's era, matching the sim's `Era` (ADR 0059): a village becomes a town at
  * `Stats.townPopulation` residents, and never goes back. */
 export const Era = {
   Village: 0,
@@ -245,6 +249,12 @@ export interface Citizen {
   grewUp: boolean;
   /** A grown child still living with their family, looking for a home of their own. */
   wantsHome: boolean;
+  /** Mood 0 to 100 from the sim (ADR 0058); 0 once they have left town. */
+  mood: number;
+  /** `Complaint` codes, in code order. */
+  complaints: Complaint[];
+  /** Clock minutes their last trip to work took; 0 = none yet or no job. */
+  commute: number;
 }
 
 /** Sim-owned counts, not physical attendance. Original use persists during closure. */
@@ -280,7 +290,7 @@ export interface Stats {
   unemployed: number;
   /** Sim-computed `unemployed` as a percentage of adults; 0 with no adults. */
   unemploymentPercent: number;
-  /** The city's era (ADR 0056). The village era refuses main roads and dense zones. */
+  /** The city's era (ADR 0059). The village era refuses main roads and dense zones. */
   era: Era;
   /** Residents, children included, at which a village becomes a town. */
   townPopulation: number;
@@ -318,6 +328,7 @@ export interface Stats {
   /** Upkeep of plants, pumps and towers, dollars per clock hour (ADR 0052). */
   utilities: number;
   fire: FireStats;
+  happiness: HappinessStats;
 }
 
 /** Persistence metadata only. A commit acknowledges the captured revision, not later edits. */
@@ -408,10 +419,17 @@ export type FromWorker =
   /**
    * The whole pollution grid (ADR 0037): `[air, ground, noise, landValue]` bytes per cell,
    * row-major from the origin, 0 = none (for land value: worthless) to 255 = full. `layout` is
-   * as for `zones`; cells are 4×4 zone cells. Sent at start, after edits and pauses, and at
-   * most once a real second while it changes.
+   * as for `zones`; cells are 4×4 zone cells. `mood` has one byte per cell (ADR 0058): 0 =
+   * nobody lives there, else 1 + residents' mean mood × 254 / 100; empty before the sim's
+   * first happiness update. Sent at start, after edits and pauses, and at most once a real
+   * second while either changes.
    */
-  | { type: 'pollution'; cells: Uint8Array; layout: [number, number, number, number, number] }
+  | {
+      type: 'pollution';
+      cells: Uint8Array;
+      mood: Uint8Array;
+      layout: [number, number, number, number, number];
+    }
   /**
    * `rings` is `[n, x0, y0, …, x(n-1), y(n-1)]` per lot: its outline's point count, then its
    * points (ADR 0018). Sent at start and whenever lots change.
@@ -423,7 +441,7 @@ export type FromWorker =
    * counter-clockwise, without a repeated closing point. Zone is the original use, not the
    * repainted zone. Roof is a stable palette index (0–3 for industry; 0 for other uses).
    * Front is the footprint edge, from point `front` to the next, facing the lot's road (ADR 0027).
-   * Era is the `Era` the building went up in, kept for life; it picks the look (ADR 0056).
+   * Era is the `Era` the building went up in, kept for life; it picks the look (ADR 0059).
    * Closing buildings stay until they empty out (ADR 0023). `ids` contains the stable ID
    * for each packed record in this same message, never a snapshot index.
    * Growth and closure are coalesced to at most four snapshots per real second. Start, edits and pause
@@ -432,6 +450,7 @@ export type FromWorker =
   | { type: 'buildings'; data: Float32Array; ids: Uint32Array }
   | ServiceMessage
   | HistoryMessage
+  | OverlayMessage
   /** `[x, y]` per outline sample of the block under the cursor, closed; empty outside blocks. */
   | { type: 'blockPreview'; outline: Float32Array; revision: number }
   /** `end` is the built road's guided end, where a chained road starts; null when refused. */

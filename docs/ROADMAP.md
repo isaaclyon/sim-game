@@ -477,9 +477,35 @@ Goals and consequences, kept light so they don't crowd out building.
   in M6.
   Done when: school runs fill the sidewalks at 8am, and a town that built schools early sees
   its dense shops fill faster a childhood later.
-- Citizen happiness from services, traffic and pollution, feeding back into demand and growth.
-  The citizen inspector shows each person's mood and complaints.
-- Data overlays: traffic, coverage, land value, happiness.
+  - Slice 1, education levels — implemented. Arriving adults bring 60% primary, 30% high
+    school and 10% university; children and grown children have none until schools exist.
+    Dense industry prefers primary and dense commerce high school; a less-educated seeker
+    takes such a job only after waiting a quarter to half a clock day. Save version 10.
+- **Money follows city quality** ([ADR 0056](adrs/0056-taxes-follow-city-quality-and-services-have-budgets.md)),
+  after schools. Three slices:
+  1. Taxes: each resident's tax scales with their home's land value and each filled job's with
+     its worker's education. A typical home and worker pay today's $2 and $1.
+  2. Service budgets: each fire station and school sets its trucks or seat blocks; upkeep and
+     staff follow. Cuts take effect gradually.
+  3. Tax rates for residential, commercial and industry, after happiness: higher rates raise
+     money and cost happiness.
+
+  Done when: two otherwise equal towns, one clean and schooled, one polluted and unschooled,
+  show a clear gap in taxes; a player trims an idle station to save money and adds a truck
+  to a busy one.
+- **Citizen happiness** ([ADR 0058](adrs/0058-citizen-happiness-steers-demand-and-move-outs.md)):
+  implemented. Mood comes from power, water, fire cover, air, noise, a job and the commute.
+  A happy city draws people in; a household that stays miserable for a clock day may leave.
+  The citizen card shows mood, complaints and commute minutes; the population panel shows the
+  city's mood and top complaints; Views has a happiness overlay. Tax rates that cost
+  happiness come later (ADR 0056, slice 3).
+  Done when: cutting power to a district turns its homes red in the happiness view, residential
+  demand falls, and some of those households move out until power returns.
+- **Data overlays** ([ADR 0057](adrs/0057-data-overlays-for-traffic-and-services.md)):
+  implemented. Views gains Traffic (roads with cars, green flowing to red jammed, eased over
+  readings) and Services (lots green with power, water and fire cover, amber missing one, red
+  missing more) beside land value.
+  Happiness has its own view (ADR 0058).
 - Two modes:
   - **Sandbox:** never fails. Problems slow growth or make people move away, but there is no game
     over.
@@ -495,7 +521,7 @@ relaxed.
 
 The village becomes a town, with councilors as an optional helper for players who want one.
 
-- **Eras — implemented** ([ADR 0056](adrs/0056-eras-village-and-town.md)). Village (dirt
+- **Eras — implemented** ([ADR 0059](adrs/0059-eras-village-and-town.md)). Village (dirt
   roads, cottages, small shops) and town (paved streets, shopfronts, apartments). A new city is
   a village; 1,500 residents unlock the town era, which brings main roads and dense zones.
   Roads follow the city's era; each building keeps the era it was built in.

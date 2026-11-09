@@ -7,7 +7,7 @@ mod view;
 use sim::road::RoadClass;
 use sim::{Command, Config, Era, World};
 
-/// Empty land in the town era, so main roads are unlocked (ADR 0056).
+/// Empty land in the town era, so main roads are unlocked (ADR 0059).
 fn empty() -> World {
     World::empty(Config::default(), 30, 30).with_era(Era::Town)
 }

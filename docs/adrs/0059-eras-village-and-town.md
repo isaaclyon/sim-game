@@ -1,4 +1,4 @@
-# 0056. The city has an era; buildings keep the era they were built in
+# 0059. The city has an era; buildings keep the era they were built in
 
 - Status: Accepted; implemented
 - Date: 2026-11-08
@@ -46,7 +46,7 @@ buildings (#46), era transit (#47) and one councilor slot per era (#48).
   `[zone, height, roof, front, era, n, x0, y0, …]`, 0 = village, 1 = town. Frame stats carry
   `era` and `townPopulation`. The build menu shows locked items with the residents still
   needed, and the tools refuse locked choices.
-- **Saves and logs.** Save version 9 holds the era; older saves are refused (ADR 0033).
+- **Saves and logs.** Save version 11 holds the era; older saves are refused (ADR 0033).
   Command logs keep their format; a `map` log replays as a village, a `grid` log as a town.
 - **Later eras** append to `Era`. Each says what it unlocks in the sim's lock check, and the
   catalog marks the matching items.

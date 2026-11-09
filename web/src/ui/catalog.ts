@@ -37,7 +37,7 @@ export type Picture =
       name: 'roads' | 'zones' | 'power' | 'water' | 'bulldoze' | 'views' | 'eraser';
     };
 
-/** The era that unlocks a tool (ADR 0056): the town brings main roads and dense zones. The
+/** The era that unlocks a tool (ADR 0059): the town brings main roads and dense zones. The
  * sim refuses locked tools too; this only lets the menu and tools say so first. */
 export function unlockEra(tool: Tool | null): Era {
   if (tool?.kind === 'road' && tool.roadClass === RoadClass.Main) return Era.Town;

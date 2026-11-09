@@ -163,7 +163,7 @@ export const HOUSES: Archetype[] = [
   { name: 'modern', draw: modern },
 ];
 
-/** Village homes (ADR 0056): steep roofs with deep eaves and a chimney, small windows. */
+/** Village homes (ADR 0059): steep roofs with deep eaves and a chimney, small windows. */
 export const VILLAGE_HOUSES: Archetype[] = [
   {
     name: 'cottage',

@@ -8,7 +8,7 @@ import { PRESENT_DAY, type Style, VILLAGE } from './style.ts';
 
 /**
  * Reads `[zone, height, roof, front, era, n, x0, y0, …]` per building. Sim (x, y) becomes local
- * (x, z). Village buildings take the village look whatever `style` the town uses (ADR 0056).
+ * (x, z). Village buildings take the village look whatever `style` the town uses (ADR 0059).
  */
 export function buildBuildingGeometry(
   data: Float32Array,

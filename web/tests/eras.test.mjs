@@ -8,7 +8,7 @@ const pressed = (t, id) => t.elements[id].attributes['aria-pressed'] === 'true';
 const hint = (t) => t.elements['build-hint'].textContent;
 const price = (t, id) => t.elements[id].children.find((c) => c.classList.contains('price'));
 
-/** A frame from the sim with the city's era and population (ADR 0056). */
+/** A frame from the sim with the city's era and population (ADR 0059). */
 function frame(t, era, population) {
   t.reply({
     type: 'frame',

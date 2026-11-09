@@ -4,8 +4,18 @@ import { CitySession } from './city-session';
 import { gridPreview, rawDraft, roadPreview } from './drafts';
 import { FireSender } from './fire-worker';
 import { historyCommand, readHistory } from './history-worker';
+import { OverlaySender } from './overlay-worker';
 import init, { type Sim } from './pkg/sim_wasm';
-import type { Activity, Building, Citizen, FromWorker, Place, ToWorker, Zone } from './protocol';
+import type {
+  Activity,
+  Building,
+  Citizen,
+  Complaint,
+  FromWorker,
+  Place,
+  ToWorker,
+  Zone,
+} from './protocol';
 import { readPrices, readStats } from './stats-worker';
 import { WaterSender } from './water-worker';
 
@@ -101,19 +111,24 @@ function sendPowerIfChanged(s: Sim, force = false) {
 }
 
 function sendPollutionIfChanged(s: Sim, force = false) {
-  const version = s.pollution_version();
+  const version = s.ground_version();
   if (version === pollutionVersion) return;
   const now = performance.now();
   if (!force && now - pollutionSentAt < POLLUTION_SNAPSHOT_INTERVAL_MS) return;
   pollutionVersion = version;
   pollutionSentAt = now;
   const cells = s.pollution_cells();
+  const mood = s.mood_cells();
   const [x0, y0, cell, cols, rows] = s.pollution_layout();
-  post({ type: 'pollution', cells, layout: [x0, y0, cell, cols, rows] }, [cells.buffer]);
+  post({ type: 'pollution', cells, mood, layout: [x0, y0, cell, cols, rows] }, [
+    cells.buffer,
+    mood.buffer,
+  ]);
 }
 
 const fire = new FireSender(post);
 const water = new WaterSender(post);
+const overlays = new OverlaySender(post);
 
 /** After an edit: zoning can add alleys, and road edits can recut lots (ADR 0016). */
 function sendEdits(s: Sim) {
@@ -125,6 +140,7 @@ function sendEdits(s: Sim) {
   sendPowerIfChanged(s, true);
   water.sendIfChanged(s, true);
   sendPollutionIfChanged(s, true);
+  overlays.send(s, true);
   sendFrame(s); // Cars and signals also change while paused.
 }
 
@@ -144,6 +160,7 @@ const cities = new CitySession(post, (next, initialSpeed) => {
   buildingsSentAt = powerSentAt = pollutionSentAt = -Infinity;
   fire.reset();
   water.reset();
+  overlays.reset();
   inspected = null;
   post({ type: 'cityReset', speed, prices: readPrices() });
   sendEdits(next);
@@ -199,6 +216,9 @@ function sendCitizen(s: Sim) {
       child: v.child,
       grewUp: v.grew_up,
       wantsHome: v.wants_home,
+      mood: v.mood,
+      complaints: Array.from(v.complaints) as Complaint[],
+      commute: v.commute,
     };
     v.free();
   }
@@ -251,6 +271,7 @@ function step() {
       water.sendIfChanged(sim);
       sendPollutionIfChanged(sim);
       fire.sendIfChanged(sim);
+      overlays.send(sim);
     }
     if (frameDue && now - frameSentAt >= FRAME_INTERVAL_MS) sendFrame(sim, lastTickMs);
   }
@@ -304,6 +325,7 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
         water.sendIfChanged(sim, true);
         sendPollutionIfChanged(sim, true);
         fire.sendIfChanged(sim, true);
+        overlays.send(sim, true);
       }
       break;
     case 'spawn':

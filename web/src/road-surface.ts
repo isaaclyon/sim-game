@@ -1,5 +1,5 @@
 // Roads as flat layers: sidewalks, the carriageway and lane paint, in that draw order. The
-// city's era picks the surface (ADR 0056): a village's roads are dirt tracks with trodden
+// city's era picks the surface (ADR 0059): a village's roads are dirt tracks with trodden
 // verges and no paint, a town's are asphalt, all at once when the town arrives. Display only.
 import * as THREE from 'three';
 import { DIRT_ROADS, ROADS, SIDEWALK, VERGE } from './palette.ts';

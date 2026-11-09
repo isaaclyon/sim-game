@@ -4,7 +4,8 @@
 //! demand is open jobs plus a small base, minus residents and the room left in empty homes, so
 //! it equals job vacancies minus unemployment, less the households still on their way.
 //! Commercial and industrial demand want a share of residents as jobs, plus a small base, minus
-//! the jobs they already offer. A due lot needs demand above its land-value threshold, power and,
+//! the jobs they already offer. The city's mood moves residential demand up or down (ADR 0058).
+//! A due lot needs demand above its land-value threshold, power and,
 //! when dense, water.
 
 use super::World;
@@ -60,7 +61,7 @@ impl World {
         let jobs = (commercial_jobs + industrial_jobs) as i32;
         let room = self.residents.vacant.len() as i32 * ROOM_PER_VACANT_HOME;
         Demand {
-            residential: RESIDENTIAL_BASE + jobs - adults - room,
+            residential: RESIDENTIAL_BASE + jobs - adults - room + self.happiness_demand(),
             commercial: COMMERCIAL_BASE + population * COMMERCIAL_SHARE / 100
                 - commercial_jobs as i32,
             industrial: INDUSTRIAL_BASE + population * INDUSTRIAL_SHARE / 100

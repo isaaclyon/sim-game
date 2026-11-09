@@ -32,9 +32,9 @@ test('a fresh game city is an empty map with starting funds, and roads are quote
   await w.send({ type: 'buildRoad', id: 1, ...street });
   assert.equal(w.messages.findLast((m) => m.type === 'buildResult').success, true);
   assert.equal(frame().stats.balance, start - 5_000, 'paused builds publish the new balance');
-  assert.equal(frame().stats.upkeep, 50, 'a village pays half (ADR 0056)');
+  assert.equal(frame().stats.upkeep, 50, 'a village pays half (ADR 0059)');
 
-  // A fresh city is a village, which has not unlocked main roads (ADR 0056).
+  // A fresh city is a village, which has not unlocked main roads (ADR 0059).
   assert.equal(frame().stats.era, Era.Village);
   assert.equal(frame().stats.townPopulation, 1500);
   const main = { points: [0, 500, 0, 9000, 500, 0], class: RoadClass.Main };
@@ -79,6 +79,7 @@ const stats = {
     saved: 0,
     destroyed: 0,
   },
+  happiness: { average: 50, complaints: [0, 0, 0, 0, 0, 0, 0] },
   balance: 12_345,
   taxes: 300,
   grant: 1_000,

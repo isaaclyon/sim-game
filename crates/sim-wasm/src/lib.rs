@@ -4,7 +4,9 @@ use sim::{Command, CommandLog, World, Zone};
 use wasm_bindgen::prelude::*;
 
 mod fire;
+mod happiness;
 mod history;
+mod overlays;
 mod roads;
 mod utilities;
 
@@ -30,7 +32,7 @@ pub struct SimStats {
     pub children: u32,
     pub unemployed: u32,
     pub unemployment_percent: f32,
-    /// The city's era (ADR 0056): 0 = village, 1 = town.
+    /// The city's era (ADR 0059): 0 = village, 1 = town.
     pub era: u8,
     /// Residents at which a village becomes a town.
     pub town_population: u32,
@@ -101,6 +103,12 @@ pub struct CitizenView {
     pub grew_up: bool,
     /// A grown child still living with their family, looking for a home of their own.
     pub wants_home: bool,
+    /// Mood 0 to 100 (ADR 0058); 0 once they have left town.
+    pub mood: u8,
+    /// `sim::world::Complaint` codes, in code order.
+    pub complaints: Vec<u8>,
+    /// Clock minutes the last trip to work took; 0 = none yet or no job.
+    pub commute: u32,
 }
 
 /// Sim-owned counts for one standing building; no attendance or visitor counts.
@@ -252,7 +260,7 @@ impl Sim {
 
     /// `[zone, height, roof, front, era, n, x0, y0, …]` per active building; footprint points
     /// are counter-clockwise, `front` is the edge facing the lot's road and `era` the city's era
-    /// when it was built (ADR 0056).
+    /// when it was built (ADR 0059).
     pub fn building_snapshot(&mut self) -> Vec<f32> {
         self.world
             .buildings
@@ -272,10 +280,6 @@ impl Sim {
     /// `[origin_x, origin_y, cell_size, cols, rows]` of the zone grid.
     pub fn zone_layout(&self) -> Vec<f32> {
         self.world.zones.layout().to_vec()
-    }
-
-    pub fn pollution_version(&self) -> u32 {
-        self.world.pollution.version
     }
 
     /// `[air, ground, noise, land_value]` bytes per pollution cell, row-major; see
@@ -333,6 +337,9 @@ impl Sim {
             child: c.child,
             grew_up: c.grew_up,
             wants_home: c.wants_home,
+            mood: c.mood,
+            complaints: c.complaints.iter().map(|&k| k as u8).collect(),
+            commute: c.commute,
         })
     }
 

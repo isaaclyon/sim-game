@@ -29,7 +29,7 @@ pub const JOB_TAX: i64 = 1;
 pub const GRANT: i64 = 2_000;
 
 /// What a village pays for its roads, as a share of the town's rates: unpaved tracks cost half
-/// to build and to keep. The town's arrival raises upkeep to the town rate (ADR 0056).
+/// to build and to keep. The town's arrival raises upkeep to the town rate (ADR 0059).
 const VILLAGE_ROAD_SHARE: f64 = 0.5;
 
 /// The share of the town's road rates paid in `era`.
@@ -216,7 +216,7 @@ impl World {
     }
 
     /// What building the road through guided raw `[x, y, snap]` points (ADR 0038) would cost,
-    /// or None if it would be refused for its shape or era (ADR 0056) or the points are not a
+    /// or None if it would be refused for its shape or era (ADR 0059) or the points are not a
     /// road.
     pub fn draft_cost(&self, raw: &[f32], class: RoadClass) -> Option<i64> {
         if !self.allows_road(class) {

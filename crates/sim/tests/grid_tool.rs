@@ -28,7 +28,7 @@ fn grid(
     }
 }
 
-/// Empty land in the town era, so main road grids are unlocked (ADR 0056).
+/// Empty land in the town era, so main road grids are unlocked (ADR 0059).
 fn empty() -> World {
     World::empty(Config::default(), 30, 30).with_era(Era::Town)
 }

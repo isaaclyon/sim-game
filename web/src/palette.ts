@@ -42,7 +42,7 @@ export const TREES = {
 /** Indexed by `RoadClass`: street, main road, alley. */
 export const ROADS = [0x8c8f95, 0x73777e, 0xaba597];
 export const SIDEWALK = 0xdad5ca;
-/** A village's roads (ADR 0056), indexed like `ROADS`: packed earth, and trodden grass verges
+/** A village's roads (ADR 0059), indexed like `ROADS`: packed earth, and trodden grass verges
  * where a town has sidewalks. */
 export const DIRT_ROADS = [0xa08766, 0x947b5b, 0xb39f80];
 export const VERGE = 0xb7ad84;
@@ -71,8 +71,14 @@ export const POLLUTION = {
   landHigh: 0x3fae5a,
   haze: 0x9a9488,
   stain: 0x5e4a30,
+  /** Happiness view (ADR 0058): miserable to happy. */
+  moodLow: 0xc0392b,
+  moodHigh: 0x2e9fd0,
 };
 export const POLLUTION_ALPHA = 0.75;
+
+/** Services view (ADR 0057): lots with every service, one missing, or more missing. */
+export const SERVICES = { served: 0x3fae5a, short: 0xf2a541, without: 0xd9483b };
 
 /** Chimney smoke: pale grey puffs, slightly see-through. */
 export const SMOKE = { puff: 0xeceae4, glow: 0x5a5854, opacity: 0.55 };

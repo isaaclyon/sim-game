@@ -1,6 +1,7 @@
 # 0055. Schools teach children, and education shapes who fills jobs
 
-- Status: Accepted; not yet implemented
+- Status: Accepted; amended 2026-11-09; slice 1 implemented; extended by
+  [0056](0056-taxes-follow-city-quality-and-services-have-budgets.md) (seat blocks and budgets)
 - Date: 2026-11-06
 - Extends: [0054](0054-children-births-and-growing-up.md), [0021](0021-citizens-households-and-trips.md),
   [0026](0026-walking-trips-and-household-cars.md), [0036](0036-money-build-costs-taxes-upkeep.md),
@@ -54,3 +55,23 @@ arriving only when offices give graduates something to do (M6 town era).
   station, road-distance area, capacity, land value boost) is generalised here, as ADR
   0053 planned.
 - University, offices and old age remain later work.
+
+## Amendment (2026-11-09): schools are buildings, teachers are real, walking first
+
+Found while scoping: service jobs (fire stations, coal plants) only raise demand, and trips,
+jobs and locations can only point at buildings. Where this section and the text above
+disagree, this section wins.
+
+- **Schools are buildings.** A placed school is a building of a new service kind in the
+  building store, so trips, jobs, inspection and frontage work unchanged. Growth, closure,
+  zoning and fire ignore it; it is removed only by bulldozing.
+- **Teachers are real.** Teacher jobs are job positions citizens fill and commute to, offered
+  first to high-school-educated seekers like other jobs. Seats and teacher jobs come in seat
+  blocks (ADR 0056).
+- **Walking first.** Until a later slice adds adult driving, enrolled children walk, and a
+  school is open to a child only if it is within the child's walking reach as well as its
+  area. The driving rule above then applies unchanged.
+- **Slices.** 1) education levels, the arrival mix and jobs preferring education; 2) placeable
+  schools, seat blocks, coverage, enrolment, graduating and teacher jobs; 3) school runs and
+  child walkers; 4) the schools view, inspector and top bar; 5) adult driving.
+

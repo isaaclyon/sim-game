@@ -222,12 +222,15 @@ export async function tools({ hash = '', clipboard = true, catalog } = {}) {
     setLinePreview(ends, a, b) {
       previews.push({ type: 'line', ends, a, b });
     }
-    setPollution(cells, layout) {
-      previews.push({ type: 'pollution', cells, layout });
-    }
     setPollutionView(view) {
       previews.push({ type: 'pollutionView', view });
     }
+    ground = {
+      setPollution: (cells, layout, mood) =>
+        previews.push({ type: 'pollution', cells, layout, mood }),
+      setTraffic: (segments) => previews.push({ type: 'traffic', segments }),
+      setServices: (lots) => previews.push({ type: 'services', lots }),
+    };
   }
   const context = createContext({
     innerWidth: 1000,

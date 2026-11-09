@@ -1,4 +1,4 @@
-//! Eras (ADR 0056): the city starts as a village and becomes a town once enough people live
+//! Eras (ADR 0059): the city starts as a village and becomes a town once enough people live
 //! there. The era decides what the player may build; buildings keep the era they were built in.
 
 use serde::{Deserialize, Serialize};

@@ -8,9 +8,11 @@ mod demolish;
 mod era;
 mod fire;
 mod grid;
+mod happiness;
 mod history;
 mod inspect;
 mod money;
+mod overlays;
 mod persist;
 mod pollution;
 mod power;
@@ -45,6 +47,9 @@ pub use command::Command;
 pub use demand::Demand;
 pub use fire::{FIRE_STRIDE, FireStats, STATION_STRIDE};
 pub use grid::{GridPreview, MAX_BLOCKS, MAX_CELL, MIN_CELL};
+pub use happiness::{
+    BASE_MOOD, COMPLAINTS, Complaint, Complaints, Happiness, HappinessStats, NEUTRAL_MOOD,
+};
 pub use history::{
     History, HistoryView, MAX_RECORDS, MAX_STEPS, Record, RoadRecord, Step, StepKind,
 };
@@ -52,6 +57,7 @@ pub use inspect::{BuildingInfo, CitizenInfo, Place};
 pub use money::{
     GRANT, JOB_TAX, Money, RESIDENT_TAX, START_FUNDS, plant_price, price_list, water_price,
 };
+pub use overlays::{GAP_FIRE, GAP_POWER, GAP_WATER, TRAFFIC_STRIDE};
 pub use persist::{SAVE_VERSION, SaveError};
 pub use power::{PLANT_STRIDE, POWER_BUILDING_STRIDE, PowerStats};
 pub use water::{WATER_BUILDING_STRIDE, WATER_PIECE_STRIDE, WaterStats};
@@ -119,10 +125,12 @@ pub struct Stats {
     pub water: WaterStats,
     /// Balance, taxes, grant and upkeep (ADR 0036).
     pub money: Money,
-    /// The city's era (ADR 0056).
+    /// The city's era (ADR 0059).
     pub era: Era,
     /// Stations, trucks and fires (ADR 0053).
     pub fire: FireStats,
+    /// Average mood and complaints (ADR 0058).
+    pub happiness: HappinessStats,
     /// Synthetic vehicles waiting between random trips; dormant citizen slots are excluded.
     pub parked: u32,
     pub awaiting_path: u32,
@@ -200,8 +208,10 @@ pub struct World {
     fire: fire::Fire,
     /// Undo and redo for placeables (ADR 0051).
     history: History,
-    /// Village or town; decides what may be built (ADR 0056).
+    /// Village or town; decides what may be built (ADR 0059).
     era: Era,
+    /// Average mood, complaints and move-outs (ADR 0058).
+    pub happiness: Happiness,
 }
 
 impl World {
@@ -209,6 +219,7 @@ impl World {
         let mut world = Self {
             residents: residents::Residents::new(cfg.seed),
             fire: fire::Fire::new(cfg.seed),
+            happiness: Happiness::new(cfg.seed),
             closures: Default::default(),
             supply: Default::default(),
             treasury: Default::default(),
@@ -242,7 +253,7 @@ impl World {
             totals: Stats::default(),
             history: History::default(),
             // Worlds on an existing road network (tests, benchmarks) start with everything
-            // unlocked; the game's empty map starts as a village (ADR 0056).
+            // unlocked; the game's empty map starts as a village (ADR 0059).
             era: Era::Town,
         };
         world.pollution = Pollution::covering(&world.zones);
@@ -425,6 +436,7 @@ impl World {
         self.traffic.recycle_exits(exits);
         self.totals.tick += 1;
         self.tick_pollution();
+        self.tick_happiness();
         self.settle_money();
         self.tick_water();
         self.tick_fire();
@@ -448,6 +460,7 @@ impl World {
         s.money = self.money();
         s.fire = self.fire_stats();
         s.era = self.era;
+        s.happiness = self.happiness_stats();
         if adults > 0 {
             s.unemployment_percent = s.unemployed as f32 * 100.0 / adults as f32;
         }

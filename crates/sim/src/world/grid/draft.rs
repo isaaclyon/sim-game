@@ -48,7 +48,7 @@ impl World {
     /// (ADR 0038), and the area `cursor`, rounded to whole blocks of `cell` metres, at least
     /// one and at most `MAX_BLOCKS` each way. Without a cursor, the edge's end stands in.
     /// None if the points are not an edge, `cell` is out of range or the era has not unlocked
-    /// `class` (ADR 0056).
+    /// `class` (ADR 0059).
     pub fn grid_command(
         &self,
         raw: &[f32],

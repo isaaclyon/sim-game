@@ -6,7 +6,7 @@ mod names;
 #[cfg(test)]
 mod tests;
 
-use super::World;
+use super::{Complaint, World};
 use crate::agents::{AgentId, AgentState};
 use crate::building::BuildingId;
 use crate::citizen::{Activity, CitizenId};
@@ -46,6 +46,12 @@ pub struct CitizenInfo {
     pub grew_up: bool,
     /// A grown child still living with their family, looking for a home of their own.
     pub wants_home: bool,
+    /// Mood 0 to 100 now (ADR 0058); 0 once the citizen has left town.
+    pub mood: u8,
+    /// What makes them unhappy, in `Complaint` code order; empty once they have left.
+    pub complaints: Vec<Complaint>,
+    /// Clock minutes their last trip to work took; 0 = none yet or no job.
+    pub commute: u32,
 }
 
 /// Counts for one standing building. Occupancy means residents or assigned workers,
@@ -110,6 +116,12 @@ impl World {
             })
         };
         let agent = self.citizens.agent[i].filter(|_| resident);
+        let (mood, complaints) = if resident {
+            let (m, why) = self.citizen_mood(c);
+            (m, why.list())
+        } else {
+            (0, Vec::new())
+        };
         Some(CitizenInfo {
             name: names::display_name(self.cfg.seed, c, family),
             resident,
@@ -129,6 +141,9 @@ impl World {
             grew_up: self.citizens.move_by[i] != u64::MAX
                 || self.citizens.family[i] != self.citizens.household[i],
             wants_home: self.citizens.move_by[i] != u64::MAX,
+            mood,
+            complaints,
+            commute: u32::from(self.citizens.commute[i]),
         })
     }
 }

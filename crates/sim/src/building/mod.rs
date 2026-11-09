@@ -41,7 +41,7 @@ pub struct Buildings {
     pub height: Vec<f32>,
     /// Stable palette choice; zero outside industry.
     pub roof: Vec<u8>,
-    /// The city's era when the building went up; kept for life, looks only (ADR 0056).
+    /// The city's era when the building went up; kept for life, looks only (ADR 0059).
     pub era: Vec<Era>,
     pub active: Vec<bool>,
     outline_start: Vec<u32>,
@@ -284,7 +284,7 @@ impl Buildings {
     /// `[zone, height, roof, front, era, n, x0, y0, …]` per active building in id order, not
     /// indexed by id. `front` is the footprint edge (from point `front` to the next) facing the
     /// lot's road; it is derived here for drawing and is not stored or hashed. `era` is the
-    /// `Era` it was built in (ADR 0056).
+    /// `Era` it was built in (ADR 0059).
     pub fn write_snapshot(&self, lots: &Lots, out: &mut Vec<f32>) {
         out.clear();
         for b in self.active_buildings() {

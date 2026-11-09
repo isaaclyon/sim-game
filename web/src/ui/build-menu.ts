@@ -246,7 +246,7 @@ export class BuildMenu {
     this.describe();
   }
 
-  /** Marks the items the city's era has not unlocked (ADR 0056), with the residents still
+  /** Marks the items the city's era has not unlocked (ADR 0059), with the residents still
    * needed in their tooltips. They stay focusable; picking one shows why it is refused. */
   setEra(era: Era, needed: number) {
     if (era === this.era && needed === this.needed) return;

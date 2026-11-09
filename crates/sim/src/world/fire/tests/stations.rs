@@ -69,7 +69,7 @@ fn a_station_clears_the_buildings_and_zoning_under_it() {
         standing(w)
             .into_iter()
             .filter(|&b| {
-                let at = w.station_spot(60.0, 20.0).unwrap();
+                let at = w.station_spot(60.0, 220.0).unwrap();
                 at.hits_ring(w.buildings.footprint(b))
             })
             .count()
@@ -78,7 +78,7 @@ fn a_station_clears_the_buildings_and_zoning_under_it() {
         inside(&w) > 0,
         "the fixture has buildings where the station goes"
     );
-    assert!(station(&mut w, 60.0, 20.0));
+    assert!(station(&mut w, 60.0, 220.0));
     assert_eq!(inside(&w), 0);
     advance(&mut w, 300);
     assert_eq!(inside(&w), 0, "nothing regrows under it");

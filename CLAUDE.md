@@ -76,15 +76,17 @@ What to build next and why lives in `docs/ROADMAP.md`. Work on the current miles
   Sent whole when the zone grid's version changes.
 - Pollution: four bytes per pollution cell, row-major, `[air, ground, noise, land_value]`,
   0 = none (land value: worthless) to 255 = full, plus a layout like the zones'; cells are
-  4×4 zone cells sharing the zone origin (ADR 0037). Sent whole when its version changes,
-  at most once a real second while running; start, edits and pause flush immediately.
+  4×4 zone cells sharing the zone origin (ADR 0037). A parallel `mood` array has one byte per
+  cell: 0 = nobody lives there, else 1 + residents' mean mood × 254 / 100 (ADR 0058). Sent
+  whole when either changes, at most once a real second while running; start, edits and pause
+  flush immediately.
 - Lots: `[n, x0, y0, …]` per lot, its outline's point count then its points, sent whole when
   the lots version changes (ADR 0018). Block preview: `[x, y]` per outline sample of the block
   under the cursor, closed; empty = no block. Read-only.
 - Buildings: `[zone, height, roof, front, era, n, x0, y0, …]` per active building in ID order, not
   indexed by ID. Height is metres; n is the counter-clockwise footprint point count, with no
   repeated closing point. Roof is a stable palette index (0–3 for industry, 0 otherwise; ADR 0019).
-  Era is the city's era when it was built, kept for life: 0 = village, 1 = town (ADR 0056).
+  Era is the city's era when it was built, kept for life: 0 = village, 1 = town (ADR 0059).
   Front is the footprint edge (point `front` to the next) facing the lot's road, derived on
   write, not stored or hashed (ADR 0027).
   Zone is the building's original use. The worker sends a parallel `ids: Uint32Array`, one
@@ -122,6 +124,14 @@ What to build next and why lives in `docs/ROADMAP.md`. Work on the current miles
   capped like buildings. Station preview: closed `[x, y]` footprint plus `ok`. `setFires`
   turns the city's fires on or off (`fires on|off` in command logs; `station x y` places one).
   Frames carry `stats.fire` (`FireStats`). Flames, smoke and rubble are display only.
+- Data overlays (ADR 0057): `traffic` carries `segments`, `[ax, ay, bx, by, class, road, jam]`
+  per rendered segment of each road with a car on it (`TRAFFIC_STRIDE`), road = stable road ID,
+  jam 0 = flowing at the limit to 1 = lanes full of stopped cars; sent at most once a real
+  second while running, at once on start, edits and pause. `services` carries `lots`,
+  `[gaps, n, x0, y0, …]` per standing building: `Gap` bits 1 = no power, 2 = no water (dense),
+  4 = no fire cover (only while fires are on past the threshold), then its lot outline; sent
+  whole when power, water, fire, lots, buildings or that rule change, capped like buildings.
+  Read-only, not hashed. The page eases traffic colours per road ID; display only.
 - Undo and redo (ADR 0051): the sim keeps the history and saves it with the city. `undo` and
   `redo` answer `historyResult` (`ok` false = refused); command logs write them as `undo` and
   `redo`, and continuous curves after the first as `curve … chain`. Frames carry `history`: the
@@ -135,10 +145,13 @@ What to build next and why lives in `docs/ROADMAP.md`. Work on the current miles
   IDs, never stored or drawn from a gameplay RNG. Places are absent once their building is gone.
   The answer carries `age` (years; a child until 18), `child` (lives at home), `grewUp` (an
   adult who came of age in town) and `wantsHome` (still with their family, looking for a home
-  of their own; ADR 0054).
+  of their own; ADR 0054), `mood` (0 to 100), `complaints` (codes 0 no power, 1 no water, 2 no
+  fire station nearby, 3 dirty air, 4 noise, 5 no job, 6 long commute) and `commute` (clock
+  minutes of the last trip to work, 0 = none; ADR 0058).
 - Population: frame stats carry `population` (children included) and `children`;
-  `unemployed` and its percentage count adults only (ADR 0054).
-- Eras (ADR 0056): frame stats carry `era` (0 = village, 1 = town) and `townPopulation`. A
+  `unemployed` and its percentage count adults only (ADR 0054). `happiness` carries the
+  residents' mean mood and a count per complaint code (ADR 0058).
+- Eras (ADR 0059): frame stats carry `era` (0 = village, 1 = town) and `townPopulation`. A
   village refuses main roads and dense zones, and its previews plan nothing for them; roads
   are drawn as dirt until the town era, and cost half to build and keep until then. `map`
   command logs replay as a village, `grid` as a town.

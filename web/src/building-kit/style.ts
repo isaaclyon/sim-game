@@ -1,4 +1,4 @@
-// The kit's look as data. Each era supplies a `Style` (ADR 0056); the grammar in `kit.ts`
+// The kit's look as data. Each era supplies a `Style` (ADR 0059); the grammar in `kit.ts`
 // stays the same. Colours are albedo hex values from the art-pass design.
 
 export interface Style {
@@ -101,7 +101,7 @@ export const PRESENT_DAY: Style = {
   trim: { light: 0xf7f4ee, dark: 0x4d4a47 },
 };
 
-/** Village buildings (ADR 0056): limewash and fieldstone under thatch, old tile and slate,
+/** Village buildings (ADR 0059): limewash and fieldstone under thatch, old tile and slate,
  * with dark timber doors and no chrome. */
 export const VILLAGE: Style = {
   ...PRESENT_DAY,

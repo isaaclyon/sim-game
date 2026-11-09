@@ -15,4 +15,4 @@ grid 4 4
 1200 undo
 1500 redo
 end 3000
-expect hash e2d282c1bfb67ce8 population 21 buildings 11 trips 104
+expect hash 9a4a2ce6ea2e558c population 21 buildings 11 trips 104

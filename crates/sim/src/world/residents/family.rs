@@ -76,6 +76,7 @@ impl World {
             .push(household, b, born, child, &mut self.residents.rng);
         self.add_member(household, c);
         if !child {
+            self.citizens.education[c as usize] = self.arriving_education();
             self.schedule_day(c);
             self.schedule_search(c, 1.0);
         }

@@ -1,4 +1,4 @@
-//! Eras (ADR 0056): a new city is a village that refuses main roads and dense zones; its
+//! Eras (ADR 0059): a new city is a village that refuses main roads and dense zones; its
 //! buildings keep the era they were built in.
 
 use sim::road::RoadClass;

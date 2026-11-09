@@ -81,6 +81,7 @@ test('city reset clears tools, follow and interpolation, and synchronizes pause 
       activity: 0,
       driving: true,
       onFoot: false,
+      complaints: [],
     },
   });
   t.key('f');
@@ -111,6 +112,7 @@ test('city reset clears tools, follow and interpolation, and synchronizes pause 
         saved: 0,
         destroyed: 0,
       },
+      happiness: { average: 50, complaints: [0, 0, 0, 0, 0, 0, 0] },
       balance: 100_000,
       taxes: 0,
       grant: 0,

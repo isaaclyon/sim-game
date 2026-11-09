@@ -74,6 +74,7 @@ test('building and citizen selections replace each other; stale replies and remo
       location: null,
       driving: false,
       onFoot: false,
+      complaints: [],
     },
   });
   assert.equal(t.elements.follow.hidden, false);
