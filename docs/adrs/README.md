@@ -64,6 +64,7 @@ rewriting history; mark the old one `Superseded by NNNN`.
 | [0056](0056-taxes-follow-city-quality-and-services-have-budgets.md) | Taxes follow city quality, and each service building has a budget | Accepted |
 | [0057](0057-data-overlays-for-traffic-and-services.md) | Data overlays show road congestion and service gaps | Accepted; implemented |
 | [0058](0058-citizen-happiness-steers-demand-and-move-outs.md) | Citizen happiness steers housing demand and move-outs | Accepted; implemented |
+| [0059](0059-eras-village-and-town.md) | The city has an era; buildings keep the era they were built in | Accepted; implemented |
 
 ADRs are only for decisions that are hard to reverse. See [AGENTS.md](AGENTS.md) for when to
 write one and how.

@@ -521,9 +521,10 @@ relaxed.
 
 The village becomes a town, with councilors as an optional helper for players who want one.
 
-- **Eras.** Village (dirt roads, cottages, small shops) and town (paved streets, shopfronts,
-  apartments). Reaching a population threshold unlocks the town era. **ADR** for how eras attach
-  to roads, buildings and unlocks.
+- **Eras — implemented** ([ADR 0059](adrs/0059-eras-village-and-town.md)). Village (dirt
+  roads, cottages, small shops) and town (paved streets, shopfronts, apartments). A new city is
+  a village; 1,500 residents unlock the town era, which brings main roads and dense zones.
+  Roads follow the city's era; each building keeps the era it was built in.
 - **Era zones.** Farms are a village-era zone: fields and barns around the edge of town that
   supply early jobs. The town era unlocks offices (clean jobs, no pollution) and mixed-use
   (shops below, flats above) for main streets.

@@ -122,7 +122,7 @@ export class BuildingLayer {
     for (const { distance, tile, b } of candidates) {
       if (best && distance > best.distance) break;
       const o = tile.starts[b];
-      const record = tile.records.subarray(o, o + 5 + 2 * tile.records[o + 4]);
+      const record = tile.records.subarray(o, o + 6 + 2 * tile.records[o + 5]);
       probe.geometry = buildBuildingGeometry(record, this.style);
       const hit = ray.intersectObject(probe, false)[0];
       probe.geometry.dispose();
@@ -143,7 +143,7 @@ export class BuildingLayer {
   }
 
   /**
-   * Takes the whole `[zone, height, roof, front, n, x0, y0, …]` snapshot. With `now` (seconds),
+   * Takes the whole `[zone, height, roof, front, era, n, x0, y0, …]` snapshot. With `now` (seconds),
    * IDs not seen in the previous snapshot rise from that time; without it they appear at once.
    */
   update(data: Float32Array, ids: Uint32Array, now: number | null = null) {
@@ -152,13 +152,13 @@ export class BuildingLayer {
     for (const [id, r] of this.rising) if (!present.has(id)) this.settle(id, r);
     const words = new Uint32Array(data.buffer, data.byteOffset, data.length);
     const records = new Map<string, { offset: number; id: number }[]>();
-    for (let o = 0, i = 0; o < data.length; o += 5 + 2 * data[o + 4], i++) {
+    for (let o = 0, i = 0; o < data.length; o += 6 + 2 * data[o + 5], i++) {
       if (now !== null && !this.known.has(ids[i]) && !this.rising.has(ids[i]))
-        this.rise(ids[i], data.subarray(o, o + 5 + 2 * data[o + 4]), now);
+        this.rise(ids[i], data.subarray(o, o + 6 + 2 * data[o + 5]), now);
       // Rising buildings join their tile once they top out.
       if (this.rising.has(ids[i])) continue;
       // A building belongs to the tile holding its first footprint point.
-      const key = `${Math.floor(data[o + 5] / TILE)},${Math.floor(data[o + 6] / TILE)}`;
+      const key = `${Math.floor(data[o + 6] / TILE)},${Math.floor(data[o + 7] / TILE)}`;
       const list = records.get(key);
       const record = { offset: o, id: ids[i] };
       if (list) list.push(record);
@@ -175,7 +175,7 @@ export class BuildingLayer {
       let hash = 0x811c9dc5;
       let length = 0;
       for (const { offset: o } of starts) {
-        const end = o + 5 + 2 * data[o + 4];
+        const end = o + 6 + 2 * data[o + 5];
         length += end - o;
         for (let i = o; i < end; i++) hash = Math.imul(hash ^ words[i], 0x01000193);
       }
@@ -187,7 +187,7 @@ export class BuildingLayer {
       const offsets: number[] = [];
       let at = 0;
       for (const { offset: o } of starts) {
-        const record = data.subarray(o, o + 5 + 2 * data[o + 4]);
+        const record = data.subarray(o, o + 6 + 2 * data[o + 5]);
         offsets.push(at);
         records.set(record, at);
         at += record.length;
@@ -251,7 +251,7 @@ export class BuildingLayer {
     mesh.receiveShadow = true;
     mesh.scale.y = 1e-3;
     const ring: Pt[] = [];
-    for (let i = 0; i < record[4]; i++) ring.push([record[5 + 2 * i], record[6 + 2 * i]]);
+    for (let i = 0; i < record[5]; i++) ring.push([record[6 + 2 * i], record[7 + 2 * i]]);
     const scaffold = new THREE.Mesh(buildScaffoldGeometry(ring, record[1]), this.material);
     scaffold.castShadow = true;
     scaffold.receiveShadow = true;

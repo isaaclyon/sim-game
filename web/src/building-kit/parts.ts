@@ -14,6 +14,8 @@ export interface Building {
   roof: number;
   /** Index of the footprint edge facing the road. */
   front: number;
+  /** The era it went up in, kept for life (ADR 0059): 0 = village, 1 = town. Picks the look. */
+  era: number;
   /** Counter-clockwise footprint in scene-local (x, z). */
   ring: Pt[];
 }

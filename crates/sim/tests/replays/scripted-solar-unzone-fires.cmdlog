@@ -12,4 +12,4 @@ grid 4 4
 800 paint 10 10 60 60 none
 1200 fires on
 end 3000
-expect hash 3c23d3b4a47a5ae0 population 25 buildings 13 trips 73
+expect hash 09822229c66e21cc population 25 buildings 13 trips 73

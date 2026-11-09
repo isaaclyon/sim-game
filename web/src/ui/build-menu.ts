@@ -2,7 +2,7 @@
 // list in `catalog.ts`. It owns which button is selected; the tools keep their canvas handling
 // and sim commands, and report what is in use through `show`.
 
-import type { Prices } from '../protocol';
+import type { Era, Prices } from '../protocol';
 import {
   type Category,
   type Item,
@@ -11,10 +11,11 @@ import {
   pictureKey,
   type RoadMode,
   type Tool,
+  unlockEra,
 } from './catalog';
 import { h, press, tooltip } from './dom';
 import { dollars } from './figures';
-import { itemPrice, priceText } from './hints';
+import { itemPrice, lockedText, priceText } from './hints';
 import type { Popovers } from './popover';
 
 /** What is in use, for marking the selected buttons. */
@@ -193,7 +194,8 @@ export class BuildMenu {
     for (const [item, button] of this.items) press(button, sameTool(item.tool, s.tool));
     for (const [option, button] of this.options) press(button, optionOn(option, s));
     for (const [id, group] of this.optionGroups) group.hidden = id !== using;
-    this.optionsRow.hidden = s.tool === null;
+    // The hint stays up without a tool when it says why a locked tool was refused.
+    this.optionsRow.hidden = s.tool === null && !this.hint.textContent;
     // Focus in a row that just closed moves to its category, so the keyboard keeps its place.
     if (holder && focused?.closest('[hidden]')) this.categoryButtons.get(holder[0])?.focus();
   }
@@ -240,12 +242,41 @@ export class BuildMenu {
 
   /** Shows the sim's prices on the items that place things, and in their tooltips. */
   setPrices(prices: Prices) {
+    this.prices = prices;
+    this.describe();
+  }
+
+  /** Marks the items the city's era has not unlocked (ADR 0059), with the residents still
+   * needed in their tooltips. They stay focusable; picking one shows why it is refused. */
+  setEra(era: Era, needed: number) {
+    if (era === this.era && needed === this.needed) return;
+    this.era = era;
+    this.needed = needed;
+    this.describe();
+  }
+
+  private prices: Prices | null = null;
+  private era: Era | null = null;
+  private needed = 0;
+
+  /** Each item's tooltip and price line from the last prices and era. */
+  private describe() {
     for (const [item, button] of this.items) {
-      const price = itemPrice(prices, item.tool);
-      if (price === null) continue;
-      button.title = tooltip(item.label, `${item.tip} ${priceText(price)}`, item.key);
+      const locked = this.era !== null && unlockEra(item.tool) > this.era;
+      const price = this.prices && itemPrice(this.prices, item.tool);
       const tag = this.priceTags.get(button);
-      if (tag) tag.textContent = price === 'free' ? 'Free' : dollars(price.cost);
+      if (locked) button.setAttribute('aria-disabled', 'true');
+      else button.removeAttribute('aria-disabled');
+      if (locked) {
+        button.title = tooltip(item.label, `${item.tip} ${lockedText(this.needed)}`, item.key);
+        if (tag) tag.textContent = 'Town';
+      } else if (price) {
+        button.title = tooltip(item.label, `${item.tip} ${priceText(price)}`, item.key);
+        if (tag) tag.textContent = price === 'free' ? 'Free' : dollars(price.cost);
+      } else {
+        button.title = tooltip(item.label, item.tip, item.key);
+        if (tag) tag.textContent = '';
+      }
     }
   }
 

@@ -10,6 +10,7 @@ pub mod building;
 mod check;
 pub mod citizen;
 pub mod clock;
+pub mod era;
 pub mod frontage;
 mod geometry;
 pub mod guide;
@@ -28,6 +29,7 @@ pub mod water;
 pub mod world;
 pub mod zone;
 
+pub use era::{Era, TOWN_POPULATION};
 pub use replay::CommandLog;
 pub use world::{
     Command, Config, FIRE_STRIDE, FireStats, PLANT_STRIDE, POWER_BUILDING_STRIDE, PowerStats,

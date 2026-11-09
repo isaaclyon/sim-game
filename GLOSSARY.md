@@ -61,7 +61,7 @@ _Avoid_: land use, zone type (when you mean the full zone including density)
 
 **Density**:
 The low or high level of a zone, chosen by the player: houses vs. apartments, corner shops vs.
-stores. It never changes on its own.
+stores. It never changes on its own. High density waits for the town era (ADR 0059).
 _Avoid_: level, tier
 
 **Zone cell**:
@@ -152,12 +152,13 @@ _Avoid_: funds (except the starting funds), cash
 
 **Build cost**:
 What a new road costs, by length and road class, paid from the balance when it is built. A
-road that costs more than the balance is refused. Bulldozing, zoning, sim-built alleys,
+village pays half (ADR 0059). A road that costs more than the balance is refused. Bulldozing, zoning, sim-built alleys,
 power plants and transmission lines are free.
 _Avoid_: price
 
 **Upkeep**:
-What every road costs per clock hour to keep, by length and class.
+What every road costs per clock hour to keep, by length and class. Half in a village; the
+town's arrival raises it to the full rate (ADR 0059).
 _Avoid_: maintenance (a later service), running cost
 
 **Taxes**:
@@ -227,3 +228,23 @@ The seed, map size (an empty map, or the generated street grid) and every player
 rebuilds the same city on the same build and target; saved logs are replay regression tests
 (ADR 0034).
 _Avoid_: save, history, undo log
+
+## Eras
+
+**Era**:
+The city's stage of growth, sim state that only moves forward: village, then town. Population
+unlocks the next era, which unlocks tools (ADR 0059).
+_Avoid_: age, level, tier
+
+**Village**:
+The first era. Streets are drawn as dirt tracks; main roads and dense zones are locked.
+_Avoid_: hamlet
+
+**Town**:
+The era a village reaches at 1,500 residents. Roads are paved and main roads and dense zones
+unlock. "Town" also stays fine as a loose word for the player's city.
+
+**Building era**:
+The city's era when a building went up, kept for life. It picks the building's look, nothing
+else (ADR 0059).
+_Avoid_: style (that is the kit's palette)

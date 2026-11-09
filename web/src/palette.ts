@@ -42,6 +42,10 @@ export const TREES = {
 /** Indexed by `RoadClass`: street, main road, alley. */
 export const ROADS = [0x8c8f95, 0x73777e, 0xaba597];
 export const SIDEWALK = 0xdad5ca;
+/** A village's roads (ADR 0059), indexed like `ROADS`: packed earth, and trodden grass verges
+ * where a town has sidewalks. */
+export const DIRT_ROADS = [0xa08766, 0x947b5b, 0xb39f80];
+export const VERGE = 0xb7ad84;
 /** Lane paint: centre lines and road edge lines, slightly weathered. */
 export const MARKINGS = { centre: 0xe2b443, edge: 0xebe8df };
 

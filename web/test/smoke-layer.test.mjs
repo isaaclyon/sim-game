@@ -7,7 +7,7 @@ import { COAL_CHIMNEY, createCoalPlant } from '../src/coal-plant.ts';
 import { MAX_STACKS, PUFF_LIFE, puffAt, SmokeLayer } from '../src/smoke-layer.ts';
 
 const rect = (x, z, w, d) => [x, z, x + w, z, x + w, z + d, x, z + d];
-const record = (zone, roof, x) => [zone, 9, roof, 0, 4, ...rect(x, 0, 30, 22)];
+const record = (zone, roof, x) => [zone, 9, roof, 0, 1, 4, ...rect(x, 0, 30, 22)];
 const snapshot = (...records) => new Float32Array(records.flat());
 const puffs = (layer) => layer.group.children[0];
 

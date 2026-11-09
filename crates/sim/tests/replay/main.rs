@@ -68,7 +68,20 @@ fn saved_sessions_replay_to_their_expected_cities() {
 
         if name == "scripted-undo-redo.cmdlog" {
             // Every undo and redo in the log succeeded, also after the halfway load.
-            assert_eq!(loaded.history().len(), (9, 1), "{name}");
+            assert_eq!(loaded.history().len(), (8, 1), "{name}");
+        }
+
+        if name == "scripted-empty-map-money.cmdlog" {
+            // A village refuses apartments and main roads (ADR 0059).
+            assert_eq!(loaded.era(), sim::Era::Village, "{name}");
+            assert!(
+                loaded
+                    .zones
+                    .cells
+                    .iter()
+                    .all(|&c| c != Zone::ResidentialHigh as u8),
+                "{name}"
+            );
         }
 
         if bless {

@@ -71,15 +71,19 @@ impl World {
         }
     }
 
-    /// The plan `set_road_class` would build, or None if it would change nothing.
+    /// The plan `set_road_class` would build, or None if it would change nothing or the era
+    /// has not unlocked `class` (ADR 0059).
     pub(super) fn class_plan(&self, x: f32, y: f32, class: RoadClass) -> Option<snap::Plan> {
+        if !self.allows_road(class) {
+            return None;
+        }
         let road = snap::bulldoze_target(&self.roads, x, y)?;
         snap::reclass_plan(&self.roads, road, class)
     }
 
     /// Charges for and builds a plan of `class`; refused when the city cannot afford it.
     fn build_plan(&mut self, plan: snap::Plan, class: RoadClass) -> bool {
-        let cost = money::plan_cost(&self.roads, &plan, class);
+        let cost = money::plan_cost(&self.roads, &plan, class, self.era);
         self.build_plans(vec![plan], cost, class)
     }
 

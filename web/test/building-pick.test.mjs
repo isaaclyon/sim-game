@@ -5,8 +5,8 @@ import { buildBuildingGeometry } from '../src/building-kit/index.ts';
 import { BuildingLayer } from '../src/building-kit/layer.ts';
 import { createSimScene } from '../src/scene.ts';
 
-const house = (x, height = 6) => [1, height, 0, 0, 4, x, 0, x + 12, 0, x + 12, 10, x, 10];
-const apartment = (x) => [2, 30, 0, 0, 4, x, 0, x + 12, 0, x + 12, 10, x, 10];
+const house = (x, height = 6) => [1, height, 0, 0, 1, 4, x, 0, x + 12, 0, x + 12, 10, x, 10];
+const apartment = (x) => [2, 30, 0, 0, 1, 4, x, 0, x + 12, 0, x + 12, 10, x, 10];
 
 /** What the renderer does when it first draws a mesh: hands each vertex array to the GPU. */
 function upload(group) {
@@ -72,7 +72,7 @@ function city() {
       cx + (x * Math.cos(a) - y * Math.sin(a)) / 2,
       cy + (x * Math.sin(a) + y * Math.cos(a)) / 2,
     ]);
-    records.push(1 + (i % 6), 5 + (i % 7) * 6, i % 4, i % 4, 4, ...ring.flat());
+    records.push(1 + (i % 6), 5 + (i % 7) * 6, i % 4, i % 4, 1, 4, ...ring.flat());
   }
   return new Float32Array(records);
 }

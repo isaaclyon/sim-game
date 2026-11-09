@@ -3,7 +3,7 @@ import { stripTypeScriptTypes } from 'node:module';
 import { extname } from 'node:path';
 import { createContext, SourceTextModule, SyntheticModule } from 'node:vm';
 
-import { FIRE_STRIDE, PlantKind, RoadClass, Snap, WaterKind, Zone } from '../src/protocol.ts';
+import { Era, FIRE_STRIDE, PlantKind, RoadClass, Snap, WaterKind, Zone } from '../src/protocol.ts';
 import { fakeDocument } from './fake-dom.mjs';
 
 // Exercise main.ts's event handlers without a WebGL context or a running clock. `catalog`, if
@@ -87,6 +87,9 @@ export async function tools({ hash = '', clipboard = true, catalog } = {}) {
     onUserPan = null;
     setTime(time) {
       lightingTimes.push(time);
+    }
+    setEra(era) {
+      this.era = era;
     }
     constructor() {
       renderer = this;
@@ -281,7 +284,7 @@ export async function tools({ hash = '', clipboard = true, catalog } = {}) {
   for (const [name, exports] of [
     ['renderer', { Renderer }],
     ['ambient-sound', { AmbientSound }],
-    ['protocol', { FIRE_STRIDE, PlantKind, RoadClass, Snap, WaterKind, Zone }],
+    ['protocol', { Era, FIRE_STRIDE, PlantKind, RoadClass, Snap, WaterKind, Zone }],
   ]) {
     const identifier = new URL(`./${name}.ts`, mainUrl).href;
     modules.set(
@@ -366,6 +369,8 @@ export async function tools({ hash = '', clipboard = true, catalog } = {}) {
     buildings,
     sound,
     lightingTimes,
+    /** The era the page last gave the renderer, for its road surface. */
+    rendererEra: () => renderer.era,
     userPan: () => renderer.onUserPan?.(),
     down: (x, y) => canvas.events.pointerdown({ clientX: x, clientY: y, button: 0 }),
     up: (x, y) => canvas.events.pointerup({ clientX: x, clientY: y, button: 0 }),

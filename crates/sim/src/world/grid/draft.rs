@@ -47,7 +47,8 @@ impl World {
     /// The `BuildGrid` for the first edge's two raw `[x, y, snap]` points, guided as a road's
     /// (ADR 0038), and the area `cursor`, rounded to whole blocks of `cell` metres, at least
     /// one and at most `MAX_BLOCKS` each way. Without a cursor, the edge's end stands in.
-    /// None if the points are not an edge or `cell` is out of range.
+    /// None if the points are not an edge, `cell` is out of range or the era has not unlocked
+    /// `class` (ADR 0059).
     pub fn grid_command(
         &self,
         raw: &[f32],
@@ -55,6 +56,9 @@ impl World {
         cell: f32,
         class: RoadClass,
     ) -> Option<Command> {
+        if !self.allows_road(class) {
+            return None;
+        }
         let [o, e] = self.draft(raw).points[..] else {
             return None;
         };
@@ -94,7 +98,7 @@ impl World {
     /// numbers or class (not for money). Changes nothing.
     pub fn grid_preview(&self, cmd: &Command) -> Option<GridPreview> {
         let (lattice, class) = lattice_of(cmd)?;
-        let p = plan(&self.roads, &lattice, class);
+        let p = plan(&self.roads, &lattice, class, self.era);
         Some(GridPreview {
             cost: (!p.plans.is_empty()).then_some(p.cost),
             roads: p.roads,
@@ -152,7 +156,7 @@ impl World {
         let Some((lattice, class)) = lattice_of(cmd) else {
             return false;
         };
-        let GridPlan { plans, cost, .. } = plan(&self.roads, &lattice, class);
+        let GridPlan { plans, cost, .. } = plan(&self.roads, &lattice, class, self.era);
         self.build_plans(plans, cost, class)
     }
 }

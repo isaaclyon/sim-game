@@ -9,7 +9,7 @@ import type { Pt } from '../building-kit/polygon.ts';
 import { createCoalPlant } from '../coal-plant.ts';
 import { createFireStation } from '../fire-station.ts';
 import { GROUND, ROADS, SIDEWALK, ZONE_OVERLAY } from '../palette.ts';
-import { PlantKind, RoadClass, type WaterKind, Zone } from '../protocol.ts';
+import { Era, PlantKind, RoadClass, type WaterKind, Zone } from '../protocol.ts';
 import { buildRoadGeometry } from '../road-geometry.ts';
 import { buildRoadMarkings } from '../road-markings.ts';
 import { createSolarPlant } from '../solar-plant.ts';
@@ -53,7 +53,7 @@ function zoneModel(zone: Zone): THREE.Object3D {
   const [w, d, height, roof] = BUILDINGS[zone];
   // Counter-clockwise, as the sim sends it; edge 0 runs along sim -y, toward the viewer.
   const ring = [-w / 2, -d / 2, w / 2, -d / 2, w / 2, d / 2, -w / 2, d / 2];
-  const data = new Float32Array([zone, height, roof, 0, 4, ...ring]);
+  const data = new Float32Array([zone, height, roof, 0, Era.Town, 4, ...ring]);
   return group(new THREE.Mesh(buildBuildingGeometry(data), lambert), pad(w + 6, d + 6));
 }
 

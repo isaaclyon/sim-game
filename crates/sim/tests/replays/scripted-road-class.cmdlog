@@ -1,6 +1,7 @@
 # Written by hand (ADR 0050): clicking roads to change their class while cars drive. A street
 # becomes a main road, a click with the same class and one off every road are refused, a main
-# road becomes a street, and another street is upgraded.
+# road becomes a street, and another street is upgraded; that upgrade is undone in place and
+# redone (ADR 0051).
 sim-game command log 1
 seed 1
 grid 4 4
@@ -11,5 +12,7 @@ grid 4 4
 600 class 76 6 street
 900 class 296 111 main
 900 class 600 600 main
+1200 undo
+1500 redo
 end 3000
-expect hash db1bb59e21281751 population 21 buildings 11 trips 110
+expect hash 9a4a2ce6ea2e558c population 21 buildings 11 trips 104

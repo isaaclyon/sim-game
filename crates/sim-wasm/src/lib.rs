@@ -32,6 +32,10 @@ pub struct SimStats {
     pub children: u32,
     pub unemployed: u32,
     pub unemployment_percent: f32,
+    /// The city's era (ADR 0059): 0 = village, 1 = town.
+    pub era: u8,
+    /// Residents at which a village becomes a town.
+    pub town_population: u32,
     /// R/C/I demand in people (ADR 0025): positive wants more buildings, negative is a surplus.
     pub demand_residential: i32,
     pub demand_commercial: i32,
@@ -254,8 +258,9 @@ impl Sim {
         self.world.buildings.version
     }
 
-    /// `[zone, height, roof, front, n, x0, y0, …]` per active building; footprint points are
-    /// counter-clockwise and `front` is the edge facing the lot's road.
+    /// `[zone, height, roof, front, era, n, x0, y0, …]` per active building; footprint points
+    /// are counter-clockwise, `front` is the edge facing the lot's road and `era` the city's era
+    /// when it was built (ADR 0059).
     pub fn building_snapshot(&mut self) -> Vec<f32> {
         self.world
             .buildings
@@ -380,6 +385,8 @@ impl Sim {
             children: s.children,
             unemployed: s.unemployed,
             unemployment_percent: s.unemployment_percent,
+            era: s.era as u8,
+            town_population: sim::TOWN_POPULATION,
             demand_residential: s.demand.residential,
             demand_commercial: s.demand.commercial,
             demand_industrial: s.demand.industrial,

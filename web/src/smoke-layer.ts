@@ -95,8 +95,8 @@ export class SmokeLayer {
    */
   update(data: Float32Array, ids: Uint32Array, now: number | null = null) {
     const next = new Map<number, Stack>();
-    for (let o = 0, i = 0; o < data.length; o += 5 + 2 * data[o + 4], i++) {
-      const [zone, height, roof, front, n] = data.subarray(o, o + 5);
+    for (let o = 0, i = 0; o < data.length; o += 6 + 2 * data[o + 5], i++) {
+      const [zone, height, roof, front, era, n] = data.subarray(o, o + 6);
       if (zone < 5) continue;
       const known = this.stacks.get(ids[i]);
       if (known) {
@@ -104,8 +104,8 @@ export class SmokeLayer {
         continue;
       }
       const ring: Pt[] = [];
-      for (let k = 0; k < n; k++) ring.push([data[o + 5 + 2 * k], data[o + 6 + 2 * k]]);
-      const stack = smokestack({ zone, height, roof, front, ring });
+      for (let k = 0; k < n; k++) ring.push([data[o + 6 + 2 * k], data[o + 7 + 2 * k]]);
+      const stack = smokestack({ zone, height, roof, front, era, ring });
       if (!stack) continue;
       const size = THREE.MathUtils.clamp(Math.sqrt(area(ring)) / 20, 0.8, 1.6);
       next.set(ids[i], {

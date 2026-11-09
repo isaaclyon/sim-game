@@ -83,9 +83,10 @@ What to build next and why lives in `docs/ROADMAP.md`. Work on the current miles
 - Lots: `[n, x0, y0, …]` per lot, its outline's point count then its points, sent whole when
   the lots version changes (ADR 0018). Block preview: `[x, y]` per outline sample of the block
   under the cursor, closed; empty = no block. Read-only.
-- Buildings: `[zone, height, roof, front, n, x0, y0, …]` per active building in ID order, not
+- Buildings: `[zone, height, roof, front, era, n, x0, y0, …]` per active building in ID order, not
   indexed by ID. Height is metres; n is the counter-clockwise footprint point count, with no
   repeated closing point. Roof is a stable palette index (0–3 for industry, 0 otherwise; ADR 0019).
+  Era is the city's era when it was built, kept for life: 0 = village, 1 = town (ADR 0059).
   Front is the footprint edge (point `front` to the next) facing the lot's road, derived on
   write, not stored or hashed (ADR 0027).
   Zone is the building's original use. The worker sends a parallel `ids: Uint32Array`, one
@@ -150,6 +151,10 @@ What to build next and why lives in `docs/ROADMAP.md`. Work on the current miles
 - Population: frame stats carry `population` (children included) and `children`;
   `unemployed` and its percentage count adults only (ADR 0054). `happiness` carries the
   residents' mean mood and a count per complaint code (ADR 0058).
+- Eras (ADR 0059): frame stats carry `era` (0 = village, 1 = town) and `townPopulation`. A
+  village refuses main roads and dense zones, and its previews plan nothing for them; roads
+  are drawn as dirt until the town era, and cost half to build and keep until then. `map`
+  command logs replay as a village, `grid` as a town.
 - Building inspection: `inspectBuilding` selects a stable building ID from the geometry message's
   parallel `ids` array. Replaces citizen inspection and vice versa. The worker answers `building`
   at once and after every frame/edit while selected, echoing the selection counter; null after

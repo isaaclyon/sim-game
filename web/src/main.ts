@@ -1,7 +1,7 @@
 import { AmbientSound } from './ambient-sound';
 import { CityControls } from './city-controls';
 import { Inspector } from './inspector';
-import type { FromWorker, Stats, ToWorker } from './protocol';
+import { Era, type FromWorker, type Stats, type ToWorker } from './protocol';
 import { Renderer } from './renderer';
 import { Toolbox } from './toolbox';
 import { BuildMenu } from './ui/build-menu';
@@ -165,6 +165,12 @@ worker.onmessage = (e: MessageEvent<FromWorker>) => {
     stats = msg.stats;
     tickMs = msg.tickMs;
     renderer.setTime(stats.secondOfDay);
+    renderer.setEra(stats.era);
+    // Nothing is locked in a town, so its menu needs no update as people come and go.
+    const village = stats.era === Era.Village;
+    const needed = village ? Math.max(0, stats.townPopulation - stats.population) : 0;
+    tools.setEra(stats.era, needed);
+    menu.setEra(stats.era, needed);
     renderer.drawSignals(msg.signals);
     undoRedo.set(msg.history);
   }

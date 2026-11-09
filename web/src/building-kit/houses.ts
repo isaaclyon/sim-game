@@ -135,10 +135,21 @@ const modern: Part = (mb, b, box, style, rand, glass) => {
   if (e.L >= 4) mb.box(along(e, h.doorAt, 0.6), 2.5, 2.2, 0.15, 1.2, turn(e.u), h.roof);
 };
 
+const gable: Archetype = { name: 'gable', draw: plain({ form: 'gable' }) };
+const saltbox: Archetype = {
+  name: 'saltbox',
+  draw: plain({ form: 'saltbox', pitch: [40, 46], ridge: 'front' }),
+};
+const jerkinhead: Archetype = {
+  name: 'jerkinhead',
+  draw: plain({ form: 'jerkinhead', pitch: [34, 42] }),
+};
+const porched: Archetype = { name: 'porch', draw: porch };
+
 export const HOUSES: Archetype[] = [
-  { name: 'gable', draw: plain({ form: 'gable' }) },
+  gable,
   { name: 'hip', draw: plain({ form: 'hip' }) },
-  { name: 'saltbox', draw: plain({ form: 'saltbox', pitch: [40, 46], ridge: 'front' }) },
+  saltbox,
   {
     name: 'gambrel',
     draw: plain({ form: 'gambrel', pitch: [16, 22], overhang: 0.15, chimney: 0.3 }),
@@ -147,7 +158,29 @@ export const HOUSES: Archetype[] = [
     name: 'mansard',
     draw: plain({ form: 'mansard', pitch: [10, 16], slate: true, overhang: 0.15, chimney: 0.8 }),
   },
-  { name: 'jerkinhead', draw: plain({ form: 'jerkinhead', pitch: [34, 42] }) },
-  { name: 'porch', draw: porch },
+  jerkinhead,
+  porched,
   { name: 'modern', draw: modern },
+];
+
+/** Village homes (ADR 0059): steep roofs with deep eaves and a chimney, small windows. */
+export const VILLAGE_HOUSES: Archetype[] = [
+  {
+    name: 'cottage',
+    draw: plain({
+      form: 'gable',
+      pitch: [46, 52],
+      overhang: 0.6,
+      chimney: 0.95,
+      window: { w: 0.9, h: 1 },
+    }),
+  },
+  {
+    name: 'thatched',
+    draw: plain({ form: 'hip', pitch: [44, 50], overhang: 0.8, chimney: 0.8, window: { w: 0.9 } }),
+  },
+  gable,
+  saltbox,
+  jerkinhead,
+  porched,
 ];

@@ -95,10 +95,15 @@ fn snapshot_front_edge_faces_the_lot_road() {
         let data = snapshot(&w);
         let mut i = 0;
         for id in w.buildings.active_buildings() {
-            let (front, n) = (data[i + 3] as usize, data[i + 4] as usize);
+            let (front, era, n) = (data[i + 3] as usize, data[i + 4], data[i + 5] as usize);
+            assert_eq!(
+                era,
+                sim::Era::Town as u8 as f32,
+                "a generated grid builds in the town era"
+            );
             assert_eq!(n, w.buildings.footprint(id).len());
             assert!(front < n);
-            let at = |k: usize| (data[i + 5 + 2 * (k % n)], data[i + 6 + 2 * (k % n)]);
+            let at = |k: usize| (data[i + 6 + 2 * (k % n)], data[i + 7 + 2 * (k % n)]);
             let ((ax, ay), (bx, by)) = (at(front), at(front + 1));
             let len = (bx - ax).hypot(by - ay);
             // Counter-clockwise rings: the outward normal is the edge turned clockwise.
@@ -109,7 +114,7 @@ fn snapshot_front_edge_faces_the_lot_road() {
                 normal.0 * facing.0 + normal.1 * facing.1 > 0.7,
                 "{zone:?} front edge faces its road"
             );
-            i += 5 + 2 * n;
+            i += 6 + 2 * n;
         }
         assert_eq!(i, data.len());
     }

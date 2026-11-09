@@ -2,15 +2,16 @@
 // tool, never two at once.
 // The build menu and the keys both start tools here (M4.6); each tool keeps its own canvas
 // handling and sim commands. Picking a power, water or fire station tool shows that service's
-// view until it is put away.
+// view until it is put away. Tools the city's era has not unlocked are refused with a hint
+// (ADR 0059).
 import { FireTools } from './fire-tools';
 import { PowerTools, WATER_TOOLS } from './power-tools';
-import { type Prices, RoadClass, type ToWorker, type WaterKind, Zone } from './protocol';
+import { Era, type Prices, RoadClass, type ToWorker, type WaterKind, Zone } from './protocol';
 import type { Renderer } from './renderer';
 import { RoadTool } from './road-tool';
-import type { Selection } from './ui/build-menu';
-import type { OptionAction, RoadMode, Tool } from './ui/catalog';
-import { zoneHelpText } from './ui/hints';
+import { type Selection, sameTool } from './ui/build-menu';
+import { CATEGORIES, type OptionAction, type RoadMode, type Tool, unlockEra } from './ui/catalog';
+import { lockedText, zoneHelpText } from './ui/hints';
 import type { Service, Views } from './ui/views';
 import { ZoneTool } from './zone-tool';
 
@@ -27,6 +28,11 @@ export class Toolbox {
   private readonly hint: HTMLElement;
   private readonly views: Views;
   private readonly changed: () => void;
+  /** The city's era, and the residents still needed for the next; town until the sim says. */
+  private era: Era = Era.Town;
+  private needed = 0;
+  /** Whether the hint says why a locked tool was refused. */
+  private lockHint = false;
 
   /** `changed` runs after every switch, so the menu can show what is in use. */
   constructor(
@@ -77,8 +83,40 @@ export class Toolbox {
     return { tool, roadMode, snap: roads.snaps, gridCell: roads.cell };
   }
 
-  /** Puts every tool away, then starts `tool`, if any. */
+  /** Whether the city's era has not unlocked `tool` yet. */
+  locked(tool: Tool | null): boolean {
+    return unlockEra(tool) > this.era;
+  }
+
+  /** The city's era from the sim's stats. A tool it locks, such as after loading a village,
+   * is put away. */
+  setEra(era: Era, needed: number) {
+    this.needed = needed;
+    if (era === this.era) return;
+    this.era = era;
+    // A refused tool's hint is out of date once the era changes.
+    if (this.lockHint) {
+      this.lockHint = false;
+      this.hint.textContent = '';
+      this.changed();
+    }
+    if (this.locked({ kind: 'road', roadClass: this.roads.roadClass })) {
+      if (this.roads.roadMode) this.use(null);
+      this.roads.setRoadClass(RoadClass.Street);
+    }
+    if (this.locked(this.selection.tool)) this.use(null);
+  }
+
+  /** Puts every tool away, then starts `tool`, if any. A locked tool changes nothing but the
+   * hint, which says what it waits for. */
   use(tool: Tool | null) {
+    if (this.locked(tool)) {
+      const item = CATEGORIES.flatMap((c) => c.items).find((i) => sameTool(i.tool, tool));
+      this.hint.textContent = `${item?.label ?? 'This tool'}. ${lockedText(this.needed)}`;
+      this.lockHint = true;
+      return this.changed();
+    }
+    this.lockHint = false;
     if (tool?.kind === 'road' && this.roads.roadMode) {
       // Street and main road are a setting of the road tool; a road being drawn carries on.
       this.roads.setRoadClass(tool.roadClass);
@@ -123,7 +161,14 @@ export class Toolbox {
 
   /** Esc: puts the tool in use away; false if none was. */
   cancel(): boolean {
-    if (!this.active) return false;
+    if (!this.active) {
+      if (!this.hint.textContent) return false;
+      // A locked tool's hint shows on its own; Esc dismisses it.
+      this.hint.textContent = '';
+      this.lockHint = false;
+      this.changed();
+      return true;
+    }
     this.use(null);
     return true;
   }

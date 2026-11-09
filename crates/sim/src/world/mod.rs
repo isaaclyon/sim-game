@@ -5,6 +5,7 @@ mod closure;
 mod command;
 mod demand;
 mod demolish;
+mod era;
 mod fire;
 mod grid;
 mod happiness;
@@ -29,6 +30,7 @@ use std::collections::{BinaryHeap, VecDeque};
 use crate::agents::{AgentId, AgentState, Agents};
 use crate::block::Blocks;
 use crate::building::Buildings;
+use crate::era::Era;
 use crate::geometry::Shape;
 use crate::junction::Junctions;
 use crate::lot::Lots;
@@ -123,6 +125,8 @@ pub struct Stats {
     pub water: WaterStats,
     /// Balance, taxes, grant and upkeep (ADR 0036).
     pub money: Money,
+    /// The city's era (ADR 0059).
+    pub era: Era,
     /// Stations, trucks and fires (ADR 0053).
     pub fire: FireStats,
     /// Average mood and complaints (ADR 0058).
@@ -204,6 +208,8 @@ pub struct World {
     fire: fire::Fire,
     /// Undo and redo for placeables (ADR 0051).
     history: History,
+    /// Village or town; decides what may be built (ADR 0059).
+    era: Era,
     /// Average mood, complaints and move-outs (ADR 0058).
     pub happiness: Happiness,
 }
@@ -246,6 +252,9 @@ impl World {
             rng,
             totals: Stats::default(),
             history: History::default(),
+            // Worlds on an existing road network (tests, benchmarks) start with everything
+            // unlocked; the game's empty map starts as a village (ADR 0059).
+            era: Era::Town,
         };
         world.pollution = Pollution::covering(&world.zones);
         world.water.step = world.water_step();
@@ -264,6 +273,7 @@ impl World {
         let mut world = Self::new(cfg, RoadNetwork::default(), rng);
         world.pollution = Pollution::covering(&zones);
         world.zones = zones;
+        world.era = Era::Village;
         world
     }
 
@@ -285,6 +295,9 @@ impl World {
     }
 
     pub fn apply(&mut self, cmd: Command) -> bool {
+        if !self.allows(&cmd) {
+            return false;
+        }
         let versions = (
             self.lots.version,
             self.zones.version,
@@ -428,6 +441,7 @@ impl World {
         self.tick_water();
         self.tick_fire();
         self.grow_buildings();
+        self.advance_era();
         // Current at every tick boundary, so a loaded world reads the same allocation.
         self.ensure_power();
         self.ensure_water();
@@ -445,6 +459,7 @@ impl World {
         s.water = self.water_stats();
         s.money = self.money();
         s.fire = self.fire_stats();
+        s.era = self.era;
         s.happiness = self.happiness_stats();
         if adults > 0 {
             s.unemployment_percent = s.unemployed as f32 * 100.0 / adults as f32;

@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { buildBuildingGeometry } from '../src/building-kit/index.ts';
 import { PRESENT_DAY } from '../src/building-kit/style.ts';
 
-const record = (x, zone = 3) => [zone, 4, 0, 0, 4, x, 0, x + 13, 0, x + 13, 14, x, 14];
+const record = (x, zone = 3) => [zone, 4, 0, 0, 1, 4, x, 0, x + 13, 0, x + 13, 14, x, 14];
 const near = (c, i, col) =>
   Math.abs(c.getX(i) - col.r) + Math.abs(c.getY(i) - col.g) + Math.abs(c.getZ(i) - col.b) < 1e-4;
 

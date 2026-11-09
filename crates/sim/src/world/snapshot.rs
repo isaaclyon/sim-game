@@ -176,7 +176,8 @@ impl World {
     /// floats of `[count, x0, y0, …]` per existing road the build would change to `class`
     /// (ADR 0048; its centreline samples, as the class preview), then, if `plan`, the road
     /// preview of the guided points as `class`: one stop for one point (where a road would
-    /// start), as `write_road_preview` for two, `write_curve_preview` for three. Changes nothing.
+    /// start), as `write_road_preview` for two, `write_curve_preview` for three. A class the
+    /// era has not unlocked plans nothing (ADR 0059). Changes nothing.
     pub fn write_road_draft(&self, raw: &[f32], plan: bool, class: RoadClass, out: &mut Vec<f32>) {
         out.clear();
         let d = self.draft(raw);
@@ -200,7 +201,7 @@ impl World {
             _ => None,
         };
         let road_plan = shape
-            .filter(|_| plan)
+            .filter(|_| plan && self.allows_road(class))
             .and_then(|shape| snap::plan(&self.roads, shape, Some(class)));
         let mut reclass = Vec::new();
         for &road in road_plan.iter().flat_map(|p| &p.reclass) {
@@ -273,6 +274,7 @@ impl World {
             h = h.wrapping_mul(0x0000_0100_0000_01b3);
         };
         mix(self.totals.tick);
+        mix(self.era as u64);
         mix(self.roads.lane_count() as u64);
         mix(self.roads.road_count() as u64);
         for road in self.roads.active_roads() {

@@ -1,4 +1,4 @@
-# Scripted: a village on an empty map paid from starting funds (ADR 0036), with zoning, a main road the city cannot afford (refused) and a bulldozed street.
+# Scripted: a village on an empty map paid from starting funds (ADR 0036), with zoning, apartments and a main road the village has not unlocked (refused, ADR 0059; the city could not afford the road either) and a bulldozed street.
 sim-game command log 1
 seed 2
 map 20 20
@@ -15,4 +15,4 @@ map 20 20
 100 road 0 400 9000 400 main
 3000 delete 240 60
 end 9000
-expect hash dcf99acc15ff5f51 population 9 buildings 7 trips 6
+expect hash deae8c2a9969e671 population 10 buildings 7 trips 4

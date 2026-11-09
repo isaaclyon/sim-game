@@ -1,17 +1,26 @@
 // The building grammar: every building is a sim footprint, height, use and front edge.
 // Each use has several designs; a hash of the footprint picks one, never sim randomness, so a
 // building keeps its look and the sim stays deterministic (ADR 0027). The designs live in one
-// file per use: houses, flats, shops, stores, industry (workshops) and factories.
+// file per use: houses, flats, shops, stores, industry (workshops) and factories. Village
+// buildings draw from their own cottage, shop and workshop lists (ADR 0059).
 import * as THREE from 'three';
+import { Era } from '../protocol.ts';
 import { FACTORIES } from './factories.ts';
 import { FLATS } from './flats.ts';
-import { HOUSES } from './houses.ts';
-import { classic, hasStack, type Smokestack, WORKSHOPS, type Works } from './industry.ts';
+import { HOUSES, VILLAGE_HOUSES } from './houses.ts';
+import {
+  classic,
+  hasStack,
+  type Smokestack,
+  VILLAGE_WORKSHOPS,
+  WORKSHOPS,
+  type Works,
+} from './industry.ts';
 import { LIGHT_SEED, lightSchedule } from './lights.ts';
 import type { MeshBuilder } from './mesh.ts';
 import { type Archetype, type Building, seeded } from './parts.ts';
 import { obb } from './polygon.ts';
-import { SHOPS } from './shops.ts';
+import { SHOPS, VILLAGE_SHOPS } from './shops.ts';
 import { STORES } from './stores.ts';
 import type { Style } from './style.ts';
 
@@ -32,10 +41,20 @@ const DESIGNS: Archetype[][] = [
   [...CLASSIC, ...WORKSHOPS],
   [...CLASSIC, ...FACTORIES],
 ];
+/** Village designs per `Zone` value. A village builds no dense zones; any it has use the town's. */
+const VILLAGE_DESIGNS: Archetype[][] = [
+  VILLAGE_HOUSES,
+  FLATS,
+  VILLAGE_SHOPS,
+  STORES,
+  VILLAGE_WORKSHOPS,
+  DESIGNS[5],
+];
 const DESIGN_SEED = 0x64657369;
 
 function design(b: Building): Archetype {
-  const list = DESIGNS[Math.min(Math.max(Math.round(b.zone), 1), 6) - 1];
+  const lists = b.era === Era.Village ? VILLAGE_DESIGNS : DESIGNS;
+  const list = lists[Math.min(Math.max(Math.round(b.zone), 1), 6) - 1];
   return list[Math.floor(seeded(b.ring, DESIGN_SEED)() * list.length)];
 }
 

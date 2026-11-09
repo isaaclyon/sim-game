@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { RoadClass, Snap } from '../src/protocol.ts';
+import { Era, RoadClass, Snap } from '../src/protocol.ts';
 import { tools } from './main-harness.mjs';
 import { worker } from './worker-harness.mjs';
 
@@ -23,23 +23,29 @@ test('a fresh game city is an empty map with starting funds, and roads are quote
   await w.send({ type: 'previewRoad', revision: 3, plan: true, ...street });
   const quote = w.messages.at(-1);
   assert.equal(quote.type, 'roadPreview');
-  assert.deepEqual([quote.cost, quote.affordable], [10_000, true]);
+  assert.deepEqual([quote.cost, quote.affordable], [5_000, true]);
   // The price is for the guided road: length snapping turns 1,003 m into 1,000 m.
   const snapped = [0, 0, Snap.Length, 1003, 0, Snap.Length];
   await w.send({ type: 'previewRoad', revision: 3, plan: true, class: 0, points: snapped });
-  assert.equal(w.messages.at(-1).cost, 10_000);
+  assert.equal(w.messages.at(-1).cost, 5_000);
   await w.send({ type: 'setSpeed', speed: 0 });
   await w.send({ type: 'buildRoad', id: 1, ...street });
   assert.equal(w.messages.findLast((m) => m.type === 'buildResult').success, true);
-  assert.equal(frame().stats.balance, start - 10_000, 'paused builds publish the new balance');
-  assert.equal(frame().stats.upkeep, 100);
+  assert.equal(frame().stats.balance, start - 5_000, 'paused builds publish the new balance');
+  assert.equal(frame().stats.upkeep, 50, 'a village pays half (ADR 0059)');
 
+  // A fresh city is a village, which has not unlocked main roads (ADR 0059).
+  assert.equal(frame().stats.era, Era.Village);
+  assert.equal(frame().stats.townPopulation, 1500);
   const main = { points: [0, 500, 0, 9000, 500, 0], class: RoadClass.Main };
   await w.send({ type: 'previewRoad', revision: 4, plan: true, ...main });
-  assert.deepEqual([w.messages.at(-1).cost, w.messages.at(-1).affordable], [225_000, false]);
+  assert.equal(w.messages.at(-1).cost, null, 'a locked road class plans nothing');
+  const long = { points: [0, 500, 0, 32000, 500, 0], class: RoadClass.Street };
+  await w.send({ type: 'previewRoad', revision: 5, plan: true, ...long });
+  assert.deepEqual([w.messages.at(-1).cost, w.messages.at(-1).affordable], [160_000, false]);
   await w.send({ type: 'buildRoad', id: 2, ...main });
   assert.equal(w.messages.findLast((m) => m.type === 'buildResult').success, false);
-  assert.equal(frame().stats.balance, start - 10_000);
+  assert.equal(frame().stats.balance, start - 5_000);
 });
 
 const stats = {

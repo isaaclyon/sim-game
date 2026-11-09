@@ -146,7 +146,7 @@ impl World {
                 self.buildings.defer(lot, zone, tick, dt, seed, Wait::Water);
                 continue;
             }
-            self.buildings.commit(plan);
+            self.buildings.commit(plan, self.era);
             self.powered_new_building(demand, lot, source);
             self.watered_new_building(water, lot);
             self.register_buildings();

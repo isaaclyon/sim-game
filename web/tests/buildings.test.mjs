@@ -16,9 +16,10 @@ test('WASM sends sim-owned building footprints, fronts, heights and original zon
     assert.equal(data[i], 2);
     assert.ok(data[i + 1] >= 12);
     assert.equal(data[i + 2], 0, 'non-industrial roofs keep their original palette');
-    assert.ok(data[i + 3] < data[i + 4], 'the front is one of the footprint edges');
-    assert.ok(data[i + 4] >= 3);
-    i += 5 + 2 * data[i + 4];
+    assert.ok(data[i + 3] < data[i + 5], 'the front is one of the footprint edges');
+    assert.equal(data[i + 4], 1, 'a generated grid builds in the town era');
+    assert.ok(data[i + 5] >= 3);
+    i += 6 + 2 * data[i + 5];
   }
   assert.equal(i, data.length);
   const version = s.buildings_version();
@@ -50,15 +51,15 @@ test('industrial snapshots keep varied roofs and halls until repainting closes t
   let i = 0;
   while (i < data.length) {
     if (data[i] === 2 || data[i] === 4) {
-      i += 5 + 2 * data[i + 4];
+      i += 6 + 2 * data[i + 5];
       continue;
     }
     assert.equal(data[i], 6);
     assert.ok(data[i + 2] >= 0 && data[i + 2] <= 3);
     roofs.add(data[i + 2]);
     heights.add(data[i + 1]);
-    assert.equal(data[i + 4], 4, 'industrial halls stay rectangular');
-    i += 5 + 2 * data[i + 4];
+    assert.equal(data[i + 5], 4, 'industrial halls stay rectangular');
+    i += 6 + 2 * data[i + 5];
   }
   assert.equal(i, data.length);
   assert.ok(roofs.size > 1);
@@ -72,7 +73,7 @@ test('industrial snapshots keep varied roofs and halls until repainting closes t
   const after = s.building_snapshot();
   for (let j = 0; j < after.length; ) {
     zones.add(after[j]);
-    j += 5 + 2 * after[j + 4];
+    j += 6 + 2 * after[j + 5];
   }
   assert.deepEqual(
     zones,
