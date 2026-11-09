@@ -161,6 +161,8 @@ impl World {
             c.child.len(),
             c.family.len(),
             c.move_by.len(),
+            c.education.len(),
+            c.any_job_at.len(),
             c.trip_start.len(),
             c.commute.len(),
         ];
@@ -258,6 +260,10 @@ impl World {
         ensure(
             active().all(|i| !c.child[i] || (c.job[i].is_none() && !c.owns_car[i])),
             "children without jobs or cars",
+        )?;
+        ensure(
+            active().all(|i| c.any_job_at[i] == u64::MAX || c.job[i].is_none()),
+            "employed citizens are not waiting to take any job",
         )?;
         let employed = active().filter(|&i| c.job[i].is_some()).count();
         ensure(r.employed as usize == employed, "employment")?;

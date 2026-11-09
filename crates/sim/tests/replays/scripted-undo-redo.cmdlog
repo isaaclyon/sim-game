@@ -37,4 +37,4 @@ map 12 12
 2200 redo
 2400 redo
 end 3000
-expect hash 6edeb2859a6a82f5 population 44 buildings 22 trips 119
+expect hash b792ad0ab668f6fb population 44 buildings 22 trips 119

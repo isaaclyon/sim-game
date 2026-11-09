@@ -1,6 +1,6 @@
 # 0055. Schools teach children, and education shapes who fills jobs
 
-- Status: Accepted; amended 2026-11-09; not yet implemented; extended by
+- Status: Accepted; amended 2026-11-09; slice 1 implemented; extended by
   [0056](0056-taxes-follow-city-quality-and-services-have-budgets.md) (seat blocks and budgets)
 - Date: 2026-11-06
 - Extends: [0054](0054-children-births-and-growing-up.md), [0021](0021-citizens-households-and-trips.md),

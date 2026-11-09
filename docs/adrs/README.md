@@ -60,7 +60,7 @@ rewriting history; mark the old one `Superseded by NNNN`.
 | [0052](0052-water-follows-roads-and-supplies-dense-buildings.md) | Water follows roads and supplies dense buildings | Accepted; implemented |
 | [0053](0053-fire-stations-send-trucks-through-traffic.md) | Fire stations send real trucks through traffic | Accepted; implemented |
 | [0054](0054-children-births-and-growing-up.md) | Children are citizens who are born, grow up and move out | Accepted; implemented |
-| [0055](0055-schools-and-education-levels.md) | Schools teach children, and education shapes who fills jobs | Accepted; amended; extended by 0056 |
+| [0055](0055-schools-and-education-levels.md) | Schools teach children, and education shapes who fills jobs | Accepted; amended; slice 1 implemented; extended by 0056 |
 | [0056](0056-taxes-follow-city-quality-and-services-have-budgets.md) | Taxes follow city quality, and each service building has a budget | Accepted |
 | [0057](0057-data-overlays-for-traffic-and-services.md) | Data overlays show road congestion and service gaps | Accepted; implemented |
 | [0058](0058-citizen-happiness-steers-demand-and-move-outs.md) | Citizen happiness steers housing demand and move-outs | Accepted; implemented |

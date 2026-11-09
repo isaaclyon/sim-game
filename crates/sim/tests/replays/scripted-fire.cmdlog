@@ -93,4 +93,4 @@ grid 10 10
 3400 station 540 420
 8800 fires off
 end 9000
-expect hash 2ba580bbcf2d6a66 population 1410 buildings 32 trips 1088
+expect hash 69f85f2d1f0036b5 population 1523 buildings 29 trips 879

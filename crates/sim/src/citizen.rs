@@ -25,6 +25,18 @@ pub enum Activity {
     Shop,
 }
 
+/// How far a citizen got in school (ADR 0055). Ordered: a higher level meets every lower
+/// requirement.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[repr(u8)]
+pub enum Education {
+    #[default]
+    None,
+    Primary,
+    HighSchool,
+    University,
+}
+
 #[derive(Default, Serialize, Deserialize)]
 pub struct Citizens {
     pub active: Vec<bool>,
@@ -61,6 +73,11 @@ pub struct Citizens {
     /// Tick by which a grown child who has not found a home of their own leaves the city;
     /// `u64::MAX` for everyone else.
     pub move_by: Vec<u64>,
+    /// Highest school level finished (ADR 0055).
+    pub education: Vec<Education>,
+    /// Tick from which this job seeker may take a job that asks for more education than they
+    /// have; `u64::MAX` while not looking for work.
+    pub any_job_at: Vec<u64>,
     /// Tick the current or latest trip to work set out (ADR 0058); `u64::MAX` before the first.
     pub trip_start: Vec<u64>,
     /// Clock minutes the last trip to work took, waiting for a route included; 0 = none yet
@@ -98,6 +115,8 @@ impl Citizens {
         self.child.push(child);
         self.family.push(household);
         self.move_by.push(u64::MAX);
+        self.education.push(Education::None);
+        self.any_job_at.push(u64::MAX);
         self.trip_start.push(u64::MAX);
         self.commute.push(0);
         self.draw_car(id, !child, rng);

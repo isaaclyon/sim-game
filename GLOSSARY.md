@@ -25,6 +25,11 @@ _Avoid_: population, occupancy
 The number of citizens who live in the city, including those who are not travelling.
 _Avoid_: vehicle count, agent count
 
+**Education**:
+The highest school level a citizen has finished: none, primary, high school or university.
+Dense jobs prefer more of it and fill more slowly without it (ADR 0055).
+_Avoid_: skill, qualification
+
 **Trip**:
 A citizen's journey from one place to another for an activity, such as work, shopping or returning home.
 _Avoid_: route (when you mean the journey rather than its path)

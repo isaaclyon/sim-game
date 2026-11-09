@@ -11,6 +11,7 @@ impl World {
         self.residents.activities.push(Reverse((at, c)));
     }
     pub(in crate::world) fn schedule_search(&mut self, c: CitizenId, seconds: f32) {
+        self.start_seeking(c);
         let at = self.totals.tick + self.secs_to_ticks(seconds);
         self.citizens.job_due[c as usize] = at;
         self.residents.searches.push(Reverse((at, c)));
@@ -37,6 +38,7 @@ impl World {
             }
             if let Some(b) = self.choose_destination(c, true) {
                 self.citizens.job[i] = Some(b);
+                self.citizens.any_job_at[i] = u64::MAX;
                 self.residents.workers[b as usize] += 1;
                 self.residents.employed += 1;
                 // Employment changes the next departure, not the current activity.
