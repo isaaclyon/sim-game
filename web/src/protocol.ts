@@ -182,6 +182,14 @@ export const Zone = {
 } as const;
 export type Zone = (typeof Zone)[keyof typeof Zone];
 
+/** The city's era, matching the sim's `Era` (ADR 0056): a village becomes a town at
+ * `Stats.townPopulation` residents, and never goes back. */
+export const Era = {
+  Village: 0,
+  Town: 1,
+} as const;
+export type Era = (typeof Era)[keyof typeof Era];
+
 /** What a citizen is doing or travelling to do, matching the sim's `Activity`. */
 export const Activity = {
   Home: 0,
@@ -272,6 +280,10 @@ export interface Stats {
   unemployed: number;
   /** Sim-computed `unemployed` as a percentage of adults; 0 with no adults. */
   unemploymentPercent: number;
+  /** The city's era (ADR 0056). The village era refuses main roads and dense zones. */
+  era: Era;
+  /** Residents, children included, at which a village becomes a town. */
+  townPopulation: number;
   /** R/C/I demand from the sim, in people (ADR 0025). Growth also needs demand above its
    * land-value threshold, available power and, when dense, water; negative demand is a
    * surplus. */
@@ -406,11 +418,12 @@ export type FromWorker =
    */
   | { type: 'lots'; rings: Float32Array }
   /**
-   * `[zone, height, roof, front, n, x0, y0, …]` per active building, packed in building ID
+   * `[zone, height, roof, front, era, n, x0, y0, …]` per active building, packed in building ID
    * order, not indexed by ID. Height is metres; n is the footprint point count,
    * counter-clockwise, without a repeated closing point. Zone is the original use, not the
    * repainted zone. Roof is a stable palette index (0–3 for industry; 0 for other uses).
    * Front is the footprint edge, from point `front` to the next, facing the lot's road (ADR 0027).
+   * Era is the `Era` the building went up in, kept for life; it picks the look (ADR 0056).
    * Closing buildings stay until they empty out (ADR 0023). `ids` contains the stable ID
    * for each packed record in this same message, never a snapshot index.
    * Growth and closure are coalesced to at most four snapshots per real second. Start, edits and pause

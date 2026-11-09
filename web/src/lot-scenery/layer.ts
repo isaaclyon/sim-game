@@ -72,8 +72,8 @@ export class LotLayer {
     const sites = new Map<string, Site[]>();
     const data = this.buildings;
     for (let o = 0; o < data.length; ) {
-      const [zone, height, roof, front, n] = data.subarray(o, o + 5);
-      o += 5;
+      const [zone, height, roof, front, era, n] = data.subarray(o, o + 6);
+      o += 6;
       const ring: Pt[] = [];
       for (let i = 0; i < n; i++, o += 2) ring.push([data[o], data[o + 1]]);
       // Just inside the first edge works even for concave footprints whose centroid is outside.
@@ -83,7 +83,7 @@ export class LotLayer {
       const lot = candidates?.find((r) => inside(p, r));
       if (!lot) continue;
       const key = `${Math.floor(lot[0][0] / TILE)},${Math.floor(lot[0][1] / TILE)}`;
-      const site = { lot, building: { zone, height, roof, front, ring } };
+      const site = { lot, building: { zone, height, roof, front, era, ring } };
       const list = sites.get(key);
       if (list) list.push(site);
       else sites.set(key, [site]);

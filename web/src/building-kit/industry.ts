@@ -291,11 +291,16 @@ const silos: Part = (mb, b, box, style, rand, glass) => {
   }
 };
 
+const brickWorks = works('brick', brick);
+
 export const WORKSHOPS: Works[] = [
   works('portal', portal),
   works('monitor', monitor),
   works('arch', arch),
   works('units', units),
-  works('brick', brick),
+  brickWorks,
   works('silos', silos),
 ];
+
+/** Village workshops (ADR 0056): the classic shed and brick works, no modern units. */
+export const VILLAGE_WORKSHOPS: Works[] = [classic, classic, brickWorks];

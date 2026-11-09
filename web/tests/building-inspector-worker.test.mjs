@@ -22,7 +22,7 @@ async function town() {
 function records(w) {
   const { data, ids } = w.messages.findLast((m) => m.type === 'buildings');
   const out = [];
-  for (let o = 0, i = 0; o < data.length; o += 5 + 2 * data[o + 4], i++)
+  for (let o = 0, i = 0; o < data.length; o += 6 + 2 * data[o + 5], i++)
     out.push({ id: ids[i], zone: data[o] });
   assert.equal(ids.length, out.length, 'one stable ID per packed snapshot record');
   return out;

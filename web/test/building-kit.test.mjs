@@ -13,6 +13,7 @@ const record = (zone, height, roof, front, ring) => [
   height,
   roof,
   front,
+  1,
   ring.length,
   ...ring.flat(),
 ];

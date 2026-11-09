@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{Command, World};
 use crate::clock::clock_seconds;
+use crate::era::Era;
 use crate::geometry::{Shape, dist};
 use crate::power::{PlantKind, Power};
 use crate::road::{RoadClass, RoadNetwork};
@@ -27,22 +28,36 @@ pub const JOB_TAX: i64 = 1;
 /// first roads before taxes can, and covers the upkeep of about 20 km of street.
 pub const GRANT: i64 = 2_000;
 
-/// Dollars per metre of new road.
-fn build_rate(class: RoadClass) -> f64 {
-    match class {
-        RoadClass::Street => 10.0,
-        RoadClass::Main => 25.0,
-        RoadClass::Alley => 5.0,
+/// What a village pays for its roads, as a share of the town's rates: unpaved tracks cost half
+/// to build and to keep. The town's arrival raises upkeep to the town rate (ADR 0056).
+const VILLAGE_ROAD_SHARE: f64 = 0.5;
+
+/// The share of the town's road rates paid in `era`.
+fn era_share(era: Era) -> f64 {
+    match era {
+        Era::Village => VILLAGE_ROAD_SHARE,
+        Era::Town => 1.0,
     }
 }
 
-/// Dollars per metre of road per clock hour.
-fn upkeep_rate(class: RoadClass) -> f64 {
-    match class {
-        RoadClass::Street => 0.10,
-        RoadClass::Main => 0.25,
-        RoadClass::Alley => 0.05,
-    }
+/// Dollars per metre of new road in `era`.
+fn build_rate(class: RoadClass, era: Era) -> f64 {
+    era_share(era)
+        * match class {
+            RoadClass::Street => 10.0,
+            RoadClass::Main => 25.0,
+            RoadClass::Alley => 5.0,
+        }
+}
+
+/// Dollars per metre of road per clock hour in `era`.
+fn upkeep_rate(class: RoadClass, era: Era) -> f64 {
+    era_share(era)
+        * match class {
+            RoadClass::Street => 0.10,
+            RoadClass::Main => 0.25,
+            RoadClass::Alley => 0.05,
+        }
 }
 
 /// What a power plant costs to build, and its upkeep per clock hour (ADR 0052).
@@ -126,11 +141,11 @@ impl Default for Treasury {
     }
 }
 
-/// Upkeep per clock hour of every active road.
-pub(super) fn road_upkeep(roads: &RoadNetwork) -> i64 {
+/// Upkeep per clock hour of every active road in `era`.
+pub(super) fn road_upkeep(roads: &RoadNetwork, era: Era) -> i64 {
     let total: f64 = roads
         .active_roads()
-        .map(|r| f64::from(roads.lane_len[2 * r as usize]) * upkeep_rate(roads.road_class(r)))
+        .map(|r| f64::from(roads.lane_len[2 * r as usize]) * upkeep_rate(roads.road_class(r), era))
         .sum();
     total.round() as i64
 }
@@ -144,8 +159,8 @@ fn shape_len(shape: Shape) -> f32 {
 
 /// What building `plan` as `class` costs: the length of its new legs, plus the difference in
 /// build rate along followed roads it moves to a dearer class (ADR 0048). Other followed
-/// roads, and moves to a cheaper class, cost nothing.
-pub(super) fn plan_cost(roads: &RoadNetwork, plan: &Plan, class: RoadClass) -> i64 {
+/// roads, and moves to a cheaper class, cost nothing. Rates are `era`'s.
+pub(super) fn plan_cost(roads: &RoadNetwork, plan: &Plan, class: RoadClass, era: Era) -> i64 {
     let metres: f64 = plan
         .legs
         .iter()
@@ -160,11 +175,11 @@ pub(super) fn plan_cost(roads: &RoadNetwork, plan: &Plan, class: RoadClass) -> i
         .reclass
         .iter()
         .map(|&r| {
-            let extra = build_rate(class) - build_rate(roads.road_class(r));
+            let extra = build_rate(class, era) - build_rate(roads.road_class(r), era);
             f64::from(roads.lane_len[2 * r as usize]) * extra.max(0.0)
         })
         .sum();
-    (metres * build_rate(class) + upgrades).round() as i64
+    (metres * build_rate(class, era) + upgrades).round() as i64
 }
 
 impl World {
@@ -201,8 +216,12 @@ impl World {
     }
 
     /// What building the road through guided raw `[x, y, snap]` points (ADR 0038) would cost,
-    /// or None if it would be refused for its shape or the points are not a road.
+    /// or None if it would be refused for its shape or era (ADR 0056) or the points are not a
+    /// road.
     pub fn draft_cost(&self, raw: &[f32], class: RoadClass) -> Option<i64> {
+        if !self.allows_road(class) {
+            return None;
+        }
         match self.draft_command(raw, class)? {
             Command::BuildRoad { ax, ay, bx, by, .. } => self.road_cost(ax, ay, bx, by, class),
             Command::BuildCurve {
@@ -257,16 +276,16 @@ impl World {
     /// nothing. Changes nothing.
     pub fn class_cost(&self, x: f32, y: f32, class: RoadClass) -> Option<i64> {
         self.class_plan(x, y, class)
-            .map(|p| plan_cost(&self.roads, &p, class))
+            .map(|p| plan_cost(&self.roads, &p, class, self.era))
     }
 
     fn shape_cost(&self, shape: Shape, class: RoadClass) -> Option<i64> {
         crate::snap::plan(&self.roads, shape, Some(class))
-            .map(|p| plan_cost(&self.roads, &p, class))
+            .map(|p| plan_cost(&self.roads, &p, class, self.era))
     }
 
     pub(super) fn refresh_upkeep(&mut self) {
-        self.treasury.upkeep = road_upkeep(&self.roads) + self.fire_upkeep();
+        self.treasury.upkeep = road_upkeep(&self.roads, self.era) + self.fire_upkeep();
         self.treasury.utilities = utility_upkeep(&self.power, &self.water);
     }
 

@@ -2,7 +2,7 @@
 // options of their tools. The menu is built from it, so a new tool is one entry here and one
 // picture model in `pictures.ts`. Keys are shown in tooltips; main.ts handles them.
 import { ZONE_OVERLAY } from '../palette';
-import { PlantKind, RoadClass, Snap, WaterKind, Zone } from '../protocol';
+import { Era, PlantKind, RoadClass, Snap, WaterKind, Zone } from '../protocol';
 
 /** How the road tool works: draw a road of a shape, lay a grid of blocks, or click roads to
  * change their class. */
@@ -36,6 +36,15 @@ export type Picture =
       kind: 'icon';
       name: 'roads' | 'zones' | 'power' | 'water' | 'bulldoze' | 'views' | 'eraser';
     };
+
+/** The era that unlocks a tool (ADR 0056): the town brings main roads and dense zones. The
+ * sim refuses locked tools too; this only lets the menu and tools say so first. */
+export function unlockEra(tool: Tool | null): Era {
+  if (tool?.kind === 'road' && tool.roadClass === RoadClass.Main) return Era.Town;
+  const dense: Zone[] = [Zone.ResidentialHigh, Zone.CommercialHigh, Zone.IndustrialHigh];
+  if (tool?.kind === 'zone' && dense.includes(tool.zone)) return Era.Town;
+  return Era.Village;
+}
 
 /** A stable name for a picture model, so each is drawn once. */
 export function pictureKey(p: Picture): string {

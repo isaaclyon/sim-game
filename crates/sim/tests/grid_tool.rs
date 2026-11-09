@@ -3,7 +3,7 @@
 use sim::rng::Rng;
 use sim::road::{RoadClass, RoadNetwork};
 use sim::world::{GridPreview, START_FUNDS};
-use sim::{Command, Config, World};
+use sim::{Command, Config, Era, World};
 
 #[allow(clippy::too_many_arguments)]
 fn grid(
@@ -28,8 +28,9 @@ fn grid(
     }
 }
 
+/// Empty land in the town era, so main road grids are unlocked (ADR 0056).
 fn empty() -> World {
-    World::empty(Config::default(), 30, 30)
+    World::empty(Config::default(), 30, 30).with_era(Era::Town)
 }
 
 /// A small town: a perfect 4 × 4 street lattice 100 m apart, from (0, 0) to (300, 300).

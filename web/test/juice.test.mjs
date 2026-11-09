@@ -6,7 +6,7 @@ import { buildScaffoldGeometry } from '../src/building-kit/scaffold.ts';
 import { PREVIEW_REFUSED_COLOR, ToolPreview } from '../src/tool-preview.ts';
 import { FLASH_SECONDS, ZoneOverlay } from '../src/zone-overlay.ts';
 
-const house = (x) => [1, 8, 0, 0, 4, x, 0, x + 12, 0, x + 12, 10, x, 10];
+const house = (x) => [1, 8, 0, 0, 1, 4, x, 0, x + 12, 0, x + 12, 10, x, 10];
 const snapshot = (...xs) => new Float32Array(xs.flatMap(house));
 const tiles = (layer) => layer.group.children.filter((m) => m.scale.y === 1).length;
 

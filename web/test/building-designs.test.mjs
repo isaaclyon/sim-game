@@ -9,7 +9,15 @@ const rect = (x, z, w, d) => [
   [x + w, z + d],
   [x, z + d],
 ];
-const record = (b) => [b.zone, b.height, b.roof, b.front, b.ring.length, ...b.ring.flat()];
+const record = (b) => [
+  b.zone,
+  b.height,
+  b.roof,
+  b.front,
+  b.era ?? 1,
+  b.ring.length,
+  ...b.ring.flat(),
+];
 const box = (b) => {
   const g = buildBuildingGeometry(new Float32Array(record(b)));
   g.computeBoundingBox();

@@ -43,7 +43,7 @@ test('paused lighting holds time while shadows follow the reflected camera focus
 });
 
 test('buildings emit only on window faces, with stable geometry across rebuilds', () => {
-  const data = new Float32Array([2, 15, 0, 0, 4, 0, 0, 18, 0, 18, 14, 0, 14]);
+  const data = new Float32Array([2, 15, 0, 0, 1, 4, 0, 0, 18, 0, 18, 14, 0, 14]);
   const g = buildBuildingGeometry(data);
   const glow = g.getAttribute('nightEmission');
   assert.equal(glow.count, g.getAttribute('position').count);

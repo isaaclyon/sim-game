@@ -23,6 +23,8 @@ export function readStats(s: Sim): Stats {
     children: st.children,
     unemployed: st.unemployed,
     unemploymentPercent: st.unemployment_percent,
+    era: st.era as Stats['era'],
+    townPopulation: st.town_population,
     demand: {
       residential: st.demand_residential,
       commercial: st.demand_commercial,

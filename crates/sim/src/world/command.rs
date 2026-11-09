@@ -7,6 +7,7 @@ use crate::zone::Zone;
 
 /// Player actions. Everything that changes the world from outside goes through `World::apply`,
 /// so the seed plus a command log is enough to replay a session (`crate::replay`, ADR 0034).
+/// Main roads and dense zones are refused until the town era unlocks them (ADR 0056).
 #[derive(Clone, Debug, PartialEq)]
 pub enum Command {
     SpawnAgents {

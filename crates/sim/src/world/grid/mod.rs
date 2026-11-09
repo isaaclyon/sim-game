@@ -13,6 +13,7 @@ pub use draft::GridPreview;
 use std::collections::BTreeSet;
 
 use super::money;
+use crate::era::Era;
 use crate::geometry::{Point, Shape};
 use crate::road::{NodeId, RoadClass, RoadNetwork};
 use crate::snap::{self, Join, Plan};
@@ -115,7 +116,7 @@ impl Lattice {
 }
 
 /// Plans `lattice` as `class` against `net` (ADR 0049). Changes nothing.
-pub(crate) fn plan(net: &RoadNetwork, lattice: &Lattice, class: RoadClass) -> GridPlan {
+pub(crate) fn plan(net: &RoadNetwork, lattice: &Lattice, class: RoadClass, era: Era) -> GridPlan {
     let edges = lattice.edges();
     // 1. Edges with existing roads alongside give way to them.
     let fits: Vec<Fit> = edges.iter().map(|e| sliver::fit(net, e.a, e.b)).collect();
@@ -201,7 +202,7 @@ pub(crate) fn plan(net: &RoadNetwork, lattice: &Lattice, class: RoadClass) -> Gr
             out.dropped.push([e.a.0, e.a.1, e.b.0, e.b.1]);
             continue;
         }
-        out.cost += money::plan_cost(&scratch, &plan, class);
+        out.cost += money::plan_cost(&scratch, &plan, class, era);
         let code = |join: Join| match join {
             Join::New => 0.0,
             Join::Split(_) => 2.0,

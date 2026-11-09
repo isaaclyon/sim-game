@@ -16,7 +16,15 @@ const rect = (x, y, w, d) => [
 ];
 const lot = rect(0, 0, 28, 40);
 const building = (zone = 1) => ({ zone, height: 6, roof: 0, front: 0, ring: rect(7, 6, 14, 14) });
-const record = (b) => [b.zone, b.height, b.roof, b.front, b.ring.length, ...b.ring.flat()];
+const record = (b) => [
+  b.zone,
+  b.height,
+  b.roof,
+  b.front,
+  b.era ?? 1,
+  b.ring.length,
+  ...b.ring.flat(),
+];
 const packedLots = (...rings) => new Float32Array(rings.flatMap((r) => [r.length, ...r.flat()]));
 const packedBuildings = (...bs) => new Float32Array(bs.flatMap(record));
 const buildLotGeometry = (lot, b, roads, ground = true) => {

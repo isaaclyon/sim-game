@@ -94,3 +94,10 @@ export function placeText(name: string, price: Price | undefined, affordable: bo
   if (!affordable) return `Not enough money: a ${name.toLowerCase()} costs ${dollars(price.cost)}.`;
   return `${name}: ${dollars(price.cost)}, then ${dollars(price.upkeep)} an hour.`;
 }
+
+/** Why a locked tool cannot be used yet (ADR 0056): it waits for the town. */
+export function lockedText(needed: number): string {
+  const more =
+    needed === 1 ? '1 more resident' : `${needed.toLocaleString('en-US')} more residents`;
+  return `Unlocks in the town era, ${more} needed.`;
+}

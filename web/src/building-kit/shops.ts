@@ -178,13 +178,20 @@ const cafe: Part = (mb, b, box, style, rand, glass) => {
   trading(mb, b, style, s.wall, glass, { awning: colour, stripes });
 };
 
+const hipped: Archetype = { name: 'hip', draw: hip };
+const falseFronted: Archetype = { name: 'false-front', draw: falseFront };
+const gableFronted: Archetype = { name: 'gable-front', draw: gableFront };
+
 export const SHOPS: Archetype[] = [
   { name: 'flat', draw: flat },
-  { name: 'hip', draw: hip },
-  { name: 'false-front', draw: falseFront },
+  hipped,
+  falseFronted,
   { name: 'diner', draw: diner },
-  { name: 'gable-front', draw: gableFront },
+  gableFronted,
   { name: 'canopy', draw: canopy },
   { name: 'sign', draw: sign },
   { name: 'cafe', draw: cafe },
 ];
+
+/** Village shops (ADR 0056): pitched roofs and false fronts, no diners or chrome canopies. */
+export const VILLAGE_SHOPS: Archetype[] = [hipped, falseFronted, gableFronted, gableFronted];

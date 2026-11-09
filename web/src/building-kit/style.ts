@@ -1,5 +1,5 @@
-// The kit's look as data. An era (ROADMAP M6) supplies another `Style`; the grammar in
-// `kit.ts` stays the same. Colours are albedo hex values from the art-pass design.
+// The kit's look as data. Each era supplies a `Style` (ADR 0056); the grammar in `kit.ts`
+// stays the same. Colours are albedo hex values from the art-pass design.
 
 export interface Style {
   /** Low-density homes: pitched roofs, chimneys, a front door. */
@@ -99,4 +99,38 @@ export const PRESENT_DAY: Style = {
   door: 0x7a5f4e,
   plinth: 0x8c877f,
   trim: { light: 0xf7f4ee, dark: 0x4d4a47 },
+};
+
+/** Village buildings (ADR 0056): limewash and fieldstone under thatch, old tile and slate,
+ * with dark timber doors and no chrome. */
+export const VILLAGE: Style = {
+  ...PRESENT_DAY,
+  resLow: {
+    walls: [0xf1ead9, 0xe6d9bd, 0xd8cdb8, 0xc9b79a, 0xeee2c8],
+    roofs: [0xa8935f, 0x8f7a4e, 0x9b5f45],
+    pitch: [42, 50],
+    modern: [0x6b5a48, 0x8a6b4f, 0xe9e1cf, 0x5d5348],
+    slate: 0x5a5d63,
+  },
+  comLow: {
+    walls: [0xe9dcc2, 0xd2b893, 0xc9b79a, 0xb8a58a],
+    roof: 0x7c6b55,
+    canopy: 0xd9cdb4,
+    chrome: 0x6b5a48,
+  },
+  industry: {
+    ...PRESENT_DAY.industry,
+    walls: [0xc9b79a, 0xb8a58a, 0xa89b86],
+    roofs: [0x7c6b55, 0x8f7a4e, 0x9b5f45, 0x5a5d63],
+    door: 0x5b4636,
+    metal: [0x8a7d6a, 0x7c6b55, 0x9a8b72, 0xa89b86],
+    doors: [0x5b4636, 0x6b5a48, 0x4f5a3e, 0x7a4a36],
+  },
+  awnings: [0x7a5a3c, 0x5d6b4a, 0x8a4f3c, 0x6b5a48],
+  shopGlass: 0x4d5a63,
+  glass: 0x56636d,
+  chimney: 0x8a7d70,
+  door: 0x5b4636,
+  plinth: 0x8d8475,
+  trim: { light: 0xefe7d6, dark: 0x3f3a35 },
 };

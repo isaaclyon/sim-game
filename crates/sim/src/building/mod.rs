@@ -9,6 +9,7 @@ mod footprint;
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
 
+use crate::era::Era;
 use crate::geometry::Point;
 use crate::lot::{LotId, Lots};
 use crate::rng::Rng;
@@ -40,6 +41,8 @@ pub struct Buildings {
     pub height: Vec<f32>,
     /// Stable palette choice; zero outside industry.
     pub roof: Vec<u8>,
+    /// The city's era when the building went up; kept for life, looks only (ADR 0056).
+    pub era: Vec<Era>,
     pub active: Vec<bool>,
     outline_start: Vec<u32>,
     outline: Vec<Point>,
@@ -260,14 +263,15 @@ impl Buildings {
         })
     }
 
-    /// Puts up a planned building.
-    pub(crate) fn commit(&mut self, plan: Plan) {
+    /// Puts up a planned building in the city's `era`.
+    pub(crate) fn commit(&mut self, plan: Plan, era: Era) {
         let id = self.active.len() as BuildingId;
         self.owner[plan.lot as usize] = Some(id);
         self.lot.push(plan.lot);
         self.zone.push(plan.zone);
         self.height.push(plan.height);
         self.roof.push(plan.roof);
+        self.era.push(era);
         self.active.push(true);
         if self.outline_start.is_empty() {
             self.outline_start.push(0);
@@ -277,9 +281,10 @@ impl Buildings {
         self.version = self.version.wrapping_add(1);
     }
 
-    /// `[zone, height, roof, front, n, x0, y0, …]` per active building in id order, not indexed
-    /// by id. `front` is the footprint edge (from point `front` to the next) facing the lot's
-    /// road; it is derived here for drawing and is not stored or hashed.
+    /// `[zone, height, roof, front, era, n, x0, y0, …]` per active building in id order, not
+    /// indexed by id. `front` is the footprint edge (from point `front` to the next) facing the
+    /// lot's road; it is derived here for drawing and is not stored or hashed. `era` is the
+    /// `Era` it was built in (ADR 0056).
     pub fn write_snapshot(&self, lots: &Lots, out: &mut Vec<f32>) {
         out.clear();
         for b in self.active_buildings() {
@@ -292,6 +297,7 @@ impl Buildings {
                 self.height[i],
                 self.roof[i] as f32,
                 front_edge(ring, facing) as f32,
+                self.era[i] as u8 as f32,
                 ring.len() as f32,
             ]);
             out.extend(ring.iter().flat_map(|p| [p.0, p.1]));
@@ -306,6 +312,7 @@ impl Buildings {
             mix(self.zone[b] as u64);
             mix(self.height[b].to_bits() as u64);
             mix(self.roof[b] as u64);
+            mix(self.era[b] as u64);
             let ring = self.footprint(b as BuildingId);
             mix(ring.len() as u64);
             for p in ring {
@@ -364,6 +371,7 @@ impl Buildings {
             self.zone.len(),
             self.height.len(),
             self.roof.len(),
+            self.era.len(),
         ];
         lens(&fields, n, "building fields")?;
         csr(

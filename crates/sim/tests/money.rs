@@ -3,7 +3,7 @@
 //! is refused.
 use sim::road::RoadClass;
 use sim::world::{GRANT, JOB_TAX, Money, RESIDENT_TAX, START_FUNDS};
-use sim::{Command, Config, World, Zone};
+use sim::{Command, Config, Era, World, Zone};
 
 /// Ticks in one clock hour at the default `dt` (`sim::clock`: 18 clock seconds per sim second).
 const HOUR: u32 = 2_000;
@@ -57,7 +57,8 @@ fn the_grant_arrives_every_clock_hour_before_anything_is_built() {
 
 #[test]
 fn building_charges_what_the_preview_quotes_by_length_and_class() {
-    let mut w = World::empty(Config::default(), 20, 20);
+    // Town rates; a village pays half (ADR 0056, tests/eras.rs).
+    let mut w = World::empty(Config::default(), 20, 20).with_era(Era::Town);
     let quote = w.road_cost(0.0, 0.0, 1000.0, 0.0, RoadClass::Street);
     assert_eq!(quote, Some(10_000));
     assert!(road(&mut w, 0.0, 0.0, 1000.0, 0.0, RoadClass::Street));
@@ -75,7 +76,8 @@ fn building_charges_what_the_preview_quotes_by_length_and_class() {
 
 #[test]
 fn a_crossing_pays_for_its_whole_length_and_a_duplicate_is_refused() {
-    let mut w = World::empty(Config::default(), 20, 20);
+    // Town rates; a village pays half (ADR 0056, tests/eras.rs).
+    let mut w = World::empty(Config::default(), 20, 20).with_era(Era::Town);
     assert!(road(&mut w, 0.0, 0.0, 500.0, 0.0, RoadClass::Street));
     assert_eq!(w.road_cost(0.0, 0.0, 500.0, 0.0, RoadClass::Street), None);
     assert_eq!(
@@ -87,7 +89,8 @@ fn a_crossing_pays_for_its_whole_length_and_a_duplicate_is_refused() {
 
 #[test]
 fn a_road_the_city_cannot_afford_is_refused_and_changes_nothing() {
-    let mut w = World::empty(Config::default(), 60, 60);
+    // The town era unlocks main roads (ADR 0056), so only money refuses this one.
+    let mut w = World::empty(Config::default(), 60, 60).with_era(Era::Town);
     let hash = w.state_hash();
     // 7 km of main road at $25/m is $175,000, more than a fresh city has.
     assert_eq!(
@@ -102,7 +105,8 @@ fn a_road_the_city_cannot_afford_is_refused_and_changes_nothing() {
 
 #[test]
 fn upkeep_is_charged_each_clock_hour() {
-    let mut w = World::empty(Config::default(), 60, 60);
+    // Town rates; a village pays half (ADR 0056, tests/eras.rs).
+    let mut w = World::empty(Config::default(), 60, 60).with_era(Era::Town);
     assert!(road(&mut w, 0.0, 0.0, 1000.0, 0.0, RoadClass::Street));
     assert_eq!(
         money(&w).upkeep,
@@ -167,7 +171,8 @@ fn a_city_in_debt_can_still_make_free_edits() {
 
 #[test]
 fn upkeep_accrues_by_the_minute_without_losing_fractions() {
-    let mut w = World::empty(Config::default(), 20, 20);
+    // Town rates; a village pays half (ADR 0056, tests/eras.rs).
+    let mut w = World::empty(Config::default(), 20, 20).with_era(Era::Town);
     assert!(road(&mut w, 0.0, 0.0, 300.0, 0.0, RoadClass::Street));
     let start = money(&w).balance;
     assert_eq!(money(&w).upkeep, 30);

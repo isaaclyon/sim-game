@@ -1,4 +1,4 @@
-// Three.js scene: roads as asphalt ribbons and pads, agents drawn by `AgentLayer`. Sim (x, y) maps
+// Three.js scene: roads as flat ribbons and pads (`RoadSurface`), agents drawn by `AgentLayer`. Sim (x, y) maps
 // to scene-local (x, z), then world (x, -z) with y up (see scene.ts).
 //
 // Current choices, all cheap to change:
@@ -29,13 +29,12 @@ import { carPosition, nearestCar } from './car-pick';
 import { FireLayer } from './fire-layer.ts';
 import { compactMaterial, Lighting, nightMaterial } from './lighting.ts';
 import { LotLayer } from './lot-scenery/layer.ts';
-import { ROADS, SIDEWALK, SKY } from './palette';
+import { SKY } from './palette';
 import { PollutionOverlay } from './pollution-overlay.ts';
 import { PowerLayer } from './power-layer.ts';
 import type { Spot } from './power-tools.ts';
-import type { FromWorker } from './protocol.ts';
-import { buildRoadGeometry } from './road-geometry';
-import { buildRoadMarkings } from './road-markings.ts';
+import type { Era, FromWorker } from './protocol.ts';
+import { RoadSurface } from './road-surface.ts';
 import { createSimScene } from './scene';
 import { Scenery } from './scenery/index.ts';
 import { SignalLayer } from './signal-layer.ts';
@@ -50,8 +49,6 @@ import { ZoneOverlay } from './zone-overlay';
 
 CameraControls.install({ THREE });
 
-const ROAD_COLORS = ROADS.map((c) => new THREE.Color(c));
-const SIDEWALK_WIDTH = 2;
 /** Rising buildings, paint flashes and gliding markers skip their motion when asked. */
 const reducedMotion = (): boolean =>
   globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
@@ -65,9 +62,7 @@ export class Renderer {
   /** Held-key camera motion; main.ts reports the keys each frame. */
   readonly keyCamera: KeyCamera;
   private readonly clock = new THREE.Clock();
-  private roads?: THREE.Mesh;
-  private sidewalks?: THREE.Mesh;
-  private markings?: THREE.Mesh;
+  private readonly roads = new RoadSurface();
   private readonly lighting = new Lighting(this.scene);
   private readonly buildings = new BuildingLayer(
     compactMaterial(nightMaterial(this.lighting.night, this.lighting.lightHour)),
@@ -103,6 +98,7 @@ export class Renderer {
     });
     this.scene.add(
       this.scenery.group,
+      this.roads.group,
       this.lotScenery.group,
       this.overlay.group,
       this.pollution.group,
@@ -146,24 +142,7 @@ export class Renderer {
 
   /** `segments` is `[ax, ay, bx, by, class]` per active rendered segment (many per curve), not per road ID. */
   setRoads(segments: Float32Array, bounds: [number, number, number, number], fitCamera: boolean) {
-    this.sidewalks = this.flatLayer(
-      this.sidewalks,
-      buildRoadGeometry(segments, SIDEWALK_WIDTH),
-      new THREE.MeshLambertMaterial({ color: SIDEWALK }),
-      3,
-    );
-    this.roads = this.flatLayer(
-      this.roads,
-      buildRoadGeometry(segments, 0, ROAD_COLORS),
-      new THREE.MeshLambertMaterial({ vertexColors: true }),
-      4,
-    );
-    this.markings = this.flatLayer(
-      this.markings,
-      buildRoadMarkings(segments),
-      new THREE.MeshLambertMaterial({ vertexColors: true }),
-      5,
-    );
+    this.roads.set(segments);
     this.scenery.setRoads(segments);
     this.lotScenery.setRoads(segments);
     this.streetlights.set(segments);
@@ -187,27 +166,6 @@ export class Renderer {
         ),
       );
     }
-  }
-
-  /** Swaps `geometry` into `mesh`, or makes a flat transparent-pass mesh at `order`. */
-  private flatLayer(
-    mesh: THREE.Mesh | undefined,
-    geometry: THREE.BufferGeometry,
-    material: THREE.Material,
-    order: number,
-  ): THREE.Mesh {
-    if (mesh) {
-      mesh.geometry.dispose();
-      mesh.geometry = geometry;
-      return mesh;
-    }
-    Object.assign(material, { transparent: true, depthWrite: false });
-    const created = new THREE.Mesh(geometry, material);
-    created.receiveShadow = true;
-    created.renderOrder = order;
-    created.frustumCulled = false;
-    this.scene.add(created);
-    return created;
   }
 
   /**
@@ -462,6 +420,11 @@ export class Renderer {
   /** The build menu's pictures, drawn once from the game's models: data URLs by `pictureKey`. */
   drawPictures(pictures: Picture[]): Map<string, string> {
     return drawPictures(this.renderer, pictures);
+  }
+
+  /** The city's era from frame stats: dirt village roads or paved town ones (ADR 0056). */
+  setEra(era: Era) {
+    this.roads.setEra(era);
   }
 
   /** Snapshot time only: paused frames keep the same lighting. */

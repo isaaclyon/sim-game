@@ -12,7 +12,7 @@ const rect = (x, y, w, d) => [
   [x + w, y + d],
   [x, y + d],
 ];
-const record = (zone, ring) => [zone, 15, 0, 0, ring.length, ...ring.flat()];
+const record = (zone, ring) => [zone, 15, 0, 0, 1, ring.length, ...ring.flat()];
 
 /** Bytes the geometry holds per vertex, counting each shared interleaved buffer once. */
 function bytesPerVertex(g) {
