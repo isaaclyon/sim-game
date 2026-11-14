@@ -144,7 +144,7 @@
 .debug {
   position: fixed;
   left: 10px;
-  top: 72px;
+  top: var(--below-top-bar, 72px);
   z-index: 15;
   margin: 0;
   padding: 10px 12px;
@@ -156,7 +156,7 @@
 /* The inspector card: who or what is selected, one small icon per line. */
 .card {
   position: fixed;
-  top: 72px;
+  top: var(--below-top-bar, 72px);
   right: 10px;
   z-index: 12;
   width: 290px;

@@ -200,15 +200,48 @@
 .menu-button[aria-expanded="true"] {
   background: var(--control-hover);
 }
-@media (max-width: 1100px) {
-  #top-bar {
-    gap: 6px;
-    font-size: 13px;
-  }
-  .demand {
-    grid-template-columns: auto 64px;
-  }
-  .clock {
-    min-width: 0;
-  }
+
+/* A narrow window: fit.ts adds the first of these levels whose content fits, each on top of
+   the ones before. Items keep their own width so the overflow can be measured. */
+#top-bar > * {
+  flex-shrink: 0;
+}
+/* 1: the same content, packed tighter. */
+#top-bar.fit-1 {
+  gap: 4px;
+  padding: 0 6px 0 12px;
+}
+.fit-1 .clock {
+  min-width: 0;
+  font-size: 15px;
+}
+.fit-1 .demand {
+  grid-template-columns: auto 64px;
+}
+.fit-1 .figure {
+  padding: 0 6px;
+  gap: 6px;
+  font-size: 15px;
+}
+.fit-1 .speeds button {
+  min-width: 34px;
+  padding: 0 6px;
+}
+/* 2: the save status moves to the menu, unless saving failed. */
+.fit-2 .save-badge:not([data-error="true"]) {
+  display: none;
+}
+/* 3: figures drop what their panels repeat. A fire warning keeps its words. */
+#top-bar.fit-3 .divider,
+.fit-3 .figure .rate,
+.fit-3 #fire:not(.warning, .caution) #fire-value {
+  display: none;
+}
+/* 4: more rows. */
+#top-bar.fit-4 {
+  flex-wrap: wrap;
+  height: auto;
+  min-height: 52px;
+  padding: 6px 8px;
+  row-gap: 2px;
 }

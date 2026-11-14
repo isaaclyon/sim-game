@@ -17,6 +17,7 @@ import {
   waterAdvice,
   waterFigures,
 } from './figures';
+import { watchFit } from './fit';
 import type { Popovers } from './popover';
 
 type Lookup = (id: string) => HTMLElement;
@@ -72,6 +73,7 @@ export class TopBar {
         popovers.close();
         actions.openCategory(category, e?.detail === 0);
       };
+    watchFit(byId('top-bar'));
     byId('fire-setting').onclick = () => actions.setFires(!this.firesOn);
     byId('show-fire').onclick = () => {
       const at = this.fireToShow();
