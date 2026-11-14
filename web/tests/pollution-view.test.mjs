@@ -65,10 +65,10 @@ test('plain haze darkens with the ground at night; the pollution views stay read
   assert.equal(material().type, 'MeshLambertMaterial');
 });
 
-test('P cycles the pollution views, land value, happiness, traffic and services, then back to plain', async () => {
+test('P cycles the pollution views, land value, happiness, traffic, services and schools, then back to plain', async () => {
   const t = await tools();
   const views = [];
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < 9; i++) {
     t.key('p');
     views.push(t.previews.findLast((p) => p.type === 'pollutionView').view);
   }
@@ -80,6 +80,7 @@ test('P cycles the pollution views, land value, happiness, traffic and services,
     'happiness',
     'traffic',
     'services',
+    'schools',
     'plain',
   ]);
   t.reply({

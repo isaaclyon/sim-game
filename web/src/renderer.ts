@@ -247,6 +247,12 @@ export class Renderer {
     return this.buildings.pick(ray);
   }
 
+  /** Stable building ID of the school whose site is under this screen point, or null. */
+  schoolAt(clientX: number, clientY: number): number | null {
+    const p = this.pick(clientX, clientY);
+    return p && this.ground.schools.at(p.x, p.z);
+  }
+
   /** Eases the camera toward agent `agent`; holds still and returns false while it is hidden. */
   follow(agent: number, seconds: number): boolean {
     if (!carPosition(this.agents.drawn, this.scene, agent, this.look)) return false;

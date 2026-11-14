@@ -48,6 +48,24 @@ test('homes show live resident counts; workplaces show total, filled and unfille
     });
     assert.match(text(t), /^Closing/m);
   }
+  const school = {
+    ...home,
+    building: 31,
+    zone: 7,
+    capacity: 4,
+    occupied: 3,
+    seats: 60,
+    pupils: 12,
+  };
+  const asked = select(t, school);
+  assert.match(text(t), /^Primary school #31$/m);
+  assert.match(text(t), /^Seats: 60$/m);
+  assert.match(text(t), /^Pupils: 12$/m);
+  assert.match(text(t), /^Free seats: 48$/m);
+  assert.match(text(t), /^Teachers: 3 of 4 jobs filled$/m);
+  assert.doesNotMatch(text(t), /density/);
+  t.reply({ type: 'building', selection: asked.selection, building: { ...school, pupils: 60 } });
+  assert.match(text(t), /^Full: more children need another school$/m);
 });
 
 test('building and citizen selections replace each other; stale replies and removal cannot reopen panels', async () => {

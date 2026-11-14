@@ -63,7 +63,10 @@ pub use money::{
 pub use overlays::{GAP_FIRE, GAP_POWER, GAP_WATER, TRAFFIC_STRIDE};
 pub use persist::{SAVE_VERSION, SaveError};
 pub use power::{PLANT_STRIDE, POWER_BUILDING_STRIDE, PowerStats};
-pub use school::{SCHOOL_STRIDE, SchoolKind, SchoolStats, Schools};
+pub use school::{
+    AREA_HIGH, AREA_PRIMARY, EducationStats, SCHOOL_ROAD_STRIDE, SCHOOL_STRIDE, SCHOOL_VIEW_STRIDE,
+    SchoolInfo, SchoolKind, SchoolStats, Schools,
+};
 pub use water::{WATER_BUILDING_STRIDE, WATER_PIECE_STRIDE, WaterStats};
 
 /// Floats per agent in `write_agent_snapshot`.
@@ -101,6 +104,8 @@ pub struct Stats {
     pub fire: FireStats,
     /// Average mood and complaints (ADR 0058).
     pub happiness: HappinessStats,
+    /// Adults by schooling and children without a seat (ADR 0055).
+    pub education: EducationStats,
     /// Synthetic vehicles waiting between random trips; dormant citizen slots are excluded.
     pub parked: u32,
     pub awaiting_path: u32,
@@ -440,6 +445,7 @@ impl World {
         s.fire = self.fire_stats();
         s.era = self.era;
         s.happiness = self.happiness_stats();
+        s.education = self.education_stats();
         if adults > 0 {
             s.unemployment_percent = s.unemployed as f32 * 100.0 / adults as f32;
         }

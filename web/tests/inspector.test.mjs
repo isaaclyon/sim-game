@@ -23,6 +23,9 @@ const resident = {
   mood: 62,
   complaints: [],
   commute: 0,
+  education: 2,
+  school: null,
+  riding: false,
 };
 const inspects = (t) => t.messages.filter((m) => m.type === 'inspect');
 /** Clicks car `agent` in idle mode and answers as the worker would. */
@@ -63,6 +66,7 @@ const showCars = (t) =>
         destroyed: 0,
       },
       happiness: { average: 50, complaints: [0, 0, 0, 0, 0, 0, 0] },
+      education: { adults: [0, 0, 0, 0], unschooled: 0 },
       balance: 100_000,
       taxes: 0,
       grant: 0,
@@ -142,6 +146,26 @@ test('the panel tells the truth about each state', async () => {
   assert.match(
     show({ ...pupil, driving: false, destination: null, location: school }),
     /^At school, primary school #12$/m,
+  );
+  assert.match(child, /^No school seat: stays home$/m);
+  assert.match(show({ ...pupil, school, education: 0 }), /^School: primary school #12$/m);
+  assert.match(
+    show({ ...pupil, school: { building: 13, zone: 8 }, education: 1 }),
+    /^School: high school #13, finished primary school$/m,
+  );
+  assert.match(
+    show({ ...pupil, driving: false, riding: true, destination: school }),
+    /^Riding to school at primary school #12, driven by family$/m,
+  );
+  assert.match(
+    show({ ...pupil, driving: false, riding: true, activity: Activity.Home, destination: null }),
+    /^Riding home, driven by family$/m,
+  );
+  assert.match(show({}), /^Education: high school$/m);
+  assert.match(show({ education: 0 }), /^Education: no schooling$/m);
+  assert.match(
+    show({ activity: Activity.SchoolRun, destination: school }),
+    /^Driving children to or from school at primary school #12$/m,
   );
   assert.match(show({ driving: false, onFoot: true }), /^Walking to work at factory #40$/m);
   assert.match(

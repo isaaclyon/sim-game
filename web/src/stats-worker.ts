@@ -1,7 +1,7 @@
 // The sim's figures for the frame's `stats`: the worker converts names, nothing more.
 import { readFireStats } from './fire-worker';
 import { Sim } from './pkg/sim_wasm';
-import type { HappinessStats, Price, Prices, Stats } from './protocol';
+import type { EducationStats, HappinessStats, Price, Prices, Stats } from './protocol';
 
 /** The sim's price list (`Sim.prices`): `[cost, upkeep]` for coal, solar, wind, pump, tower
  * fire station, primary school and high school. */
@@ -20,6 +20,13 @@ export function readPrices(): Prices {
 function readHappiness(s: Sim): HappinessStats {
   const [average, ...complaints] = s.happiness_stats();
   return { average, complaints };
+}
+
+/** `Sim.education_stats`: adults by level (none, primary, high, university), then children
+ * without a school seat. */
+function readEducation(s: Sim): EducationStats {
+  const d = s.education_stats();
+  return { adults: Array.from(d.subarray(0, 4)), unschooled: d[4] };
 }
 
 /** The sim's figures now; see `Stats`. */
@@ -75,6 +82,7 @@ export function readStats(s: Sim): Stats {
     utilities: st.utilities,
     fire: readFireStats(s),
     happiness: readHappiness(s),
+    education: readEducation(s),
   };
   st.free();
   return out;

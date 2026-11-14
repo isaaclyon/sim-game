@@ -79,7 +79,8 @@ pub struct SimStats {
 
 /// One citizen's details for the inspector (ADR 0022); see `World::citizen_info`. Places are
 /// building IDs with their original use as a zone byte; `None` when absent or removed.
-/// `activity` is 0 = home, 1 = work, 2 = shop, 3 = school (a child's school day, ADR 0055).
+/// `activity` is 0 = home, 1 = work, 2 = shop, 3 = school (a child's school day), 4 = school run (an
+/// adult driving children to or from school; ADR 0055).
 #[wasm_bindgen(getter_with_clone)]
 pub struct CitizenView {
     pub name: String,
@@ -110,6 +111,13 @@ pub struct CitizenView {
     pub complaints: Vec<u8>,
     /// Clock minutes the last trip to work took; 0 = none yet or no job.
     pub commute: u32,
+    /// `sim::citizen::Education`: 0 = none, 1 = primary, 2 = high school, 3 = university.
+    pub education: u8,
+    /// The school a child holds a seat at.
+    pub school: Option<u32>,
+    pub school_zone: Option<u8>,
+    /// A child in an adult's car on a lift; `destination` is where the car takes them.
+    pub riding: bool,
 }
 
 /// Sim-owned counts for one standing building; no attendance or visitor counts.
@@ -124,6 +132,9 @@ pub struct BuildingView {
     pub powered: bool,
     /// Has water, or is low density and does not need it (ADR 0052).
     pub watered: bool,
+    /// A school's seats and seats taken (ADR 0055); `None` for anything else.
+    pub seats: Option<u32>,
+    pub pupils: Option<u32>,
 }
 
 impl Sim {
@@ -244,6 +255,7 @@ impl Sim {
 
     pub fn building_info(&self, id: u32) -> Option<BuildingView> {
         let b = self.world.building_info(id)?;
+        let school = self.world.school_info(id);
         Some(BuildingView {
             building: b.building,
             zone: b.zone as u8,
@@ -252,6 +264,8 @@ impl Sim {
             closing: b.closing,
             powered: self.world.building_powered(id),
             watered: self.world.building_watered(id),
+            seats: school.map(|s| s.seats),
+            pupils: school.map(|s| s.pupils),
         })
     }
 
@@ -319,6 +333,7 @@ impl Sim {
         let (job, job_zone) = split(c.job);
         let (location, location_zone) = split(c.location);
         let (destination, destination_zone) = split(c.destination);
+        let (school, school_zone) = split(c.school);
         Some(CitizenView {
             name: c.name,
             resident: c.resident,
@@ -341,6 +356,10 @@ impl Sim {
             mood: c.mood,
             complaints: c.complaints.iter().map(|&k| k as u8).collect(),
             commute: c.commute,
+            education: c.education as u8,
+            school,
+            school_zone,
+            riding: c.riding,
         })
     }
 

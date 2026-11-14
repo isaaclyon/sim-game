@@ -2,9 +2,10 @@
 // thread only sends commands and draws snapshots.
 
 import type { HistoryCommand, HistoryMessage, HistoryStatus } from './protocol-history.ts';
+import type { Building, Citizen } from './protocol-inspect.ts';
 import type { OverlayMessage } from './protocol-overlays.ts';
 import type {
-  Complaint,
+  EducationStats,
   FireStats,
   HappinessStats,
   PlantKind,
@@ -17,6 +18,7 @@ import type {
 } from './protocol-services.ts';
 
 export * from './protocol-history.ts';
+export * from './protocol-inspect.ts';
 export * from './protocol-overlays.ts';
 export * from './protocol-services.ts';
 
@@ -196,75 +198,12 @@ export const Era = {
 } as const;
 export type Era = (typeof Era)[keyof typeof Era];
 
-/** What a citizen is doing or travelling to do, matching the sim's `Activity`. */
-export const Activity = { Home: 0, Work: 1, Shop: 2, School: 3 } as const;
-export type Activity = (typeof Activity)[keyof typeof Activity];
-
 /** Floats per agent in the `frame` agents snapshot. */
 export const AGENT_STRIDE = 5;
 /** The `kind` field of an agent snapshot entry (ADR 0026, 0053); a child walker is drawn
  * smaller (ADR 0055). */
 export const AgentKind = { Car: 0, Walker: 1, FireTruck: 2, Child: 3 } as const;
 export type AgentKind = (typeof AgentKind)[keyof typeof AgentKind];
-
-/** A building, named by its ID and original use. */
-export interface Place {
-  building: number;
-  zone: Zone;
-}
-
-/**
- * Sim-owned details of one citizen. Places are null when absent, or when their building was
- * removed; all are null once the citizen has left town (`resident` false).
- */
-export interface Citizen {
-  id: number;
-  /** Derived from the world seed and IDs; a shared surname means a shared home, not kinship. */
-  name: string;
-  resident: boolean;
-  home: Place | null;
-  job: Place | null;
-  /** The current activity, or the one the current trip is for. */
-  activity: Activity;
-  /** Where the citizen is, or where the current trip started. */
-  location: Place | null;
-  /** Where the current trip goes; null while staying put. */
-  destination: Place | null;
-  /** The citizen's own travel slot: an index into `frame` agents; never reassigned. */
-  agent: number | null;
-  /** On a road now, so the car is drawn. */
-  driving: boolean;
-  /** The current trip is on foot (ADR 0026); the walker is drawn once it sets off. */
-  onFoot: boolean;
-  /** Age in years from the sim; a child until 18 (ADR 0054). */
-  age: number;
-  /** A child, who lives at home with their household. */
-  child: boolean;
-  /** An adult who came of age in town rather than arriving grown up (ADR 0054). */
-  grewUp: boolean;
-  /** A grown child still living with their family, looking for a home of their own. */
-  wantsHome: boolean;
-  /** Mood 0 to 100 from the sim (ADR 0058); 0 once they have left town. */
-  mood: number;
-  /** `Complaint` codes, in code order. */
-  complaints: Complaint[];
-  /** Clock minutes their last trip to work took; 0 = none yet or no job. */
-  commute: number;
-}
-
-/** Sim-owned counts, not physical attendance. Original use persists during closure. */
-export interface Building extends Place {
-  /** Resident places for homes, total jobs for workplaces. */
-  capacity: number;
-  /** People living here or employees assigned here, including those currently elsewhere. */
-  occupied: number;
-  closing: boolean;
-  /** Starter power or its grid covers it (ADR 0041); if not, its vacancies stay empty. */
-  powered: boolean;
-  /** Has water, or is low density and needs none (ADR 0052); if not, its vacancies stay
-   * empty and, after a day, its people slowly leave. */
-  watered: boolean;
-}
 
 export interface Demand {
   residential: number;
@@ -324,6 +263,7 @@ export interface Stats {
   utilities: number;
   fire: FireStats;
   happiness: HappinessStats;
+  education: EducationStats;
 }
 
 /** Persistence metadata only. A commit acknowledges the captured revision, not later edits. */

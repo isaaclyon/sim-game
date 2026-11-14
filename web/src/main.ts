@@ -139,6 +139,8 @@ worker.onmessage = (e: MessageEvent<FromWorker>) => {
     renderer.ground.setTraffic(msg.segments);
   } else if (msg.type === 'services') {
     renderer.ground.setServices(msg.lots);
+  } else if (msg.type === 'schoolView') {
+    renderer.ground.schools.set(msg);
   } else if (msg.type === 'lots') {
     renderer.setLots(msg.rings);
   } else if (msg.type === 'buildings') {
@@ -209,7 +211,10 @@ canvas.addEventListener('pointerup', (e) => {
   if (!roads.mode) {
     if (e.button === 0 && still) {
       const agent = renderer.carAt(e.clientX, e.clientY);
-      const building = agent === null ? renderer.buildingAt(e.clientX, e.clientY) : null;
+      const building =
+        agent === null
+          ? (renderer.buildingAt(e.clientX, e.clientY) ?? renderer.schoolAt(e.clientX, e.clientY))
+          : null;
       if (building !== null) inspector.selectBuilding(building);
       else inspector.select(agent);
     }

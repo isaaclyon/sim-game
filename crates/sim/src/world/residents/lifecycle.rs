@@ -25,6 +25,7 @@ impl World {
         }
         self.citizens.destination[i] = None;
         self.citizens.due[i] = u64::MAX;
+        self.release_riders(c);
     }
 
     /// Atomically reserve an eligible vacant home for the whole household, or leave town.
@@ -71,6 +72,7 @@ impl World {
         for c in self.households.members[hh].clone() {
             let i = c as usize;
             self.cancel_citizen_trip(c);
+            self.forget_lift(c);
             if let Some(h) = replacement {
                 self.citizens.location[i] = self.homes.building[h];
                 self.citizens.car_out[i] = false;

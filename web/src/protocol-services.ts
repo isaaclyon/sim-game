@@ -56,6 +56,14 @@ export const POWER_BUILDING_STRIDE = 5;
 export const STATION_STRIDE = 5;
 /** Floats per burning building in `fire.fires`. */
 export const FIRE_STRIDE = 4;
+/** How far the residents got in school, from the sim (ADR 0055). */
+export interface EducationStats {
+  /** Adults by `Education` level: none, primary, high school, university. */
+  adults: number[];
+  /** Children without a school seat: no school of their kind in reach, or all are full. */
+  unschooled: number;
+}
+
 /** Floats per school in `schools.schools`. */
 export const SCHOOL_STRIDE = 6;
 

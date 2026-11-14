@@ -7,10 +7,12 @@
 //! rebuilt whenever either changes.
 
 mod enrol;
+mod lift;
 mod place;
 mod run;
 #[cfg(test)]
 mod tests;
+mod view;
 
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
@@ -27,6 +29,9 @@ use crate::power::Footprint;
 use crate::road::{NodeId, RoadId};
 use crate::zone::Zone;
 pub(in crate::world) use run::SCHOOL_DAY_S;
+pub use view::{
+    AREA_HIGH, AREA_PRIMARY, EducationStats, SCHOOL_ROAD_STRIDE, SCHOOL_VIEW_STRIDE, SchoolInfo,
+};
 
 /// Floats per school in the schools snapshot: `[kind, x, y, half_size, front_x, front_y]`.
 pub const SCHOOL_STRIDE: usize = 6;
@@ -158,6 +163,10 @@ pub struct Schools {
     stages: BinaryHeap<Reverse<(u64, CitizenId)>>,
     /// Seats or roads changed: children without a seat look again on the next tick.
     pending: bool,
+    /// Per citizen ID: the adult whose car a child is riding in (a lift).
+    ride: Vec<Option<CitizenId>>,
+    /// Per citizen ID: the child waits at school for a lift home.
+    waiting: Vec<bool>,
     /// Bumped whenever a school is added or removed.
     #[serde(skip)]
     pub version: u32,
@@ -211,6 +220,8 @@ impl Schools {
             self.seat.resize(n, None);
             self.since.resize(n, 0);
             self.schooled.resize(n, 0);
+            self.ride.resize(n, None);
+            self.waiting.resize(n, false);
         }
     }
 
@@ -244,6 +255,12 @@ impl Schools {
             mix(u64::from(c));
         }
         mix(u64::from(self.pending));
+        for c in 0..self.ride.len() {
+            if self.ride[c].is_some() || self.waiting[c] {
+                mix(c as u64);
+                mix(self.ride[c].map_or(u64::MAX, u64::from) << 1 | u64::from(self.waiting[c]));
+            }
+        }
     }
 
     /// Internal consistency of loaded school state (ADR 0033).
@@ -268,11 +285,17 @@ impl Schools {
         below(&self.building, buildings, "school buildings")?;
         ensure(self.seat.len() <= citizens, "school seats")?;
         lens(
-            &[self.since.len(), self.schooled.len()],
+            &[
+                self.since.len(),
+                self.schooled.len(),
+                self.ride.len(),
+                self.waiting.len(),
+            ],
             self.seat.len(),
             "enrolment fields",
         )?;
         below(self.seat.iter().flatten(), n, "enrolled schools")?;
+        below(self.ride.iter().flatten(), citizens, "lift drivers")?;
         below(
             self.stages.iter().map(|Reverse((_, c))| c),
             citizens,

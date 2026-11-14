@@ -36,4 +36,29 @@ impl Sim {
         self.world.write_schools(&mut self.buf);
         self.buf.clone()
     }
+
+    /// `[none, primary, high school, university, unschooled]`: adults by how far they got
+    /// in school, then children without a school seat.
+    pub fn education_stats(&self) -> Vec<u32> {
+        let e = self.world.education_stats();
+        e.adults.into_iter().chain([e.unschooled]).collect()
+    }
+
+    /// The schools view, one array: `[schools_len, roads_len, schools…, roads…, homes…]`,
+    /// lengths in floats; see `World::write_school_view`.
+    pub fn school_view(&mut self) -> Vec<f32> {
+        let (mut schools, mut roads, mut homes) = (Vec::new(), Vec::new(), Vec::new());
+        self.world
+            .write_school_view(&mut schools, &mut roads, &mut homes);
+        let mut out = vec![schools.len() as f32, roads.len() as f32];
+        out.extend(schools);
+        out.extend(roads);
+        out.extend(homes);
+        out
+    }
+
+    /// Seats taken across all schools; the schools view is resent when it changes.
+    pub fn school_pupils(&self) -> u32 {
+        self.world.schools.pupils.iter().sum()
+    }
 }

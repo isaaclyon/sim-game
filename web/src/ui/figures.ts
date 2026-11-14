@@ -4,6 +4,7 @@ import type {
   CityStatus,
   Complaint,
   Demand,
+  EducationStats,
   FireStats,
   HappinessStats,
   PowerStats,
@@ -52,6 +53,17 @@ export function topComplaints(h: HappinessStats) {
   return top.length ? top.join(', ') : 'none';
 }
 
+/** Adults by the highest school they finished, as shares; levels nobody has are left out. */
+export function educationText(e: EducationStats) {
+  const adults = e.adults.reduce((sum, n) => sum + n, 0);
+  if (!adults) return 'no adults yet';
+  return ['no school', 'primary', 'high school', 'university']
+    .map((word, level) => ({ word, n: e.adults[level] ?? 0 }))
+    .filter(({ n }) => n > 0)
+    .map(({ word, n }) => `${percent(n, adults).toFixed(0)}% ${word}`)
+    .join(', ');
+}
+
 /** The population panel's rows, in the order the page lists them. */
 export function populationRows(s: Stats): Record<string, string> {
   return {
@@ -59,6 +71,8 @@ export function populationRows(s: Stats): Record<string, string> {
     'pop-adults': fmt(s.population - s.children),
     'pop-children': fmt(s.children),
     'pop-unemployed': `${fmt(s.unemployed)} (${s.unemploymentPercent.toFixed(1)}%)`,
+    'pop-education': educationText(s.education),
+    'pop-unschooled': fmt(s.education.unschooled),
     'pop-happiness': s.population ? moodText(s.happiness.average) : 'nobody yet',
     'pop-complaints': topComplaints(s.happiness),
     'pop-driving': fmt(s.driving),

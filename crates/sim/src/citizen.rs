@@ -25,6 +25,8 @@ pub enum Activity {
     Shop,
     /// A child's day at school (ADR 0055).
     School,
+    /// An adult driving household children to or from school (ADR 0055).
+    SchoolRun,
 }
 
 /// How far a citizen got in school (ADR 0055). Ordered: a higher level meets every lower

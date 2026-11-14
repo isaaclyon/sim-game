@@ -115,6 +115,9 @@ export async function tools({ hash = '', clipboard = true, catalog } = {}) {
     buildingAt() {
       return buildings.at;
     }
+    schoolAt() {
+      return null;
+    }
     follow(agent, seconds) {
       cars.follows.push([agent, seconds]);
       return cars.visible;

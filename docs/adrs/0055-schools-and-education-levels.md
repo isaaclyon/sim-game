@@ -1,6 +1,6 @@
 # 0055. Schools teach children, and education shapes who fills jobs
 
-- Status: Accepted; amended 2026-11-09 and 2026-11-13; slices 1 to 3 implemented; extended by
+- Status: Accepted; amended 2026-11-09 and 2026-11-13; slices 1 to 5 implemented; extended by
   [0056](0056-taxes-follow-city-quality-and-services-have-budgets.md) (seat blocks and budgets)
 - Date: 2026-11-06
 - Extends: [0054](0054-children-births-and-growing-up.md), [0021](0021-citizens-households-and-trips.md),
@@ -125,3 +125,39 @@ wins.
 - **Display.** A child on foot is agent kind 3 in the snapshot and is drawn at about 60% of
   an adult's size. The inspector reads "At school" and "Walking to school".
 - **Saves.** Still save version 12, which has not shipped without this slice.
+
+## Amendment (2026-11-13): slice 4 and 5 rules
+
+Settled while building slices 4 and 5. Where this section and the text above disagree, this
+section wins.
+
+- **Lifts.** A child whose school is past their walking reach is driven by an adult of their
+  household who owns a car. The adult's drive is an ordinary citizen trip with a new activity,
+  school run (code 4), always by car. The children have no trip of their own: they ride in
+  the adult's car and are moved when it arrives. Lifts draw nothing from the residents'
+  random numbers.
+- **Enrolment reach.** A child in a household where an adult owns a car can take a seat at any
+  school whose area covers their home, however far the walk. Other children still need the
+  school within walking reach.
+- **Mornings.** When a child who needs a lift is due to leave, the first adult by ID who has a
+  car and is at home drives them, taking along every child of the household who is at home
+  and due to leave within 90 clock minutes. An adult leaving home for work or the shops takes
+  such children too. The driver drops each child at their school, then goes on to work if
+  they have a job, else home. With no adult at home to drive, the child stays home that day.
+- **Afternoons.** A child whose school day ends waits at the school. An adult at home with a
+  car fetches them at once; an adult out with the car fetches them when they next leave work
+  or a shop. A child nobody fetched within four clock hours walks home, however far.
+- **Lifts always end.** A ride that has not ended after six clock hours puts the child home.
+  If the driver's trip is cancelled (a road edit, their building removed, moving out), the
+  children in the car are put home. A household that moves forgets its lifts.
+- **Schools view.** A new ground overlay, Schools, in the Views list and the P cycle: each
+  home's lot is green inside both a primary and a high school's area, amber inside one, red
+  inside none; roads inside any school's area are tinted blue; each school's site is green
+  with free seats, amber from 90% full and red when full. The sim decides the areas.
+- **Inspecting.** Clicking a school's site opens the building card with its seats, pupils,
+  free seats and teacher jobs. A citizen's card shows their education, a child's school or
+  that they have no seat, and when they are riding in a family car.
+- **Population panel.** Adults by highest school finished, as shares, and the number of
+  children without a school seat.
+- **Saves.** Still save version 12. Who rides with whom and who waits are saved, and hashed
+  only when set, so a city without lifts hashes as it did before.

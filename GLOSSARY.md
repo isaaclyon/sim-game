@@ -46,7 +46,17 @@ gains that stage's education.
 _Avoid_: attendance (children are enrolled whether or not they are at school now)
 
 **School run**:
-An enrolled child's trip to school in the morning or home in the afternoon, on foot (ADR 0055).
+An enrolled child's trip to school in the morning or home in the afternoon, on foot or by
+lift (ADR 0055).
+
+**Lift**:
+A household adult driving the household's children to or from a school too far for them to
+walk. The children ride in the adult's car and have no trip of their own (ADR 0055).
+_Avoid_: carpool, school bus
+
+**School area**:
+The roads a school reaches. Only children living inside it can take a seat there, and the
+Schools view colours homes by the areas that reach them (ADR 0055).
 
 **School day**:
 The time a child spends at school between the two school runs: six and a half clock hours.

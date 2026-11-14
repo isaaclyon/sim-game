@@ -4,6 +4,9 @@ use crate::citizen::Education;
 use crate::world::residents::family::CHILDHOOD_DAYS;
 use crate::{Command, Config};
 
+mod lifts;
+mod view;
+
 /// Homes, shops and industry along the top row of blocks; the bottom row is empty.
 fn town() -> World {
     let mut w = World::new(
@@ -196,6 +199,7 @@ fn a_child_out_of_walking_reach_or_outside_the_area_waits() {
     let mut w = town();
     assert!(place(&mut w, SchoolKind::Primary, 60.0, 135.0));
     w.citizens.walk_limit.fill(1.0);
+    w.citizens.owns_car.fill(false);
     w.tick();
     assert!(seated(&w, SchoolKind::Primary).is_empty());
     // Seats or roads changing makes waiting children look again.

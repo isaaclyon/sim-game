@@ -47,6 +47,7 @@ test('lighting receives sim snapshot time and never advances from animation fram
         destroyed: 0,
       },
       happiness: { average: 50, complaints: [0, 0, 0, 0, 0, 0, 0] },
+      education: { adults: [0, 0, 0, 0], unschooled: 0 },
       balance: 100_000,
       taxes: 0,
       grant: 0,

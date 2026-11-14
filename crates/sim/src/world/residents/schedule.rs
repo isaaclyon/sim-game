@@ -66,8 +66,14 @@ impl World {
                 continue;
             }
             self.citizens.due[i] = u64::MAX;
+            if self.ride_overdue(c) {
+                continue;
+            }
             if self.citizens.destination[i].is_some() {
                 self.start_citizen_trip(c);
+                continue;
+            }
+            if self.lift_decides(c) {
                 continue;
             }
             let next = match self.citizens.activity[i] {
@@ -95,7 +101,9 @@ impl World {
                         (b, Activity::Shop)
                     }))
                 }
-                Activity::Shop | Activity::School => Some((self.home_building(c), Activity::Home)),
+                Activity::Shop | Activity::School | Activity::SchoolRun => {
+                    Some((self.home_building(c), Activity::Home))
+                }
             };
             if let Some((b, activity)) = next {
                 if activity == Activity::Work {
@@ -145,8 +153,10 @@ impl World {
         // The mode is chosen leaving home and kept until home again, so the car comes back.
         let home = self.home_building(c);
         if self.citizens.location[i] == home {
+            // A school run is always by car: the children could not walk it.
             self.citizens.car_out[i] = self.citizens.owns_car[i]
-                && self.front_distance(home, destination) > self.citizens.walk_limit[i];
+                && (self.citizens.activity[i] == Activity::SchoolRun
+                    || self.front_distance(home, destination) > self.citizens.walk_limit[i]);
         }
         let (Some(from), Some(to)) = (
             self.building_node(self.citizens.location[i]),
@@ -189,12 +199,14 @@ impl World {
             Activity::Home => {
                 self.citizens.car_out[i] = false;
                 self.schedule_day(c);
+                self.lift_arrived_home(c);
             }
             Activity::Work => {
                 self.note_commute(c);
                 self.schedule_activity(c, self.citizens.work_duration[i] as f32);
             }
             Activity::School => self.schedule_activity(c, SCHOOL_DAY_S),
+            Activity::SchoolRun => self.school_run_arrived(c),
             Activity::Shop => {
                 // 6 to 30 clock minutes.
                 let seconds = 20 + self.residents.rng.below(81);

@@ -13,6 +13,7 @@ export const POLLUTION_VIEWS = [
   'happiness',
   'traffic',
   'services',
+  'schools',
 ] as const;
 export type PollutionView = (typeof POLLUTION_VIEWS)[number];
 
@@ -25,6 +26,7 @@ const OVERLAY_NAMES: Record<PollutionView, string> = {
   happiness: 'Happiness',
   traffic: 'Traffic',
   services: 'Services',
+  schools: 'Schools',
 };
 
 /** What the data overlays mean (ADR 0057); the pollution views explain themselves. */
@@ -32,6 +34,8 @@ const OVERLAY_TIPS: Partial<Record<PollutionView, string>> = {
   traffic: 'Roads with cars: green flows, yellow is slow, red is jammed.',
   services:
     'Lots by what their building lacks: green has everything, amber misses power, water or fire cover, red misses more.',
+  schools:
+    'Homes by the schools in reach: green has a primary and a high school, amber one, red none. Blue roads are inside a school area; a school turns amber, then red, as its seats fill.',
 };
 
 export function nextPollutionView(view: PollutionView): PollutionView {

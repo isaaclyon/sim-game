@@ -113,6 +113,7 @@ test('city reset clears tools, follow and interpolation, and synchronizes pause 
         destroyed: 0,
       },
       happiness: { average: 50, complaints: [0, 0, 0, 0, 0, 0, 0] },
+      education: { adults: [0, 0, 0, 0], unschooled: 0 },
       balance: 100_000,
       taxes: 0,
       grant: 0,

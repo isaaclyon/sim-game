@@ -117,8 +117,8 @@ impl World {
     }
 
     /// Enrols child `c`, if they have no seat, at the nearest school of their stage by road
-    /// distance whose area covers their home, which they can walk to and which has a free
-    /// seat. Ties go to the lower school ID.
+    /// distance whose area covers their home, which they can walk or be driven to and which has a
+    /// free seat. Ties go to the lower school ID.
     pub(in crate::world) fn try_enrol(&mut self, c: CitizenId) -> bool {
         let i = c as usize;
         if !self.citizens.active[i]
@@ -132,7 +132,12 @@ impl World {
         let Some(node) = self.building_node(home) else {
             return false;
         };
-        let reach = self.citizens.walk_limit[i];
+        // A school past walking reach is open to a child an adult at home can drive.
+        let reach = if self.household_drives(c) {
+            f32::INFINITY
+        } else {
+            self.citizens.walk_limit[i]
+        };
         let mut best: Option<(f32, u32)> = None;
         for s in self.schools.active_schools() {
             let k = s as usize;

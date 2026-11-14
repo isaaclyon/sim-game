@@ -204,6 +204,7 @@ impl World {
         let i = c as usize;
         self.stop_waiting(c);
         let old = self.citizens.household[i] as usize;
+        self.cancel_citizen_trip(c);
         self.households.members[old].retain(|&m| m != c);
         let household = self.found_household(home);
         self.households.members[household as usize].push(c);

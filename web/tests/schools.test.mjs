@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Sim } from '../src/pkg/sim_wasm.js';
-import { SCHOOL_STRIDE, SchoolKind } from '../src/protocol.ts';
+import {
+  SCHOOL_ROAD_STRIDE,
+  SCHOOL_STRIDE,
+  SCHOOL_VIEW_STRIDE,
+  SchoolArea,
+  SchoolKind,
+} from '../src/protocol.ts';
 import { PRICES, tools } from './main-harness.mjs';
 import { worker } from './worker-harness.mjs';
 
@@ -51,6 +57,19 @@ test('a school is previewed, placed, paid for, drawn, bulldozed and undone', asy
   assert.equal(last(w, 'buildings').data[0], 8, 'the school is a building of zone 8');
   await w.send({ type: 'placeSchool', kind, ...spot });
   assert.equal(last(w, 'schools').schools.length, SCHOOL_STRIDE, 'a second cannot overlap');
+
+  const view = last(w, 'schoolView');
+  assert.equal(view.schools.length, SCHOOL_VIEW_STRIDE);
+  assert.deepEqual([...view.schools.subarray(5, 8)], [kind, 120, 0], 'kind, seats, pupils');
+  assert.ok(view.roads.length > 0 && view.roads.length % SCHOOL_ROAD_STRIDE === 0);
+  assert.ok(
+    view.roads.every((v, i) => i % SCHOOL_ROAD_STRIDE !== 4 || v === SchoolArea.High),
+    'roads inside the high school area',
+  );
+  await w.send({ type: 'inspectBuilding', building: view.schools[8], selection: 3 });
+  const { building } = last(w, 'building');
+  assert.deepEqual([building.zone, building.seats, building.pupils], [8, 120, 0]);
+  assert.equal(last(w, 'frame').stats.education.unschooled, 0, 'no children yet');
 
   await w.send({ type: 'deleteRoad', x: schools[1], y: schools[2] });
   assert.equal(last(w, 'schools').schools.length, 0, 'bulldozed');

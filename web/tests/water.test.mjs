@@ -32,6 +32,7 @@ const STATS = {
     destroyed: 0,
   },
   happiness: { average: 50, complaints: [0, 0, 0, 0, 0, 0, 0] },
+  education: { adults: [0, 0, 0, 0], unschooled: 0 },
   agents: 0,
   parked: 0,
   awaitingPath: 0,
