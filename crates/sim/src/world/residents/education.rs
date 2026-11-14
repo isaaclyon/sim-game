@@ -11,11 +11,11 @@ pub const ARRIVING_MIX: [u32; 4] = [0, 60, 30, 10];
 const ANY_JOB_WAIT_S: (f32, f32) = (1_200.0, 2_400.0);
 
 /// The education a job in a building of this use prefers. Low-density work needs none;
-/// dense industry prefers primary and dense commerce high school.
+/// dense industry prefers primary; dense commerce and teaching prefer high school.
 pub fn job_education(zone: Zone) -> Education {
     match zone {
         Zone::IndustrialHigh => Education::Primary,
-        Zone::CommercialHigh => Education::HighSchool,
+        Zone::CommercialHigh | Zone::PrimarySchool | Zone::HighSchool => Education::HighSchool,
         _ => Education::None,
     }
 }

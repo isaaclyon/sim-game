@@ -1,6 +1,6 @@
 # 0055. Schools teach children, and education shapes who fills jobs
 
-- Status: Accepted; amended 2026-11-09; slice 1 implemented; extended by
+- Status: Accepted; amended 2026-11-09 and 2026-11-13; slices 1 and 2 implemented; extended by
   [0056](0056-taxes-follow-city-quality-and-services-have-budgets.md) (seat blocks and budgets)
 - Date: 2026-11-06
 - Extends: [0054](0054-children-births-and-growing-up.md), [0021](0021-citizens-households-and-trips.md),
@@ -75,3 +75,31 @@ disagree, this section wins.
   schools, seat blocks, coverage, enrolment, graduating and teacher jobs; 3) school runs and
   child walkers; 4) the schools view, inspector and top bar; 5) adult driving.
 
+
+## Amendment (2026-11-13): slice 2 rules
+
+Settled while building slice 2. Where this section and the text above disagree, this section
+wins.
+
+- **Kinds.** A primary school has a 28 m site, costs $4,000, and per seat block has 30 seats,
+  2 teacher jobs and $20 an hour of upkeep; its area reaches 800 m along roads. A high school
+  has a 36 m site, costs $7,000, and per block has 40 seats, 3 teacher jobs and $35 an hour;
+  its area reaches 1,200 m. Every school opens with 3 seat blocks until ADR 0056 adds budgets.
+- **No utilities, any era.** A school needs no power or water, never burns, and can be placed
+  in a village. Its teacher jobs count as commercial jobs in demand.
+- **Graduating.** "Stays enrolled through a stage" means: the child holds a seat when the
+  stage ends and was enrolled for at least half of it. A child who arrives in town part-way
+  through a stage counts as schooled elsewhere for the part already behind them. A child who
+  has no seat when the stage ends gains nothing, whatever came before.
+- **Seats are kept.** A seated child keeps their seat when roads change, even if the school
+  no longer covers their home. Only children without a seat look again, when a school is
+  placed or removed or roads change, in citizen ID order. A child who moves home within the
+  city gives up their seat and looks again; the time already spent enrolled still counts.
+- **Bulldozing** a school frees its seats and ends its teachers' jobs; its pupils look for
+  another school at once. Undo puts the school back empty.
+- **Land value.** Cells of homes inside any school's area gain 10% of full land value, once,
+  however many schools cover them.
+- **Display.** `schools` carries each school's site for drawing; the building kit skips school
+  buildings (zones 7 and 8), which have their own models. Clicking a school selects nothing
+  until slice 4.
+- **Saves.** Save version 12. A city that never had a school hashes as it did before.

@@ -12,6 +12,7 @@ pub(in crate::world) struct Capture {
     lines: Vec<bool>,
     water: Vec<bool>,
     stations: Vec<bool>,
+    schools: Vec<bool>,
     balance: i64,
 }
 
@@ -33,6 +34,7 @@ impl Capture {
             lines: w.power.line_active.clone(),
             water: w.water.active.clone(),
             stations: w.fire.station_active.clone(),
+            schools: w.schools.active.clone(),
             balance: w.treasury.balance,
         }
     }
@@ -84,6 +86,14 @@ impl Capture {
         pieces(&self.stations, &f.station_active, &|i| {
             let at = f.footprint(i as u32);
             Record::Station {
+                centre: at.centre,
+                front: at.front,
+            }
+        });
+        pieces(&self.schools, &w.schools.active, &|i| {
+            let at = w.schools.footprint(i as u32);
+            Record::School {
+                kind: w.schools.kind[i],
                 centre: at.centre,
                 front: at.front,
             }

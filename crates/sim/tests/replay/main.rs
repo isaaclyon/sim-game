@@ -66,6 +66,18 @@ fn saved_sessions_replay_to_their_expected_cities() {
             );
         }
 
+        if name == "scripted-schools.cmdlog" {
+            // One primary and one high school stand, the high school after a bulldoze and
+            // an undo; the second primary was undone. Children hold seats (ADR 0055).
+            use sim::world::SchoolKind;
+            let (p, h) = (
+                loaded.school_stats(SchoolKind::Primary),
+                loaded.school_stats(SchoolKind::High),
+            );
+            assert_eq!((p.schools, h.schools), (1, 1), "{name}");
+            assert!(p.pupils > 0 && h.pupils > 0, "{name}: {p:?} {h:?}");
+        }
+
         if name == "scripted-undo-redo.cmdlog" {
             // Every undo and redo in the log succeeded, also after the halfway load.
             assert_eq!(loaded.history().len(), (8, 1), "{name}");

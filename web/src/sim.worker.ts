@@ -1,8 +1,8 @@
 // Runs the WASM sim on a fixed-timestep clock, off the main thread.
 
 import { CitySession } from './city-session';
+import { CivicSender } from './civic-worker';
 import { gridPreview, rawDraft, roadPreview } from './drafts';
-import { FireSender } from './fire-worker';
 import { historyCommand, readHistory } from './history-worker';
 import { OverlaySender } from './overlay-worker';
 import init, { type Sim } from './pkg/sim_wasm';
@@ -126,7 +126,7 @@ function sendPollutionIfChanged(s: Sim, force = false) {
   ]);
 }
 
-const fire = new FireSender(post);
+const fire = new CivicSender(post);
 const water = new WaterSender(post);
 const overlays = new OverlaySender(post);
 
@@ -391,6 +391,8 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
       break;
     case 'placeStation':
     case 'previewStation':
+    case 'placeSchool':
+    case 'previewSchool':
     case 'setFires':
       if (fire.command(sim, msg, cities.ready) && sim) {
         cities.changed();

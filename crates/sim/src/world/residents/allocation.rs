@@ -54,7 +54,8 @@ impl World {
         let i = b as usize;
         self.buildings.active.get(i) == Some(&true)
             && !self.building_closing(b)
-            && self.lots.zone(self.buildings.lot[i], &self.zones) == self.buildings.zone[i]
+            && (self.buildings.zone[i].is_school()
+                || self.lots.zone(self.buildings.lot[i], &self.zones) == self.buildings.zone[i])
             && self.building_node(b).is_some()
     }
 
@@ -63,18 +64,39 @@ impl World {
         if self.buildings.active.get(i) != Some(&true) {
             return None;
         }
-        let l = self.buildings.lot[i] as usize;
-        let road = self.lots.road[l];
-        if !self.lots.active[l] || !self.roads.is_road_active(road) {
-            return None;
-        }
+        let (road, front) = self.building_access(b)?;
         let lane = road as usize * 2;
         let (a, z) = (self.roads.lane_from[lane], self.roads.lane_to[lane]);
         let distance = |n: NodeId| {
-            (self.roads.node_x[n as usize] - self.lots.front_x[l])
-                .hypot(self.roads.node_y[n as usize] - self.lots.front_y[l])
+            (self.roads.node_x[n as usize] - front.0).hypot(self.roads.node_y[n as usize] - front.1)
         };
         Some(if distance(a) <= distance(z) { a } else { z })
+    }
+
+    /// The active road building `b` fronts and its front point: its lot's, or for a school,
+    /// which stands on no lot, its door (ADR 0055). `None` without access.
+    pub(in crate::world) fn building_access(
+        &self,
+        b: BuildingId,
+    ) -> Option<(crate::road::RoadId, crate::geometry::Point)> {
+        let l = self.buildings.lot[b as usize];
+        if l == crate::building::NO_LOT {
+            return self.school_access(b);
+        }
+        let l = l as usize;
+        let road = self.lots.road[l];
+        (self.lots.active[l] && self.roads.is_road_active(road))
+            .then(|| (road, (self.lots.front_x[l], self.lots.front_y[l])))
+    }
+
+    /// Building `b`'s front point whether or not its road still stands.
+    pub(in crate::world) fn building_front(&self, b: BuildingId) -> crate::geometry::Point {
+        let l = self.buildings.lot[b as usize];
+        if l != crate::building::NO_LOT {
+            return (self.lots.front_x[l as usize], self.lots.front_y[l as usize]);
+        }
+        let ring = self.buildings.footprint(b);
+        ((ring[0].0 + ring[1].0) / 2.0, (ring[0].1 + ring[1].1) / 2.0)
     }
 
     pub(in crate::world) fn register_buildings(&mut self) {
@@ -85,6 +107,11 @@ impl World {
                 home_size: capacity,
                 jobs,
             } = capacity(self.buildings.zone[b], area, self.buildings.height[b]);
+            // A school's jobs are its teachers (ADR 0055), not a matter of floor area.
+            let jobs = match self.schools.of_building(b as u32) {
+                Some(s) => self.schools.teachers(s),
+                None => jobs,
+            };
             self.residents.jobs.push(jobs);
             self.residents.workers.push(0);
             if self.buildings.active[b] {

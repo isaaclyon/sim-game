@@ -22,6 +22,7 @@ use crate::lot::LotId;
 use crate::power::Footprint;
 use crate::rng::Rng;
 
+pub(super) use cover::distances;
 pub use snapshot::{FIRE_STRIDE, STATION_STRIDE};
 
 /// Half the side of a station's square footprint, metres.

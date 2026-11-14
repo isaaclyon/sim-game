@@ -8,6 +8,7 @@ mod happiness;
 mod history;
 mod overlays;
 mod roads;
+mod schools;
 mod utilities;
 
 #[wasm_bindgen]

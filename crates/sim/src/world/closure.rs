@@ -59,6 +59,10 @@ impl World {
                 continue;
             }
             let lot = self.buildings.lot[b];
+            if lot == crate::building::NO_LOT {
+                // Service buildings (ADR 0055) ignore zoning and never close.
+                continue;
+            }
             let matches = self.lots.zone(lot, &self.zones) == self.buildings.zone[b];
             if !matches && !closing {
                 self.schedule_closure_step(b as BuildingId);

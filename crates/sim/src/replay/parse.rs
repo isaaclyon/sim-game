@@ -1,7 +1,8 @@
 //! Reads the command log text format described in `replay/mod.rs`.
 
 use super::{
-    CLASSES, CommandLog, LOG_VERSION, LogError, Outcome, PLANTS, Start, TITLE, WATER, ZONES,
+    CLASSES, CommandLog, LOG_VERSION, LogError, Outcome, PLANTS, SCHOOLS, Start, TITLE, WATER,
+    ZONES,
 };
 use crate::Command;
 
@@ -158,6 +159,11 @@ impl<'a> Line<'a> {
             "station" => {
                 let [x, y] = self.coords()?;
                 Command::PlaceStation { x, y }
+            }
+            "school" => {
+                let [x, y] = self.coords()?;
+                let kind = self.named(&SCHOOLS, "school kind")?;
+                Command::PlaceSchool { kind, x, y }
             }
             "undo" => Command::Undo,
             "redo" => Command::Redo,

@@ -76,6 +76,7 @@ impl World {
     pub fn write_bulldoze_preview(&self, x: f32, y: f32, out: &mut Vec<f32>) {
         out.clear();
         if self.write_station_bulldoze(x, y, out)
+            || self.write_school_bulldoze(x, y, out)
             || self.write_power_bulldoze(x, y, out)
             || self.write_water_bulldoze(x, y, out)
         {
@@ -323,6 +324,7 @@ impl World {
         self.water.hash_into(&mut mix);
         self.pollution.hash_into(&mut mix);
         self.fire.hash_into(self.cfg.seed, &mut mix);
+        self.schools.hash_into(&mut mix);
         self.happiness.hash_into(&mut mix);
         for chunk in self.zones.cells.chunks(8) {
             let mut word = [0u8; 8];

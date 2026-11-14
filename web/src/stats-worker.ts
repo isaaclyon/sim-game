@@ -4,11 +4,16 @@ import { Sim } from './pkg/sim_wasm';
 import type { HappinessStats, Price, Prices, Stats } from './protocol';
 
 /** The sim's price list (`Sim.prices`): `[cost, upkeep]` for coal, solar, wind, pump, tower
- * and fire station. */
+ * fire station, primary school and high school. */
 export function readPrices(): Prices {
   const d = Sim.prices();
   const at = (i: number): Price => ({ cost: d[2 * i], upkeep: d[2 * i + 1] });
-  return { plants: [at(0), at(1), at(2)], water: [at(3), at(4)], station: at(5) };
+  return {
+    plants: [at(0), at(1), at(2)],
+    water: [at(3), at(4)],
+    station: at(5),
+    schools: [at(6), at(7)],
+  };
 }
 
 /** `Sim.happiness_stats`: the average, then one count per complaint code. */

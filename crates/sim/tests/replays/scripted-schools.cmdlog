@@ -1,0 +1,23 @@
+# Scripted: a generated grid with houses, shops and industry gets a primary and a high school
+# (ADR 0055). Children enrol at the nearest school with a free seat; the high school is
+# bulldozed, undone back, and a second primary is placed and undone.
+sim-game command log 1
+seed 55
+grid 6 6
+1 fill 60 60 residential-low
+1 fill 180 60 residential-low
+1 fill 300 60 residential-low
+1 fill 60 180 residential-low
+1 fill 180 180 commercial-low
+1 fill 300 180 industrial-low
+1 fill 60 300 residential-low
+1 fill 180 300 residential-low
+2 plant 420 420 solar
+600 school 240 305 primary
+600 school 305 300 high
+2400 delete 305 300
+2500 undo
+2600 school 420 185 primary
+2700 undo
+end 6000
+expect hash f7361d3f4b08b304 population 33 buildings 20 trips 16

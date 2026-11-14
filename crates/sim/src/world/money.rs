@@ -78,9 +78,12 @@ pub fn water_price(kind: WaterKind) -> (i64, i64) {
 }
 
 /// Build cost and upkeep per clock hour of each placeable the build menu sells, in this
-/// order: coal, solar and wind plants, pump, water tower, fire station. Lines are free.
-pub fn price_list() -> [(i64, i64); 6] {
+/// order: coal, solar and wind plants, pump, water tower, fire station, primary school, high
+/// school. Lines are free. A school's upkeep is for the seat blocks it opens with.
+pub fn price_list() -> [(i64, i64); 8] {
     use super::fire::{STATION_COST, STATION_UPKEEP};
+    use super::school::{START_BLOCKS, SchoolKind};
+    let school = |k: SchoolKind| (k.cost(), i64::from(START_BLOCKS) * k.block_upkeep());
     [
         plant_price(PlantKind::Coal),
         plant_price(PlantKind::Solar),
@@ -88,6 +91,8 @@ pub fn price_list() -> [(i64, i64); 6] {
         water_price(WaterKind::Pump),
         water_price(WaterKind::Tower),
         (STATION_COST, STATION_UPKEEP),
+        school(SchoolKind::Primary),
+        school(SchoolKind::High),
     ]
 }
 
@@ -285,7 +290,8 @@ impl World {
     }
 
     pub(super) fn refresh_upkeep(&mut self) {
-        self.treasury.upkeep = road_upkeep(&self.roads, self.era) + self.fire_upkeep();
+        self.treasury.upkeep =
+            road_upkeep(&self.roads, self.era) + self.fire_upkeep() + self.school_upkeep();
         self.treasury.utilities = utility_upkeep(&self.power, &self.water);
     }
 

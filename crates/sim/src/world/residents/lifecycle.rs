@@ -76,6 +76,7 @@ impl World {
                 self.citizens.car_out[i] = false;
                 self.citizens.activity[i] = Activity::Home;
                 self.schedule_day(c);
+                self.child_moved(c);
             } else {
                 self.release_job(c);
                 self.member_left(c);

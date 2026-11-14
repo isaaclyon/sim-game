@@ -3,7 +3,17 @@ import { stripTypeScriptTypes } from 'node:module';
 import { extname } from 'node:path';
 import { createContext, SourceTextModule, SyntheticModule } from 'node:vm';
 
-import { Era, FIRE_STRIDE, PlantKind, RoadClass, Snap, WaterKind, Zone } from '../src/protocol.ts';
+import {
+  Era,
+  FIRE_STRIDE,
+  PlantKind,
+  RoadClass,
+  SCHOOL_STRIDE,
+  SchoolKind,
+  Snap,
+  WaterKind,
+  Zone,
+} from '../src/protocol.ts';
 import { fakeDocument } from './fake-dom.mjs';
 
 // Exercise main.ts's event handlers without a WebGL context or a running clock. `catalog`, if
@@ -20,6 +30,10 @@ export const PRICES = {
     { cost: 4000, upkeep: 20 },
   ],
   station: { cost: 6000, upkeep: 120 },
+  schools: [
+    { cost: 4000, upkeep: 60 },
+    { cost: 7000, upkeep: 105 },
+  ],
 };
 
 export async function tools({ hash = '', clipboard = true, catalog } = {}) {
@@ -207,6 +221,9 @@ export async function tools({ hash = '', clipboard = true, catalog } = {}) {
     setFire(fire) {
       previews.push({ type: 'fire', fire });
     }
+    setSchools(schools) {
+      previews.push({ type: 'schools', schools });
+    }
     setFireView(on) {
       previews.push({ type: 'fireView', on });
     }
@@ -284,7 +301,10 @@ export async function tools({ hash = '', clipboard = true, catalog } = {}) {
   for (const [name, exports] of [
     ['renderer', { Renderer }],
     ['ambient-sound', { AmbientSound }],
-    ['protocol', { Era, FIRE_STRIDE, PlantKind, RoadClass, Snap, WaterKind, Zone }],
+    [
+      'protocol',
+      { Era, FIRE_STRIDE, PlantKind, RoadClass, SCHOOL_STRIDE, SchoolKind, Snap, WaterKind, Zone },
+    ],
   ]) {
     const identifier = new URL(`./${name}.ts`, mainUrl).href;
     modules.set(

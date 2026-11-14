@@ -81,6 +81,8 @@ export function itemPrice(prices: Prices, tool: Tool): Price | 'free' | null {
       return prices.water[tool.water];
     case 'station':
       return prices.station;
+    case 'school':
+      return prices.schools[tool.school];
     case 'line':
       return 'free';
     default:

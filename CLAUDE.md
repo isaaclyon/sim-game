@@ -28,8 +28,9 @@ What to build next and why lives in `docs/ROADMAP.md`. Work on the current miles
   2 = alley; curves emit multiple segments. Packed in road ID order, not indexed by road ID
   (ADR 0015, 0017).
 - Bulldoze preview: `[x, y]` per centreline sample of the selected road, or a closed outline
-  for a fire station, plant, pump, tower, building or ruins (ADR 0045, 0052, 0053); empty =
-  no target. Stations, plants, lines, pumps and towers, buildings, then ruins win over roads.
+  for a fire station, school, plant, pump, tower, building or ruins (ADR 0045, 0052, 0053,
+  0055); empty = no target. Stations, schools, plants, lines, pumps and towers, buildings,
+  then ruins win over roads.
   Read-only. Road/lane IDs are never reused after deletion (ADR 0013). Lane counts include
   tombstone slots.
 - Road class clicks (ADR 0050): `setRoadClass` gives the road nearest `[x, y]` in bulldoze
@@ -89,7 +90,8 @@ What to build next and why lives in `docs/ROADMAP.md`. Work on the current miles
   Era is the city's era when it was built, kept for life: 0 = village, 1 = town (ADR 0059).
   Front is the footprint edge (point `front` to the next) facing the lot's road, derived on
   write, not stored or hashed (ADR 0027).
-  Zone is the building's original use. The worker sends a parallel `ids: Uint32Array`, one
+  Zone is the building's original use; 7 = primary school, 8 = high school are placed
+  schools (ADR 0055), which the page draws from `schools` instead. The worker sends a parallel `ids: Uint32Array`, one
   stable building ID per packed record in the same message (ADR 0029). Sent whole when the buildings version changes,
   including growth, closure removals (ADR 0023)
   and removals from paused road edits. Growth snapshots are capped at four
@@ -102,9 +104,9 @@ What to build next and why lives in `docs/ROADMAP.md`. Work on the current miles
   none. Grid numbers are stable within one message only. Sent whole when plants, lines, grids
   or who is powered change; growth is capped like buildings. Plant preview: closed `[x, y]`
   footprint where the plant would stand (coal snapped beside a road) plus `ok`. Line preview: `[ax, ay, a_join, bx, by, b_join]`, join 1 = meets a line,
-  plant or road; empty = refused. Bulldoze removes a fire station, else a plant, else a line,
-  else a pump or tower, else a building, else ruins, else a road. Placing a plant is refused
-  when the city cannot pay (ADR 0052).
+  plant or road; empty = refused. Bulldoze removes a fire station, else a school, else a
+  plant, else a line, else a pump or tower, else a building, else ruins, else a road. Placing
+  a plant is refused when the city cannot pay (ADR 0052).
 - Water (ADR 0052): networks follow roads, derived with power's road grids, no pipe tool.
   `placeWater`/`previewWater` take `kind` 0 = pump, 1 = tower and a point; the piece snaps
   beside the nearest road facing it, refused off roads, over other pieces or when unaffordable.
@@ -124,6 +126,14 @@ What to build next and why lives in `docs/ROADMAP.md`. Work on the current miles
   capped like buildings. Station preview: closed `[x, y]` footprint plus `ok`. `setFires`
   turns the city's fires on or off (`fires on|off` in command logs; `station x y` places one).
   Frames carry `stats.fire` (`FireStats`). Flames, smoke and rubble are display only.
+- Schools (ADR 0055): `placeSchool`/`previewSchool` take `kind` 0 = primary, 1 = high and a
+  point; the school snaps beside the nearest road facing it, refused off roads, over roads
+  and other pieces or when unaffordable (`school x y primary|high` in command logs).
+  `schools` sends `[kind, x, y, half_size, front_x, front_y]` per school (`SCHOOL_STRIDE`),
+  whole when one is placed or removed. `schoolPreview` answers with a closed `[x, y]` site
+  plus `ok`, like the station preview. Seats, enrolment and graduating are sim-owned, saved
+  and hashed (save version 12); nothing shows them yet. `Sim.prices` lists `[cost, upkeep]`
+  for coal, solar, wind, pump, tower, fire station, primary school, high school.
 - Data overlays (ADR 0057): `traffic` carries `segments`, `[ax, ay, bx, by, class, road, jam]`
   per rendered segment of each road with a car on it (`TRAFFIC_STRIDE`), road = stable road ID,
   jam 0 = flowing at the limit to 1 = lanes full of stopped cars; sent at most once a real

@@ -10,6 +10,7 @@ import type {
   PlantKind,
   PowerStats,
   Prices,
+  SchoolCommand,
   ServiceMessage,
   WaterKind,
   WaterStats,
@@ -21,6 +22,7 @@ export * from './protocol-services.ts';
 
 export type ToWorker =
   | HistoryCommand
+  | SchoolCommand
   /**
    * `grid` starts on the generated `cols` × `rows` street grid (tests and benchmarks); false
    * starts on an empty map of that size, as the game does.
@@ -60,9 +62,9 @@ export type ToWorker =
   /** Asks which road `setRoadClass` would change and for what. Answered with
    * `roadClassPreview`. Changes nothing. */
   | { type: 'previewRoadClass'; x: number; y: number; class: RoadClass; revision: number }
-  /** Removes the fire station or plant under the point, else the nearest line, else the pump
-   * or tower under the point (ADR 0052), else the building under the point (ADR 0045), else
-   * ruins (ADR 0053), else the nearest road. */
+  /** Removes the fire station, school (ADR 0055) or plant under the point, else the nearest
+   * line, else the pump or tower under the point (ADR 0052), else the building under the point
+   * (ADR 0045), else ruins (ADR 0053), else the nearest road. */
   | { type: 'deleteRoad'; x: number; y: number }
   /** Places a power plant at the point: coal snaps beside the nearest road and faces it, others
    * centre on the point (ADR 0041, 0042). Refused, changing nothing, when it does not fit or

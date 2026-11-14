@@ -481,6 +481,14 @@ Goals and consequences, kept light so they don't crowd out building.
     school and 10% university; children and grown children have none until schools exist.
     Dense industry prefers primary and dense commerce high school; a less-educated seeker
     takes such a job only after waiting a quarter to half a clock day. Save version 10.
+  - Slice 2, school buildings — implemented. Primary schools ($4,000, 90 seats, 6 teachers)
+    and high schools ($7,000, 120 seats, 9 teachers) are placed beside a road from the
+    Services menu, bulldozed and undone like fire stations. A child takes a seat at the
+    nearest school of their stage that covers their home, is within walking reach and has
+    room; a child seated for at least half a stage when it ends gains that level. Teacher
+    jobs prefer high school education. Homes in a school's area gain land value. Children do
+    not travel to school yet (slice 3), and nothing shows seats or pupils yet (slice 4).
+    Save version 12.
 - **Money follows city quality** ([ADR 0056](adrs/0056-taxes-follow-city-quality-and-services-have-budgets.md)),
   after schools. Three slices:
   1. Taxes: each resident's tax scales with their home's land value and each filled job's with

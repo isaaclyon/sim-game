@@ -6,7 +6,17 @@ import { COMPLAINT_WORDS, moodText } from './ui/figures';
 import { type IconName, iconSvg } from './ui/icons';
 
 /** Words for a building by its original use, indexed by `Zone`. */
-const BUILDING_WORDS = ['building', 'house', 'apartments', 'shop', 'store', 'factory', 'factory'];
+const BUILDING_WORDS = [
+  'building',
+  'house',
+  'apartments',
+  'shop',
+  'store',
+  'factory',
+  'factory',
+  'primary school',
+  'high school',
+];
 const label = (p: Place) => `${BUILDING_WORDS[p.zone] ?? 'building'} #${p.building}`;
 const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 

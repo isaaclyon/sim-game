@@ -12,7 +12,8 @@ pub(super) fn risk(zone: Zone) -> u32 {
         Zone::ResidentialHigh | Zone::CommercialHigh => 300,
         Zone::IndustrialLow => 450,
         Zone::IndustrialHigh => 750,
-        Zone::None => 0,
+        // Schools do not burn (ADR 0055).
+        Zone::None | Zone::PrimarySchool | Zone::HighSchool => 0,
     }
 }
 

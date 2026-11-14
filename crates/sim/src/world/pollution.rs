@@ -70,6 +70,7 @@ impl World {
             }
         }
         self.fire_boost(&mut src);
+        self.school_boost(&mut src);
         src
     }
 

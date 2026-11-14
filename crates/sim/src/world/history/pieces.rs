@@ -1,4 +1,4 @@
-//! Matching recorded plants, lines, pumps, towers and stations, and putting them back
+//! Matching recorded plants, lines, pumps, towers, stations and schools, and putting them back
 //! (ADR 0051, amended).
 
 use super::Record;
@@ -16,6 +16,7 @@ pub(super) enum Piece {
     Line(u32),
     Water(u32),
     Station(u32),
+    School(u32),
 }
 
 pub(super) fn footprint(record: Record) -> Option<Footprint> {
@@ -31,6 +32,11 @@ pub(super) fn footprint(record: Record) -> Option<Footprint> {
             front,
         } => (centre, front, kind.half_size()),
         Record::Station { centre, front } => (centre, front, STATION_HALF),
+        Record::School {
+            kind,
+            centre,
+            front,
+        } => (centre, front, kind.half_size()),
         Record::Road(_) | Record::Line { .. } => return None,
     };
     Some(Footprint {
@@ -77,6 +83,14 @@ impl World {
                     .active_stations()
                     .find(|&s| same(self.fire.footprint(s).centre, centre))
                     .map(Piece::Station),
+                Record::School { kind, centre, .. } => {
+                    let s = &self.schools;
+                    s.active_schools()
+                        .find(|&i| {
+                            s.kind[i as usize] == kind && same(s.footprint(i).centre, centre)
+                        })
+                        .map(Piece::School)
+                }
             };
             found.push(piece?);
         }
@@ -93,7 +107,7 @@ impl World {
                 let at = footprint(record).expect("a plant has a footprint");
                 self.spot_fits_on(net, at, kind == PlantKind::Coal)
             }
-            Record::Water { .. } | Record::Station { .. } => {
+            Record::Water { .. } | Record::Station { .. } | Record::School { .. } => {
                 let at = footprint(record).expect("a roadside piece has a footprint");
                 self.spot_fits_on(net, at, true)
             }
@@ -106,6 +120,7 @@ impl World {
             Piece::Line(l) => self.power.remove_line(l),
             Piece::Water(p) => self.water.remove(p),
             Piece::Station(s) => self.remove_station(s),
+            Piece::School(s) => self.remove_school(s),
         }
     }
 
@@ -130,6 +145,9 @@ impl World {
                 self.claim_land(at);
             }
             Record::Station { .. } => self.add_station(at.expect("a station has a footprint")),
+            Record::School { kind, .. } => {
+                self.add_school(kind, at.expect("a school has a footprint"));
+            }
         }
     }
 }

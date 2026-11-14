@@ -3,13 +3,13 @@
 use sim::Command;
 use sim::power::PlantKind;
 use sim::water::WaterKind;
-use sim::world::StepKind;
+use sim::world::{SchoolKind, StepKind};
 use wasm_bindgen::prelude::*;
 
 use crate::Sim;
 
 /// What the undo and redo buttons show; see `sim::HistoryView`. Kinds are names the frontend
-/// labels: road, curve, grid, class, bulldoze, coal, solar, wind, line, pump, tower, station.
+/// labels: road, curve, grid, class, bulldoze, coal, solar, wind, line, pump, tower, station, primary, high.
 #[wasm_bindgen(getter_with_clone)]
 pub struct HistoryView {
     pub undo: Option<String>,
@@ -33,6 +33,8 @@ fn name(kind: StepKind) -> String {
         StepKind::Water(WaterKind::Pump) => "pump",
         StepKind::Water(WaterKind::Tower) => "tower",
         StepKind::Station => "station",
+        StepKind::School(SchoolKind::Primary) => "primary",
+        StepKind::School(SchoolKind::High) => "high",
     }
     .to_owned()
 }

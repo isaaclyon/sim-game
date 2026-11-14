@@ -20,6 +20,7 @@ impl World {
         self.register_buildings();
         self.admit_households();
         self.tick_families();
+        self.tick_schools();
         for _ in 0..8 {
             let Some(&Reverse((at, c))) = self.residents.searches.peek() else {
                 break;

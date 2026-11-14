@@ -37,6 +37,8 @@ impl World {
             self.buildings.active.len(),
             self.lots.len(),
         )?;
+        self.schools
+            .check(self.buildings.active.len(), self.citizens.child.len())?;
         self.pollution
             .check(&self.zones, self.roads.lane_count() / 2)?;
         self.happiness
@@ -282,7 +284,10 @@ impl World {
         let (mut commercial, mut industrial) = (0u64, 0u64);
         for b in (0..supply.counted.len()).filter(|&b| supply.counted[b]) {
             match self.buildings.zone[b] {
-                Zone::CommercialLow | Zone::CommercialHigh => commercial += u64::from(r.jobs[b]),
+                Zone::CommercialLow
+                | Zone::CommercialHigh
+                | Zone::PrimarySchool
+                | Zone::HighSchool => commercial += u64::from(r.jobs[b]),
                 Zone::IndustrialLow | Zone::IndustrialHigh => industrial += u64::from(r.jobs[b]),
                 _ => {}
             }

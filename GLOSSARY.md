@@ -30,6 +30,21 @@ The highest school level a citizen has finished: none, primary, high school or u
 Dense jobs prefer more of it and fill more slowly without it (ADR 0055).
 _Avoid_: skill, qualification
 
+**School**:
+A service building placed beside a road that teaches children of one stage: a primary school
+the first half of childhood, a high school the second (ADR 0055).
+_Avoid_: college, academy
+
+**Seat**:
+One child's place at a school. A child holds at most one; a school has a fixed number per
+seat block.
+_Avoid_: slot, capacity (when you mean one place)
+
+**Enrolment**:
+A child holding a seat at a school. Holding one for at least half a stage, and at its end,
+gains that stage's education.
+_Avoid_: attendance (children are enrolled whether or not they are at school now)
+
 **Trip**:
 A citizen's journey from one place to another for an activity, such as work, shopping or returning home.
 _Avoid_: route (when you mean the journey rather than its path)
