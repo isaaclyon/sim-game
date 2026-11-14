@@ -133,6 +133,16 @@ test('the panel tells the truth about each state', async () => {
   assert.match(child, /^Age 7, a child: lives at home$/m);
   assert.doesNotMatch(child, /Job:/);
   assert.match(child, /^At home$/m);
+  const school = { building: 12, zone: 7 };
+  const pupil = { job: null, age: 7, child: true, activity: Activity.School };
+  assert.match(
+    show({ ...pupil, driving: false, onFoot: true, destination: school }),
+    /^Walking to school at primary school #12$/m,
+  );
+  assert.match(
+    show({ ...pupil, driving: false, destination: null, location: school }),
+    /^At school, primary school #12$/m,
+  );
   assert.match(show({ driving: false, onFoot: true }), /^Walking to work at factory #40$/m);
   assert.match(
     show({ driving: false }),

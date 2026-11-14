@@ -45,6 +45,12 @@ A child holding a seat at a school. Holding one for at least half a stage, and a
 gains that stage's education.
 _Avoid_: attendance (children are enrolled whether or not they are at school now)
 
+**School run**:
+An enrolled child's trip to school in the morning or home in the afternoon, on foot (ADR 0055).
+
+**School day**:
+The time a child spends at school between the two school runs: six and a half clock hours.
+
 **Trip**:
 A citizen's journey from one place to another for an activity, such as work, shopping or returning home.
 _Avoid_: route (when you mean the journey rather than its path)

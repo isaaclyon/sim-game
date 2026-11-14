@@ -7,6 +7,7 @@ import type { AGENT_STRIDE, AgentKind } from './protocol';
 // Type-only import keeps this loadable by plain Node in tests; the types pin the values.
 const STRIDE: typeof AGENT_STRIDE = 5;
 const WALKER: (typeof AgentKind)['Walker'] = 1;
+const CHILD: (typeof AgentKind)['Child'] = 3;
 
 /** Volumes from 0 to 1 per layer. */
 export interface AmbientMix {
@@ -81,7 +82,7 @@ export function ambientMix(
       if (ratio < 0) continue;
       const w = weight(agents[o], agents[o + 1]);
       if (w === 0) continue;
-      if (agents[o + 4] === WALKER) city += w * 0.5;
+      if (agents[o + 4] === WALKER || agents[o + 4] === CHILD) city += w * 0.5;
       else traffic += w * Math.min(ratio, 1);
     }
   }

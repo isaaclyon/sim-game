@@ -79,7 +79,7 @@ pub struct SimStats {
 
 /// One citizen's details for the inspector (ADR 0022); see `World::citizen_info`. Places are
 /// building IDs with their original use as a zone byte; `None` when absent or removed.
-/// `activity` is 0 = home, 1 = work, 2 = shop.
+/// `activity` is 0 = home, 1 = work, 2 = shop, 3 = school (a child's school day, ADR 0055).
 #[wasm_bindgen(getter_with_clone)]
 pub struct CitizenView {
     pub name: String,

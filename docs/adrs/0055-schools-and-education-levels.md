@@ -1,6 +1,6 @@
 # 0055. Schools teach children, and education shapes who fills jobs
 
-- Status: Accepted; amended 2026-11-09 and 2026-11-13; slices 1 and 2 implemented; extended by
+- Status: Accepted; amended 2026-11-09 and 2026-11-13; slices 1 to 3 implemented; extended by
   [0056](0056-taxes-follow-city-quality-and-services-have-budgets.md) (seat blocks and budgets)
 - Date: 2026-11-06
 - Extends: [0054](0054-children-births-and-growing-up.md), [0021](0021-citizens-households-and-trips.md),
@@ -103,3 +103,25 @@ wins.
   buildings (zones 7 and 8), which have their own models. Clicking a school selects nothing
   until slice 4.
 - **Saves.** Save version 12. A city that never had a school hashes as it did before.
+
+## Amendment (2026-11-13): slice 3 rules
+
+Settled while building slice 3. Where this section and the text above disagree, this section
+wins.
+
+- **The school day.** A child holding a seat leaves home between 7:30 and 8:00, at a minute
+  fixed per child, walks to their school, stays six and a half clock hours from arriving and
+  walks home. There are no weekends or holidays. A school trip is an ordinary citizen trip
+  with a new activity, school; it draws nothing from the residents' random numbers, so a
+  city without schools runs as it did.
+- **No seat, no trip.** A child without a seat stays home. A child who enrols while at home
+  starts with the next 7:30; one who loses their seat during the day finishes the day and
+  walks home.
+- **Changes mid-day.** A pupil inside a bulldozed school is put back home at once, as anyone
+  inside a removed building is. A child who moves up to high school or comes of age during
+  the day walks home at the day's end and follows their new day from the next morning.
+- **Attendance does not gate graduating.** Graduating still depends only on holding a seat
+  (slice 2); a child whose walk fails keeps their seat and tries again.
+- **Display.** A child on foot is agent kind 3 in the snapshot and is drawn at about 60% of
+  an adult's size. The inspector reads "At school" and "Walking to school".
+- **Saves.** Still save version 12, which has not shipped without this slice.

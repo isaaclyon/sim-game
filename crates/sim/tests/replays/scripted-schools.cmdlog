@@ -20,4 +20,4 @@ grid 6 6
 2600 school 420 185 primary
 2700 undo
 end 6000
-expect hash f7361d3f4b08b304 population 33 buildings 20 trips 16
+expect hash 263239e30fe87372 population 33 buildings 20 trips 18

@@ -2,6 +2,7 @@ use super::super::World;
 use crate::agents::AgentState;
 use crate::citizen::{Activity, CitizenId};
 use crate::clock::{CLOCK_SECONDS_PER_SIM_SECOND, clock_at};
+use crate::world::school::SCHOOL_DAY_S;
 use std::cmp::Reverse;
 
 impl World {
@@ -70,6 +71,10 @@ impl World {
                 continue;
             }
             let next = match self.citizens.activity[i] {
+                // A child's only trip from home is to their school; no draw is made.
+                Activity::Home if self.citizens.child[i] => self
+                    .school_building(c)
+                    .map(|school| (school, Activity::School)),
                 Activity::Home => {
                     if let Some(job) = self.citizens.job[i] {
                         Some((job, Activity::Work))
@@ -90,7 +95,7 @@ impl World {
                         (b, Activity::Shop)
                     }))
                 }
-                Activity::Shop => Some((self.home_building(c), Activity::Home)),
+                Activity::Shop | Activity::School => Some((self.home_building(c), Activity::Home)),
             };
             if let Some((b, activity)) = next {
                 if activity == Activity::Work {
@@ -105,13 +110,16 @@ impl World {
         }
     }
 
-    /// Children stay home (ADR 0054): they have no day to schedule.
+    /// A child's day is their school day; a child without a seat stays home (ADR 0054, 0055).
     pub(in crate::world) fn schedule_day(&mut self, c: CitizenId) {
-        if self.citizens.child[c as usize] {
+        let child = self.citizens.child[c as usize];
+        if child && self.school_building(c).is_none() {
             return;
         }
         let now = clock_at(self.totals.tick, self.cfg.dt).second_of_day;
-        let target = if self.citizens.job[c as usize].is_some() {
+        let target = if child {
+            self.school_departure(c)
+        } else if self.citizens.job[c as usize].is_some() {
             self.citizens.departure[c as usize]
         } else {
             10 * 3600 + self.residents.rng.below(6 * 3600)
@@ -186,6 +194,7 @@ impl World {
                 self.note_commute(c);
                 self.schedule_activity(c, self.citizens.work_duration[i] as f32);
             }
+            Activity::School => self.schedule_activity(c, SCHOOL_DAY_S),
             Activity::Shop => {
                 // 6 to 30 clock minutes.
                 let seconds = 20 + self.residents.rng.below(81);

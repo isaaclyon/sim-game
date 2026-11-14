@@ -486,8 +486,11 @@ Goals and consequences, kept light so they don't crowd out building.
     Services menu, bulldozed and undone like fire stations. A child takes a seat at the
     nearest school of their stage that covers their home, is within walking reach and has
     room; a child seated for at least half a stage when it ends gains that level. Teacher
-    jobs prefer high school education. Homes in a school's area gain land value. Children do
-    not travel to school yet (slice 3), and nothing shows seats or pupils yet (slice 4).
+    jobs prefer high school education. Homes in a school's area gain land value. Nothing
+    shows seats or pupils yet (slice 4).
+  - Slice 3, school runs — implemented. An enrolled child walks to school between 7:30 and
+    8:00, stays six and a half hours and walks home, drawn as a smaller walker. A child
+    without a seat stays home. Being driven to school waits for slice 5.
     Save version 12.
 - **Money follows city quality** ([ADR 0056](adrs/0056-taxes-follow-city-quality-and-services-have-budgets.md)),
   after schools. Three slices:

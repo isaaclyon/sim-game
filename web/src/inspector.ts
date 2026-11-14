@@ -34,12 +34,18 @@ export interface Card {
 export function describe(c: Citizen): Card {
   if (!c.resident) return { title: c.name, lines: [{ icon: 'leave', text: 'Left town' }] };
   const there = (p: Place | null) => (p ? ` at ${label(p)}` : '');
-  // Indexed by `Activity`: home, work, shop.
-  const trip = ['home', `to work${there(c.destination)}`, `to shop${there(c.destination)}`];
+  // Indexed by `Activity`: home, work, shop, school.
+  const trip = [
+    'home',
+    `to work${there(c.destination)}`,
+    `to shop${there(c.destination)}`,
+    `to school${there(c.destination)}`,
+  ];
   const stay: CardLine[] = [
     { icon: 'home', text: 'At home' },
     { icon: 'work', text: `At work${c.location ? `, ${label(c.location)}` : ''}` },
     { icon: 'shop', text: `Shopping${there(c.location)}` },
+    { icon: 'work', text: `At school${c.location ? `, ${label(c.location)}` : ''}` },
   ];
   const how: [IconName, string] = c.onFoot
     ? ['walk', 'Walking']

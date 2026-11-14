@@ -331,3 +331,129 @@ fn schools_survive_a_save_and_a_city_without_one_hashes_as_before() {
     assert_eq!(out.len(), SCHOOL_STRIDE);
     assert_eq!((out[0], out[3]), (0.0, SchoolKind::Primary.half_size()));
 }
+
+/// Runs one clock day, counting ticks on which each watched thing was seen.
+struct Day {
+    at_school: bool,
+    child_walkers: bool,
+    left_before_seven: bool,
+}
+
+fn watch_a_day(w: &mut World) -> Day {
+    use crate::citizen::Activity;
+    use crate::clock::clock_at;
+    let mut day = Day {
+        at_school: false,
+        child_walkers: false,
+        left_before_seven: false,
+    };
+    let mut agents = Vec::new();
+    for tick in 0..w.days_to_ticks(1.0) {
+        w.tick();
+        let kids = children(w);
+        let out = |c: &u32| w.citizens.location[*c as usize] != w.home_building(*c);
+        let walking = |c: &u32| w.citizens.destination[*c as usize].is_some();
+        day.at_school |= kids.iter().any(|&c| {
+            w.citizens.activity[c as usize] == Activity::School
+                && Some(w.citizens.location[c as usize]) == w.school_building(c)
+        });
+        if clock_at(w.totals.tick, w.cfg.dt).second_of_day < 7 * 3600 {
+            day.left_before_seven |= kids.iter().any(|c| out(c) || walking(c));
+        }
+        if tick % 50 == 0 {
+            w.write_agent_snapshot(&mut agents);
+            day.child_walkers |= agents
+                .chunks(crate::world::SNAPSHOT_STRIDE)
+                .any(|a| a[3] >= 0.0 && a[4] == 3.0);
+        }
+    }
+    day
+}
+
+#[test]
+fn enrolled_children_walk_to_school_in_the_morning_and_home_again() {
+    let mut w = town();
+    tireless(&mut w);
+    assert!(place(&mut w, SchoolKind::Primary, 60.0, 135.0));
+    assert!(place(&mut w, SchoolKind::High, 180.0, 135.0));
+    w.tick();
+    assert!(
+        !seated(&w, SchoolKind::Primary).is_empty() || !seated(&w, SchoolKind::High).is_empty()
+    );
+    let walks = w.totals.walks_completed;
+
+    let day = watch_a_day(&mut w);
+    assert!(day.at_school, "children spend the day at their school");
+    assert!(
+        day.child_walkers,
+        "children on the way are drawn as child walkers"
+    );
+    assert!(!day.left_before_seven, "nobody sets out before the morning");
+    assert!(w.totals.walks_completed > walks);
+    // A second day ends with every child back home or on the way.
+    watch_a_day(&mut w);
+    let now = crate::clock::clock_at(w.totals.tick, w.cfg.dt).second_of_day;
+    for c in children(&w) {
+        let i = c as usize;
+        let home = w.home_building(c);
+        let settled = w.citizens.location[i] == home || w.citizens.destination[i] == Some(home);
+        // Mid school day, a seated child is at school instead.
+        let in_class = (9 * 3600..14 * 3600).contains(&now) && w.school_building(c).is_some();
+        assert!(
+            settled || in_class,
+            "child {c} is neither home nor in class"
+        );
+    }
+}
+
+#[test]
+fn a_child_without_a_seat_stays_home() {
+    let mut w = town();
+    // Only a high school, and no child old enough for it: nobody holds a seat.
+    assert!(place(&mut w, SchoolKind::High, 180.0, 135.0));
+    for c in children(&w) {
+        w.citizens.born[c as usize] = w.totals.tick as i64;
+    }
+    let day = watch_a_day(&mut w);
+    assert!(seated(&w, SchoolKind::High).is_empty());
+    assert!(!day.at_school && !day.child_walkers);
+    for c in children(&w) {
+        assert_eq!(w.citizens.location[c as usize], w.home_building(c));
+    }
+}
+
+#[test]
+fn bulldozing_a_school_in_session_sends_its_pupils_home() {
+    use crate::citizen::Activity;
+    let mut w = town();
+    tireless(&mut w);
+    assert!(place(&mut w, SchoolKind::Primary, 60.0, 135.0));
+    assert!(place(&mut w, SchoolKind::High, 180.0, 135.0));
+    let in_class = |w: &World| {
+        children(w)
+            .into_iter()
+            .filter(|&c| Some(w.citizens.location[c as usize]) == w.school_building(c))
+            .count()
+    };
+    for _ in 0..w.days_to_ticks(2.0) {
+        w.tick();
+        if in_class(&w) > 0 {
+            break;
+        }
+    }
+    assert!(in_class(&w) > 0);
+    for s in 0..2 {
+        let at = w.schools.footprint(s).centre;
+        assert!(w.apply(Command::DeleteRoad { x: at.0, y: at.1 }));
+    }
+    for c in children(&w) {
+        let i = c as usize;
+        assert!(w.buildings.active[w.citizens.location[i] as usize]);
+        assert_eq!(w.citizens.activity[i], Activity::Home);
+        assert!(w.citizens.destination[i].is_none_or(|b| b == w.home_building(c)));
+    }
+    watch_a_day(&mut w);
+    for c in children(&w) {
+        assert_eq!(w.citizens.location[c as usize], w.home_building(c));
+    }
+}

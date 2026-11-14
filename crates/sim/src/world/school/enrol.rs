@@ -156,6 +156,13 @@ impl World {
         self.schools.seat[i] = Some(s);
         self.schools.since[i] = self.totals.tick;
         self.schools.pupils[s as usize] += 1;
+        // A child idle at home starts going to school; one out or already due keeps their plan.
+        if self.citizens.location[i] == home
+            && self.citizens.destination[i].is_none()
+            && self.citizens.activity[i] == crate::citizen::Activity::Home
+        {
+            self.schedule_day(c);
+        }
         true
     }
 

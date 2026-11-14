@@ -21,7 +21,8 @@ What to build next and why lives in `docs/ROADMAP.md`. Work on the current miles
 ## Snapshot formats
 - Agents: `[x, y, heading, speed_ratio, kind]` per agent (`SNAPSHOT_STRIDE`, `AGENT_STRIDE`),
   speed_ratio < 0 = hidden, kind 0 = car, 1 = walker on the sidewalk (ADR 0026), 2 = fire
-  truck (ADR 0053; not a citizen, so inspecting one answers null). Frames go out at most
+  truck (ADR 0053; not a citizen, so inspecting one answers null), 3 = child walker, drawn
+  smaller (ADR 0055). Frames go out at most
   ~60 a real second; the page returns drawn agent buffers with `spareAgents` for the worker
   to refill, so a frame's agents may view a larger buffer (ADR 0003, amended).
 - Roads: `[ax, ay, bx, by, class]` per active rendered segment, class 0 = street, 1 = main road,
@@ -132,7 +133,9 @@ What to build next and why lives in `docs/ROADMAP.md`. Work on the current miles
   `schools` sends `[kind, x, y, half_size, front_x, front_y]` per school (`SCHOOL_STRIDE`),
   whole when one is placed or removed. `schoolPreview` answers with a closed `[x, y]` site
   plus `ok`, like the station preview. Seats, enrolment and graduating are sim-owned, saved
-  and hashed (save version 12); nothing shows them yet. `Sim.prices` lists `[cost, upkeep]`
+  and hashed (save version 12); nothing shows them yet. An enrolled child walks to school
+  between 7:30 and 8:00, stays six and a half clock hours and walks home: citizen `activity`
+  3 = school. `Sim.prices` lists `[cost, upkeep]`
   for coal, solar, wind, pump, tower, fire station, primary school, high school.
 - Data overlays (ADR 0057): `traffic` carries `segments`, `[ax, ay, bx, by, class, road, jam]`
   per rendered segment of each road with a car on it (`TRAFFIC_STRIDE`), road = stable road ID,

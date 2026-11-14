@@ -8,6 +8,7 @@
 
 mod enrol;
 mod place;
+mod run;
 #[cfg(test)]
 mod tests;
 
@@ -25,6 +26,7 @@ use crate::pollution::Sources;
 use crate::power::Footprint;
 use crate::road::{NodeId, RoadId};
 use crate::zone::Zone;
+pub(in crate::world) use run::SCHOOL_DAY_S;
 
 /// Floats per school in the schools snapshot: `[kind, x, y, half_size, front_x, front_y]`.
 pub const SCHOOL_STRIDE: usize = 6;

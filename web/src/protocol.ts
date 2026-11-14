@@ -197,21 +197,14 @@ export const Era = {
 export type Era = (typeof Era)[keyof typeof Era];
 
 /** What a citizen is doing or travelling to do, matching the sim's `Activity`. */
-export const Activity = {
-  Home: 0,
-  Work: 1,
-  Shop: 2,
-} as const;
+export const Activity = { Home: 0, Work: 1, Shop: 2, School: 3 } as const;
 export type Activity = (typeof Activity)[keyof typeof Activity];
 
 /** Floats per agent in the `frame` agents snapshot. */
 export const AGENT_STRIDE = 5;
-/** The `kind` field of an agent snapshot entry (ADR 0026, 0053). */
-export const AgentKind = {
-  Car: 0,
-  Walker: 1,
-  FireTruck: 2,
-} as const;
+/** The `kind` field of an agent snapshot entry (ADR 0026, 0053); a child walker is drawn
+ * smaller (ADR 0055). */
+export const AgentKind = { Car: 0, Walker: 1, FireTruck: 2, Child: 3 } as const;
 export type AgentKind = (typeof AgentKind)[keyof typeof AgentKind];
 
 /** A building, named by its ID and original use. */
