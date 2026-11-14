@@ -118,6 +118,7 @@ impl World {
             .any(|other| other.overlaps(at));
         !overlaps
             && !self.station_overlaps(at)
+            && !self.school_overlaps(at)
             && !near_road(ROAD_CLEARANCE)
             && (!beside_road || near_road(PLANT_REACH))
     }

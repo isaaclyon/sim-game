@@ -1,5 +1,5 @@
-// Power, water and fire (ADR 0041, 0052, 0053): kinds, snapshot strides, stats and the
-// worker messages that carry them. Re-exported from `protocol.ts`.
+// Power, water, fire and schools (ADR 0041, 0052, 0053, 0055): kinds, snapshot strides, stats
+// and the worker messages that carry them. Re-exported from `protocol.ts`.
 
 /** Power plant kinds, matching the sim's `PlantKind` (ADR 0041). */
 export const PlantKind = {
@@ -16,6 +16,13 @@ export const WaterKind = {
 } as const;
 export type WaterKind = (typeof WaterKind)[keyof typeof WaterKind];
 
+/** School kinds, matching the sim's `SchoolKind` (ADR 0055). */
+export const SchoolKind = {
+  Primary: 0,
+  High: 1,
+} as const;
+export type SchoolKind = (typeof SchoolKind)[keyof typeof SchoolKind];
+
 /** What a placeable costs, from the sim (ADR 0036, 0052, 0053): dollars to build, and dollars
  * per clock hour to keep. */
 export interface Price {
@@ -31,6 +38,8 @@ export interface Prices {
   /** By `WaterKind`. */
   water: Price[];
   station: Price;
+  /** By `SchoolKind`. */
+  schools: Price[];
 }
 
 /** Floats per piece in `water.pieces`. */
@@ -47,6 +56,25 @@ export const POWER_BUILDING_STRIDE = 5;
 export const STATION_STRIDE = 5;
 /** Floats per burning building in `fire.fires`. */
 export const FIRE_STRIDE = 4;
+/** How far the residents got in school, from the sim (ADR 0055). */
+export interface EducationStats {
+  /** Adults by `Education` level: none, primary, high school, university. */
+  adults: number[];
+  /** Children without a school seat: no school of their kind in reach, or all are full. */
+  unschooled: number;
+}
+
+/** Floats per school in `schools.schools`. */
+export const SCHOOL_STRIDE = 6;
+
+/** School commands, part of `ToWorker` (ADR 0055). */
+export type SchoolCommand =
+  /** Places a primary or high school beside the nearest road, facing it. Refused away from
+   * roads, over roads, plants, pumps, towers, stations and schools, and when the city cannot
+   * pay. Buildings under it are cleared. */
+  | { type: 'placeSchool'; kind: SchoolKind; x: number; y: number }
+  /** Asks where a school asked for here would stand. Answered with `schoolPreview`. */
+  | { type: 'previewSchool'; kind: SchoolKind; x: number; y: number; revision: number };
 
 /** The town's power from the sim (ADR 0041), in the units of a building's demand. */
 export interface PowerStats {
@@ -165,11 +193,21 @@ export type ServiceMessage =
   /** `outline` is the closed `[x, y]` footprint a station asked about would take, beside its
    * road, empty where no road is in reach; `ok` and `affordable` as for `waterPreview`. */
   | PlacementPreview<'stationPreview'>
+  /**
+   * Schools (ADR 0055), sent whole when one is placed or removed: `[kind, x, y, halfSize,
+   * frontX, frontY]` per school (`SCHOOL_STRIDE`), kind as `SchoolKind`: a square site turned
+   * to face its road. Each school is also a building in `buildings`, zone 7 = primary school,
+   * 8 = high school, which the page draws from this message instead.
+   */
+  | { type: 'schools'; schools: Float32Array }
+  /** `outline` is the closed `[x, y]` site a school asked about would take, beside its road,
+   * empty where no road is in reach; `ok` and `affordable` as for `waterPreview`. */
+  | PlacementPreview<'schoolPreview'>
   /** `[ax, ay, aJoin, bx, by, bJoin]`, join 1 where an end meets a line, plant or road and 0
    * where it stands free; empty means refused. */
   | { type: 'linePreview'; ends: Float32Array; revision: number };
 
-/** Where a plant, pump, tower or station asked about would stand, and whether it would. */
+/** Where a plant, pump, tower, station or school asked about would stand, and whether it would. */
 export interface PlacementPreview<T> {
   type: T;
   outline: Float32Array;

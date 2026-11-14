@@ -44,7 +44,7 @@ const tools = new Toolbox(
   views,
   () => menu.show(tools.selection),
 );
-const { roads, zoning, power, fire } = tools;
+const { roads, zoning, power, fire, schools } = tools;
 const undoRedo = new HistoryButtons(menu.bar, send, renderer, () => tools.dropDrafts());
 const topBar = new TopBar(byId, popovers, {
   setSpeed,
@@ -94,7 +94,7 @@ let buildingsSeen = false;
 worker.onmessage = (e: MessageEvent<FromWorker>) => {
   const msg = e.data;
   if (msg.type === 'fire') topBar.setFires(msg.fires);
-  if (power.receive(msg) || fire.receive(msg)) return;
+  if (power.receive(msg) || fire.receive(msg) || schools.receive(msg)) return;
   if (msg.type === 'cityStatus') {
     cityControls.receive(msg);
     topBar.setCity(msg);
@@ -139,6 +139,8 @@ worker.onmessage = (e: MessageEvent<FromWorker>) => {
     renderer.ground.setTraffic(msg.segments);
   } else if (msg.type === 'services') {
     renderer.ground.setServices(msg.lots);
+  } else if (msg.type === 'schoolView') {
+    renderer.ground.schools.set(msg);
   } else if (msg.type === 'lots') {
     renderer.setLots(msg.rings);
   } else if (msg.type === 'buildings') {
@@ -205,10 +207,14 @@ canvas.addEventListener('pointerup', (e) => {
   }
   if (power.active) return power.release(e.button, still, renderer.pick(e.clientX, e.clientY));
   if (fire.active) return fire.release(e.button, still, renderer.pick(e.clientX, e.clientY));
+  if (schools.active) return schools.release(e.button, still, renderer.pick(e.clientX, e.clientY));
   if (!roads.mode) {
     if (e.button === 0 && still) {
       const agent = renderer.carAt(e.clientX, e.clientY);
-      const building = agent === null ? renderer.buildingAt(e.clientX, e.clientY) : null;
+      const building =
+        agent === null
+          ? (renderer.buildingAt(e.clientX, e.clientY) ?? renderer.schoolAt(e.clientX, e.clientY))
+          : null;
       if (building !== null) inspector.selectBuilding(building);
       else inspector.select(agent);
     }
@@ -226,6 +232,7 @@ function hover(e: { clientX: number; clientY: number }) {
   if (zoning.zone !== null) return zoning.hover(renderer.pick(e.clientX, e.clientY));
   if (power.active) return power.hover(renderer.pick(e.clientX, e.clientY));
   if (fire.active) return fire.hover(renderer.pick(e.clientX, e.clientY));
+  if (schools.active) return schools.hover(renderer.pick(e.clientX, e.clientY));
   if (roads.mode) roads.hover(renderer.pick(e.clientX, e.clientY), e);
 }
 canvas.addEventListener('pointermove', hover);
@@ -233,6 +240,7 @@ canvas.addEventListener('pointerleave', () => {
   pointer = null;
   power.hover(null);
   fire.hover(null);
+  schools.hover(null);
   zoning.leave();
   roads.leave();
 });

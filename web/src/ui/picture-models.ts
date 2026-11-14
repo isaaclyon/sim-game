@@ -12,6 +12,7 @@ import { GROUND, ROADS, SIDEWALK, ZONE_OVERLAY } from '../palette.ts';
 import { Era, PlantKind, RoadClass, type WaterKind, Zone } from '../protocol.ts';
 import { buildRoadGeometry } from '../road-geometry.ts';
 import { buildRoadMarkings } from '../road-markings.ts';
+import { createSchool } from '../school-building.ts';
 import { createSolarPlant } from '../solar-plant.ts';
 import { createWaterPiece, MODEL_HALF } from '../water-pieces.ts';
 import { createWindPlant } from '../wind-plant.ts';
@@ -210,6 +211,11 @@ export function pictureModel(p: Picture): THREE.Object3D {
       const station = new THREE.Group().add(createFireStation(12));
       station.rotation.y = Math.PI;
       return station;
+    }
+    case 'school': {
+      const school = new THREE.Group().add(createSchool(p.school));
+      school.rotation.y = Math.PI;
+      return school;
     }
     case 'icon':
       if (p.name === 'roads') return roadModel(RoadClass.Street, 20);

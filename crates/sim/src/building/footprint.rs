@@ -109,7 +109,7 @@ pub(super) fn make(
             road_box(&inset, front, facing, (width, depth), setback)
         }
         Zone::ResidentialHigh | Zone::CommercialHigh => Some(clear),
-        Zone::None => None,
+        Zone::None | Zone::PrimarySchool | Zone::HighSchool => None,
     }?;
     Some(ring.into_iter().map(poly::to_point).collect())
 }

@@ -1,5 +1,5 @@
-//! Edit history (ADR 0051): undo and redo for roads, power plants and lines, pumps, towers and
-//! fire stations. A step records what an edit removed (`before`) and added (`after`) as shapes
+//! Edit history (ADR 0051): undo and redo for roads, power plants and lines, pumps, towers,
+//! fire stations and schools. A step records what an edit removed (`before`) and added (`after`) as shapes
 //! and footprints, never IDs; undo and redo replay them as new edits with new IDs.
 
 mod apply;
@@ -10,7 +10,7 @@ mod view;
 
 use serde::{Deserialize, Serialize};
 
-use super::{Command, World};
+use super::{Command, SchoolKind, World};
 use crate::check::{Check, ensure};
 use crate::geometry::{Point, Shape};
 use crate::power::PlantKind;
@@ -49,7 +49,7 @@ impl RoadRecord {
     }
 }
 
-/// One placeable as it stood. Plants, pumps, towers and stations keep their placed footprint
+/// One placeable as it stood. Plants, pumps, towers, stations and schools keep their placed footprint
 /// (centre and the unit direction their front faces), lines their snapped ends.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Record {
@@ -72,6 +72,11 @@ pub enum Record {
         centre: Point,
         front: Point,
     },
+    School {
+        kind: SchoolKind,
+        centre: Point,
+        front: Point,
+    },
 }
 
 impl Record {
@@ -81,6 +86,7 @@ impl Record {
             Self::Line { a, b } => vec![a, b],
             Self::Plant { centre, front, .. }
             | Self::Water { centre, front, .. }
+            | Self::School { centre, front, .. }
             | Self::Station { centre, front } => vec![centre, front],
         }
     }
@@ -98,6 +104,7 @@ pub enum StepKind {
     Line,
     Water(WaterKind),
     Station,
+    School(SchoolKind),
 }
 
 impl StepKind {
@@ -113,6 +120,7 @@ impl StepKind {
             Command::BuildLine { .. } => Self::Line,
             Command::PlaceWater { kind, .. } => Self::Water(kind),
             Command::PlaceStation { .. } => Self::Station,
+            Command::PlaceSchool { kind, .. } => Self::School(kind),
             _ => return None,
         })
     }

@@ -20,6 +20,8 @@ const ACTIONS: Record<StepKind, string> = {
   pump: 'place pump',
   tower: 'place water tower',
   station: 'place fire station',
+  primary: 'place primary school',
+  high: 'place high school',
 };
 
 type HistoryReply = Extract<FromWorker, { type: 'historyResult' | 'historyPreview' }>;

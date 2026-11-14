@@ -1,5 +1,5 @@
-// Which tool is in use: a road tool, bulldoze, a zone brush, a power tool or the fire station
-// tool, never two at once.
+// Which tool is in use: a road tool, bulldoze, a zone brush, a power tool, the fire station
+// tool or a school tool, never two at once.
 // The build menu and the keys both start tools here (M4.6); each tool keeps its own canvas
 // handling and sim commands. Picking a power, water or fire station tool shows that service's
 // view until it is put away. Tools the city's era has not unlocked are refused with a hint
@@ -9,6 +9,7 @@ import { PowerTools, WATER_TOOLS } from './power-tools';
 import { Era, type Prices, RoadClass, type ToWorker, type WaterKind, Zone } from './protocol';
 import type { Renderer } from './renderer';
 import { RoadTool } from './road-tool';
+import { SchoolTools } from './school-tools';
 import { type Selection, sameTool } from './ui/build-menu';
 import { CATEGORIES, type OptionAction, type RoadMode, type Tool, unlockEra } from './ui/catalog';
 import { lockedText, zoneHelpText } from './ui/hints';
@@ -20,6 +21,7 @@ export class Toolbox {
   readonly zoning: ZoneTool;
   readonly power: PowerTools;
   readonly fire: FireTools;
+  readonly schools: SchoolTools;
   /** The road shape the road items start with: the last one picked. */
   private shape: RoadMode = 'straight';
   /** Whether each service's view showed before its tool turned it on; null when it did not. */
@@ -50,6 +52,7 @@ export class Toolbox {
     this.zoning = new ZoneTool(send, renderer);
     this.power = new PowerTools(send, renderer, el.hint, () => this.use(null));
     this.fire = new FireTools(send, renderer, el.hint, () => this.use(null));
+    this.schools = new SchoolTools(send, renderer, el.hint, () => this.use(null));
     // The player's own choice stands when the tool is put away.
     views.onPlayerMarkers = (service) => {
       this.viewBefore[service] = null;
@@ -57,8 +60,9 @@ export class Toolbox {
   }
 
   get active() {
-    const { roads, zoning, power, fire } = this;
-    return roads.mode !== null || zoning.zone !== null || power.active || fire.active;
+    const { roads, zoning, power, fire, schools } = this;
+    const placing = power.active || fire.active || schools.active;
+    return roads.mode !== null || zoning.zone !== null || placing;
   }
 
   get selection(): Selection {
@@ -78,7 +82,9 @@ export class Toolbox {
                 ? { kind: 'plant', plant: p }
                 : this.fire.active
                   ? { kind: 'station' }
-                  : null;
+                  : this.schools.kind !== null
+                    ? { kind: 'school', school: this.schools.kind }
+                    : null;
     const roadMode = roads.roadMode ? this.shape : null;
     return { tool, roadMode, snap: roads.snaps, gridCell: roads.cell };
   }
@@ -125,6 +131,7 @@ export class Toolbox {
     // The hint line is shared, and each tool clears only what it wrote: stop them all first.
     this.power.set(null);
     this.fire.set(false);
+    this.schools.set(null);
     this.zoning.set(null);
     this.roads.setMode(null);
     this.hint.textContent = '';
@@ -139,6 +146,7 @@ export class Toolbox {
     else if (tool?.kind === 'line') this.power.set('line');
     else if (tool?.kind === 'water') this.power.set(WATER_TOOLS[tool.water]);
     else if (tool?.kind === 'station') this.fire.set(true);
+    else if (tool?.kind === 'school') this.schools.set(tool.school);
     const t = this.power.tool;
     const water = t === 'pump' || t === 'tower';
     this.showView('power', t !== null && !water);
@@ -150,7 +158,7 @@ export class Toolbox {
 
   /** The sim's prices, for the placement tools' hints. */
   setPrices(prices: Prices) {
-    this.power.prices = this.fire.prices = prices;
+    this.power.prices = this.fire.prices = this.schools.prices = prices;
   }
 
   /** Undo or redo changed the map under a road or line being drawn: start it again. */

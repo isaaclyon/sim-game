@@ -201,6 +201,6 @@ fn a_parked_resident_reports_where_they_are_and_no_trip() {
     );
     assert!(matches!(
         info.activity,
-        Activity::Home | Activity::Work | Activity::Shop
+        Activity::Home | Activity::Work | Activity::Shop | Activity::School | Activity::SchoolRun
     ));
 }

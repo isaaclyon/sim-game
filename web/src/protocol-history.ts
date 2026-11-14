@@ -2,7 +2,7 @@
 // that carry them. Re-exported from `protocol.ts`.
 
 /** What a step did, from the sim's `StepKind`: a road, curve, grid, class change or bulldoze,
- * or the plant, line, pump, tower or station placed. */
+ * or the plant, line, pump, tower, station or school placed. */
 export type StepKind =
   | 'road'
   | 'curve'
@@ -15,7 +15,9 @@ export type StepKind =
   | 'line'
   | 'pump'
   | 'tower'
-  | 'station';
+  | 'station'
+  | 'primary'
+  | 'high';
 
 /** What the undo and redo buttons show, from the sim. Read-only. */
 export interface HistoryStatus {

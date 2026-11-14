@@ -27,6 +27,7 @@ const STATS = {
     destroyed: 0,
   },
   happiness: { average: 50, complaints: [0, 0, 0, 0, 0, 0, 0] },
+  education: { adults: [0, 0, 0, 0], unschooled: 0 },
   agents: 9,
   parked: 3,
   awaitingPath: 0,
@@ -102,6 +103,10 @@ test('population opens its details; a second click or Esc closes them', async ()
   assert.equal(el['pop-unemployed'].textContent, '56 (4.5%)');
   assert.equal(el['pop-happiness'].textContent, 'Content (50)');
   assert.equal(el['pop-complaints'].textContent, 'none');
+  assert.equal(el['pop-education'].textContent, 'no adults yet');
+  show(t, { education: { adults: [150, 0, 600, 250], unschooled: 17 } });
+  assert.equal(el['pop-education'].textContent, '15% no school, 60% high school, 25% university');
+  assert.equal(el['pop-unschooled'].textContent, '17');
   show(t, { happiness: { average: 81, complaints: [0, 40, 0, 7, 0, 40, 3, 0] } });
   assert.equal(el['pop-happiness'].textContent, 'Happy (81)');
   assert.equal(

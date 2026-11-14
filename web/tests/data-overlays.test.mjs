@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { DataOverlays, easeJams, gapColor, jamColor } from '../src/data-overlays.ts';
 import { SERVICES } from '../src/palette.ts';
-import { Gap, TRAFFIC_STRIDE } from '../src/protocol.ts';
+import { Gap, SchoolArea, TRAFFIC_STRIDE } from '../src/protocol.ts';
+import { areaColor, schoolAt, seatColor } from '../src/school-view.ts';
 import { worker } from './worker-harness.mjs';
 
 test('roads read green when flowing, yellow when slow and red when jammed', () => {
@@ -49,6 +50,33 @@ test('each data view shows only its own layer, over the plain haze', () => {
   assert.ok(services.visible && !traffic.visible);
   o.setView('land');
   assert.ok(!services.visible && !traffic.visible);
+});
+
+test('the schools view tints homes by school areas, schools by seats, and finds a school', () => {
+  assert.equal(areaColor(SchoolArea.Primary | SchoolArea.High), SERVICES.served);
+  assert.equal(areaColor(SchoolArea.High), SERVICES.short);
+  assert.equal(areaColor(0), SERVICES.without);
+  assert.equal(seatColor(60, 10), SERVICES.served);
+  assert.equal(seatColor(60, 54), SERVICES.short, 'nearly full');
+  assert.equal(seatColor(60, 60), SERVICES.without, 'full');
+  // One school at (100, 50), 14 m half size, facing +x, standing as building 31.
+  const schools = new Float32Array([100, 50, 14, 1, 0, 0, 60, 12, 31]);
+  assert.equal(schoolAt(schools, 110, 60), 31);
+  assert.equal(schoolAt(schools, 115, 50), null, 'past the site');
+  const o = new DataOverlays();
+  const [lots, roads] = o.schools.group.children;
+  o.schools.set({
+    schools,
+    roads: new Float32Array([0, 0, 100, 0, 1]),
+    homes: new Float32Array([1, 4, 0, 0, 10, 0, 10, 10, 0, 10]),
+  });
+  assert.equal(lots.geometry.getAttribute('position').count, 12, 'a home lot and the school site');
+  assert.equal(roads.geometry.getAttribute('position').count, 6, 'one road quad');
+  assert.equal(o.schools.at(100, 50), 31, 'clickable whether or not the view shows');
+  o.setView('schools');
+  assert.ok(lots.visible && roads.visible);
+  o.setView('traffic');
+  assert.ok(!lots.visible && !roads.visible);
 });
 
 test('the worker sends traffic once a real second and service gaps as the city changes', async () => {

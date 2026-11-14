@@ -11,12 +11,8 @@ use crate::road::{LaneId, RoadId};
 impl World {
     /// Straight-line distance between two buildings' front points, metres.
     pub(super) fn front_distance(&self, a: BuildingId, b: BuildingId) -> f32 {
-        let (la, lb) = (
-            self.buildings.lot[a as usize] as usize,
-            self.buildings.lot[b as usize] as usize,
-        );
-        (self.lots.front_x[la] - self.lots.front_x[lb])
-            .hypot(self.lots.front_y[la] - self.lots.front_y[lb])
+        let (pa, pb) = (self.building_front(a), self.building_front(b));
+        (pa.0 - pb.0).hypot(pa.1 - pb.1)
     }
 
     /// How far citizen `c` may walk for a job (`job`) or their next stop, or `None` if they
@@ -35,10 +31,10 @@ impl World {
     /// The road building `b` fronts and its front point's distance along that road's lane
     /// `2k`, or `None` without access.
     fn frontage(&self, b: BuildingId) -> Option<(RoadId, f32)> {
-        self.building_node(b)?;
-        let l = self.buildings.lot[b as usize] as usize;
-        let road = self.lots.road[l];
-        let front = (self.lots.front_x[l], self.lots.front_y[l]);
+        if self.buildings.active.get(b as usize) != Some(&true) {
+            return None;
+        }
+        let (road, front) = self.building_access(b)?;
         Some((road, self.roads.road_offset(road, front)))
     }
 

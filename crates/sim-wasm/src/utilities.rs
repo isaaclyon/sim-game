@@ -17,7 +17,8 @@ impl Sim {
     }
 
     /// `[cost, upkeep]` per placeable, in dollars and dollars per clock hour, in
-    /// `sim::world::price_list` order: coal, solar, wind, pump, tower, fire station.
+    /// `sim::world::price_list` order: coal, solar, wind, pump, tower, fire station, primary
+    /// school, high school.
     pub fn prices() -> Vec<f64> {
         sim::world::price_list()
             .into_iter()

@@ -23,6 +23,10 @@ pub enum Activity {
     Home,
     Work,
     Shop,
+    /// A child's day at school (ADR 0055).
+    School,
+    /// An adult driving household children to or from school (ADR 0055).
+    SchoolRun,
 }
 
 /// How far a citizen got in school (ADR 0055). Ordered: a higher level meets every lower
@@ -65,7 +69,8 @@ pub struct Citizens {
     pub walk_speed: Vec<f32>,
     /// Tick of birth; negative for people older than the city (ADR 0054).
     pub born: Vec<i64>,
-    /// Under age: never works, shops or owns a car, and stays home (ADR 0054).
+    /// Under age: never works, shops or owns a car, and leaves home only for school
+    /// (ADR 0054, 0055).
     pub child: Vec<bool>,
     /// The household the citizen first belonged to; names its surname, so a grown child who
     /// moves out keeps their family name.

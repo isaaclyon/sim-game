@@ -2,7 +2,7 @@
 // options of their tools. The menu is built from it, so a new tool is one entry here and one
 // picture model in `pictures.ts`. Keys are shown in tooltips; main.ts handles them.
 import { ZONE_OVERLAY } from '../palette';
-import { Era, PlantKind, RoadClass, Snap, WaterKind, Zone } from '../protocol';
+import { Era, PlantKind, RoadClass, SchoolKind, Snap, WaterKind, Zone } from '../protocol';
 
 /** How the road tool works: draw a road of a shape, lay a grid of blocks, or click roads to
  * change their class. */
@@ -16,6 +16,7 @@ export type Tool =
   | { kind: 'line' }
   | { kind: 'water'; water: WaterKind }
   | { kind: 'station' }
+  | { kind: 'school'; school: SchoolKind }
   | { kind: 'bulldoze' };
 
 /** What an option changes on the tool in use. */
@@ -32,6 +33,7 @@ export type Picture =
   | { kind: 'line' }
   | { kind: 'water'; water: WaterKind }
   | { kind: 'station' }
+  | { kind: 'school'; school: SchoolKind }
   | {
       kind: 'icon';
       name: 'roads' | 'zones' | 'power' | 'water' | 'bulldoze' | 'views' | 'eraser';
@@ -119,6 +121,14 @@ const water = (id: string, label: string, kind: WaterKind, tip: string): Item =>
   tip,
   picture: { kind: 'water', water: kind },
   tool: { kind: 'water', water: kind },
+});
+
+const school = (id: string, label: string, kind: SchoolKind, tip: string): Item => ({
+  id,
+  label,
+  tip,
+  picture: { kind: 'school', school: kind },
+  tool: { kind: 'school', school: kind },
 });
 
 export const CATEGORIES: Category[] = [
@@ -249,7 +259,7 @@ export const CATEGORIES: Category[] = [
   {
     id: 'services',
     label: 'Services',
-    tip: 'Fire stations; police, health and schools later',
+    tip: 'Fire stations and schools; police and health later',
     icon: { kind: 'station' },
     items: [
       {
@@ -260,6 +270,18 @@ export const CATEGORIES: Category[] = [
         picture: { kind: 'station' },
         tool: { kind: 'station' },
       },
+      school(
+        'primary-school',
+        'Primary school',
+        SchoolKind.Primary,
+        'Teaches children under 9 who live within walking reach; stands beside a road.',
+      ),
+      school(
+        'high-school',
+        'High school',
+        SchoolKind.High,
+        'Teaches children from 9 to 18 who live within walking reach; stands beside a road.',
+      ),
     ],
   },
   {
@@ -282,7 +304,7 @@ export const CATEGORIES: Category[] = [
 export const BULLDOZE: Item = {
   id: 'bulldoze',
   label: 'Bulldoze',
-  tip: 'Remove a road, building, plant, power line, pump, water tower, fire station or ruins.',
+  tip: 'Remove a road, building, plant, power line, pump, water tower, fire station, school or ruins.',
   key: 'B',
   picture: { kind: 'icon', name: 'bulldoze' },
   tool: { kind: 'bulldoze' },

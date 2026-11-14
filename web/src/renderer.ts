@@ -38,6 +38,7 @@ import type { Era, FromWorker } from './protocol.ts';
 import { RoadSurface } from './road-surface.ts';
 import { createSimScene } from './scene';
 import { Scenery } from './scenery/index.ts';
+import { SchoolLayer } from './school-layer.ts';
 import { SignalLayer } from './signal-layer.ts';
 import { SmokeLayer } from './smoke-layer.ts';
 import { StreetlightLayer } from './streetlights.ts';
@@ -81,6 +82,7 @@ export class Renderer {
   private readonly power = new PowerLayer();
   private readonly water = new WaterLayer();
   private readonly fire = new FireLayer();
+  private readonly schools = new SchoolLayer();
   private readonly up = new THREE.Vector3(0, 1, 0);
   private readonly look = new THREE.Vector3();
   /** Called when a mouse or touch drag pans the camera, so follow can let go. */
@@ -108,6 +110,7 @@ export class Renderer {
       this.power.group,
       this.water.group,
       this.fire.group,
+      this.schools.group,
       this.smoke.group,
       this.streetlights.group,
       this.tools.group,
@@ -242,6 +245,12 @@ export class Renderer {
       this.camera,
     );
     return this.buildings.pick(ray);
+  }
+
+  /** Stable building ID of the school whose site is under this screen point, or null. */
+  schoolAt(clientX: number, clientY: number): number | null {
+    const p = this.pick(clientX, clientY);
+    return p && this.ground.schools.at(p.x, p.z);
   }
 
   /** Eases the camera toward agent `agent`; holds still and returns false while it is hidden. */
@@ -392,6 +401,11 @@ export class Renderer {
   /** Draws stations, fires, ruins and coverage; see `fire` in protocol.ts. */
   setFire(fire: Extract<FromWorker, { type: 'fire' }>) {
     this.fire.set(fire);
+  }
+
+  /** Draws the schools; see `schools` in protocol-services.ts. */
+  setSchools(schools: Float32Array) {
+    this.schools.set(schools);
   }
 
   /** The fire view shows the roads and buildings stations reach (ADR 0053). */

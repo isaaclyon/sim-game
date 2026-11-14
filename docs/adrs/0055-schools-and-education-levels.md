@@ -1,6 +1,6 @@
 # 0055. Schools teach children, and education shapes who fills jobs
 
-- Status: Accepted; amended 2026-11-09; slice 1 implemented; extended by
+- Status: Accepted; amended 2026-11-09 and 2026-11-13; slices 1 to 5 implemented; extended by
   [0056](0056-taxes-follow-city-quality-and-services-have-budgets.md) (seat blocks and budgets)
 - Date: 2026-11-06
 - Extends: [0054](0054-children-births-and-growing-up.md), [0021](0021-citizens-households-and-trips.md),
@@ -75,3 +75,89 @@ disagree, this section wins.
   schools, seat blocks, coverage, enrolment, graduating and teacher jobs; 3) school runs and
   child walkers; 4) the schools view, inspector and top bar; 5) adult driving.
 
+
+## Amendment (2026-11-13): slice 2 rules
+
+Settled while building slice 2. Where this section and the text above disagree, this section
+wins.
+
+- **Kinds.** A primary school has a 28 m site, costs $4,000, and per seat block has 30 seats,
+  2 teacher jobs and $20 an hour of upkeep; its area reaches 800 m along roads. A high school
+  has a 36 m site, costs $7,000, and per block has 40 seats, 3 teacher jobs and $35 an hour;
+  its area reaches 1,200 m. Every school opens with 3 seat blocks until ADR 0056 adds budgets.
+- **No utilities, any era.** A school needs no power or water, never burns, and can be placed
+  in a village. Its teacher jobs count as commercial jobs in demand.
+- **Graduating.** "Stays enrolled through a stage" means: the child holds a seat when the
+  stage ends and was enrolled for at least half of it. A child who arrives in town part-way
+  through a stage counts as schooled elsewhere for the part already behind them. A child who
+  has no seat when the stage ends gains nothing, whatever came before.
+- **Seats are kept.** A seated child keeps their seat when roads change, even if the school
+  no longer covers their home. Only children without a seat look again, when a school is
+  placed or removed or roads change, in citizen ID order. A child who moves home within the
+  city gives up their seat and looks again; the time already spent enrolled still counts.
+- **Bulldozing** a school frees its seats and ends its teachers' jobs; its pupils look for
+  another school at once. Undo puts the school back empty.
+- **Land value.** Cells of homes inside any school's area gain 10% of full land value, once,
+  however many schools cover them.
+- **Display.** `schools` carries each school's site for drawing; the building kit skips school
+  buildings (zones 7 and 8), which have their own models. Clicking a school selects nothing
+  until slice 4.
+- **Saves.** Save version 12. A city that never had a school hashes as it did before.
+
+## Amendment (2026-11-13): slice 3 rules
+
+Settled while building slice 3. Where this section and the text above disagree, this section
+wins.
+
+- **The school day.** A child holding a seat leaves home between 7:30 and 8:00, at a minute
+  fixed per child, walks to their school, stays six and a half clock hours from arriving and
+  walks home. There are no weekends or holidays. A school trip is an ordinary citizen trip
+  with a new activity, school; it draws nothing from the residents' random numbers, so a
+  city without schools runs as it did.
+- **No seat, no trip.** A child without a seat stays home. A child who enrols while at home
+  starts with the next 7:30; one who loses their seat during the day finishes the day and
+  walks home.
+- **Changes mid-day.** A pupil inside a bulldozed school is put back home at once, as anyone
+  inside a removed building is. A child who moves up to high school or comes of age during
+  the day walks home at the day's end and follows their new day from the next morning.
+- **Attendance does not gate graduating.** Graduating still depends only on holding a seat
+  (slice 2); a child whose walk fails keeps their seat and tries again.
+- **Display.** A child on foot is agent kind 3 in the snapshot and is drawn at about 60% of
+  an adult's size. The inspector reads "At school" and "Walking to school".
+- **Saves.** Still save version 12, which has not shipped without this slice.
+
+## Amendment (2026-11-13): slice 4 and 5 rules
+
+Settled while building slices 4 and 5. Where this section and the text above disagree, this
+section wins.
+
+- **Lifts.** A child whose school is past their walking reach is driven by an adult of their
+  household who owns a car. The adult's drive is an ordinary citizen trip with a new activity,
+  school run (code 4), always by car. The children have no trip of their own: they ride in
+  the adult's car and are moved when it arrives. Lifts draw nothing from the residents'
+  random numbers.
+- **Enrolment reach.** A child in a household where an adult owns a car can take a seat at any
+  school whose area covers their home, however far the walk. Other children still need the
+  school within walking reach.
+- **Mornings.** When a child who needs a lift is due to leave, the first adult by ID who has a
+  car and is at home drives them, taking along every child of the household who is at home
+  and due to leave within 90 clock minutes. An adult leaving home for work or the shops takes
+  such children too. The driver drops each child at their school, then goes on to work if
+  they have a job, else home. With no adult at home to drive, the child stays home that day.
+- **Afternoons.** A child whose school day ends waits at the school. An adult at home with a
+  car fetches them at once; an adult out with the car fetches them when they next leave work
+  or a shop. A child nobody fetched within four clock hours walks home, however far.
+- **Lifts always end.** A ride that has not ended after six clock hours puts the child home.
+  If the driver's trip is cancelled (a road edit, their building removed, moving out), the
+  children in the car are put home. A household that moves forgets its lifts.
+- **Schools view.** A new ground overlay, Schools, in the Views list and the P cycle: each
+  home's lot is green inside both a primary and a high school's area, amber inside one, red
+  inside none; roads inside any school's area are tinted blue; each school's site is green
+  with free seats, amber from 90% full and red when full. The sim decides the areas.
+- **Inspecting.** Clicking a school's site opens the building card with its seats, pupils,
+  free seats and teacher jobs. A citizen's card shows their education, a child's school or
+  that they have no seat, and when they are riding in a family car.
+- **Population panel.** Adults by highest school finished, as shares, and the number of
+  children without a school seat.
+- **Saves.** Still save version 12. Who rides with whom and who waits are saved, and hashed
+  only when set, so a city without lifts hashes as it did before.

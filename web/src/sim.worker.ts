@@ -1,21 +1,13 @@
 // Runs the WASM sim on a fixed-timestep clock, off the main thread.
 
 import { CitySession } from './city-session';
+import { CivicSender } from './civic-worker';
 import { gridPreview, rawDraft, roadPreview } from './drafts';
-import { FireSender } from './fire-worker';
 import { historyCommand, readHistory } from './history-worker';
+import { readBuilding, readCitizen } from './inspect-worker';
 import { OverlaySender } from './overlay-worker';
 import init, { type Sim } from './pkg/sim_wasm';
-import type {
-  Activity,
-  Building,
-  Citizen,
-  Complaint,
-  FromWorker,
-  Place,
-  ToWorker,
-  Zone,
-} from './protocol';
+import type { FromWorker, ToWorker } from './protocol';
 import { readPrices, readStats } from './stats-worker';
 import { WaterSender } from './water-worker';
 
@@ -126,7 +118,7 @@ function sendPollutionIfChanged(s: Sim, force = false) {
   ]);
 }
 
-const fire = new FireSender(post);
+const fire = new CivicSender(post);
 const water = new WaterSender(post);
 const overlays = new OverlaySender(post);
 
@@ -190,38 +182,10 @@ function sendFrame(s: Sim, perTick = 0) {
   sendBuilding(s);
 }
 
-function place(building: number | undefined, zone: number | undefined): Place | null {
-  return building === undefined ? null : { building, zone: zone as Zone };
-}
-
 /** Details of the selected citizen, sent only while someone is selected. */
 function sendCitizen(s: Sim) {
   if (inspected?.kind !== 'citizen') return;
-  const v = s.citizen_info(inspected.id);
-  let citizen: Citizen | null = null;
-  if (v) {
-    citizen = {
-      id: inspected.id,
-      name: v.name,
-      resident: v.resident,
-      home: place(v.home, v.home_zone),
-      job: place(v.job, v.job_zone),
-      activity: v.activity as Activity,
-      location: place(v.location, v.location_zone),
-      destination: place(v.destination, v.destination_zone),
-      agent: v.agent ?? null,
-      driving: v.driving,
-      onFoot: v.on_foot,
-      age: v.age,
-      child: v.child,
-      grewUp: v.grew_up,
-      wantsHome: v.wants_home,
-      mood: v.mood,
-      complaints: Array.from(v.complaints) as Complaint[],
-      commute: v.commute,
-    };
-    v.free();
-  }
+  const citizen = readCitizen(s, inspected.id);
   post({ type: 'citizen', selection: inspected.selection, citizen });
   if (!citizen) inspected = null;
 }
@@ -229,19 +193,7 @@ function sendCitizen(s: Sim) {
 /** One building only, using the same live query contract as citizen inspection. */
 function sendBuilding(s: Sim) {
   if (inspected?.kind !== 'building') return;
-  const v = s.building_info(inspected.id);
-  const building: Building | null = v
-    ? {
-        building: v.building,
-        zone: v.zone as Zone,
-        capacity: v.capacity,
-        occupied: v.occupied,
-        closing: v.closing,
-        powered: v.powered,
-        watered: v.watered,
-      }
-    : null;
-  v?.free();
+  const building = readBuilding(s, inspected.id);
   post({ type: 'building', selection: inspected.selection, building });
   if (!building) inspected = null;
 }
@@ -391,6 +343,8 @@ self.onmessage = async (e: MessageEvent<ToWorker>) => {
       break;
     case 'placeStation':
     case 'previewStation':
+    case 'placeSchool':
+    case 'previewSchool':
     case 'setFires':
       if (fire.command(sim, msg, cities.ready) && sim) {
         cities.changed();

@@ -85,7 +85,10 @@ impl World {
 
     /// The network in `nodes` (per road node) of the lot's road; `u32::MAX` once it is gone.
     pub(in crate::world) fn lot_network(&self, lot: LotId, nodes: &[u32]) -> u32 {
-        let road = self.lots.road[lot as usize];
+        // A service building (ADR 0055) stands on no lot and draws nothing.
+        let Some(&road) = self.lots.road.get(lot as usize) else {
+            return u32::MAX;
+        };
         if !self.roads.is_road_active(road) {
             return u32::MAX;
         }
@@ -146,7 +149,10 @@ impl World {
         cache.starter_open = true;
         cache.powered = vec![false; n];
         for b in 0..n {
-            if self.buildings.active[b] {
+            if self.buildings.active[b] && self.buildings.zone[b].is_school() {
+                // Schools need no power and take from no pool.
+                self.power_cache.powered[b] = true;
+            } else if self.buildings.active[b] {
                 let c = &self.power_cache;
                 let source = self.power_source(c.demand[b], c.grid[b]);
                 self.take_power(b, source);

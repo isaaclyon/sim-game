@@ -2,6 +2,7 @@ use super::super::World;
 use crate::agents::AgentState;
 use crate::citizen::{Activity, CitizenId};
 use crate::clock::{CLOCK_SECONDS_PER_SIM_SECOND, clock_at};
+use crate::world::school::SCHOOL_DAY_S;
 use std::cmp::Reverse;
 
 impl World {
@@ -20,6 +21,7 @@ impl World {
         self.register_buildings();
         self.admit_households();
         self.tick_families();
+        self.tick_schools();
         for _ in 0..8 {
             let Some(&Reverse((at, c))) = self.residents.searches.peek() else {
                 break;
@@ -64,11 +66,21 @@ impl World {
                 continue;
             }
             self.citizens.due[i] = u64::MAX;
+            if self.ride_overdue(c) {
+                continue;
+            }
             if self.citizens.destination[i].is_some() {
                 self.start_citizen_trip(c);
                 continue;
             }
+            if self.lift_decides(c) {
+                continue;
+            }
             let next = match self.citizens.activity[i] {
+                // A child's only trip from home is to their school; no draw is made.
+                Activity::Home if self.citizens.child[i] => self
+                    .school_building(c)
+                    .map(|school| (school, Activity::School)),
                 Activity::Home => {
                     if let Some(job) = self.citizens.job[i] {
                         Some((job, Activity::Work))
@@ -89,7 +101,9 @@ impl World {
                         (b, Activity::Shop)
                     }))
                 }
-                Activity::Shop => Some((self.home_building(c), Activity::Home)),
+                Activity::Shop | Activity::School | Activity::SchoolRun => {
+                    Some((self.home_building(c), Activity::Home))
+                }
             };
             if let Some((b, activity)) = next {
                 if activity == Activity::Work {
@@ -104,13 +118,16 @@ impl World {
         }
     }
 
-    /// Children stay home (ADR 0054): they have no day to schedule.
+    /// A child's day is their school day; a child without a seat stays home (ADR 0054, 0055).
     pub(in crate::world) fn schedule_day(&mut self, c: CitizenId) {
-        if self.citizens.child[c as usize] {
+        let child = self.citizens.child[c as usize];
+        if child && self.school_building(c).is_none() {
             return;
         }
         let now = clock_at(self.totals.tick, self.cfg.dt).second_of_day;
-        let target = if self.citizens.job[c as usize].is_some() {
+        let target = if child {
+            self.school_departure(c)
+        } else if self.citizens.job[c as usize].is_some() {
             self.citizens.departure[c as usize]
         } else {
             10 * 3600 + self.residents.rng.below(6 * 3600)
@@ -136,8 +153,10 @@ impl World {
         // The mode is chosen leaving home and kept until home again, so the car comes back.
         let home = self.home_building(c);
         if self.citizens.location[i] == home {
+            // A school run is always by car: the children could not walk it.
             self.citizens.car_out[i] = self.citizens.owns_car[i]
-                && self.front_distance(home, destination) > self.citizens.walk_limit[i];
+                && (self.citizens.activity[i] == Activity::SchoolRun
+                    || self.front_distance(home, destination) > self.citizens.walk_limit[i]);
         }
         let (Some(from), Some(to)) = (
             self.building_node(self.citizens.location[i]),
@@ -180,11 +199,14 @@ impl World {
             Activity::Home => {
                 self.citizens.car_out[i] = false;
                 self.schedule_day(c);
+                self.lift_arrived_home(c);
             }
             Activity::Work => {
                 self.note_commute(c);
                 self.schedule_activity(c, self.citizens.work_duration[i] as f32);
             }
+            Activity::School => self.schedule_activity(c, SCHOOL_DAY_S),
+            Activity::SchoolRun => self.school_run_arrived(c),
             Activity::Shop => {
                 // 6 to 30 clock minutes.
                 let seconds = 20 + self.residents.rng.below(81);

@@ -17,7 +17,8 @@ const SIGNAL_OFFSET: f32 = 6.0;
 impl World {
     /// Writes `[x, y, heading, speed_ratio, kind]` per agent, indexed by agent id so the
     /// renderer can interpolate between snapshots. Heading is radians from +x. Kind is 0 = car,
-    /// 1 = walker on the sidewalk (ADR 0026), 2 = fire truck (ADR 0053). Agents not on a road or sidewalk get
+    /// 1 = walker on the sidewalk (ADR 0026), 2 = fire truck (ADR 0053), 3 = child walker
+    /// (ADR 0055). Agents not on a road or sidewalk get
     /// `speed_ratio = -1`.
     pub fn write_agent_snapshot(&self, out: &mut Vec<f32>) {
         let a = &self.agents;
@@ -42,7 +43,8 @@ impl World {
                         SIDEWALK_OFFSET
                     };
                     let c = a.citizen[i].expect("walkers are citizens") as usize;
-                    (side, self.citizens.walk_speed[c], 1.0)
+                    let kind = if self.citizens.child[c] { 3.0 } else { 1.0 };
+                    (side, self.citizens.walk_speed[c], kind)
                 }
                 _ => {
                     out.extend([0.0, 0.0, 0.0, -1.0, 0.0]);
@@ -76,6 +78,7 @@ impl World {
     pub fn write_bulldoze_preview(&self, x: f32, y: f32, out: &mut Vec<f32>) {
         out.clear();
         if self.write_station_bulldoze(x, y, out)
+            || self.write_school_bulldoze(x, y, out)
             || self.write_power_bulldoze(x, y, out)
             || self.write_water_bulldoze(x, y, out)
         {
@@ -323,6 +326,7 @@ impl World {
         self.water.hash_into(&mut mix);
         self.pollution.hash_into(&mut mix);
         self.fire.hash_into(self.cfg.seed, &mut mix);
+        self.schools.hash_into(&mut mix);
         self.happiness.hash_into(&mut mix);
         for chunk in self.zones.cells.chunks(8) {
             let mut word = [0u8; 8];

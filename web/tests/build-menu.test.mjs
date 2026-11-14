@@ -136,6 +136,8 @@ test('Views shows one ground overlay at a time, with traffic and power as switch
   t.key('p');
   assert.equal(latest('pollutionView').view, 'services');
   t.key('p');
+  assert.equal(latest('pollutionView').view, 'schools');
+  t.key('p');
   assert.ok(pressed(t, 'view-plain'), 'P wraps back to none');
   assert.ok(el.views.classList.contains('on'), 'traffic and power still show');
   t.key('Escape');

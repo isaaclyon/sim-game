@@ -23,9 +23,9 @@ impl World {
         Era::of_road(class) <= self.era
     }
 
-    /// Whether the city's era allows painting `zone`.
+    /// Whether the city's era allows painting `zone`. School kinds are never painted.
     pub fn allows_zone(&self, zone: Zone) -> bool {
-        Era::of_zone(zone) <= self.era
+        !zone.is_school() && Era::of_zone(zone) <= self.era
     }
 
     /// False for a command that builds something the city's era has not unlocked. Undo and

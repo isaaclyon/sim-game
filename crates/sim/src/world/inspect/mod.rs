@@ -9,7 +9,7 @@ mod tests;
 use super::{Complaint, World};
 use crate::agents::{AgentId, AgentState};
 use crate::building::BuildingId;
-use crate::citizen::{Activity, CitizenId};
+use crate::citizen::{Activity, CitizenId, Education};
 use crate::zone::Zone;
 
 /// A building as the inspector names it: its ID and original use.
@@ -52,6 +52,12 @@ pub struct CitizenInfo {
     pub complaints: Vec<Complaint>,
     /// Clock minutes their last trip to work took; 0 = none yet or no job.
     pub commute: u32,
+    /// How far they got in school (ADR 0055).
+    pub education: Education,
+    /// The school a child holds a seat at.
+    pub school: Option<Place>,
+    /// A child in a household adult's car, on the way to `destination` (a lift).
+    pub riding: bool,
 }
 
 /// Counts for one standing building. Occupancy means residents or assigned workers,
@@ -122,6 +128,16 @@ impl World {
         } else {
             (0, Vec::new())
         };
+        // A child riding in an adult's car has no trip of their own: it is the driver's.
+        let riding = resident && self.riding_with(c).is_some();
+        let destination = if riding {
+            match self.citizens.activity[i] {
+                Activity::School => self.school_building(c),
+                _ => Some(self.home_building(c)),
+            }
+        } else {
+            self.citizens.destination[i]
+        };
         Some(CitizenInfo {
             name: names::display_name(self.cfg.seed, c, family),
             resident,
@@ -129,7 +145,7 @@ impl World {
             job: self.citizens.job[i].and_then(place),
             activity: self.citizens.activity[i],
             location: place(self.citizens.location[i]),
-            destination: self.citizens.destination[i].and_then(place),
+            destination: destination.and_then(place),
             agent,
             driving: agent.is_some_and(|a| self.agents.state[a as usize] == AgentState::Driving),
             on_foot: resident
@@ -144,6 +160,9 @@ impl World {
             mood,
             complaints,
             commute: u32::from(self.citizens.commute[i]),
+            education: self.citizens.education[i],
+            school: self.school_building(c).filter(|_| resident).and_then(place),
+            riding,
         })
     }
 }

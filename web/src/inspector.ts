@@ -6,7 +6,17 @@ import { COMPLAINT_WORDS, moodText } from './ui/figures';
 import { type IconName, iconSvg } from './ui/icons';
 
 /** Words for a building by its original use, indexed by `Zone`. */
-const BUILDING_WORDS = ['building', 'house', 'apartments', 'shop', 'store', 'factory', 'factory'];
+const BUILDING_WORDS = [
+  'building',
+  'house',
+  'apartments',
+  'shop',
+  'store',
+  'factory',
+  'factory',
+  'primary school',
+  'high school',
+];
 const label = (p: Place) => `${BUILDING_WORDS[p.zone] ?? 'building'} #${p.building}`;
 const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -24,21 +34,31 @@ export interface Card {
 export function describe(c: Citizen): Card {
   if (!c.resident) return { title: c.name, lines: [{ icon: 'leave', text: 'Left town' }] };
   const there = (p: Place | null) => (p ? ` at ${label(p)}` : '');
-  // Indexed by `Activity`: home, work, shop.
-  const trip = ['home', `to work${there(c.destination)}`, `to shop${there(c.destination)}`];
+  // Indexed by `Activity`: home, work, shop, school, school run.
+  const trip = [
+    'home',
+    `to work${there(c.destination)}`,
+    `to shop${there(c.destination)}`,
+    `to school${there(c.destination)}`,
+    `children to or from school${there(c.destination)}`,
+  ];
   const stay: CardLine[] = [
     { icon: 'home', text: 'At home' },
     { icon: 'work', text: `At work${c.location ? `, ${label(c.location)}` : ''}` },
     { icon: 'shop', text: `Shopping${there(c.location)}` },
+    { icon: 'work', text: `At school${c.location ? `, ${label(c.location)}` : ''}` },
+    { icon: 'car', text: `Waiting at the school door${there(c.location)}` },
   ];
   const how: [IconName, string] = c.onFoot
     ? ['walk', 'Walking']
     : c.driving
       ? ['car', 'Driving']
       : ['clock', 'Waiting to drive'];
-  const now: CardLine = !c.destination
-    ? stay[c.activity]
-    : { icon: how[0], text: `${how[1]} ${trip[c.activity]}` };
+  const now: CardLine = c.riding
+    ? { icon: 'car', text: `Riding ${trip[c.activity]}, driven by family` }
+    : !c.destination
+      ? stay[c.activity]
+      : { icon: how[0], text: `${how[1]} ${trip[c.activity]}` };
   return {
     title: c.name,
     lines: [
@@ -47,6 +67,7 @@ export function describe(c: Citizen): Card {
         ? { icon: 'people', text: `Age ${c.age}, a child: lives at home` }
         : { icon: 'work', text: c.job ? `Job: ${label(c.job)}${commute(c)}` : 'Job: unemployed' },
       ...(c.child ? [] : [{ icon: 'people', text: `Age ${c.age}${grewUp(c)}` } as const]),
+      schooling(c),
       { icon: 'mood', text: `Mood: ${moodText(c.mood)}` },
       ...(c.complaints.length
         ? [
@@ -59,6 +80,18 @@ export function describe(c: Citizen): Card {
       now,
     ],
   };
+}
+
+/** Words for the highest school finished, indexed by `Education`. */
+const EDUCATION_WORDS = ['no schooling', 'primary school', 'high school', 'university'];
+
+/** A child's school, or how far an adult got (ADR 0055). */
+function schooling(c: Citizen): CardLine {
+  const done = EDUCATION_WORDS[c.education] ?? EDUCATION_WORDS[0];
+  if (!c.child) return { icon: 'layers', text: `Education: ${done}` };
+  if (!c.school) return { icon: 'warning', text: 'No school seat: stays home' };
+  const finished = c.education > 0 ? `, finished ${done}` : '';
+  return { icon: 'layers', text: `School: ${label(c.school)}${finished}` };
 }
 
 /** How long the last trip to work took, once there has been one (ADR 0058). */
@@ -75,6 +108,18 @@ function grewUp(c: Citizen): string {
 /** Counts describe residency or assigned jobs, never physical attendance. */
 export function describeBuilding(b: Building): Card {
   const residential = b.zone === 1 || b.zone === 2;
+  if (b.seats != null && b.pupils != null)
+    return {
+      title: capital(label(b)),
+      lines: [
+        { icon: 'building', text: `Seats: ${b.seats}` },
+        { icon: 'people', text: `Pupils: ${b.pupils}` },
+        b.pupils >= b.seats
+          ? { icon: 'warning', text: 'Full: more children need another school' }
+          : { icon: 'open', text: `Free seats: ${b.seats - b.pupils}` },
+        { icon: 'work', text: `Teachers: ${b.occupied} of ${b.capacity} jobs filled` },
+      ],
+    };
   return {
     title: capital(label(b)),
     lines: [

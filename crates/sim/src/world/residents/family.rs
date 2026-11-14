@@ -90,6 +90,7 @@ impl World {
             let at = self.citizens.born[c as usize] + self.days_to_ticks(CHILDHOOD_DAYS) as i64;
             let at = (at.max(0) as u64).max(self.totals.tick + 1);
             self.residents.grown.push(Reverse((at, c)));
+            self.child_joined(c);
         }
     }
 
@@ -152,6 +153,7 @@ impl World {
         if !self.citizens.active[i] || !self.citizens.child[i] {
             return;
         }
+        self.finish_school(c);
         self.citizens.child[i] = false;
         self.residents.children -= 1;
         let deadline = self.totals.tick + self.days_to_ticks(MOVE_OUT_DAYS);
@@ -171,6 +173,7 @@ impl World {
     /// Bookkeeping for a member leaving the city with their household.
     pub(in crate::world) fn member_left(&mut self, c: CitizenId) {
         self.stop_waiting(c);
+        self.leave_school(c);
         if self.citizens.child[c as usize] {
             self.residents.children -= 1;
         }
@@ -201,6 +204,7 @@ impl World {
         let i = c as usize;
         self.stop_waiting(c);
         let old = self.citizens.household[i] as usize;
+        self.cancel_citizen_trip(c);
         self.households.members[old].retain(|&m| m != c);
         let household = self.found_household(home);
         self.households.members[household as usize].push(c);

@@ -67,6 +67,9 @@ impl World {
         out.clear();
         let fire = self.fire_gaps_shown();
         for b in self.buildings.active_buildings() {
+            if self.buildings.lot[b as usize] == crate::building::NO_LOT {
+                continue;
+            }
             let mut gaps = 0;
             if !self.building_powered(b) {
                 gaps |= GAP_POWER;

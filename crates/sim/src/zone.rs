@@ -18,6 +18,10 @@ pub enum Zone {
     CommercialHigh = 4,
     IndustrialLow = 5,
     IndustrialHigh = 6,
+    /// A placed primary school's building (ADR 0055). Never painted: `from_u8` refuses it.
+    PrimarySchool = 7,
+    /// A placed high school's building (ADR 0055). Never painted.
+    HighSchool = 8,
 }
 
 impl Zone {
@@ -32,6 +36,11 @@ impl Zone {
             6 => Zone::IndustrialHigh,
             _ => return None,
         })
+    }
+
+    /// A placed school's building rather than a zoned use (ADR 0055).
+    pub fn is_school(self) -> bool {
+        matches!(self, Zone::PrimarySchool | Zone::HighSchool)
     }
 
     /// High density: the uses that need water (ADR 0052).

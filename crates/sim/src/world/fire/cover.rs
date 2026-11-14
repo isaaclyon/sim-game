@@ -4,11 +4,12 @@
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
 
-use super::{COVER_M, LAND_BOOST, STATION_HALF};
+use super::{COVER_M, LAND_BOOST};
 use crate::building::BuildingId;
 use crate::frontage::frontage;
 use crate::pollution::Sources;
-use crate::road::{NodeId, RoadNetwork};
+use crate::power::Footprint;
+use crate::road::{NodeId, RoadId, RoadNetwork};
 use crate::world::World;
 
 /// A station joins the road its front faces within this many metres of its front edge.
@@ -27,15 +28,16 @@ pub(super) struct Cover {
     pub(super) covered: Vec<bool>,
 }
 
-/// Shortest driving distance from `from` to every node, following lane directions.
-fn distances(roads: &RoadNetwork, from: NodeId) -> Vec<f32> {
+/// Shortest driving distance from `from` to every node, following lane directions. Nodes
+/// past `limit` metres stay unreached. Shared by fire stations and schools (ADR 0055).
+pub(in crate::world) fn distances(roads: &RoadNetwork, from: NodeId, limit: f32) -> Vec<f32> {
     let mut dist = vec![f32::INFINITY; roads.node_count()];
     let mut heap = BinaryHeap::new();
     dist[from as usize] = 0.0;
     heap.push(Reverse((0f32.to_bits(), from)));
     while let Some(Reverse((bits, n))) = heap.pop() {
         let d = f32::from_bits(bits);
-        if d > dist[n as usize] || d > COVER_M {
+        if d > dist[n as usize] || d > limit {
             continue;
         }
         for &lane in roads.out_lanes(n) {
@@ -54,10 +56,15 @@ fn distances(roads: &RoadNetwork, from: NodeId) -> Vec<f32> {
 impl World {
     /// The junction of the road station `s` faces: the nearer end of that road.
     fn station_node(&self, s: u32) -> Option<NodeId> {
-        let at = self.fire.footprint(s);
+        Some(self.roadside_access(self.fire.footprint(s))?.1)
+    }
+
+    /// The road a roadside piece faces and that road's nearer end, or `None` when no road
+    /// runs within reach of the middle of its front edge.
+    pub(in crate::world) fn roadside_access(&self, at: Footprint) -> Option<(RoadId, NodeId)> {
         let front = (
-            at.centre.0 + at.front.0 * STATION_HALF,
-            at.centre.1 + at.front.1 * STATION_HALF,
+            at.centre.0 + at.front.0 * at.half,
+            at.centre.1 + at.front.1 * at.half,
         );
         let f = frontage(&self.roads, front, STATION_ROAD_REACH)?;
         let lane = f.road as usize * 2;
@@ -66,7 +73,7 @@ impl World {
             let n = n as usize;
             (self.roads.node_x[n] - f.on.0).hypot(self.roads.node_y[n] - f.on.1)
         };
-        Some(if far(a) <= far(z) { a } else { z })
+        Some((f.road, if far(a) <= far(z) { a } else { z }))
     }
 
     /// Recomputes distances when roads or stations changed, and coverage when they, lots or
@@ -85,7 +92,7 @@ impl World {
                 .collect();
             let dist = node
                 .iter()
-                .map(|n| n.map_or_else(Vec::new, |n| distances(&self.roads, n)))
+                .map(|n| n.map_or_else(Vec::new, |n| distances(&self.roads, n, COVER_M)))
                 .collect();
             let c = &mut self.fire.cover;
             (c.node, c.dist, c.dist_key) = (node, dist, Some(dist_key));
@@ -143,6 +150,9 @@ impl World {
                 continue;
             }
             let lot = self.buildings.lot[b as usize];
+            if lot == crate::building::NO_LOT {
+                continue;
+            }
             for &cell in self.lots.cells(lot) {
                 let c = self.pollution.cell_of_zone_cell(cell, cols);
                 src.boost[c] = LAND_BOOST;

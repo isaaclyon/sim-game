@@ -18,6 +18,10 @@ use crate::zone::{Zone, ZoneGrid};
 
 pub type BuildingId = u32;
 
+/// The lot of a service building (a school, ADR 0055): it stands on no lot, so growth,
+/// closure and zoning never touch it.
+pub const NO_LOT: LotId = LotId::MAX;
+
 /// Why a scheduled lot last waited instead of building.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(u8)]
@@ -136,7 +140,7 @@ impl Buildings {
     ) -> bool {
         let b = building as usize;
         let l = self.lot[b] as usize;
-        if !self.active[b] || self.owner[l] != Some(building) {
+        if !self.active[b] || self.lot[b] == NO_LOT || self.owner[l] != Some(building) {
             return false;
         }
         self.active[b] = false;
@@ -246,7 +250,9 @@ impl Buildings {
                         0.0
                     }
             }
-            Zone::None => unreachable!("unzoned lots are not scheduled"),
+            Zone::None | Zone::PrimarySchool | Zone::HighSchool => {
+                unreachable!("only zoned lots are scheduled")
+            }
         };
         let roof = if matches!(zone, Zone::IndustrialLow | Zone::IndustrialHigh) {
             rng.below(4) as u8
@@ -281,6 +287,42 @@ impl Buildings {
         self.version = self.version.wrapping_add(1);
     }
 
+    /// Puts up a service building (ADR 0055) on no lot. `ring` is counter-clockwise and its
+    /// first edge is the front.
+    pub(crate) fn add_service(
+        &mut self,
+        zone: Zone,
+        height: f32,
+        ring: &[Point],
+        era: Era,
+    ) -> BuildingId {
+        let id = self.active.len() as BuildingId;
+        self.lot.push(NO_LOT);
+        self.zone.push(zone);
+        self.height.push(height);
+        self.roof.push(0);
+        self.era.push(era);
+        self.active.push(true);
+        if self.outline_start.is_empty() {
+            self.outline_start.push(0);
+        }
+        self.outline.extend(ring);
+        self.outline_start.push(self.outline.len() as u32);
+        self.version = self.version.wrapping_add(1);
+        id
+    }
+
+    /// Removes a standing service building; false for anything else.
+    pub(crate) fn remove_service(&mut self, building: BuildingId) -> bool {
+        let b = building as usize;
+        if self.active.get(b) != Some(&true) || self.lot[b] != NO_LOT {
+            return false;
+        }
+        self.active[b] = false;
+        self.version = self.version.wrapping_add(1);
+        true
+    }
+
     /// `[zone, height, roof, front, era, n, x0, y0, …]` per active building in id order, not
     /// indexed by id. `front` is the footprint edge (from point `front` to the next) facing the
     /// lot's road; it is derived here for drawing and is not stored or hashed. `era` is the
@@ -290,13 +332,18 @@ impl Buildings {
         for b in self.active_buildings() {
             let i = b as usize;
             let ring = self.footprint(b);
-            let lot = self.lot[i] as usize;
-            let facing = (lots.facing_x[lot], lots.facing_y[lot]);
+            // A service building's first edge is its front.
+            let front = if self.lot[i] == NO_LOT {
+                0
+            } else {
+                let lot = self.lot[i] as usize;
+                front_edge(ring, (lots.facing_x[lot], lots.facing_y[lot]))
+            };
             out.extend([
                 self.zone[i] as u8 as f32,
                 self.height[i],
                 self.roof[i] as f32,
-                front_edge(ring, facing) as f32,
+                front as f32,
                 self.era[i] as u8 as f32,
                 ring.len() as f32,
             ]);
@@ -380,7 +427,11 @@ impl Buildings {
             self.outline.len(),
             "building outlines",
         )?;
-        below(&self.lot, lots, "building lots")?;
+        below(
+            self.lot.iter().filter(|&&l| l != NO_LOT),
+            lots,
+            "building lots",
+        )?;
         ensure(
             self.owner.len() <= lots && self.due.len() == self.owner.len(),
             "lot schedules",

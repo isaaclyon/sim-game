@@ -18,8 +18,8 @@ const MAGIC: &[u8; 8] = b"CITYSAVE";
 /// version 7 added children, births and grown children moving out (ADR 0054); version 8 added
 /// the edit history (ADR 0051); version 9 added happiness and commute times (ADR 0058); version
 /// 10 added education levels (ADR 0055); version 11 added the city's era and each building's
-/// (ADR 0059).
-pub const SAVE_VERSION: u32 = 11;
+/// (ADR 0059); version 12 added schools and enrolment (ADR 0055).
+pub const SAVE_VERSION: u32 = 12;
 const HEADER: usize = 8 + 4 + 8 + 8;
 
 /// Why a save could not be written or read. Loading never yields a partial world.
@@ -124,6 +124,7 @@ impl World {
         world.ensure_water();
         world.refresh_upkeep();
         world.ensure_fire();
+        world.ensure_schools();
         Ok(world)
     }
 }

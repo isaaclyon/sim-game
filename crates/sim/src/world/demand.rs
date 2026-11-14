@@ -75,7 +75,7 @@ impl World {
             Zone::ResidentialLow | Zone::ResidentialHigh => d.residential,
             Zone::CommercialLow | Zone::CommercialHigh => d.commercial,
             Zone::IndustrialLow | Zone::IndustrialHigh => d.industrial,
-            Zone::None => 0,
+            Zone::None | Zone::PrimarySchool | Zone::HighSchool => 0,
         }
     }
 
@@ -96,7 +96,10 @@ impl World {
         self.supply.counted[i] = open;
         let jobs = self.residents.jobs[i];
         let total = match self.buildings.zone[i] {
-            Zone::CommercialLow | Zone::CommercialHigh => &mut self.supply.commercial_jobs,
+            // Teacher jobs (ADR 0055) count as commerce, like fire stations' (ADR 0053).
+            Zone::CommercialLow | Zone::CommercialHigh | Zone::PrimarySchool | Zone::HighSchool => {
+                &mut self.supply.commercial_jobs
+            }
             Zone::IndustrialLow | Zone::IndustrialHigh => &mut self.supply.industrial_jobs,
             _ => return,
         };
@@ -116,7 +119,7 @@ impl World {
         let tick = self.totals.tick;
         let (dt, seed) = (self.cfg.dt, self.cfg.seed);
         while let Some((lot, zone)) = self.buildings.next_due(tick) {
-            if self.lot_blocked(lot) || self.station_blocks(lot) {
+            if self.lot_blocked(lot) || self.station_blocks(lot) || self.school_blocks(lot) {
                 continue;
             }
             // Ruins hold the lot for a day (ADR 0053).

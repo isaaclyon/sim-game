@@ -7,7 +7,7 @@ import { POLLUTION, POLLUTION_ALPHA } from './palette.ts';
 import type { PollutionView } from './ui/views.ts';
 
 /** The views this layer draws; the data views (ADR 0057) show the plain haze under them. */
-export type PollutionLayerView = Exclude<PollutionView, 'traffic' | 'services'>;
+export type PollutionLayerView = Exclude<PollutionView, 'traffic' | 'services' | 'schools'>;
 
 const color = (hex: number) => new THREE.Color(hex);
 const KIND = {

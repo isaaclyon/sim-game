@@ -27,6 +27,8 @@ const TRUCK = VEHICLES.length;
 const SELECTED_COLOR = new THREE.Color(0x3fd0ff);
 const WHITE = new THREE.Color(0xffffff);
 const Z = new THREE.Vector3(0, 0, 1);
+/** A child walker's size next to an adult's (ADR 0055). */
+const CHILD_SCALE = 0.62;
 /** A walker's height in metres, for level of detail. */
 const WALKER_HEIGHT = 1.75;
 
@@ -120,7 +122,7 @@ export class AgentLayer {
       const o = i * AGENT_STRIDE;
       if (curr[o + 3] < 0) continue;
       const kind = curr[o + 4];
-      if (kind === AgentKind.Walker) walkers++;
+      if (onFoot(kind)) walkers++;
       else perModel[kind === AgentKind.FireTruck ? TRUCK : this.models[i]]++;
     }
     MODELS.forEach((v, m) => {
@@ -190,13 +192,16 @@ export class AgentLayer {
       const distance = this.pos.distanceTo(eye);
       this.sphere.set(this.pos, 4 + distance * 0.05);
       if (!this.frustum.intersectsSphere(this.sphere)) continue;
-      if (kind === AgentKind.Walker) {
-        const d = detail(WALKER_HEIGHT, distance, pxPerMetre, WALKER_DETAIL_PX, WALKER_HIDE_PX);
+      if (onFoot(kind)) {
+        const small = kind === AgentKind.Child ? CHILD_SCALE : 1;
+        const tall = WALKER_HEIGHT * small;
+        const d = detail(tall, distance, pxPerMetre, WALKER_DETAIL_PX, WALKER_HIDE_PX);
         if (d === Detail.Full)
-          this.drawWalker(w++, i, x * Math.cos(h) + y * Math.sin(h), ratio, i === selected);
+          this.drawWalker(w++, i, x * Math.cos(h) + y * Math.sin(h), ratio, i === selected, small);
         else if (d === Detail.Simple) {
           const [height, build] = sizeOf(i);
-          this.matrix.compose(this.pos, this.quat, this.size.set(build, height, build));
+          this.size.set(build * small, height * small, build * small);
+          this.matrix.compose(this.pos, this.quat, this.size);
           const far = this.farWalkers as THREE.InstancedMesh;
           far.setMatrixAt(fw, this.matrix);
           far.setColorAt(fw++, i === selected ? SELECTED_COLOR : shirtOf(i));
@@ -232,12 +237,21 @@ export class AgentLayer {
     finish(this.figure.longHair, this.hairs[1]);
   }
 
-  /** Walker `w` of this frame, agent `agent`, posed from `walked` metres along its heading. */
-  private drawWalker(w: number, agent: number, walked: number, ratio: number, selected: boolean) {
+  /** Walker `w` of this frame, agent `agent`, posed from `walked` metres along its heading
+   * and scaled by `small` (1 = adult). A child's shorter legs take the same swing. */
+  private drawWalker(
+    w: number,
+    agent: number,
+    walked: number,
+    ratio: number,
+    selected: boolean,
+    small: number,
+  ) {
     const f = this.figure as Record<Part, THREE.InstancedMesh>;
     const shirt = selected ? SELECTED_COLOR : shirtOf(agent);
     const [height, build] = sizeOf(agent);
-    this.matrix.compose(this.pos, this.quat, this.size.set(build, height, build));
+    this.size.set(build * small, height * small, build * small);
+    this.matrix.compose(this.pos, this.quat, this.size);
     const style = hairStyle(agent);
     if (style > 0) {
       const hair = style === 1 ? f.hair : f.longHair;
@@ -261,6 +275,11 @@ export class AgentLayer {
       }
     }
   }
+}
+
+/** Whether an agent of `kind` is drawn as a walking figure. */
+function onFoot(kind: number): boolean {
+  return kind === AgentKind.Walker || kind === AgentKind.Child;
 }
 
 function finish(mesh: THREE.InstancedMesh | undefined, count: number) {

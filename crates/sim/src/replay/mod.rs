@@ -23,6 +23,7 @@
 //! 180 line 400 40 600 40
 //! 190 water 300 40 pump
 //! 190 station 300 50
+//! 195 school 320 60 primary
 //! 200 fires off
 //! end 3000
 //! expect hash 0123456789abcdef population 12 buildings 30 trips 40
@@ -44,6 +45,7 @@ use std::fmt::{self, Write};
 use crate::power::PlantKind;
 use crate::road::RoadClass;
 use crate::water::WaterKind;
+use crate::world::SchoolKind;
 use crate::{Command, Config, World, Zone};
 
 /// Bump when a log of the previous version would read differently. Adding a command word
@@ -61,6 +63,8 @@ const PLANTS: [(PlantKind, &str); 3] = [
     (PlantKind::Solar, "solar"),
     (PlantKind::Wind, "wind"),
 ];
+const SCHOOLS: [(SchoolKind, &str); 2] =
+    [(SchoolKind::Primary, "primary"), (SchoolKind::High, "high")];
 const WATER: [(WaterKind, &str); 2] = [(WaterKind::Pump, "pump"), (WaterKind::Tower, "tower")];
 const ZONES: [(Zone, &str); 7] = [
     (Zone::None, "none"),
@@ -320,6 +324,10 @@ fn command_text(cmd: &Command) -> String {
         Command::PlaceStation { x, y } => {
             nums("station", &[x, y]);
             s
+        }
+        Command::PlaceSchool { kind, x, y } => {
+            nums("school", &[x, y]);
+            s + " " + name(&SCHOOLS, kind)
         }
         Command::SetFires { on } => format!("fires {}", if on { "on" } else { "off" }),
         Command::Undo => "undo".into(),

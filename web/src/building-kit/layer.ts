@@ -153,6 +153,8 @@ export class BuildingLayer {
     const words = new Uint32Array(data.buffer, data.byteOffset, data.length);
     const records = new Map<string, { offset: number; id: number }[]>();
     for (let o = 0, i = 0; o < data.length; o += 6 + 2 * data[o + 5], i++) {
+      // Schools (zones 7 and 8, ADR 0055) have a model of their own, drawn from `schools`.
+      if (data[o] > 6) continue;
       if (now !== null && !this.known.has(ids[i]) && !this.rising.has(ids[i]))
         this.rise(ids[i], data.subarray(o, o + 6 + 2 * data[o + 5]), now);
       // Rising buildings join their tile once they top out.

@@ -1,4 +1,4 @@
-//! Every command kind, and every plant, water piece, zone, road class and fires setting a
+//! Every command kind, and every plant, water piece, school, zone, road class and fires setting a
 //! command can carry, appears in at least one saved session. A new command variant fails to
 //! compile here until it gets a name in `KINDS`, and then fails the test until a log uses it.
 
@@ -10,10 +10,11 @@ use sim::Zone;
 use sim::power::PlantKind;
 use sim::road::RoadClass;
 use sim::water::WaterKind;
+use sim::world::SchoolKind;
 
-const KINDS: [&str; 15] = [
+const KINDS: [&str; 16] = [
     "spawn", "road", "curve", "roadgrid", "class", "delete", "plant", "water", "line", "station",
-    "fires", "paint", "undo", "redo", "fill",
+    "fires", "paint", "undo", "redo", "fill", "school",
 ];
 
 /// The command's word in `KINDS`, then the option it carries, if any.
@@ -35,6 +36,7 @@ fn words(c: &Command) -> (usize, Option<String>) {
         Command::Undo => (12, None),
         Command::Redo => (13, None),
         Command::FillBlock { zone, .. } => (14, option(zone)),
+        Command::PlaceSchool { kind, .. } => (15, option(kind)),
     }
 }
 
@@ -44,6 +46,7 @@ fn every_option() -> BTreeSet<String> {
     let mut out: BTreeSet<String> = ["fires true", "fires false"].map(String::from).into();
     out.extend(all(&|v| PlantKind::from_u8(v).map(|k| format!("{k:?}"))));
     out.extend(all(&|v| WaterKind::from_u8(v).map(|k| format!("{k:?}"))));
+    out.extend(all(&|v| SchoolKind::from_u8(v).map(|k| format!("{k:?}"))));
     out.extend(all(&|v| Zone::from_u8(v).map(|k| format!("{k:?}"))));
     out.extend(all(&|v| RoadClass::from_u8(v).map(|k| format!("{k:?}"))));
     out

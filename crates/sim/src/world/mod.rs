@@ -3,6 +3,7 @@
 use serde::{Deserialize, Serialize};
 mod closure;
 mod command;
+mod config;
 mod demand;
 mod demolish;
 mod era;
@@ -18,6 +19,7 @@ mod pollution;
 mod power;
 mod residents;
 mod roads;
+mod school;
 mod snapshot;
 mod trips;
 mod walking;
@@ -44,6 +46,7 @@ use crate::water::Water;
 use crate::zone::ZoneGrid;
 
 pub use command::Command;
+pub use config::Config;
 pub use demand::Demand;
 pub use fire::{FIRE_STRIDE, FireStats, STATION_STRIDE};
 pub use grid::{GridPreview, MAX_BLOCKS, MAX_CELL, MIN_CELL};
@@ -60,6 +63,10 @@ pub use money::{
 pub use overlays::{GAP_FIRE, GAP_POWER, GAP_WATER, TRAFFIC_STRIDE};
 pub use persist::{SAVE_VERSION, SaveError};
 pub use power::{PLANT_STRIDE, POWER_BUILDING_STRIDE, PowerStats};
+pub use school::{
+    AREA_HIGH, AREA_PRIMARY, EducationStats, SCHOOL_ROAD_STRIDE, SCHOOL_STRIDE, SCHOOL_VIEW_STRIDE,
+    SchoolInfo, SchoolKind, SchoolStats, Schools,
+};
 pub use water::{WATER_BUILDING_STRIDE, WATER_PIECE_STRIDE, WaterStats};
 
 /// Floats per agent in `write_agent_snapshot`.
@@ -69,40 +76,6 @@ pub const SIGNAL_STRIDE: usize = 4;
 /// Expected delay each queued car adds to a lane, seconds. Feeds route choice so traffic
 /// spreads off backed-up avenues.
 const QUEUE_DELAY_S: f32 = 1.0;
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Config {
-    pub seed: u64,
-    /// Sim seconds per tick. The frontend's tick clock must match.
-    pub dt: f32,
-    /// Max pathfinding requests served per tick; the rest wait in a queue.
-    pub path_budget: u32,
-    pub dwell_min_s: f32,
-    pub dwell_max_s: f32,
-    /// A vehicle blocked this long at a lane end is despawned, the way gridlock is cleared in
-    /// most city builders.
-    pub stuck_limit_s: f32,
-    pub grid_spacing: f32,
-    /// Builds every due lot whatever the demand (ADR 0025) and powers and waters every
-    /// building (ADR 0041, 0052). For tests and benchmarks that need full blocks; the game
-    /// leaves it off.
-    pub ignore_demand: bool,
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            seed: 1,
-            dt: 0.1,
-            path_budget: 1000,
-            dwell_min_s: 20.0,
-            dwell_max_s: 240.0,
-            stuck_limit_s: 60.0,
-            grid_spacing: 120.0,
-            ignore_demand: false,
-        }
-    }
-}
 
 #[derive(Clone, Copy, Default, Debug, Serialize, Deserialize)]
 pub struct Stats {
@@ -131,6 +104,8 @@ pub struct Stats {
     pub fire: FireStats,
     /// Average mood and complaints (ADR 0058).
     pub happiness: HappinessStats,
+    /// Adults by schooling and children without a seat (ADR 0055).
+    pub education: EducationStats,
     /// Synthetic vehicles waiting between random trips; dormant citizen slots are excluded.
     pub parked: u32,
     pub awaiting_path: u32,
@@ -212,6 +187,8 @@ pub struct World {
     era: Era,
     /// Average mood, complaints and move-outs (ADR 0058).
     pub happiness: Happiness,
+    /// Schools, seats and enrolment (ADR 0055).
+    pub schools: Schools,
 }
 
 impl World {
@@ -220,6 +197,7 @@ impl World {
             residents: residents::Residents::new(cfg.seed),
             fire: fire::Fire::new(cfg.seed),
             happiness: Happiness::new(cfg.seed),
+            schools: Schools::default(),
             closures: Default::default(),
             supply: Default::default(),
             treasury: Default::default(),
@@ -305,6 +283,7 @@ impl World {
             self.water.version,
             self.buildings.version,
             self.fire.version,
+            self.schools.version,
         );
         let roads = self.roads.version;
         let captured = self.before_command(&cmd);
@@ -346,6 +325,7 @@ impl World {
             Command::SetRoadClass { x, y, class } => self.set_road_class(x, y, class),
             Command::DeleteRoad { x, y } => {
                 self.bulldoze_station(x, y)
+                    || self.bulldoze_school(x, y)
                     || self.bulldoze_power(x, y)
                     || self.bulldoze_water(x, y)
                     || self.demolish(x, y)
@@ -371,6 +351,7 @@ impl World {
             }
             Command::FillBlock { x, y, zone } => self.fill_block(x, y, zone),
             Command::PlaceStation { x, y } => self.place_station(x, y),
+            Command::PlaceSchool { kind, x, y } => self.place_school(kind, x, y),
             Command::SetFires { on } => self.set_fires(on),
             Command::Undo => self.undo(),
             Command::Redo => self.redo(),
@@ -382,6 +363,7 @@ impl World {
             self.water.version,
             self.buildings.version,
             self.fire.version,
+            self.schools.version,
         );
         if versions != now {
             self.buildings.reconcile(
@@ -400,6 +382,7 @@ impl World {
             self.refresh_upkeep();
         }
         self.ensure_fire();
+        self.ensure_schools();
         if changed {
             self.after_command(chain, captured);
         }
@@ -409,6 +392,7 @@ impl World {
     pub fn tick(&mut self) {
         self.sync_roads();
         self.ensure_fire();
+        self.ensure_schools();
         self.tick_closures();
         self.ensure_power();
         self.ensure_water();
@@ -461,6 +445,7 @@ impl World {
         s.fire = self.fire_stats();
         s.era = self.era;
         s.happiness = self.happiness_stats();
+        s.education = self.education_stats();
         if adults > 0 {
             s.unemployment_percent = s.unemployed as f32 * 100.0 / adults as f32;
         }
